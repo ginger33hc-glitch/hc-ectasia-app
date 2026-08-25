@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>HC Ectasia App v0.4</title>
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <meta name="theme-color" content="#173b57">
   <style>
     :root{--navy:#173b57;--ink:#17212b;--muted:#66717d;--line:#d9e0e6;--bg:#f4f6f8;--blue:#eaf3fa;--blueInk:#1f5e8c;--orange:#fff0d8;--orangeInk:#9a4d00;--red:#fde5e5;--redInk:#a31212;--gray:#eef2f5;--grayInk:#4b5965}
     *{box-sizing:border-box}body{font-family:Arial,sans-serif;background:var(--bg);margin:0;color:var(--ink);line-height:1.42}
@@ -102,119 +106,3 @@ document.querySelector("#os-fields").innerHTML = eyeTemplate("os");
 
 const f = document.querySelector("#f");
 const statusBox = document.querySelector("#status");
-const decisionBox = document.querySelector("#decision");
-const extractBox = document.querySelector("#extract");
-const eyeResults = document.querySelector("#eye-results");
-const overallNote = document.querySelector("#overall-note");
-const analyzeBtn = document.querySelector("#analyzeBtn");
-const reportCard = document.querySelector("#reportCard");
-const pdfBtn = document.querySelector("#pdfBtn");
-const wordBtn = document.querySelector("#wordBtn");
-const printBtn = document.querySelector("#printBtn");
-let lastReport = null;
-const value = (id) => document.querySelector(`#${id}`).value;
-const numberOrNull = (id) => value(id) === "" ? null : Number(value(id));
-document.querySelector("#report_date").value = new Date().toISOString().slice(0,10);
-
-function plan(prefix){return {
-  prior:value(`${prefix}_prior`), procedure:value(`${prefix}_procedure`),
-  sphere_D:numberOrNull(`${prefix}_sphere`), cylinder_magnitude_D:numberOrNull(`${prefix}_cylinder`),
-  ablation_um:numberOrNull(`${prefix}_ablation`), flap_um:numberOrNull(`${prefix}_flap`),
-  laser_platform:value(`${prefix}_platform`), optical_zone_mm:numberOrNull(`${prefix}_optical`),
-  transition_zone_mm:numberOrNull(`${prefix}_transition`), transition_zone_not_applicable:value(`${prefix}_transition_na`),
-  stable:value(`${prefix}_stable`), progression:value(`${prefix}_progression`),
-  cdva_below_20_20:value(`${prefix}_cdva`), enhancement_anticipated:value(`${prefix}_enhancement`)
-}}
-
-function statusClass(s){
-  if(s === "PASS") return "pass";
-  if(s === "DO NOT PROCEED") return "fail";
-  if(s.startsWith("CAUTION")) return "caution";
-  if(s.startsWith("REVIEW")) return "review";
-  return "insufficient";
-}
-const fmt = (x, digits=1) => x === null || x === undefined ? "—" : Number(x).toFixed(digits);
-const safe = (x) => String(x ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
-function listBlock(title, items){if(!items || !items.length)return "";return `<div class="finding-group"><h4>${safe(title)}</h4><ul>${items.map(x=>`<li>${safe(x)}</li>`).join("")}</ul></div>`}
-function renderEye(r, extracted){
-  const v=r.values||{}, s=r.score||{};
-  const rows=[
-    ["Procedure",v.procedure??"—"],["Score / category",`${s.total ?? "—"} / ${s.category ?? "—"}`],
-    ["Thinnest pachymetry",`${fmt(v.pachy_thinnest_um,0)} µm`],["MRSE",`${fmt(v.MRSE_D,2)} D`],
-    ["Maximum ablation",`${fmt(v.max_ablation_um,1)} µm`],["PRK RST / PTA",`${fmt(v.PRK_RST_um,0)} µm / ${fmt(v.PRK_PTA_percent,1)}%`],
-    ["LASIK RSB / PTA",`${fmt(v.LASIK_RSB_um,0)} µm / ${fmt(v.LASIK_PTA_percent,1)}%`],
-    ["Tomography review",r.tomography_review?.status??"—"],["Morphology category",r.topography_classification?.scoring_category??"—"]
-  ];
-  const source=(extracted.eyes||[]).find(x=>x.eye===r.eye)||{};
-  const tomoRows=[
-    ["K1",fmt(source.K1_D,2)+" D"],["K2",fmt(source.K2_D,2)+" D"],["Kmax",fmt(source.Kmax_D,2)+" D"],
-    ["BAD-D",fmt(source.BAD_D,2)],["ARTmax",fmt(source.ARTmax_um,0)+" µm"],["PPI max",fmt(source.PPI_max,2)],
-    ["ISV",fmt(source.ISV,0)],["IVA",fmt(source.IVA,3)],["I-S",fmt(source.I_S,2)+" D"],
-    ["SRAX",fmt(source.srax_deg,1)+"°"],["Posterior pattern",source.posterior_pattern??"—"],["Image quality",source.quality??"—"]
-  ];
-  return `<section class="eye-result"><div class="eye-head"><strong>${safe(r.eye)} ASSESSMENT</strong><span class="status ${statusClass(r.status)}">${safe(r.status)}</span></div><div class="eye-body">
-    <p class="eye-action"><strong>Clinical action:</strong> ${safe(r.action)}</p>
-    <p class="note"><strong>Instrument/source:</strong> ${safe(r.instrument||"Not documented")}</p>
-    <table class="clinical-table"><thead><tr><th>Parameter</th><th>Result</th></tr></thead><tbody>${rows.map(([a,b])=>`<tr><td>${safe(a)}</td><td>${safe(b)}</td></tr>`).join("")}</tbody></table>
-    ${listBlock("Reasons",r.reasons)}${listBlock("Hard stops",r.hard_stops)}${listBlock("Missing / unresolved",r.missing)}${listBlock("Surgical-load evidence flags",r.surgical_load_flags)}${listBlock("Clinical modifiers",r.clinical_modifiers)}${listBlock("Warnings",r.warnings)}
-    <div class="finding-group"><h4>Extracted tomography</h4><table class="clinical-table"><thead><tr><th>Parameter</th><th>Value</th></tr></thead><tbody>${tomoRows.map(([a,b])=>`<tr><td>${safe(a)}</td><td>${safe(b)}</td></tr>`).join("")}</tbody></table></div>
-  </div></section>`;
-}
-
-function patientPayload(){return {
-  name:value("patient_name")||null, id:value("patient_id")||null, age:numberOrNull("age"),
-  reviewer:value("reviewer")||null, report_date:value("report_date")||null
-}}
-function setReportMetadata(decision){
-  const p=patientPayload();
-  document.querySelector("#reportPatient").textContent=p.name||"Not documented";
-  document.querySelector("#reportPatientId").textContent=p.id||"Not documented";
-  document.querySelector("#reportAge").textContent=p.age??"Not documented";
-  document.querySelector("#reportDate").textContent=p.report_date||"Not documented";
-  document.querySelector("#reportReviewer").textContent=p.reviewer||"Not documented";
-  document.querySelector("#reportEyes").textContent=(decision.eyes||[]).map(x=>x.eye).join(", ")||"None";
-  document.querySelector("#generatedAt").textContent=`Generated ${new Date().toLocaleString()}`;
-}
-async function downloadReport(kind){
-  if(!lastReport)return;
-  const button=kind==="pdf"?pdfBtn:wordBtn, original=button.textContent;
-  button.disabled=true;button.textContent="Preparing...";
-  try{
-    const response=await fetch(`/report/${kind}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(lastReport)});
-    if(!response.ok)throw new Error(`Report export failed (${response.status})`);
-    const blob=await response.blob(), url=URL.createObjectURL(blob), a=document.createElement("a");
-    const id=(lastReport.patient.id||lastReport.patient.name||"Report").replace(/[^a-z0-9_-]+/gi,"_");
-    a.href=url;a.download=`HC_Ectasia_${id}.${kind==="pdf"?"pdf":"docx"}`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
-  }catch(err){alert(String(err))}finally{button.disabled=false;button.textContent=original}
-}
-pdfBtn.addEventListener("click",()=>downloadReport("pdf"));
-wordBtn.addEventListener("click",()=>downloadReport("word"));
-printBtn.addEventListener("click",()=>window.print());
-
-f.addEventListener("submit", async (e) => {
-  e.preventDefault(); const originalText=analyzeBtn.textContent;
-  analyzeBtn.disabled=true; analyzeBtn.textContent="Analyzing images... Please wait";
-  statusBox.className="status insufficient"; statusBox.textContent="ANALYZING...";
-  reportCard.hidden=true;lastReport=null;eyeResults.innerHTML=""; decisionBox.textContent=""; extractBox.textContent=""; overallNote.textContent="";
-  try{
-    const fd=new FormData(f);
-    fd.set("eye_plans",JSON.stringify({OD:plan("od"),OS:plan("os")}));
-    fd.set("patient_modifiers",JSON.stringify({
-      eye_rubbing:value("eye_rubbing"), family_history:value("family_history"),
-      inter_eye_asymmetry:value("inter_eye_asymmetry")
-    }));
-    const r=await fetch("/analyze",{method:"POST",body:fd}); const text=await r.text();
-    let j; try{j=JSON.parse(text)}catch{throw new Error("Server returned a non-JSON response: "+text.slice(0,200))}
-    if(!r.ok)throw new Error(j.detail||"Request failed");
-    statusBox.textContent=j.decision.status; statusBox.className=`status ${statusClass(j.decision.status)}`;
-    overallNote.textContent=j.decision.action||"";
-    eyeResults.innerHTML=(j.decision.eyes||[]).map(x=>renderEye(x,j.extracted)).join("");
-    decisionBox.textContent=JSON.stringify(j.decision,null,2); extractBox.textContent=JSON.stringify(j.extracted,null,2);
-    lastReport={patient:patientPayload(),decision:j.decision,extracted:j.extracted};setReportMetadata(j.decision);reportCard.hidden=false;
-    reportCard.scrollIntoView({behavior:"smooth",block:"start"});
-  }catch(err){statusBox.textContent="ERROR";statusBox.className="status fail";decisionBox.textContent=String(err)}
-  finally{analyzeBtn.disabled=false;analyzeBtn.textContent=originalText}
-});
-</script>
-</body>
-</html>
