@@ -147,14 +147,24 @@ class TestBoundaries(unittest.TestCase):
         self.assertEqual(result["score"]["rows"]["topography"], 3)
         self.assertEqual(result["status"], "CAUTION — STOP/DEFER")
 
-    def test_ablation_estimate_is_limited_to_ex500_at_6_mm(self):
-        eligible = plan(ablation=None)
-        ineligible = dict(eligible, laser_platform="Other platform")
-        eligible_result = app.assess_eye(normal_eye(), eligible, 35, MODIFIERS)
-        ineligible_result = app.assess_eye(normal_eye(), ineligible, 35, MODIFIERS)
-        self.assertEqual(eligible_result["values"]["max_ablation_um"], 36.0)
-        self.assertIsNone(ineligible_result["values"]["max_ablation_um"])
-        self.assertEqual(ineligible_result["status"], "DATA INSUFFICIENT")
+    def test_ablation_estimate_uses_zone_specific_ex500_conventions(self):
+        zone_6 = plan(ablation=None)
+        zone_65 = dict(zone_6, optical_zone_mm=6.5)
+        other_platform = dict(zone_65, laser_platform="Other platform")
+        unsupported_zone = dict(zone_6, optical_zone_mm=6.25)
+
+        zone_6_result = app.assess_eye(normal_eye(), zone_6, 35, MODIFIERS)
+        zone_65_result = app.assess_eye(normal_eye(), zone_65, 35, MODIFIERS)
+        other_platform_result = app.assess_eye(normal_eye(), other_platform, 35, MODIFIERS)
+        unsupported_zone_result = app.assess_eye(normal_eye(), unsupported_zone, 35, MODIFIERS)
+
+        self.assertEqual(zone_6_result["values"]["max_ablation_um"], 36.0)
+        self.assertEqual(zone_65_result["values"]["max_ablation_um"], 45.0)
+        self.assertIn("15 µm/D", zone_65_result["warnings"][0])
+        self.assertIsNone(other_platform_result["values"]["max_ablation_um"])
+        self.assertIsNone(unsupported_zone_result["values"]["max_ablation_um"])
+        self.assertEqual(other_platform_result["status"], "DATA INSUFFICIENT")
+        self.assertEqual(unsupported_zone_result["status"], "DATA INSUFFICIENT")
 
 
 class TestScoringAndCompleteness(unittest.TestCase):
