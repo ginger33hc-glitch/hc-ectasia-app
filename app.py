@@ -256,8 +256,33 @@ async def analyze(
             }},
         )
 
-        extraction_results.append(json.loads(response.output_text))
+                output_text = response.output_text
 
+        print(
+            "OPENAI DEBUG:",
+            "status=", getattr(response, "status", None),
+            "incomplete_details=", getattr(response, "incomplete_details", None),
+            "output_length=", len(output_text or ""),
+            "output_preview=", repr((output_text or "")[:300]),
+            flush=True,
+        )
+
+        if not output_text or not output_text.strip():
+            raise RuntimeError(
+                "OpenAI returned empty output_text. "
+                f"status={getattr(response, 'status', None)}, "
+                f"incomplete_details={getattr(response, 'incomplete_details', None)}"
+            )
+
+        try:
+            parsed = json.loads(output_text)
+        except json.JSONDecodeError as e:
+            raise RuntimeError(
+                f"OpenAI output was not valid JSON: {e}; "
+                f"preview={output_text[:300]!r}"
+            ) from e
+
+        extraction_results.append(parsed)
     if not extraction_results:
         raise HTTPException(400, "No readable images supplied.")
 
