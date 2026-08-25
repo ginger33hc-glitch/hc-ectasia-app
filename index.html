@@ -1,0 +1,29 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HC Ectasia App v0.3</title><style>
+body{font-family:Arial,sans-serif;background:#f4f6f8;margin:0;color:#17212b}header{background:#173b57;color:#fff;padding:20px}
+main{max-width:850px;margin:20px auto;padding:0 14px}.card{background:white;border:1px solid #d9e0e6;border-radius:11px;padding:16px;margin:12px 0}
+.row{display:grid;grid-template-columns:1.2fr 1fr;gap:9px;margin:9px 0;align-items:center}input,select{padding:9px;width:100%;box-sizing:border-box}
+button{background:#173b57;color:white;border:0;border-radius:8px;padding:12px 16px;font-weight:bold}.status{font-size:22px;font-weight:bold;padding:14px;border-radius:8px;background:#eef2f5}
+pre{white-space:pre-wrap;overflow:auto;background:#f7f9fb;padding:12px;border-radius:7px}.note{font-size:12px;color:#66717d}
+@media(max-width:600px){.row{grid-template-columns:1fr}}
+</style></head><body><header><h1>HC Ectasia App v0.3</h1><div>Photo → automatic extraction → HC engine</div></header><main>
+<div class="card"><h2>New case</h2>
+<form id="f">
+<div class="row"><label>Pentacam photos</label><input name="images" type="file" accept="image/*" multiple required></div>
+<div class="row"><label>Prior corneal refractive surgery?</label><select name="prior"><option value="no">No</option><option value="yes">Yes</option><option value="unknown">Unknown</option></select></div>
+<div class="row"><label>Age</label><input name="age" type="number"></div>
+<div class="row"><label>Procedure</label><select name="procedure"><option>PRK</option><option>LASIK</option></select></div>
+<div class="row"><label>Intended sphere (D)</label><input name="sphere" type="number" step=".25"></div>
+<div class="row"><label>Cylinder magnitude (D)</label><input name="cylinder" type="number" step=".25" min="0"></div>
+<div class="row"><label>Actual max ablation (µm; optional)</label><input name="ablation" type="number"></div>
+<div class="row"><label>LASIK flap (µm)</label><input name="flap" type="number" value="100"></div>
+<div class="row"><label>Refraction stable?</label><select name="stable"><option value="yes">Yes</option><option value="no">No</option></select></div>
+<button>Analyze photos & run HC engine</button>
+</form><p class="note">Topography/tomography fields are not manually requested. Missing/unreadable image data are returned as warnings/null values.</p></div>
+<div class="card"><h2>Result</h2><div id="status" class="status">NOT ASSESSED</div><h3>Decision</h3><pre id="decision">—</pre><h3>Automatically extracted Pentacam data</h3><pre id="extract">—</pre></div>
+</main><script>
+f.onsubmit=async(e)=>{e.preventDefault();status.textContent="ANALYZING…";decision.textContent="";extract.textContent="";
+let fd=new FormData(f);try{let r=await fetch("/analyze",{method:"POST",body:fd});let j=await r.json();if(!r.ok)throw new Error(j.detail||"Request failed");
+status.textContent=j.decision.status;decision.textContent=JSON.stringify(j.decision,null,2);extract.textContent=JSON.stringify(j.extracted,null,2)}
+catch(err){status.textContent="ERROR";decision.textContent=String(err)}}
+</script></body></html>
