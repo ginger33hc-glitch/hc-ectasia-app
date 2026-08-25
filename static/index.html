@@ -1,76 +1,146 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HC Ectasia App v0.3</title><style>
-body{font-family:Arial,sans-serif;background:#f4f6f8;margin:0;color:#17212b}header{background:#173b57;color:#fff;padding:20px}
-main{max-width:850px;margin:20px auto;padding:0 14px}.card{background:white;border:1px solid #d9e0e6;border-radius:11px;padding:16px;margin:12px 0}
-.row{display:grid;grid-template-columns:1.2fr 1fr;gap:9px;margin:9px 0;align-items:center}input,select{padding:9px;width:100%;box-sizing:border-box}
-button{background:#173b57;color:white;border:0;border-radius:8px;padding:12px 16px;font-weight:bold}.status{font-size:22px;font-weight:bold;padding:14px;border-radius:8px;background:#eef2f5}
-pre{white-space:pre-wrap;overflow:auto;background:#f7f9fb;padding:12px;border-radius:7px}.note{font-size:12px;color:#66717d}
-@media(max-width:600px){.row{grid-template-columns:1fr}}
-</style></head><body><header><h1>HC Ectasia App v0.3</h1><div>Photo → automatic extraction → HC engine</div></header><main>
-<div class="card"><h2>New case</h2>
-<form id="f">
-<div class="row"><label>Pentacam photos</label><input name="images" type="file" accept="image/*" multiple required></div>
-<div class="row"><label>Prior corneal refractive surgery?</label><select name="prior"><option value="no">No</option><option value="yes">Yes</option><option value="unknown">Unknown</option></select></div>
-<div class="row"><label>Age</label><input name="age" type="number"></div>
-<div class="row"><label>Procedure</label><select name="procedure"><option>PRK</option><option>LASIK</option></select></div>
-<div class="row"><label>Intended sphere (D)</label><input name="sphere" type="number" step=".25"></div>
-<div class="row"><label>Cylinder magnitude (D)</label><input name="cylinder" type="number" step=".25" min="0"></div>
-<div class="row"><label>Actual max ablation (µm; optional)</label><input name="ablation" type="number"></div>
-<div class="row"><label>LASIK flap (µm)</label><input name="flap" type="number" value="100"></div>
-<div class="row"><label>Refraction stable?</label><select name="stable"><option value="yes">Yes</option><option value="no">No</option></select></div>
-<button id="analyzeBtn" type="submit">Analyze photos & run HC engine</button>
-</form><p class="note">Topography/tomography fields are not manually requested. Missing/unreadable image data are returned as warnings/null values.</p></div>
-<div class="card"><h2>Result</h2><div id="status" class="status">NOT ASSESSED</div><h3>Decision</h3><pre id="decision">—</pre><h3>Automatically extracted Pentacam data</h3><pre id="extract">—</pre></div>
-</main><script>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>HC Ectasia App v0.4</title>
+  <style>
+    :root{--navy:#173b57;--ink:#17212b;--muted:#66717d;--line:#d9e0e6;--bg:#f4f6f8;--green:#e5f5e9;--greenInk:#126b31;--orange:#fff0d8;--orangeInk:#9a4d00;--red:#fde5e5;--redInk:#a31212;--gray:#eef2f5;--grayInk:#4b5965}
+    *{box-sizing:border-box}body{font-family:Arial,sans-serif;background:var(--bg);margin:0;color:var(--ink);line-height:1.42}
+    header{background:var(--navy);color:#fff;padding:22px}header h1{margin:0 0 4px}header p{margin:0;opacity:.88}
+    main{max-width:1100px;margin:20px auto;padding:0 14px 40px}.card{background:white;border:1px solid var(--line);border-radius:11px;padding:18px;margin:14px 0;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.row{display:grid;grid-template-columns:1.25fr 1fr;gap:10px;margin:10px 0;align-items:center}
+    input,select{padding:9px;width:100%;border:1px solid #bcc8d1;border-radius:5px;background:white}fieldset{border:1px solid var(--line);border-radius:8px;padding:14px}legend{font-weight:bold;padding:0 6px}
+    button{background:var(--navy);color:white;border:0;border-radius:8px;padding:13px 18px;font-weight:bold;font-size:15px;cursor:pointer}button:disabled{opacity:.6;cursor:wait}
+    .status{font-size:21px;font-weight:bold;padding:14px;border-radius:8px;background:var(--gray);color:var(--grayInk);border-left:7px solid #8a98a4}.status.pass{background:var(--green);color:var(--greenInk);border-color:#2d8d4d}.status.caution,.status.review{background:var(--orange);color:var(--orangeInk);border-color:#d9790d}.status.fail{background:var(--red);color:var(--redInk);border-color:#c52b2b}.status.insufficient{background:var(--gray);color:var(--grayInk);border-color:#8a98a4}
+    .eye-result{border:1px solid var(--line);border-radius:9px;margin:14px 0;overflow:hidden}.eye-head{padding:12px 14px;background:#f7f9fb;display:flex;justify-content:space-between;gap:10px;align-items:center}.eye-body{padding:14px}.eye-body h4{margin:16px 0 5px}.eye-body ul{margin-top:5px}.kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.kv div{background:#f7f9fb;padding:9px;border-radius:6px}.kv strong{display:block;font-size:12px;color:var(--muted);margin-bottom:2px}
+    .note{font-size:12px;color:var(--muted)}.alert{background:#fff7e8;border-left:5px solid #dc8b1a;padding:11px 13px;border-radius:5px}.required{color:#a31212}details{margin-top:12px}pre{white-space:pre-wrap;overflow:auto;background:#f7f9fb;padding:12px;border-radius:7px;font-size:12px}
+    @media(max-width:760px){.grid,.kv{grid-template-columns:1fr}.row{grid-template-columns:1fr}.eye-head{align-items:flex-start;flex-direction:column}}
+  </style>
+</head>
+<body>
+<header><h1>HC Ectasia App v0.4</h1><p>Image extraction → eye-specific HC assessment → evidence-labeled clinical report</p></header>
+<main>
+  <div class="card">
+    <h2>Case inputs</h2>
+    <p class="alert"><strong>No silent assumptions.</strong> Unknown or unreadable decision-critical data prohibit PASS. OD and OS are assessed independently and are never averaged.</p>
+    <form id="f">
+      <div class="row"><label>Pentacam/topography images <span class="required">*</span></label><input name="images" type="file" accept="image/*" multiple required></div>
+      <div class="row"><label>Patient age (years) <span class="required">*</span></label><input name="age" type="number" min="0" step="1" required></div>
+      <h3>Patient-level clinical modifiers</h3>
+      <div class="grid">
+        <div class="row"><label>Chronic eye rubbing / repetitive ocular trauma?</label><select id="eye_rubbing"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+        <div class="row"><label>Family history of keratoconus?</label><select id="family_history"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+        <div class="row"><label>Marked inter-eye asymmetry?</label><select id="inter_eye_asymmetry"><option value="unknown">Unknown / one eye only</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+      </div>
+      <h3>Eye-specific plans</h3>
+      <div class="grid">
+        <fieldset><legend>OD</legend><div id="od-fields"></div></fieldset>
+        <fieldset><legend>OS</legend><div id="os-fields"></div></fieldset>
+      </div>
+      <p class="note">Cylinder is entered as a non-negative magnitude in minus-cylinder convention. MRSE = sphere − cylinder magnitude/2. If actual maximum ablation is blank, the HC 12 µm/D estimate is used and explicitly labeled.</p>
+      <button id="analyzeBtn" type="submit">Analyze images and run HC assessment</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Clinical result</h2>
+    <div id="status" class="status insufficient">NOT ASSESSED</div>
+    <p id="overall-note" class="note"></p>
+    <div id="eye-results"></div>
+    <details><summary>Automatically extracted source data</summary><pre id="extract">—</pre></details>
+    <details><summary>Complete machine-readable decision record</summary><pre id="decision">—</pre></details>
+  </div>
+</main>
+
+<script>
+const eyeTemplate = (eye) => `
+  <div class="row"><label>Prior corneal refractive surgery?</label><select id="${eye}_prior"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+  <div class="row"><label>Procedure</label><select id="${eye}_procedure"><option value="">Select</option><option value="PRK">PRK</option><option value="LASIK">LASIK</option></select></div>
+  <div class="row"><label>Intended sphere (D)</label><input id="${eye}_sphere" type="number" step=".25"></div>
+  <div class="row"><label>Cylinder magnitude (D)</label><input id="${eye}_cylinder" type="number" step=".25" min="0"></div>
+  <div class="row"><label>Actual maximum ablation (µm)</label><input id="${eye}_ablation" type="number" step=".1" min="0"></div>
+  <div class="row"><label>Laser platform</label><input id="${eye}_platform" type="text" placeholder="e.g., Alcon EX500"></div>
+  <div class="row"><label>Planned LASIK flap (µm)</label><input id="${eye}_flap" type="number" step="1" min="0"></div>
+  <div class="row"><label>Optical zone (mm)</label><input id="${eye}_optical" type="number" step=".1" min="0"></div>
+  <div class="row"><label>Transition zone (mm)</label><input id="${eye}_transition" type="number" step=".1" min="0"></div>
+  <div class="row"><label>Transition zone not applicable?</label><select id="${eye}_transition_na"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+  <div class="row"><label>Refraction stable?</label><select id="${eye}_stable"><option value="unknown">Unknown</option><option value="yes">Yes</option><option value="no">No</option></select></div>
+  <div class="row"><label>Documented progression?</label><select id="${eye}_progression"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+  <div class="row"><label>Unexplained CDVA &lt;20/20?</label><select id="${eye}_cdva"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+  <div class="row"><label>Enhancement anticipated?</label><select id="${eye}_enhancement"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>`;
+document.querySelector("#od-fields").innerHTML = eyeTemplate("od");
+document.querySelector("#os-fields").innerHTML = eyeTemplate("os");
+
 const f = document.querySelector("#f");
-const status = document.querySelector("#status");
-const decision = document.querySelector("#decision");
-const extract = document.querySelector("#extract");
+const statusBox = document.querySelector("#status");
+const decisionBox = document.querySelector("#decision");
+const extractBox = document.querySelector("#extract");
+const eyeResults = document.querySelector("#eye-results");
+const overallNote = document.querySelector("#overall-note");
 const analyzeBtn = document.querySelector("#analyzeBtn");
+const value = (id) => document.querySelector(`#${id}`).value;
+const numberOrNull = (id) => value(id) === "" ? null : Number(value(id));
+
+function plan(prefix){return {
+  prior:value(`${prefix}_prior`), procedure:value(`${prefix}_procedure`),
+  sphere_D:numberOrNull(`${prefix}_sphere`), cylinder_magnitude_D:numberOrNull(`${prefix}_cylinder`),
+  ablation_um:numberOrNull(`${prefix}_ablation`), flap_um:numberOrNull(`${prefix}_flap`),
+  laser_platform:value(`${prefix}_platform`), optical_zone_mm:numberOrNull(`${prefix}_optical`),
+  transition_zone_mm:numberOrNull(`${prefix}_transition`), transition_zone_not_applicable:value(`${prefix}_transition_na`),
+  stable:value(`${prefix}_stable`), progression:value(`${prefix}_progression`),
+  cdva_below_20_20:value(`${prefix}_cdva`), enhancement_anticipated:value(`${prefix}_enhancement`)
+}}
+
+function statusClass(s){
+  if(s === "PASS") return "pass";
+  if(s === "DO NOT PROCEED") return "fail";
+  if(s.startsWith("CAUTION")) return "caution";
+  if(s.startsWith("REVIEW")) return "review";
+  return "insufficient";
+}
+const fmt = (x, digits=1) => x === null || x === undefined ? "—" : Number(x).toFixed(digits);
+function listBlock(title, items){if(!items || !items.length)return "";return `<h4>${title}</h4><ul>${items.map(x=>`<li>${x}</li>`).join("")}</ul>`}
+function renderEye(r){
+  const v=r.values||{}, s=r.score||{};
+  return `<section class="eye-result"><div class="eye-head"><strong>${r.eye}</strong><span class="status ${statusClass(r.status)}">${r.status}</span></div><div class="eye-body">
+    <p><strong>Action:</strong> ${r.action}</p>
+    <p class="note"><strong>Instrument:</strong> ${r.instrument||"—"}</p>
+    <div class="kv">
+      <div><strong>Score / category</strong>${s.total ?? "—"} / ${s.category ?? "—"}</div>
+      <div><strong>Thinnest pachymetry</strong>${fmt(v.pachy_thinnest_um,0)} µm</div>
+      <div><strong>MRSE</strong>${fmt(v.MRSE_D,2)} D</div>
+      <div><strong>PRK RST / PTA</strong>${fmt(v.PRK_RST_um,0)} µm / ${fmt(v.PRK_PTA_percent,1)}%</div>
+      <div><strong>LASIK RSB / PTA</strong>${fmt(v.LASIK_RSB_um,0)} µm / ${fmt(v.LASIK_PTA_percent,1)}%</div>
+      <div><strong>Tomography review</strong>${r.tomography_review?.status ?? "—"}</div>
+      <div><strong>ERSS/PRK morphology category</strong>${r.topography_classification?.scoring_category ?? "—"}</div>
+    </div>
+    ${listBlock("Reasons",r.reasons)}${listBlock("Hard stops",r.hard_stops)}${listBlock("Missing / unresolved",r.missing)}${listBlock("Surgical-load evidence flags",r.surgical_load_flags)}${listBlock("Clinical modifiers",r.clinical_modifiers)}${listBlock("Warnings",r.warnings)}
+  </div></section>`;
+}
 
 f.addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    const originalText = analyzeBtn.textContent;
-
-    analyzeBtn.disabled = true;
-    analyzeBtn.textContent = "⏳ Analyzing images... Please wait";
-    status.textContent = "ANALYZING...";
-    decision.textContent = "";
-    extract.textContent = "";
-
-    try {
-        const fd = new FormData(f);
-
-        const r = await fetch("/analyze", {
-            method: "POST",
-            body: fd
-        });
-
-        const text = await r.text();
-
-        let j;
-        try {
-            j = JSON.parse(text);
-        } catch {
-            throw new Error("Server returned a non-JSON response: " + text.slice(0, 200));
-        }
-
-        if (!r.ok) {
-            throw new Error(j.detail || "Request failed");
-        }
-
-        status.textContent = j.decision.status;
-        decision.textContent = JSON.stringify(j.decision, null, 2);
-        extract.textContent = JSON.stringify(j.extracted, null, 2);
-
-    } catch (err) {
-        status.textContent = "ERROR";
-        decision.textContent = String(err);
-    } finally {
-        analyzeBtn.disabled = false;
-        analyzeBtn.textContent = originalText;
-    }
+  e.preventDefault(); const originalText=analyzeBtn.textContent;
+  analyzeBtn.disabled=true; analyzeBtn.textContent="Analyzing images... Please wait";
+  statusBox.className="status insufficient"; statusBox.textContent="ANALYZING...";
+  eyeResults.innerHTML=""; decisionBox.textContent=""; extractBox.textContent=""; overallNote.textContent="";
+  try{
+    const fd=new FormData(f);
+    fd.set("eye_plans",JSON.stringify({OD:plan("od"),OS:plan("os")}));
+    fd.set("patient_modifiers",JSON.stringify({
+      eye_rubbing:value("eye_rubbing"), family_history:value("family_history"),
+      inter_eye_asymmetry:value("inter_eye_asymmetry")
+    }));
+    const r=await fetch("/analyze",{method:"POST",body:fd}); const text=await r.text();
+    let j; try{j=JSON.parse(text)}catch{throw new Error("Server returned a non-JSON response: "+text.slice(0,200))}
+    if(!r.ok)throw new Error(j.detail||"Request failed");
+    statusBox.textContent=j.decision.status; statusBox.className=`status ${statusClass(j.decision.status)}`;
+    overallNote.textContent=j.decision.action||"";
+    eyeResults.innerHTML=(j.decision.eyes||[]).map(renderEye).join("");
+    decisionBox.textContent=JSON.stringify(j.decision,null,2); extractBox.textContent=JSON.stringify(j.extracted,null,2);
+  }catch(err){statusBox.textContent="ERROR";statusBox.className="status fail";decisionBox.textContent=String(err)}
+  finally{analyzeBtn.disabled=false;analyzeBtn.textContent=originalText}
 });
-
-</script></body></html>
+</script>
+</body>
+</html>
