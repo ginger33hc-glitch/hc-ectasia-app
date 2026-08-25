@@ -256,7 +256,7 @@ async def analyze(
             }},
         )
 
-                output_text = response.output_text
+        output_text = response.output_text
 
         print(
             "OPENAI DEBUG:",
