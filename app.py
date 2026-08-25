@@ -227,7 +227,7 @@ async def analyze(
 ):
     if not images:
         raise HTTPException(400, "No images supplied.")
-        extraction_results = []
+    extraction_results = []
 
     for img in images:
         raw = await img.read()
