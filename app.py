@@ -2,12 +2,15 @@ import base64
 import json
 import mimetypes
 import os
+from io import BytesIO
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
+
+from reports import build_docx, build_pdf
 
 
 app = FastAPI(title="HC Ectasia App v0.4")
@@ -572,6 +575,7 @@ def assess_eye(
             "note": "Numeric ERSS category support does not, by itself, constitute a keratoconus diagnosis.",
         },
         "values": {
+            "procedure": procedure,
             "age_years": age,
             "sphere_D": sphere,
             "cylinder_magnitude_D": cylinder,
@@ -716,6 +720,25 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse("static/index.html")
+
+
+@app.post("/report/pdf")
+def report_pdf(payload: Dict[str, Any] = Body(...)) -> StreamingResponse:
+    content = build_pdf(payload)
+    return StreamingResponse(
+        BytesIO(content), media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="HC_Ectasia_Report.pdf"'},
+    )
+
+
+@app.post("/report/word")
+def report_word(payload: Dict[str, Any] = Body(...)) -> StreamingResponse:
+    content = build_docx(payload)
+    return StreamingResponse(
+        BytesIO(content),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": 'attachment; filename="HC_Ectasia_Report.docx"'},
+    )
 
 
 @app.post("/analyze")

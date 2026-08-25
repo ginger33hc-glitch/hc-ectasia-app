@@ -1,10 +1,13 @@
 import json
 import unittest
+from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import app
+from docx import Document
 from fastapi.testclient import TestClient
+from pypdf import PdfReader
 
 
 def normal_eye(eye="OD", pachy=560, morphology="NORMAL_SYMMETRIC"):
@@ -228,6 +231,30 @@ class TestApiIntegration(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["decision"]["status"], "PASS")
         self.assertEqual(payload["decision"]["eyes"][0]["eye"], "OD")
+
+    def test_professional_pdf_and_word_exports_are_valid(self):
+        extracted = {"eyes": [normal_eye()], "global_warnings": []}
+        decision = app.hc_engine(extracted, 35, {"OD": plan()}, MODIFIERS)
+        payload = {
+            "patient": {
+                "name": "Test Patient", "id": "HC-001", "age": 35,
+                "reviewer": "Test Reviewer", "report_date": "2026-08-25",
+            },
+            "decision": decision,
+            "extracted": extracted,
+        }
+        client = TestClient(app.app)
+        pdf = client.post("/report/pdf", json=payload)
+        word = client.post("/report/word", json=payload)
+        self.assertEqual(pdf.status_code, 200)
+        self.assertEqual(pdf.headers["content-type"], "application/pdf")
+        self.assertGreaterEqual(len(PdfReader(BytesIO(pdf.content)).pages), 1)
+        self.assertEqual(word.status_code, 200)
+        self.assertIn("wordprocessingml.document", word.headers["content-type"])
+        document = Document(BytesIO(word.content))
+        text = "\n".join(paragraph.text for paragraph in document.paragraphs)
+        self.assertIn("HC PREOPERATIVE ECTASIA RISK ASSESSMENT", text)
+        self.assertIn("PASS", text)
 
 
 if __name__ == "__main__":

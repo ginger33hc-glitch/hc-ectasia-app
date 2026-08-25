@@ -15,7 +15,9 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - BAD-D/component display interpretation plus adjunctive ARTmax/TP/Dt/Da evidence flags.
 - Required clinical modifiers and treatment-plan inputs; missing/unreadable critical data prohibit PASS.
 - Binding CAUTION action: STOP/DEFER, repeat relevant screening, and reassess after at least 6 months.
-- Human-readable color-coded report plus a complete machine-readable record.
+- Formal clinical report with patient/reviewer metadata, restrained decision colors (PASS blue,
+  CAUTION amber, FAIL red, NOT ASSESSED gray), print layout, and validated PDF and DOCX exports.
+- Complete machine-readable extraction and decision records remain available for audit.
 
 See [PROTOCOL_COMPLIANCE.md](PROTOCOL_COMPLIANCE.md) for the source-to-code audit and evidence limitations.
 
@@ -34,4 +36,4 @@ Railway start command: `python start.py`.
 python -m unittest discover -s tests -v
 ```
 
-The tests cover the exact 480/310/300 µm boundaries, ERSS/PRK-EWSS categories, missing-data prohibition, per-eye isolation, BAD display boundaries, and extraction merging.
+The tests cover the exact 480/310/300 µm boundaries, ERSS/PRK-EWSS categories, missing-data prohibition, per-eye isolation, BAD display boundaries, extraction merging, and valid PDF/DOCX report generation.

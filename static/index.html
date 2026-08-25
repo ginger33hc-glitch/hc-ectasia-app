@@ -5,17 +5,21 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>HC Ectasia App v0.4</title>
   <style>
-    :root{--navy:#173b57;--ink:#17212b;--muted:#66717d;--line:#d9e0e6;--bg:#f4f6f8;--green:#e5f5e9;--greenInk:#126b31;--orange:#fff0d8;--orangeInk:#9a4d00;--red:#fde5e5;--redInk:#a31212;--gray:#eef2f5;--grayInk:#4b5965}
+    :root{--navy:#173b57;--ink:#17212b;--muted:#66717d;--line:#d9e0e6;--bg:#f4f6f8;--blue:#eaf3fa;--blueInk:#1f5e8c;--orange:#fff0d8;--orangeInk:#9a4d00;--red:#fde5e5;--redInk:#a31212;--gray:#eef2f5;--grayInk:#4b5965}
     *{box-sizing:border-box}body{font-family:Arial,sans-serif;background:var(--bg);margin:0;color:var(--ink);line-height:1.42}
     header{background:var(--navy);color:#fff;padding:22px}header h1{margin:0 0 4px}header p{margin:0;opacity:.88}
     main{max-width:1100px;margin:20px auto;padding:0 14px 40px}.card{background:white;border:1px solid var(--line);border-radius:11px;padding:18px;margin:14px 0;box-shadow:0 1px 2px rgba(0,0,0,.03)}
     .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.row{display:grid;grid-template-columns:1.25fr 1fr;gap:10px;margin:10px 0;align-items:center}
     input,select{padding:9px;width:100%;border:1px solid #bcc8d1;border-radius:5px;background:white}fieldset{border:1px solid var(--line);border-radius:8px;padding:14px}legend{font-weight:bold;padding:0 6px}
     button{background:var(--navy);color:white;border:0;border-radius:8px;padding:13px 18px;font-weight:bold;font-size:15px;cursor:pointer}button:disabled{opacity:.6;cursor:wait}
-    .status{font-size:21px;font-weight:bold;padding:14px;border-radius:8px;background:var(--gray);color:var(--grayInk);border-left:7px solid #8a98a4}.status.pass{background:var(--green);color:var(--greenInk);border-color:#2d8d4d}.status.caution,.status.review{background:var(--orange);color:var(--orangeInk);border-color:#d9790d}.status.fail{background:var(--red);color:var(--redInk);border-color:#c52b2b}.status.insufficient{background:var(--gray);color:var(--grayInk);border-color:#8a98a4}
-    .eye-result{border:1px solid var(--line);border-radius:9px;margin:14px 0;overflow:hidden}.eye-head{padding:12px 14px;background:#f7f9fb;display:flex;justify-content:space-between;gap:10px;align-items:center}.eye-body{padding:14px}.eye-body h4{margin:16px 0 5px}.eye-body ul{margin-top:5px}.kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.kv div{background:#f7f9fb;padding:9px;border-radius:6px}.kv strong{display:block;font-size:12px;color:var(--muted);margin-bottom:2px}
+    .status{font-size:21px;font-weight:bold;padding:14px;border-radius:6px;background:var(--gray);color:var(--grayInk);border-left:7px solid #8a98a4}.status.pass{background:var(--blue);color:var(--blueInk);border-color:var(--blueInk)}.status.caution,.status.review{background:var(--orange);color:var(--orangeInk);border-color:#d9790d}.status.fail{background:var(--red);color:var(--redInk);border-color:#c52b2b}.status.insufficient{background:var(--gray);color:var(--grayInk);border-color:#8a98a4}
+    .report-card{padding:0;background:transparent;border:0;box-shadow:none}.report-toolbar{display:flex;justify-content:flex-end;gap:9px;margin:0 0 12px}.secondary{background:white;color:var(--navy);border:1px solid var(--navy)}
+    .report-sheet{background:#fff;max-width:850px;margin:0 auto;padding:38px 44px;border:1px solid #cfd8df;box-shadow:0 8px 28px rgba(23,59,87,.10);font-family:Arial,sans-serif}.report-masthead{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid var(--navy);padding-bottom:13px;margin-bottom:17px}.report-masthead h2{font-size:20px;letter-spacing:.35px;color:var(--navy);margin:0 0 5px}.report-kicker{font-size:11px;font-weight:bold;letter-spacing:1.1px;color:var(--blueInk);text-transform:uppercase}.report-version{text-align:right;color:var(--muted);font-size:11px;white-space:nowrap}
+    .meta-table,.clinical-table{width:100%;border-collapse:collapse}.meta-table{margin-bottom:17px}.meta-table th,.meta-table td{border:1px solid var(--line);padding:7px 9px;font-size:12px;text-align:left}.meta-table th{width:15%;background:#f1f4f6;color:#42515d}.meta-table td{width:35%}.report-section-title{font-size:13px;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--line);padding-bottom:5px;margin:20px 0 8px}
+    .eye-result{border:1px solid var(--line);margin:18px 0;page-break-inside:avoid}.eye-head{padding:10px 12px;background:#f1f4f6;display:flex;justify-content:space-between;gap:10px;align-items:center;border-bottom:1px solid var(--line)}.eye-head strong{color:var(--navy);font-size:15px}.eye-head .status{font-size:13px;padding:6px 9px;border-left-width:4px}.eye-body{padding:13px}.eye-action{margin:0 0 11px;padding:9px 11px;background:#f7f9fb;border-left:4px solid var(--navy);font-size:12px}.clinical-table{margin:9px 0 12px}.clinical-table th,.clinical-table td{border:1px solid var(--line);padding:6px 8px;font-size:11px;text-align:left;vertical-align:middle}.clinical-table th{background:var(--navy);color:white}.clinical-table td:first-child{font-weight:bold;width:38%;background:#f7f9fb}.finding-group{page-break-inside:avoid}.finding-group h4{color:var(--navy);font-size:12px;margin:12px 0 4px}.finding-group ul{margin:4px 0 8px;padding-left:21px}.finding-group li{font-size:11px;margin:3px 0}.report-footer-note{margin-top:19px;padding-top:10px;border-top:1px solid var(--line);font-size:9px;color:var(--muted)}
     .note{font-size:12px;color:var(--muted)}.alert{background:#fff7e8;border-left:5px solid #dc8b1a;padding:11px 13px;border-radius:5px}.required{color:#a31212}details{margin-top:12px}pre{white-space:pre-wrap;overflow:auto;background:#f7f9fb;padding:12px;border-radius:7px;font-size:12px}
-    @media(max-width:760px){.grid,.kv{grid-template-columns:1fr}.row{grid-template-columns:1fr}.eye-head{align-items:flex-start;flex-direction:column}}
+    @media(max-width:760px){.grid{grid-template-columns:1fr}.row{grid-template-columns:1fr}.eye-head,.report-masthead{align-items:flex-start;flex-direction:column}.report-sheet{padding:24px 18px}.report-version{text-align:left}.meta-table th,.meta-table td{display:block;width:100%}}
+    @media print{@page{size:A4;margin:12mm}body{background:white}.no-print,body>header,.card:first-of-type{display:none!important}main{max-width:none;margin:0;padding:0}.report-card{display:block!important;margin:0}.report-sheet{max-width:none;border:0;box-shadow:none;padding:0}.eye-result{break-inside:avoid-page}.status,.meta-table th,.clinical-table th,.clinical-table td:first-child{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
   </style>
 </head>
 <body>
@@ -25,8 +29,15 @@
     <h2>Case inputs</h2>
     <p class="alert"><strong>No silent assumptions.</strong> Unknown or unreadable decision-critical data prohibit PASS. OD and OS are assessed independently and are never averaged.</p>
     <form id="f">
+      <h3>Report identification</h3>
+      <div class="grid">
+        <div class="row"><label>Patient name</label><input id="patient_name" type="text" autocomplete="off"></div>
+        <div class="row"><label>Patient ID / record number</label><input id="patient_id" type="text" autocomplete="off"></div>
+        <div class="row"><label>Patient age (years) <span class="required">*</span></label><input id="age" name="age" type="number" min="0" step="1" required></div>
+        <div class="row"><label>Reviewer / surgeon</label><input id="reviewer" type="text" autocomplete="off"></div>
+        <div class="row"><label>Assessment date</label><input id="report_date" type="date"></div>
+      </div>
       <div class="row"><label>Pentacam/topography images <span class="required">*</span></label><input name="images" type="file" accept="image/*" multiple required></div>
-      <div class="row"><label>Patient age (years) <span class="required">*</span></label><input name="age" type="number" min="0" step="1" required></div>
       <h3>Patient-level clinical modifiers</h3>
       <div class="grid">
         <div class="row"><label>Chronic eye rubbing / repetitive ocular trauma?</label><select id="eye_rubbing"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
@@ -43,13 +54,30 @@
     </form>
   </div>
 
-  <div class="card">
-    <h2>Clinical result</h2>
-    <div id="status" class="status insufficient">NOT ASSESSED</div>
-    <p id="overall-note" class="note"></p>
-    <div id="eye-results"></div>
-    <details><summary>Automatically extracted source data</summary><pre id="extract">—</pre></details>
-    <details><summary>Complete machine-readable decision record</summary><pre id="decision">—</pre></details>
+  <div id="reportCard" class="card report-card" hidden>
+    <div class="report-toolbar no-print">
+      <button id="pdfBtn" type="button">Download PDF</button>
+      <button id="wordBtn" type="button" class="secondary">Download Word</button>
+      <button id="printBtn" type="button" class="secondary">Print report</button>
+    </div>
+    <article id="reportSheet" class="report-sheet">
+      <div class="report-masthead">
+        <div><div class="report-kicker">HC Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
+        <div class="report-version"><strong>Protocol v0.4</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+      </div>
+      <table class="meta-table"><tbody>
+        <tr><th>Patient</th><td id="reportPatient">Not documented</td><th>Patient ID</th><td id="reportPatientId">Not documented</td></tr>
+        <tr><th>Age</th><td id="reportAge">Not documented</td><th>Date</th><td id="reportDate">Not documented</td></tr>
+        <tr><th>Reviewer</th><td id="reportReviewer">Not documented</td><th>Eyes</th><td id="reportEyes">—</td></tr>
+      </tbody></table>
+      <div class="report-section-title">Overall disposition</div>
+      <div id="status" class="status insufficient">NOT ASSESSED</div>
+      <p id="overall-note" class="eye-action"></p>
+      <div id="eye-results"></div>
+      <p class="report-footer-note">Generated under the HC Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. CAUTION is a STOP/DEFER decision requiring repeat ectasia/tomographic assessment after at least 6 months. DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review.</p>
+    </article>
+    <details class="no-print"><summary>Automatically extracted source data</summary><pre id="extract">—</pre></details>
+    <details class="no-print"><summary>Complete machine-readable decision record</summary><pre id="decision">—</pre></details>
   </div>
 </main>
 
@@ -79,8 +107,14 @@ const extractBox = document.querySelector("#extract");
 const eyeResults = document.querySelector("#eye-results");
 const overallNote = document.querySelector("#overall-note");
 const analyzeBtn = document.querySelector("#analyzeBtn");
+const reportCard = document.querySelector("#reportCard");
+const pdfBtn = document.querySelector("#pdfBtn");
+const wordBtn = document.querySelector("#wordBtn");
+const printBtn = document.querySelector("#printBtn");
+let lastReport = null;
 const value = (id) => document.querySelector(`#${id}`).value;
 const numberOrNull = (id) => value(id) === "" ? null : Number(value(id));
+document.querySelector("#report_date").value = new Date().toISOString().slice(0,10);
 
 function plan(prefix){return {
   prior:value(`${prefix}_prior`), procedure:value(`${prefix}_procedure`),
@@ -100,30 +134,68 @@ function statusClass(s){
   return "insufficient";
 }
 const fmt = (x, digits=1) => x === null || x === undefined ? "—" : Number(x).toFixed(digits);
-function listBlock(title, items){if(!items || !items.length)return "";return `<h4>${title}</h4><ul>${items.map(x=>`<li>${x}</li>`).join("")}</ul>`}
-function renderEye(r){
+const safe = (x) => String(x ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
+function listBlock(title, items){if(!items || !items.length)return "";return `<div class="finding-group"><h4>${safe(title)}</h4><ul>${items.map(x=>`<li>${safe(x)}</li>`).join("")}</ul></div>`}
+function renderEye(r, extracted){
   const v=r.values||{}, s=r.score||{};
-  return `<section class="eye-result"><div class="eye-head"><strong>${r.eye}</strong><span class="status ${statusClass(r.status)}">${r.status}</span></div><div class="eye-body">
-    <p><strong>Action:</strong> ${r.action}</p>
-    <p class="note"><strong>Instrument:</strong> ${r.instrument||"—"}</p>
-    <div class="kv">
-      <div><strong>Score / category</strong>${s.total ?? "—"} / ${s.category ?? "—"}</div>
-      <div><strong>Thinnest pachymetry</strong>${fmt(v.pachy_thinnest_um,0)} µm</div>
-      <div><strong>MRSE</strong>${fmt(v.MRSE_D,2)} D</div>
-      <div><strong>PRK RST / PTA</strong>${fmt(v.PRK_RST_um,0)} µm / ${fmt(v.PRK_PTA_percent,1)}%</div>
-      <div><strong>LASIK RSB / PTA</strong>${fmt(v.LASIK_RSB_um,0)} µm / ${fmt(v.LASIK_PTA_percent,1)}%</div>
-      <div><strong>Tomography review</strong>${r.tomography_review?.status ?? "—"}</div>
-      <div><strong>ERSS/PRK morphology category</strong>${r.topography_classification?.scoring_category ?? "—"}</div>
-    </div>
+  const rows=[
+    ["Procedure",v.procedure??"—"],["Score / category",`${s.total ?? "—"} / ${s.category ?? "—"}`],
+    ["Thinnest pachymetry",`${fmt(v.pachy_thinnest_um,0)} µm`],["MRSE",`${fmt(v.MRSE_D,2)} D`],
+    ["Maximum ablation",`${fmt(v.max_ablation_um,1)} µm`],["PRK RST / PTA",`${fmt(v.PRK_RST_um,0)} µm / ${fmt(v.PRK_PTA_percent,1)}%`],
+    ["LASIK RSB / PTA",`${fmt(v.LASIK_RSB_um,0)} µm / ${fmt(v.LASIK_PTA_percent,1)}%`],
+    ["Tomography review",r.tomography_review?.status??"—"],["Morphology category",r.topography_classification?.scoring_category??"—"]
+  ];
+  const source=(extracted.eyes||[]).find(x=>x.eye===r.eye)||{};
+  const tomoRows=[
+    ["K1",fmt(source.K1_D,2)+" D"],["K2",fmt(source.K2_D,2)+" D"],["Kmax",fmt(source.Kmax_D,2)+" D"],
+    ["BAD-D",fmt(source.BAD_D,2)],["ARTmax",fmt(source.ARTmax_um,0)+" µm"],["PPI max",fmt(source.PPI_max,2)],
+    ["ISV",fmt(source.ISV,0)],["IVA",fmt(source.IVA,3)],["I-S",fmt(source.I_S,2)+" D"],
+    ["SRAX",fmt(source.srax_deg,1)+"°"],["Posterior pattern",source.posterior_pattern??"—"],["Image quality",source.quality??"—"]
+  ];
+  return `<section class="eye-result"><div class="eye-head"><strong>${safe(r.eye)} ASSESSMENT</strong><span class="status ${statusClass(r.status)}">${safe(r.status)}</span></div><div class="eye-body">
+    <p class="eye-action"><strong>Clinical action:</strong> ${safe(r.action)}</p>
+    <p class="note"><strong>Instrument/source:</strong> ${safe(r.instrument||"Not documented")}</p>
+    <table class="clinical-table"><thead><tr><th>Parameter</th><th>Result</th></tr></thead><tbody>${rows.map(([a,b])=>`<tr><td>${safe(a)}</td><td>${safe(b)}</td></tr>`).join("")}</tbody></table>
     ${listBlock("Reasons",r.reasons)}${listBlock("Hard stops",r.hard_stops)}${listBlock("Missing / unresolved",r.missing)}${listBlock("Surgical-load evidence flags",r.surgical_load_flags)}${listBlock("Clinical modifiers",r.clinical_modifiers)}${listBlock("Warnings",r.warnings)}
+    <div class="finding-group"><h4>Extracted tomography</h4><table class="clinical-table"><thead><tr><th>Parameter</th><th>Value</th></tr></thead><tbody>${tomoRows.map(([a,b])=>`<tr><td>${safe(a)}</td><td>${safe(b)}</td></tr>`).join("")}</tbody></table></div>
   </div></section>`;
 }
+
+function patientPayload(){return {
+  name:value("patient_name")||null, id:value("patient_id")||null, age:numberOrNull("age"),
+  reviewer:value("reviewer")||null, report_date:value("report_date")||null
+}}
+function setReportMetadata(decision){
+  const p=patientPayload();
+  document.querySelector("#reportPatient").textContent=p.name||"Not documented";
+  document.querySelector("#reportPatientId").textContent=p.id||"Not documented";
+  document.querySelector("#reportAge").textContent=p.age??"Not documented";
+  document.querySelector("#reportDate").textContent=p.report_date||"Not documented";
+  document.querySelector("#reportReviewer").textContent=p.reviewer||"Not documented";
+  document.querySelector("#reportEyes").textContent=(decision.eyes||[]).map(x=>x.eye).join(", ")||"None";
+  document.querySelector("#generatedAt").textContent=`Generated ${new Date().toLocaleString()}`;
+}
+async function downloadReport(kind){
+  if(!lastReport)return;
+  const button=kind==="pdf"?pdfBtn:wordBtn, original=button.textContent;
+  button.disabled=true;button.textContent="Preparing...";
+  try{
+    const response=await fetch(`/report/${kind}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(lastReport)});
+    if(!response.ok)throw new Error(`Report export failed (${response.status})`);
+    const blob=await response.blob(), url=URL.createObjectURL(blob), a=document.createElement("a");
+    const id=(lastReport.patient.id||lastReport.patient.name||"Report").replace(/[^a-z0-9_-]+/gi,"_");
+    a.href=url;a.download=`HC_Ectasia_${id}.${kind==="pdf"?"pdf":"docx"}`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+  }catch(err){alert(String(err))}finally{button.disabled=false;button.textContent=original}
+}
+pdfBtn.addEventListener("click",()=>downloadReport("pdf"));
+wordBtn.addEventListener("click",()=>downloadReport("word"));
+printBtn.addEventListener("click",()=>window.print());
 
 f.addEventListener("submit", async (e) => {
   e.preventDefault(); const originalText=analyzeBtn.textContent;
   analyzeBtn.disabled=true; analyzeBtn.textContent="Analyzing images... Please wait";
   statusBox.className="status insufficient"; statusBox.textContent="ANALYZING...";
-  eyeResults.innerHTML=""; decisionBox.textContent=""; extractBox.textContent=""; overallNote.textContent="";
+  reportCard.hidden=true;lastReport=null;eyeResults.innerHTML=""; decisionBox.textContent=""; extractBox.textContent=""; overallNote.textContent="";
   try{
     const fd=new FormData(f);
     fd.set("eye_plans",JSON.stringify({OD:plan("od"),OS:plan("os")}));
@@ -136,8 +208,10 @@ f.addEventListener("submit", async (e) => {
     if(!r.ok)throw new Error(j.detail||"Request failed");
     statusBox.textContent=j.decision.status; statusBox.className=`status ${statusClass(j.decision.status)}`;
     overallNote.textContent=j.decision.action||"";
-    eyeResults.innerHTML=(j.decision.eyes||[]).map(renderEye).join("");
+    eyeResults.innerHTML=(j.decision.eyes||[]).map(x=>renderEye(x,j.extracted)).join("");
     decisionBox.textContent=JSON.stringify(j.decision,null,2); extractBox.textContent=JSON.stringify(j.extracted,null,2);
+    lastReport={patient:patientPayload(),decision:j.decision,extracted:j.extracted};setReportMetadata(j.decision);reportCard.hidden=false;
+    reportCard.scrollIntoView({behavior:"smooth",block:"start"});
   }catch(err){statusBox.textContent="ERROR";statusBox.className="status fail";decisionBox.textContent=String(err)}
   finally{analyzeBtn.disabled=false;analyzeBtn.textContent=originalText}
 });
