@@ -131,6 +131,83 @@ def hc_engine(extracted, prior, age, procedure, sphere, cylinder, ablation, flap
       "limiting_values":{"pachy_thinnest_um":pachy,"BAD_D":bad,"ARTmax_um":art,"PPI_max":ppi},
       "structural":{"max_ablation_um":ablation,"PRK_RST_um":rst,"LASIK_RSB_um":rsb,"LASIK_PTA_percent":pta}
     }
+  
+def merge_extractions(results):
+    merged = {"eyes": [], "global_warnings": []}
+    by_eye = {}
+
+    conservative = {
+        "pachy_thinnest_um": "min",
+        "BAD_D": "max",
+        "ARTmax_um": "min",
+        "PPI_max": "max",
+    }
+
+    for result in results:
+        merged["global_warnings"].extend(result.get("global_warnings", []))
+
+        for eye in result.get("eyes", []):
+            eye_id = eye.get("eye", "UNKNOWN")
+
+            if eye_id not in by_eye:
+                by_eye[eye_id] = dict(eye)
+                continue
+
+            target = by_eye[eye_id]
+
+            target["screen_types"] = sorted(set(
+                target.get("screen_types", []) + eye.get("screen_types", [])
+            ))
+
+            target["missing_or_unreadable"] = sorted(set(
+                target.get("missing_or_unreadable", []) +
+                eye.get("missing_or_unreadable", [])
+            ))
+
+            quality_rank = {"ADEQUATE": 0, "LIMITED": 1, "INADEQUATE": 2}
+            if quality_rank.get(eye.get("quality"), 0) > quality_rank.get(target.get("quality"), 0):
+                target["quality"] = eye.get("quality")
+
+            for key, value in eye.items():
+                if key in ("eye", "screen_types", "quality", "missing_or_unreadable"):
+                    continue
+
+                old = target.get(key)
+
+                if old is None and value is not None:
+                    target[key] = value
+                    continue
+
+                if value is None or old == value:
+                    continue
+
+                if key in conservative and isinstance(old, (int, float)) and isinstance(value, (int, float)):
+                    if conservative[key] == "min":
+                        target[key] = min(old, value)
+                    else:
+                        target[key] = max(old, value)
+
+                    merged["global_warnings"].append(
+                        f"Conflicting {key} values for {eye_id}; conservative limiting value retained."
+                    )
+
+                elif key in ("asymmetric_bow_tie", "srax"):
+                    if "YES" in (old, value):
+                        target[key] = "YES"
+                    elif "UNCERTAIN" in (old, value):
+                        target[key] = "UNCERTAIN"
+                    else:
+                        target[key] = "NO"
+
+                elif old != value:
+                    merged["global_warnings"].append(
+                        f"Conflicting {key} values for {eye_id}: {old} vs {value}; first value retained."
+                    )
+
+    merged["eyes"] = list(by_eye.values())
+    merged["global_warnings"] = sorted(set(merged["global_warnings"]))
+
+    return merged
 
 @app.get("/")
 def index():
@@ -150,21 +227,40 @@ async def analyze(
 ):
     if not images:
         raise HTTPException(400, "No images supplied.")
-    content=[{"type":"input_text","text":PROMPT}]
-    for img in images:
-        raw=await img.read()
-        if not raw: continue
-        content.append({"type":"input_image","image_url":data_url(raw,img.filename),"detail":"original"})
+        extraction_results = []
 
-    response=client.responses.create(
-        model=MODEL,
-        store=False,
-        reasoning={"effort":"low"},
-        input=[{"role":"user","content":content}],
-        text={"format":{
-          "type":"json_schema","name":"pentacam_extraction","strict":True,"schema":SCHEMA
-        }}
-    )
-    extracted=json.loads(response.output_text)
+    for img in images:
+        raw = await img.read()
+        if not raw:
+            continue
+
+        content = [
+            {"type": "input_text", "text": PROMPT},
+            {
+                "type": "input_image",
+                "image_url": data_url(raw, img.filename),
+                "detail": "original",
+            },
+        ]
+
+        response = client.responses.create(
+            model=MODEL,
+            store=False,
+            reasoning={"effort": "low"},
+            input=[{"role": "user", "content": content}],
+            text={"format": {
+                "type": "json_schema",
+                "name": "pentacam_extraction",
+                "strict": True,
+                "schema": SCHEMA,
+            }},
+        )
+
+        extraction_results.append(json.loads(response.output_text))
+
+    if not extraction_results:
+        raise HTTPException(400, "No readable images supplied.")
+
+    extracted = merge_extractions(extraction_results)
     decision=hc_engine(extracted,prior,age,procedure,sphere,cylinder,ablation,flap,stable)
     return {"extracted":extracted,"decision":decision}
