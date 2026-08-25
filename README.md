@@ -11,6 +11,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Morphology-first override gate for definite KC/FFKC/PMD or unequivocal ectatic morphology.
 - HC operational hard stops: preoperative thinnest pachymetry `<480 µm`, LASIK RSB `<300 µm`, and PRK RST `<310 µm`.
 - Standard HC PRK calculation: `RST = pachymetry - 50 µm epithelium - maximum stromal ablation`.
+- Zone-specific HC ablation estimates for explicitly documented Alcon EX500 plans: `12 µm/D` at 6.0 mm and `15 µm/D` at 6.5 mm; the actual treatment-plan maximum remains preferred.
 - Procedure-correct PTA formulas for LASIK and PRK.
 - BAD-D/component display interpretation plus adjunctive ARTmax/TP/Dt/Da evidence flags.
 - Required clinical modifiers and treatment-plan inputs; missing/unreadable critical data prohibit PASS.
