@@ -610,6 +610,11 @@ class TestPatientModifierUi(unittest.TestCase):
         self.assertIn('value="none" data-exclusive="true"', html)
         self.assertIn('value="unknown" data-exclusive="true"', html)
 
+    def test_none_closes_dropdown_but_regular_multi_select_items_do_not(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn('if(input.checked&&input.value==="none")modifierDropdown.open=false;', html)
+        self.assertNotIn('if(input.checked)modifierDropdown.open=false;', html)
+
 
 class TestFixedLaserPlatformUi(unittest.TestCase):
     def test_each_eye_keeps_a_read_only_alcon_ex500_box(self):

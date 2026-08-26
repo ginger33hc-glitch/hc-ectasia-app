@@ -202,6 +202,7 @@ const modifierLabels={
   collagen_tissue_disease:"Collagen-tissue disease",drug_usage:"Medication / drug usage",
   none:"None",unknown:"Not documented"
 };
+const modifierDropdown=document.querySelector("#modifierDropdown");
 const modifierInputs=[...document.querySelectorAll('input[name="patient_modifier"]')];
 function selectedModifierValues(){return modifierInputs.filter(input=>input.checked).map(input=>input.value)}
 function updateModifierSummary(){
@@ -212,6 +213,7 @@ modifierInputs.forEach(input=>input.addEventListener("change",()=>{
   if(input.checked&&input.dataset.exclusive==="true")modifierInputs.forEach(other=>{if(other!==input)other.checked=false});
   else if(input.checked)modifierInputs.filter(other=>other.dataset.exclusive==="true").forEach(other=>{other.checked=false});
   updateModifierSummary();
+  if(input.checked&&input.value==="none")modifierDropdown.open=false;
 }));
 function patientModifiers(){
   const selected=selectedModifierValues();
