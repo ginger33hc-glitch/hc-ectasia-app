@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>HC Ectasia App v0.5</title>
-  <link rel="manifest" href="/static/manifest.webmanifest?v=4">
+  <link rel="manifest" href="/static/manifest.webmanifest?v=5">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=4">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=4">
   <link rel="shortcut icon" type="image/png" href="/static/icons/favicon-32.png?v=4">
@@ -46,7 +46,8 @@
         <div class="row"><label>Reviewer / surgeon</label><input id="reviewer" type="text" autocomplete="off"></div>
         <div class="row"><label>Assessment date</label><input id="report_date" type="date"></div>
       </div>
-      <div class="row"><label>Pentacam/topography and treatment-card images <span class="required">*</span></label><input name="images" type="file" accept="image/*" multiple required></div>
+      <div class="row"><label>Pentacam/topography and treatment-card images <span class="required">*</span></label><input id="imageInput" name="images" type="file" accept="image/*" multiple required></div>
+      <p id="sharedImageNotice" class="alert" hidden></p>
       <h3>Patient-level clinical modifiers</h3>
       <div class="modifier-row">
         <label for="modifierDropdown">Select all that apply <span class="required">*</span></label>
@@ -141,10 +142,57 @@ const cardTransferNote = document.querySelector("#cardTransferNote");
 const pdfBtn = document.querySelector("#pdfBtn");
 const wordBtn = document.querySelector("#wordBtn");
 const printBtn = document.querySelector("#printBtn");
+const imageInput = document.querySelector("#imageInput");
+const sharedImageNotice = document.querySelector("#sharedImageNotice");
 let lastReport = null;
+let sharedImages = [];
 const value = (id) => document.querySelector(`#${id}`).value;
 const numberOrNull = (id) => value(id) === "" ? null : Number(value(id));
 document.querySelector("#report_date").value = new Date().toISOString().slice(0,10);
+
+async function loadSharedImages(){
+  const params=new URLSearchParams(window.location.search), token=params.get("share_token");
+  if(!token)return;
+  try{
+    if(!window.caches)throw new Error("Shared-image storage is unavailable.");
+    const cache=await caches.open("hc-ectasia-shared-images-v1");
+    const metaUrl=`/__hc_share__/${encodeURIComponent(token)}/meta`;
+    const metaResponse=await cache.match(metaUrl);
+    if(!metaResponse)throw new Error("The shared images could not be found. Please share them again.");
+    const meta=await metaResponse.json(), loaded=[];
+    for(const item of meta.files||[]){
+      const response=await cache.match(item.url);
+      if(!response)continue;
+      const blob=await response.blob();
+      loaded.push(new File([blob],item.name||"shared-image.jpg",{type:item.type||blob.type||"image/jpeg",lastModified:item.lastModified||Date.now()}));
+      await cache.delete(item.url);
+    }
+    await cache.delete(metaUrl);
+    if(!loaded.length)throw new Error("No readable image was received. Please share the photos again.");
+    sharedImages=loaded;
+    imageInput.required=false;
+    try{
+      const transfer=new DataTransfer();
+      loaded.forEach(file=>transfer.items.add(file));
+      imageInput.files=transfer.files;
+    }catch(_error){/* FormData fallback below handles browsers that block assignment. */}
+    sharedImageNotice.hidden=false;
+    sharedImageNotice.innerHTML=`<strong>${loaded.length} shared image${loaded.length===1?"":"s"} received.</strong> Complete the clinical fields, then run the HC assessment.`;
+  }catch(error){
+    sharedImageNotice.hidden=false;
+    sharedImageNotice.innerHTML=`<strong>Shared images were not loaded.</strong> ${safe(error.message||error)}`;
+  }finally{
+    history.replaceState({},document.title,window.location.pathname);
+  }
+}
+
+imageInput.addEventListener("change",()=>{
+  if(imageInput.files.length){
+    sharedImages=[];
+    imageInput.required=true;
+    sharedImageNotice.hidden=true;
+  }
+});
 
 const modifierLabels={
   eye_rubbing:"Eye rubbing / ocular trauma",family_history:"Family history",
@@ -287,6 +335,11 @@ f.addEventListener("submit", async (e) => {
   reportCard.hidden=true;lastReport=null;eyeResults.innerHTML=""; decisionBox.textContent=""; extractBox.textContent=""; overallNote.textContent="";cardTransferNote.textContent="";
   try{
     const fd=new FormData(f);
+    const manualImages=[...imageInput.files];
+    const images=manualImages.length?manualImages:sharedImages;
+    if(!images.length)throw new Error("Select or share at least one image.");
+    fd.delete("images");
+    images.forEach(file=>fd.append("images",file,file.name));
     fd.set("eye_plans",JSON.stringify({OD:plan("od"),OS:plan("os")}));
     fd.set("patient_modifiers",JSON.stringify(patientModifiers()));
     const r=await fetch("/analyze",{method:"POST",body:fd}); const text=await r.text();
@@ -302,6 +355,13 @@ f.addEventListener("submit", async (e) => {
   }catch(err){statusBox.textContent="ERROR";statusBox.className="status fail";decisionBox.textContent=String(err)}
   finally{analyzeBtn.disabled=false;analyzeBtn.textContent=originalText}
 });
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load",async()=>{
+    try{await navigator.serviceWorker.register("/sw.js",{scope:"/"})}catch(error){console.error("Service worker registration failed",error)}
+  });
+}
+loadSharedImages();
 </script>
 </body>
 </html>

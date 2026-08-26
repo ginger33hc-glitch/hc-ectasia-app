@@ -956,6 +956,18 @@ def index() -> FileResponse:
     return FileResponse("static/index.html")
 
 
+@app.get("/sw.js", include_in_schema=False)
+def service_worker() -> FileResponse:
+    return FileResponse(
+        "static/sw.js",
+        media_type="application/javascript",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Service-Worker-Allowed": "/",
+        },
+    )
+
+
 @app.post("/report/pdf")
 def report_pdf(payload: Dict[str, Any] = Body(...)) -> StreamingResponse:
     content = build_pdf(payload)

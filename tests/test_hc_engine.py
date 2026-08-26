@@ -483,7 +483,7 @@ class TestPwaIcons(unittest.TestCase):
             self.assertEqual(raw[12:16], b"IHDR")
             self.assertEqual(struct.unpack(">II", raw[16:24]), dimensions)
 
-    def test_manifest_and_html_use_cache_busted_v4_png_icons(self):
+    def test_manifest_and_html_use_cache_busted_png_assets(self):
         static_dir = Path(__file__).resolve().parents[1] / "static"
         manifest = json.loads((static_dir / "manifest.webmanifest").read_text())
         self.assertEqual({icon["src"] for icon in manifest["icons"]}, {
@@ -492,10 +492,37 @@ class TestPwaIcons(unittest.TestCase):
             "/static/icons/icon-maskable-512.png?v=4",
         })
         html = (static_dir / "index.html").read_text()
-        self.assertIn('/static/manifest.webmanifest?v=4', html)
+        self.assertIn('/static/manifest.webmanifest?v=5', html)
         self.assertIn('/static/icons/favicon-32.png?v=4', html)
         self.assertIn('/static/icons/apple-touch-icon.png?v=4', html)
         self.assertNotIn('/static/icons/icon-source.svg', html)
+
+
+class TestPwaShareTarget(unittest.TestCase):
+    def test_manifest_accepts_one_or_multiple_shared_images(self):
+        static_dir = Path(__file__).resolve().parents[1] / "static"
+        manifest = json.loads((static_dir / "manifest.webmanifest").read_text())
+        target = manifest["share_target"]
+        self.assertEqual(target["action"], "/share-target")
+        self.assertEqual(target["method"], "POST")
+        self.assertEqual(target["enctype"], "multipart/form-data")
+        self.assertEqual(target["params"]["files"], [{"name": "images", "accept": ["image/*"]}])
+
+    def test_root_scoped_service_worker_is_served_without_caching(self):
+        response = TestClient(app.app).get("/sw.js")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/javascript", response.headers["content-type"])
+        self.assertEqual(response.headers["service-worker-allowed"], "/")
+        self.assertEqual(response.headers["cache-control"], "no-cache, no-store, must-revalidate")
+        self.assertIn('url.pathname===SHARE_PATH', response.text)
+
+    def test_frontend_loads_shared_files_into_existing_analyze_request(self):
+        static_dir = Path(__file__).resolve().parents[1] / "static"
+        html = (static_dir / "index.html").read_text()
+        self.assertIn('id="imageInput" name="images"', html)
+        self.assertIn('params.get("share_token")', html)
+        self.assertIn('images.forEach(file=>fd.append("images",file,file.name))', html)
+        self.assertIn('navigator.serviceWorker.register("/sw.js",{scope:"/"})', html)
 
 
 class TestPatientModifierUi(unittest.TestCase):
