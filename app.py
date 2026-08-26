@@ -1509,7 +1509,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         bool(normalized_names) and all(normalized_names) and len(set(normalized_names)) == 1
     )
     age_is_consistent = len(pentacam_ages) <= 1
-    identity_corrobated_by_name_and_age = (
+    identity_corroborated_by_name_and_age = (
         shared_readable_name and age_is_consistent and len(pentacam_ages) == 1
     )
 
@@ -1520,7 +1520,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     elif len(pentacam_ages) == 1:
         merged["derived_age_years"] = next(iter(pentacam_ages))
     if len(ids) > 1:
-        if identity_corrobated_by_name_and_age:
+        if identity_corroborated_by_name_and_age:
             merged["global_warnings"].append(
                 "Different patient-ID strings were extracted from Pentacam sources, but the shared "
                 "readable patient name and consistent printed age corroborate one patient. The ID "
