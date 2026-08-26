@@ -17,6 +17,7 @@
     main{max-width:1100px;margin:20px auto;padding:0 14px 40px}.card{background:white;border:1px solid var(--line);border-radius:11px;padding:18px;margin:14px 0;box-shadow:0 1px 2px rgba(0,0,0,.03)}
     .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.row{display:grid;grid-template-columns:1.25fr 1fr;gap:10px;margin:10px 0;align-items:center}
     input,select{padding:9px;width:100%;border:1px solid #bcc8d1;border-radius:5px;background:white}fieldset{border:1px solid var(--line);border-radius:8px;padding:14px}legend{font-weight:bold;padding:0 6px}
+    .modifier-row{max-width:720px}.multi-select{position:relative;margin:8px 0 0}.multi-select summary{list-style:none;padding:10px 38px 10px 12px;border:1px solid #bcc8d1;border-radius:6px;background:#fff;cursor:pointer;position:relative}.multi-select summary::-webkit-details-marker{display:none}.multi-select summary::after{content:"▼";position:absolute;right:13px;color:var(--muted);font-size:11px}.multi-select[open] summary::after{content:"▲"}.multi-options{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 4px);background:#fff;border:1px solid #bcc8d1;border-radius:7px;box-shadow:0 8px 24px rgba(23,59,87,.16);padding:7px;max-height:330px;overflow:auto}.multi-option{display:flex;gap:9px;align-items:flex-start;padding:9px 8px;border-radius:5px;cursor:pointer}.multi-option:hover{background:#f1f6f9}.multi-option input{width:auto;margin:3px 0 0;padding:0}.multi-divider{border-top:1px solid var(--line);margin:5px 0}
     button{background:var(--navy);color:white;border:0;border-radius:8px;padding:13px 18px;font-weight:bold;font-size:15px;cursor:pointer}button:disabled{opacity:.6;cursor:wait}
     .status{font-size:21px;font-weight:bold;padding:14px;border-radius:6px;background:var(--gray);color:var(--grayInk);border-left:7px solid #8a98a4}.status.pass{background:var(--green);color:var(--greenInk);border-color:var(--greenInk)}.status.caution,.status.review{background:var(--orange);color:var(--orangeInk);border-color:#d9790d}.status.fail{background:var(--red);color:var(--redInk);border-color:#c52b2b}.status.insufficient{background:var(--gray);color:var(--grayInk);border-color:#8a98a4}
     .report-card{padding:0;background:transparent;border:0;box-shadow:none}.report-toolbar{display:flex;justify-content:flex-end;gap:9px;margin:0 0 12px}.secondary{background:white;color:var(--navy);border:1px solid var(--navy)}
@@ -45,10 +46,23 @@
       </div>
       <div class="row"><label>Pentacam/topography and treatment-card images <span class="required">*</span></label><input name="images" type="file" accept="image/*" multiple required></div>
       <h3>Patient-level clinical modifiers</h3>
-      <div class="grid">
-        <div class="row"><label>Chronic eye rubbing / repetitive ocular trauma?</label><select id="eye_rubbing"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
-        <div class="row"><label>Family history of keratoconus?</label><select id="family_history"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
-        <div class="row"><label>Marked inter-eye asymmetry?</label><select id="inter_eye_asymmetry"><option value="unknown">Unknown / one eye only</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+      <div class="modifier-row">
+        <label for="modifierDropdown">Select all that apply <span class="required">*</span></label>
+        <details id="modifierDropdown" class="multi-select">
+          <summary id="modifierSummary">Select modifiers</summary>
+          <div class="multi-options">
+            <label class="multi-option"><input type="checkbox" name="patient_modifier" value="eye_rubbing"><span>Chronic eye rubbing / repetitive ocular trauma</span></label>
+            <label class="multi-option"><input type="checkbox" name="patient_modifier" value="family_history"><span>Family history of keratoconus</span></label>
+            <label class="multi-option"><input type="checkbox" name="patient_modifier" value="inter_eye_asymmetry"><span>Marked inter-eye asymmetry</span></label>
+            <label class="multi-option"><input type="checkbox" name="patient_modifier" value="pregnancy_nursing"><span>Pregnancy or nursing</span></label>
+            <label class="multi-option"><input type="checkbox" name="patient_modifier" value="collagen_tissue_disease"><span>Collagen / connective-tissue disease</span></label>
+            <label class="multi-option"><input type="checkbox" name="patient_modifier" value="drug_usage"><span>Relevant medication / drug usage</span></label>
+            <div class="multi-divider"></div>
+            <label class="multi-option"><input type="checkbox" name="patient_modifier" value="none" data-exclusive="true"><span>None of the listed modifiers</span></label>
+            <label class="multi-option"><input type="checkbox" name="patient_modifier" value="unknown" data-exclusive="true"><span>Not documented / unknown</span></label>
+          </div>
+        </details>
+        <p class="note">Multiple modifiers may be selected. “None” and “Not documented” are exclusive choices.</p>
       </div>
       <h3>Eye-specific plans</h3>
       <div class="grid">
@@ -124,6 +138,34 @@ let lastReport = null;
 const value = (id) => document.querySelector(`#${id}`).value;
 const numberOrNull = (id) => value(id) === "" ? null : Number(value(id));
 document.querySelector("#report_date").value = new Date().toISOString().slice(0,10);
+
+const modifierLabels={
+  eye_rubbing:"Eye rubbing / ocular trauma",family_history:"Family history",
+  inter_eye_asymmetry:"Inter-eye asymmetry",pregnancy_nursing:"Pregnancy / nursing",
+  collagen_tissue_disease:"Collagen-tissue disease",drug_usage:"Medication / drug usage",
+  none:"None",unknown:"Not documented"
+};
+const modifierInputs=[...document.querySelectorAll('input[name="patient_modifier"]')];
+function selectedModifierValues(){return modifierInputs.filter(input=>input.checked).map(input=>input.value)}
+function updateModifierSummary(){
+  const selected=selectedModifierValues();
+  document.querySelector("#modifierSummary").textContent=selected.length?selected.map(item=>modifierLabels[item]).join(", "):"Select modifiers";
+}
+modifierInputs.forEach(input=>input.addEventListener("change",()=>{
+  if(input.checked&&input.dataset.exclusive==="true")modifierInputs.forEach(other=>{if(other!==input)other.checked=false});
+  else if(input.checked)modifierInputs.filter(other=>other.dataset.exclusive==="true").forEach(other=>{other.checked=false});
+  updateModifierSummary();
+}));
+function patientModifiers(){
+  const selected=selectedModifierValues();
+  if(!selected.length)throw new Error("Select patient-level modifiers, None, or Not documented.");
+  const keys=["eye_rubbing","family_history","inter_eye_asymmetry","pregnancy_nursing","collagen_tissue_disease","drug_usage"];
+  const state=selected.includes("unknown")?"unknown":"no";
+  const result=Object.fromEntries(keys.map(key=>[key,state]));
+  if(!selected.includes("unknown")&&!selected.includes("none"))selected.forEach(key=>{if(keys.includes(key))result[key]="yes"});
+  result.selected_modifiers=selected.filter(item=>keys.includes(item));
+  return result;
+}
 
 function plan(prefix){return {
   prior:value(`${prefix}_prior`), procedure:value(`${prefix}_procedure`),
@@ -237,10 +279,7 @@ f.addEventListener("submit", async (e) => {
   try{
     const fd=new FormData(f);
     fd.set("eye_plans",JSON.stringify({OD:plan("od"),OS:plan("os")}));
-    fd.set("patient_modifiers",JSON.stringify({
-      eye_rubbing:value("eye_rubbing"), family_history:value("family_history"),
-      inter_eye_asymmetry:value("inter_eye_asymmetry")
-    }));
+    fd.set("patient_modifiers",JSON.stringify(patientModifiers()));
     const r=await fetch("/analyze",{method:"POST",body:fd}); const text=await r.text();
     let j; try{j=JSON.parse(text)}catch{throw new Error("Server returned a non-JSON response: "+text.slice(0,200))}
     if(!r.ok)throw new Error(j.detail||"Request failed");

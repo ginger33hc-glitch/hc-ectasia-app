@@ -21,6 +21,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Expanded extraction/reporting of anterior and posterior elevation, pachymetric progression,
   topometric, thinnest-point location, corneal-volume, and HOA/coma fields when visibly available.
 - Required clinical modifiers and treatment-plan inputs; missing/unreadable critical data prohibit PASS.
+- One multi-select patient-modifier control records eye rubbing/ocular trauma, keratoconus family history, inter-eye asymmetry, pregnancy/nursing, collagen/connective-tissue disease, and relevant medication/drug usage; no new score weights are inferred for the added items.
 - Binding CAUTION action: STOP/DEFER, repeat relevant screening, and reassess after at least 6 months.
 - Formal clinical report with patient/reviewer metadata, restrained decision colors (PASS green,
   CAUTION amber, FAIL red, NOT ASSESSED gray), print layout, and validated PDF and DOCX exports.

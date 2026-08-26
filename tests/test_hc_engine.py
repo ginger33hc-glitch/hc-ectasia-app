@@ -99,6 +99,9 @@ MODIFIERS = {
     "eye_rubbing": "no",
     "family_history": "no",
     "inter_eye_asymmetry": "no",
+    "pregnancy_nursing": "no",
+    "collagen_tissue_disease": "no",
+    "drug_usage": "no",
     "assessed_eyes": ["OD"],
 }
 
@@ -255,6 +258,19 @@ class TestScoringAndCompleteness(unittest.TestCase):
         result = app.assess_eye(eye, plan(), 35, MODIFIERS)
         self.assertEqual(result["status"], "DATA INSUFFICIENT")
         self.assertIn("readable anterior pattern", result["missing"])
+
+    def test_added_patient_modifiers_are_reported_without_invented_score_weights(self):
+        modifiers = dict(
+            MODIFIERS,
+            pregnancy_nursing="yes",
+            collagen_tissue_disease="yes",
+            drug_usage="yes",
+        )
+        result = app.assess_eye(normal_eye(), plan(), 35, modifiers)
+        self.assertEqual(result["status"], "PASS")
+        self.assertTrue(any("Pregnancy or nursing" in item for item in result["clinical_modifiers"]))
+        self.assertTrue(any("Collagen/connective-tissue" in item for item in result["clinical_modifiers"]))
+        self.assertTrue(any("medication/drug" in item for item in result["clinical_modifiers"]))
 
     def test_conflicting_i_s_values_use_concerning_value_and_prohibit_pass(self):
         first = normal_eye()
@@ -479,6 +495,22 @@ class TestPwaIcons(unittest.TestCase):
         self.assertIn('/static/icons/favicon-32.png?v=4', html)
         self.assertIn('/static/icons/apple-touch-icon.png?v=4', html)
         self.assertNotIn('/static/icons/icon-source.svg', html)
+
+
+class TestPatientModifierUi(unittest.TestCase):
+    def test_single_dropdown_contains_all_multi_select_modifier_options(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertEqual(html.count('id="modifierDropdown"'), 1)
+        for value in (
+            "eye_rubbing", "family_history", "inter_eye_asymmetry",
+            "pregnancy_nursing", "collagen_tissue_disease", "drug_usage",
+        ):
+            self.assertIn(f'name="patient_modifier" value="{value}"', html)
+        self.assertNotIn('id="eye_rubbing"', html)
+        self.assertNotIn('id="family_history"', html)
+        self.assertNotIn('id="inter_eye_asymmetry"', html)
+        self.assertIn('value="none" data-exclusive="true"', html)
+        self.assertIn('value="unknown" data-exclusive="true"', html)
 
 
 if __name__ == "__main__":

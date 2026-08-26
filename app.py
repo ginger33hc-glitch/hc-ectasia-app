@@ -448,6 +448,9 @@ def assess_eye(
     eye_rubbing = tri(patient_modifiers.get("eye_rubbing"))
     family_history = tri(patient_modifiers.get("family_history"))
     inter_eye = tri(patient_modifiers.get("inter_eye_asymmetry"))
+    pregnancy_nursing = tri(patient_modifiers.get("pregnancy_nursing"))
+    collagen_tissue_disease = tri(patient_modifiers.get("collagen_tissue_disease"))
+    drug_usage = tri(patient_modifiers.get("drug_usage"))
 
     if eye_id not in EYES:
         missing.append("reliable OD/OS identification")
@@ -555,6 +558,12 @@ def assess_eye(
     if inter_eye == "yes":
         status = combine_status(status, "REVIEW — NOT CLEARED")
         modifiers.append("Marked inter-eye asymmetry requires escalated review.")
+    if pregnancy_nursing == "yes":
+        modifiers.append("Pregnancy or nursing reported; separate refractive-surgery eligibility review required.")
+    if collagen_tissue_disease == "yes":
+        modifiers.append("Collagen/connective-tissue disease reported; separate clinical eligibility review required.")
+    if drug_usage == "yes":
+        modifiers.append("Relevant medication/drug usage reported; medication-specific clinical review required.")
 
     score_rows: Dict[str, Any] = {}
     score_total: Optional[int] = None
