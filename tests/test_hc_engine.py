@@ -926,6 +926,26 @@ class TestPwaIcons(unittest.TestCase):
         self.assertNotIn('/static/icons/icon-source.svg', html)
 
 
+class TestSignedRefractionInputs(unittest.TestCase):
+    def test_manifest_and_intended_cylinders_accept_minus_cylinder_notation(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn('id="${eye}_manifest_cylinder" type="number" step=".25" min="-15" max="0"', html)
+        self.assertIn('id="${eye}_cylinder" type="number" step=".25" min="-15" max="0"', html)
+        self.assertIn('manifest_cylinder_magnitude_D:cylinderMagnitudeOrNull', html)
+        self.assertIn('intended_cylinder_magnitude_D:cylinderMagnitudeOrNull', html)
+
+    def test_all_refraction_fields_have_phone_safe_negative_buttons(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        for target in ("manifest_sphere", "manifest_cylinder", "sphere", "cylinder"):
+            self.assertIn(f'data-negative-target="${{eye}}_{target}"', html)
+        self.assertIn('String(-Math.abs(parsed||0.25))', html)
+
+    def test_autofilled_internal_cylinder_magnitudes_render_as_negative(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn('value=-Math.abs(p.manifest_cylinder_magnitude_D)', html)
+        self.assertIn('value=-Math.abs(p.intended_cylinder_magnitude_D)', html)
+
+
 class TestPwaShareTarget(unittest.TestCase):
     def test_manifest_accepts_one_or_multiple_shared_images(self):
         static_dir = Path(__file__).resolve().parents[1] / "static"
