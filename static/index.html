@@ -25,7 +25,7 @@
     .report-sheet{background:#fff;max-width:850px;margin:0 auto;padding:38px 44px;border:1px solid #cfd8df;box-shadow:0 8px 28px rgba(23,59,87,.10);font-family:Arial,sans-serif}.report-masthead{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid var(--navy);padding-bottom:13px;margin-bottom:17px}.report-masthead h2{font-size:20px;letter-spacing:.35px;color:var(--navy);margin:0 0 5px}.report-kicker{font-size:11px;font-weight:bold;letter-spacing:1.1px;color:var(--blueInk);text-transform:uppercase}.report-version{text-align:right;color:var(--muted);font-size:11px;white-space:nowrap}
     .meta-table,.clinical-table{width:100%;border-collapse:collapse}.meta-table{margin-bottom:17px}.meta-table th,.meta-table td{border:1px solid var(--line);padding:7px 9px;font-size:12px;text-align:left}.meta-table th{width:15%;background:#f1f4f6;color:#42515d}.meta-table td{width:35%}.report-section-title{font-size:13px;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--line);padding-bottom:5px;margin:20px 0 8px}
     .eye-result{border:1px solid var(--line);margin:18px 0;page-break-inside:avoid}.eye-head{padding:10px 12px;background:#f1f4f6;display:flex;justify-content:space-between;gap:10px;align-items:center;border-bottom:1px solid var(--line)}.eye-head strong{color:var(--navy);font-size:15px}.eye-head .status{font-size:13px;padding:6px 9px;border-left-width:4px}.eye-body{padding:13px}.eye-action{margin:0 0 11px;padding:9px 11px;background:#f7f9fb;border-left:4px solid var(--navy);font-size:12px}.clinical-table{margin:9px 0 12px}.clinical-table th,.clinical-table td{border:1px solid var(--line);padding:6px 8px;font-size:11px;text-align:left;vertical-align:middle}.clinical-table th{background:var(--navy);color:white}.clinical-table td:first-child{font-weight:bold;width:38%;background:#f7f9fb}.finding-group{page-break-inside:avoid}.finding-group h4{color:var(--navy);font-size:12px;margin:12px 0 4px}.finding-group ul{margin:4px 0 8px;padding-left:21px}.finding-group li{font-size:11px;margin:3px 0}.report-footer-note{margin-top:19px;padding-top:10px;border-top:1px solid var(--line);font-size:9px;color:var(--muted)}
-    .note{font-size:12px;color:var(--muted)}.alert{background:#fff7e8;border-left:5px solid #dc8b1a;padding:11px 13px;border-radius:5px}.liability-notice{color:#a31212;font-weight:bold;font-size:14px;margin:4px 0 12px}.required{color:#a31212}details{margin-top:12px}pre{white-space:pre-wrap;overflow:auto;background:#f7f9fb;padding:12px;border-radius:7px;font-size:12px}
+    .note{font-size:12px;color:var(--muted)}.file-picker-wrap{min-width:0}.selected-files{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}.selected-file{display:inline-block;max-width:100%;padding:6px 9px;border:1px solid #b8c9d6;border-radius:6px;background:#f2f7fa;color:var(--blueInk);font-size:12px;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.selected-file:hover,.selected-file:focus{background:#e3f0f8;text-decoration:underline}.alert{background:#fff7e8;border-left:5px solid #dc8b1a;padding:11px 13px;border-radius:5px}.liability-notice{color:#a31212;font-weight:bold;font-size:14px;margin:4px 0 12px}.required{color:#a31212}details{margin-top:12px}pre{white-space:pre-wrap;overflow:auto;background:#f7f9fb;padding:12px;border-radius:7px;font-size:12px}
     @media(max-width:760px){.grid{grid-template-columns:1fr}.row{grid-template-columns:1fr}.eye-head,.report-masthead{align-items:flex-start;flex-direction:column}.report-sheet{padding:24px 18px}.report-version{text-align:left}.meta-table th,.meta-table td{display:block;width:100%}}
     @media print{@page{size:A4;margin:12mm}body{background:white}.no-print,body>header,.card:first-of-type{display:none!important}main{max-width:none;margin:0;padding:0}.report-card{display:block!important;margin:0}.report-sheet{max-width:none;border:0;box-shadow:none;padding:0}.eye-result{break-inside:avoid-page}.status,.meta-table th,.clinical-table th,.clinical-table td:first-child{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
   </style>
@@ -46,7 +46,7 @@
         <div class="row"><label>Reviewer / surgeon</label><input id="reviewer" type="text" autocomplete="off"></div>
         <div class="row"><label>Assessment date</label><input id="report_date" type="date"></div>
       </div>
-      <div class="row"><label>Pentacam/topography and treatment-card images <span class="required">*</span></label><input id="imageInput" name="images" type="file" accept="image/*" multiple required></div>
+      <div class="row"><label>Pentacam/topography and treatment-card images <span class="required">*</span></label><div class="file-picker-wrap"><input id="imageInput" name="images" type="file" accept="image/*" multiple required><div id="selectedFiles" class="selected-files" aria-live="polite"></div></div></div>
       <p id="sharedImageNotice" class="alert" hidden></p>
       <h3>Patient-level clinical modifiers</h3>
       <div class="modifier-row">
@@ -146,6 +146,26 @@ const wordBtn = document.querySelector("#wordBtn");
 const printBtn = document.querySelector("#printBtn");
 const imageInput = document.querySelector("#imageInput");
 const sharedImageNotice = document.querySelector("#sharedImageNotice");
+const selectedFiles = document.querySelector("#selectedFiles");
+let selectedFileUrls = [];
+function renderSelectedFiles(files){
+  selectedFileUrls.forEach(url=>URL.revokeObjectURL(url));
+  selectedFileUrls=[];
+  selectedFiles.replaceChildren();
+  [...files].forEach((file,index)=>{
+    const url=URL.createObjectURL(file);
+    selectedFileUrls.push(url);
+    const link=document.createElement("a");
+    link.className="selected-file";
+    link.href=url;
+    link.target="_blank";
+    link.rel="noopener";
+    link.textContent=file.name||`Image ${index+1}`;
+    link.title=`Open ${file.name||`image ${index+1}`}`;
+    selectedFiles.appendChild(link);
+  });
+}
+window.addEventListener("beforeunload",()=>selectedFileUrls.forEach(url=>URL.revokeObjectURL(url)));
 let lastReport = null;
 let sharedImages = [];
 const value = (id) => document.querySelector(`#${id}`).value;
@@ -172,6 +192,7 @@ async function loadSharedImages(){
     await cache.delete(metaUrl);
     if(!loaded.length)throw new Error("No readable image was received. Please share the photos again.");
     sharedImages=loaded;
+    renderSelectedFiles(loaded);
     imageInput.required=false;
     try{
       const transfer=new DataTransfer();
@@ -189,6 +210,7 @@ async function loadSharedImages(){
 }
 
 imageInput.addEventListener("change",()=>{
+  renderSelectedFiles(imageInput.files);
   if(imageInput.files.length){
     sharedImages=[];
     imageInput.required=true;
