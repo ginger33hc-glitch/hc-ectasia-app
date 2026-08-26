@@ -95,7 +95,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">HC Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.6.1</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.6.2</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <table class="meta-table"><tbody>
         <tr><th>Patient</th><td id="reportPatient">Not documented</td><th>Patient ID</th><td id="reportPatientId">Not documented</td></tr>
@@ -325,7 +325,9 @@ function renderEye(r, extracted){
     ["Procedure",v.procedure??"—"],["Score / category",`${s.total ?? "—"} / ${s.category ?? "—"}`],
     ["Prior refractive surgery",v.prior_refractive_surgery??"—"],["Stability / progression / CDVA flag",`${v.refractive_stability??"—"} / ${v.documented_progression??"—"} / ${v.unexplained_CDVA_below_20_20??"—"}`],
     ["Manifest refraction",manifestText(v)],["Intended correction",correctionText(v)],["Correction source",v.correction_source??"Manual / not documented"],
-    ["Thinnest pachymetry",`${fmt(v.pachy_thinnest_um,0)} µm`],["MRSE",`${fmt(v.MRSE_D,2)} D`],
+    ["Thinnest pachymetry",`${fmt(v.pachy_thinnest_um,0)} µm`],["Manifest MRSE",`${fmt(v.MRSE_D,2)} D`],
+    ["Intended MRSE",`${fmt(v.intended_MRSE_D,2)} D`],["Preoperative Kmean",`${fmt(v.preoperative_Kmean_D,2)} D`],
+    ["Estimated final Kmean",`${fmt(v.estimated_final_Kmean_D,2)} D`],["Corneal effect factor",`${fmt(v.corneal_effect_per_intended_MRSE_D,1)} D/D`],
     ["Maximum ablation",`${fmt(v.max_ablation_um,1)} µm`],["Laser platform",v.laser_platform??"—"],
     ["PRK epithelium",`${fmt(v.PRK_epithelium_um,0)} µm`],
     ["Optical / transition zone",`${fmt(v.optical_zone_mm,1)} mm / ${transition}`],["Enhancement anticipated",v.enhancement_anticipated??"—"],

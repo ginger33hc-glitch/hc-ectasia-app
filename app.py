@@ -15,7 +15,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="HC Ectasia App v0.6.1")
+app = FastAPI(title="HC Ectasia App v0.6.2")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -23,6 +23,9 @@ VALIDATED_MODEL = "gpt-5.6-terra"
 
 EYES = ("OD", "OS")
 PRK_EPITHELIUM_UM = 50
+CORNEAL_EFFECT_PER_INTENDED_MRSE_D = 0.8
+FINAL_KMEAN_MIN_D = 36.0
+FINAL_KMEAN_MAX_D = 48.0
 MORPHOLOGY = (
     "NORMAL_SYMMETRIC",
     "ASYMMETRIC_BOWTIE",
@@ -770,6 +773,9 @@ def assess_eye(
     missing.extend(required_tomography_missing(eye))
 
     pachy = eye.get("pachy_thinnest_um") if is_number(eye.get("pachy_thinnest_um")) else None
+    preoperative_kmean = eye.get("Kmean_D") if is_number(eye.get("Kmean_D")) else None
+    if preoperative_kmean is None:
+        missing.append("preoperative Kmean for final keratometry safety calculation")
     ablation = estimate_ablation(plan, warnings)
     if ablation is None:
         missing.append("maximum stromal ablation depth or inputs for HC estimate")
@@ -809,6 +815,16 @@ def assess_eye(
     intended_cylinder = plan.get("intended_cylinder_magnitude_D")
     manifest_sphere = plan.get("manifest_sphere_D")
     manifest_cylinder = plan.get("manifest_cylinder_magnitude_D")
+    intended_mrse = (
+        intended_sphere - intended_cylinder / 2
+        if is_number(intended_sphere) and is_number(intended_cylinder)
+        else None
+    )
+    estimated_final_kmean = (
+        preoperative_kmean + CORNEAL_EFFECT_PER_INTENDED_MRSE_D * intended_mrse
+        if preoperative_kmean is not None and intended_mrse is not None
+        else None
+    )
     mrse = (
         manifest_sphere - manifest_cylinder / 2
         if is_number(manifest_sphere) and is_number(manifest_cylinder)
@@ -831,6 +847,14 @@ def assess_eye(
         hard_stops.append("HC operational treatment-range hard stop: intended sphere <−10.00 D.")
     if is_number(intended_sphere) and intended_sphere > 6.0:
         hard_stops.append("HC operational treatment-range hard stop: intended sphere >+6.00 D.")
+    if estimated_final_kmean is not None and estimated_final_kmean < FINAL_KMEAN_MIN_D - 1e-9:
+        hard_stops.append(
+            "HC operational final-keratometry hard stop: estimated postoperative Kmean <36.00 D."
+        )
+    if estimated_final_kmean is not None and estimated_final_kmean > FINAL_KMEAN_MAX_D + 1e-9:
+        hard_stops.append(
+            "HC operational final-keratometry hard stop: estimated postoperative Kmean >48.00 D."
+        )
 
     if hard_stops:
         status = "DO NOT PROCEED"
@@ -1002,6 +1026,10 @@ def assess_eye(
             "correction_axis_deg": plan.get("correction_axis_deg"),
             "correction_source": plan.get("correction_source"),
             "MRSE_D": mrse,
+            "intended_MRSE_D": intended_mrse,
+            "preoperative_Kmean_D": preoperative_kmean,
+            "corneal_effect_per_intended_MRSE_D": CORNEAL_EFFECT_PER_INTENDED_MRSE_D,
+            "estimated_final_Kmean_D": estimated_final_kmean,
             "pachy_thinnest_um": pachy,
             "max_ablation_um": ablation,
             "PRK_epithelium_um": PRK_EPITHELIUM_UM if procedure == "PRK" else None,
@@ -1022,6 +1050,8 @@ def assess_eye(
                 "CCT <480 µm is a hard stop; exactly 480 µm is not stopped by that rule alone.",
                 "LASIK RSB <300 µm and PRK RST <310 µm are HC operational hard stops.",
                 "PRK epithelial thickness is standardized to 50 µm for HC calculations.",
+                "Estimated postoperative Kmean = preoperative Kmean + (0.8 × intended MRSE); "
+                "values <36.00 D or >48.00 D are HC operational hard stops.",
             ],
             "literature_limit": (
                 "The supplied evidence does not validate 310 µm as a universal safe PRK cutoff; "
@@ -1211,7 +1241,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.6.1 / source set 2026-08-25 plus binding HC amendments",
+        "version": "software v0.6.2 / source set 2026-08-25 plus binding HC amendments",
     }
 
 

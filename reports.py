@@ -121,7 +121,12 @@ def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
         ("Correction source", _text(values.get("correction_source"), "Manual / not documented")),
         ("Score / category", f"{_text(score.get('total'), '-')} / {_text(score.get('category'), '-') }"),
         ("Thinnest pachymetry", _fmt(values.get("pachy_thinnest_um"), 0, " um")),
-        ("MRSE", _fmt(values.get("MRSE_D"), 2, " D")),
+        ("Manifest MRSE", _fmt(values.get("MRSE_D"), 2, " D")),
+        ("Intended MRSE", _fmt(values.get("intended_MRSE_D"), 2, " D")),
+        ("Preoperative / estimated final Kmean", (
+            f"{_fmt(values.get('preoperative_Kmean_D'), 2, ' D')} / "
+            f"{_fmt(values.get('estimated_final_Kmean_D'), 2, ' D')}"
+        )),
         ("Maximum ablation", _fmt(values.get("max_ablation_um"), 1, " um")),
         ("Laser platform", _text(values.get("laser_platform"))),
         ("PRK epithelium", _fmt(values.get("PRK_epithelium_um"), 0, " um")),
@@ -213,7 +218,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
 
     story: List[Any] = []
     story.append(Paragraph("HC PREOPERATIVE ECTASIA RISK ASSESSMENT", styles["ReportTitle"]))
-    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.6.1", styles["ReportSub"]))
+    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.6.2", styles["ReportSub"]))
 
     metadata = [
         ["Patient", _ascii(patient.get("name")), "Patient ID", _ascii(patient.get("id"))],
@@ -447,7 +452,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     run.font.size = Pt(18)
     run.bold = True
     run.font.color.rgb = RGBColor.from_string(NAVY)
-    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.6.1")
+    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.6.2")
     subtitle.paragraph_format.space_after = Pt(10)
     for run in subtitle.runs:
         run.font.name = "Arial"

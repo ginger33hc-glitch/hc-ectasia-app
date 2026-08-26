@@ -147,6 +147,48 @@ class TestSafetyGates(unittest.TestCase):
         self.assertTrue(any(">+6.00" in item for item in plus_7["hard_stops"]))
         self.assertFalse(any(">+6.00" in item for item in plus_6["hard_stops"]))
 
+    def test_final_keratometry_uses_intended_mrse_and_exact_boundaries_are_allowed(self):
+        formula_eye = normal_eye()
+        formula_eye["Kmean_D"] = 42.5
+        formula = app.assess_eye(
+            formula_eye, plan(sphere=-4.5, cylinder=3.5), 35, MODIFIERS
+        )
+        self.assertEqual(formula["values"]["intended_MRSE_D"], -6.25)
+        self.assertEqual(formula["values"]["estimated_final_Kmean_D"], 37.5)
+
+        lower_eye = normal_eye()
+        lower_eye["Kmean_D"] = 44.0
+        lower = app.assess_eye(lower_eye, plan(sphere=-10.0, cylinder=0.0), 35, MODIFIERS)
+        upper_eye = normal_eye()
+        upper_eye["Kmean_D"] = 43.2
+        upper = app.assess_eye(upper_eye, plan(sphere=6.0, cylinder=0.0), 35, MODIFIERS)
+        self.assertEqual(lower["values"]["estimated_final_Kmean_D"], 36.0)
+        self.assertEqual(upper["values"]["estimated_final_Kmean_D"], 48.0)
+        self.assertFalse(any("final-keratometry" in item for item in lower["hard_stops"]))
+        self.assertFalse(any("final-keratometry" in item for item in upper["hard_stops"]))
+
+    def test_final_keratometry_outside_36_to_48_is_independent_hard_stop(self):
+        flat_eye = normal_eye()
+        flat_eye["Kmean_D"] = 43.5
+        flat = app.assess_eye(flat_eye, plan(sphere=-9.5, cylinder=0.0), 35, MODIFIERS)
+        steep_eye = normal_eye()
+        steep_eye["Kmean_D"] = 43.3
+        steep = app.assess_eye(steep_eye, plan(sphere=6.0, cylinder=0.0), 35, MODIFIERS)
+        self.assertAlmostEqual(flat["values"]["estimated_final_Kmean_D"], 35.9)
+        self.assertAlmostEqual(steep["values"]["estimated_final_Kmean_D"], 48.1)
+        self.assertEqual(flat["status"], "DO NOT PROCEED")
+        self.assertEqual(steep["status"], "DO NOT PROCEED")
+        self.assertTrue(any("<36.00" in item for item in flat["hard_stops"]))
+        self.assertTrue(any(">48.00" in item for item in steep["hard_stops"]))
+
+    def test_missing_kmean_prohibits_pass_instead_of_inferring_from_k1_k2(self):
+        eye = normal_eye()
+        eye["Kmean_D"] = None
+        result = app.assess_eye(eye, plan(), 35, MODIFIERS)
+        self.assertIsNone(result["values"]["estimated_final_Kmean_D"])
+        self.assertIn("preoperative Kmean for final keratometry safety calculation", result["missing"])
+        self.assertNotEqual(result["status"], "PASS")
+
     def test_manifest_refraction_not_intended_plan_drives_lasik_mrse(self):
         p = plan("LASIK", sphere=-9, cylinder=2, ablation=70, flap=100)
         p["manifest_sphere_D"] = -1
@@ -370,6 +412,7 @@ class TestScoringAndCompleteness(unittest.TestCase):
         eye = normal_eye(morphology="ASYMMETRIC_BOWTIE")
         eye["asymmetric_bow_tie"] = "YES"
         eye["inferior_opposite_steepening_D"] = 0.7
+        eye["Kmean_D"] = 44.0
         result = app.assess_eye(
             eye, plan("LASIK", sphere=-8.5, cylinder=1.0, ablation=100, flap=100), 28, MODIFIERS
         )
