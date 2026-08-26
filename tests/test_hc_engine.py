@@ -1,6 +1,8 @@
 import json
+import struct
 import unittest
 from io import BytesIO
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -448,6 +450,33 @@ class TestApiIntegration(unittest.TestCase):
         text = "\n".join(paragraph.text for paragraph in document.paragraphs)
         self.assertIn("HC PREOPERATIVE ECTASIA RISK ASSESSMENT", text)
         self.assertIn("PASS", text)
+
+
+class TestPwaIcons(unittest.TestCase):
+    def test_icon_files_are_real_pngs_with_declared_dimensions(self):
+        expected = {
+            "icon-192.png": (192, 192),
+            "icon-512.png": (512, 512),
+            "icon-maskable-512.png": (512, 512),
+        }
+        icon_dir = Path(__file__).resolve().parents[1] / "static" / "icons"
+        for filename, dimensions in expected.items():
+            raw = (icon_dir / filename).read_bytes()
+            self.assertEqual(raw[:8], b"\x89PNG\r\n\x1a\n")
+            self.assertEqual(raw[12:16], b"IHDR")
+            self.assertEqual(struct.unpack(">II", raw[16:24]), dimensions)
+
+    def test_manifest_and_html_use_cache_busted_v3_icons(self):
+        static_dir = Path(__file__).resolve().parents[1] / "static"
+        manifest = json.loads((static_dir / "manifest.webmanifest").read_text())
+        self.assertEqual({icon["src"] for icon in manifest["icons"]}, {
+            "/static/icons/icon-192.png?v=3",
+            "/static/icons/icon-512.png?v=3",
+            "/static/icons/icon-maskable-512.png?v=3",
+        })
+        html = (static_dir / "index.html").read_text()
+        self.assertIn('/static/manifest.webmanifest?v=3', html)
+        self.assertIn('/static/icons/icon-source.svg?v=3', html)
 
 
 if __name__ == "__main__":
