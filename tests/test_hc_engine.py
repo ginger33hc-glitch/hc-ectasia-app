@@ -596,5 +596,16 @@ class TestClinicalEligibilityGroupUi(unittest.TestCase):
             )
 
 
+class TestLiabilityNoticeUi(unittest.TestCase):
+    def test_top_input_box_contains_the_red_surgeon_liability_notice(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        notice = (
+            '<p class="liability-notice">Final decision and liability always rests on the surgeon, '
+            'this app is only an aid tool.</p>'
+        )
+        self.assertIn(notice, html)
+        self.assertIn('.liability-notice{color:#a31212;', html)
+
+
 if __name__ == "__main__":
     unittest.main()
