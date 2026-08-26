@@ -566,5 +566,15 @@ class TestZoneDropdownUi(unittest.TestCase):
         self.assertIn('transition_zone_not_applicable:"no"', html)
 
 
+class TestPriorSurgeryDefaultUi(unittest.TestCase):
+    def test_prior_surgery_defaults_to_no_and_yes_remains_selectable(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        expected = (
+            '<select id="${eye}_prior"><option value="no" selected>No</option>'
+            '<option value="yes">Yes</option><option value="unknown">Unknown</option></select>'
+        )
+        self.assertIn(expected, html)
+
+
 if __name__ == "__main__":
     unittest.main()

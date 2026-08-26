@@ -104,7 +104,7 @@
 
 <script>
 const eyeTemplate = (eye) => `
-  <div class="row"><label>Prior corneal refractive surgery?</label><select id="${eye}_prior"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+  <div class="row"><label>Prior corneal refractive surgery?</label><select id="${eye}_prior"><option value="no" selected>No</option><option value="yes">Yes</option><option value="unknown">Unknown</option></select></div>
   <div class="row"><label>Procedure</label><select id="${eye}_procedure"><option value="">Select</option><option value="PRK">PRK</option><option value="LASIK">LASIK</option></select></div>
   <div class="row"><label>Intended sphere (D)</label><input id="${eye}_sphere" type="number" step=".25"></div>
   <div class="row"><label>Cylinder magnitude (D)</label><input id="${eye}_cylinder" type="number" step=".25" min="0"></div>
