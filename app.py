@@ -77,6 +77,7 @@ SCHEMA = {
                     "asymmetric_bow_tie": {"type": "string", "enum": ["YES", "NO", "UNCERTAIN"]},
                     "srax": {"type": "string", "enum": ["YES", "NO", "UNCERTAIN"]},
                     "srax_deg": {"type": ["number", "null"]},
+                    "inferior_opposite_steepening_D": {"type": ["number", "null"]},
                     "anterior_pattern": {
                         "type": "string",
                         "enum": ["REASSURING", "BORDERLINE", "ABNORMAL", "UNREADABLE"],
@@ -94,6 +95,7 @@ SCHEMA = {
                     "posterior_elevation_thinnest_um", "thinnest_x_mm", "thinnest_y_mm",
                     "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um", "morphology",
                     "morphology_evidence", "asymmetric_bow_tie", "srax", "srax_deg",
+                    "inferior_opposite_steepening_D",
                     "anterior_pattern", "posterior_pattern",
                 ],
             },
@@ -151,9 +153,20 @@ thinnest-point location, pachymetric-progression, topometric, corneal-volume, an
 when they are printed; otherwise return null. Classify both visible anterior and posterior maps as
 REASSURING, BORDERLINE, ABNORMAL, or UNREADABLE. ABNORMAL_ECTATIC is reserved for a clearly visible keratoconus,
 forme-fruste keratoconus, pellucid/ectatic pattern; do not infer it from one isolated index.
-INFERIOR_STEEPENING_SRA requires visible inferior steepening or skewed radial axis. Record short
-visible reasons in morphology_evidence. If the relevant map is not sufficiently visible, use
-UNCERTAIN. Do not make a surgical recommendation. Do not calculate or infer missing BAD-D,
+Apply the published Placido-era ERSS morphology definitions strictly. A small or merely nonzero axis
+deviation is not SRAX/SRA. Set srax=YES and use INFERIOR_STEEPENING_SRA only when the image
+supports a skewed radial axis of at least 20 degrees. srax_deg is the angular separation of the two
+principal hemi-meridians; it is not the cylinder axis and not deviation from the horizontal or vertical
+meridian. Alternatively, INFERIOR_STEEPENING_SRA may be used when there is at least 1.0 D of
+inferior steepening versus the region 180 degrees opposite the steepest region and the printed I-S is
+less than 1.4 D. Record that regional difference only in inferior_opposite_steepening_D. Do not infer
+either numeric criterion from a slight visual asymmetry or from map colors alone. If the 20-degree or
+1.0-D criterion cannot be verified, set srax=UNCERTAIN, srax_deg=null, and use UNCERTAIN rather than
+INFERIOR_STEEPENING_SRA. Asymmetric bowtie requires greater than 0.5 D but less than 1.0 D of
+asymmetric steepening versus the region 180 degrees opposite, without SRA. Normal/symmetrical
+includes round, oval, and symmetric bowtie patterns. Record short visible reasons in
+morphology_evidence. If the relevant map is not sufficiently visible, use UNCERTAIN. Do not make a
+surgical recommendation. Do not calculate or infer missing BAD-D,
 component D values, ARTmax, or other indices from related measurements. Treat this as strict
 transcription and structured image interpretation, not autonomous diagnosis.
 
@@ -229,16 +242,39 @@ def lasik_topography_points(morphology: str) -> Optional[int]:
 
 def scoring_morphology(eye: Dict[str, Any]) -> Dict[str, Any]:
     """Apply published ERSS Placido definitions without declaring disease from one index."""
-    category = eye.get("morphology", "UNCERTAIN")
+    reported_category = eye.get("morphology", "UNCERTAIN")
+    category = reported_category
     evidence = list(eye.get("morphology_evidence", []))
     i_s = eye.get("I_S")
     srax_deg = eye.get("srax_deg")
-    if is_number(i_s) and i_s >= 1.4:
+    inferior_opposite = eye.get("inferior_opposite_steepening_D")
+    srax_supported = is_number(srax_deg) and srax_deg >= 20
+    inferior_supported = (
+        is_number(inferior_opposite)
+        and inferior_opposite >= 1.0
+        and is_number(i_s)
+        and i_s < 1.4
+    )
+    if reported_category == "ABNORMAL_ECTATIC":
+        category = "ABNORMAL_ECTATIC"
+    elif is_number(i_s) and i_s >= 1.4:
         category = "ABNORMAL_ECTATIC"
         evidence.append("Published Placido-era ERSS abnormal-pattern criterion: I-S >=1.4 D.")
-    elif eye.get("srax") == "YES" or (is_number(srax_deg) and srax_deg >= 20):
+    elif srax_supported or inferior_supported:
         category = "INFERIOR_STEEPENING_SRA"
-        evidence.append("Published ERSS SRA/SRAX category supported (SRA >=20 degrees or visible SRA).")
+        if srax_supported:
+            evidence.append("Published ERSS SRA/SRAX category supported: SRA/SRAX >=20 degrees.")
+        if inferior_supported:
+            evidence.append(
+                "Published ERSS inferior-steepening category supported: >=1.0 D versus the opposite "
+                "region with I-S <1.4 D."
+            )
+    elif reported_category == "INFERIOR_STEEPENING_SRA" or eye.get("srax") == "YES":
+        category = "UNCERTAIN"
+        evidence.append(
+            "SRAX/inferior-steepening label not scored: neither SRA/SRAX >=20 degrees nor the "
+            ">=1.0 D inferior-opposite criterion with I-S <1.4 D was documented."
+        )
     elif eye.get("asymmetric_bow_tie") == "YES" and category == "NORMAL_SYMMETRIC":
         category = "ASYMMETRIC_BOWTIE"
         evidence.append("Visible asymmetric bowtie category reported.")
@@ -868,7 +904,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         "KI": "max", "CKI": "max", "IHD": "max", "I_S": "max", "KISA": "max",
         "IHA": "max", "anterior_elevation_thinnest_um": "max",
         "posterior_elevation_thinnest_um": "max", "RMS_HOA_um": "max", "vertical_coma_um": "max",
-        "srax_deg": "max",
+        "srax_deg": "max", "inferior_opposite_steepening_D": "max",
     }
     morphology_rank = {
         "UNCERTAIN": 0, "NORMAL_SYMMETRIC": 1, "ASYMMETRIC_BOWTIE": 2,

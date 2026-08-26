@@ -11,6 +11,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Published five-component LASIK ERSS scoring and categories.
 - PRK-EWSS v1.0 provisional morphology/pachymetry/age triage score, explicitly labeled as unvalidated.
 - Morphology-first override gate for definite KC/FFKC/PMD or unequivocal ectatic morphology.
+- Published ERSS Placido thresholds are enforced for SRAX/inferior steepening: SRAX requires `≥20°`; the alternative category requires `≥1.0 D` inferior-versus-opposite steepening with `I-S <1.4 D`. Minimal axis deviation is not scored as SRAX, and unsupported visual labels remain unscorable rather than being guessed.
 - HC operational hard stops: preoperative thinnest pachymetry `<480 µm`, LASIK RSB `<300 µm`, and PRK RST `<310 µm`.
 - Standard HC PRK calculation: `RST = pachymetry - 50 µm epithelium - maximum stromal ablation`.
 - Zone-specific HC ablation estimates for explicitly documented Alcon EX500 plans: `12 µm/D` at 6.0 mm, `15 µm/D` at 6.5 mm, and `16.33 µm/D` at 7.0 mm; the actual treatment-plan maximum remains preferred.

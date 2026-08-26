@@ -53,6 +53,7 @@ def normal_eye(eye="OD", pachy=560, morphology="NORMAL_SYMMETRIC"):
         "asymmetric_bow_tie": "NO",
         "srax": "NO",
         "srax_deg": 0,
+        "inferior_opposite_steepening_D": 0,
         "anterior_pattern": "REASSURING",
         "posterior_pattern": "REASSURING",
     }
@@ -181,6 +182,61 @@ class TestBoundaries(unittest.TestCase):
         self.assertEqual(result["topography_classification"]["scoring_category"], "INFERIOR_STEEPENING_SRA")
         self.assertEqual(result["score"]["rows"]["topography"], 3)
         self.assertEqual(result["status"], "CAUTION — STOP/DEFER")
+
+    def test_minimal_axis_deviation_is_not_scored_as_srax(self):
+        eye = normal_eye()
+        eye["morphology"] = "INFERIOR_STEEPENING_SRA"
+        eye["srax"] = "YES"
+        eye["srax_deg"] = 5
+        result = app.assess_eye(
+            eye, plan("LASIK", sphere=-3, ablation=100, flap=100), 35, MODIFIERS
+        )
+        self.assertEqual(result["topography_classification"]["scoring_category"], "UNCERTAIN")
+        self.assertIsNone(result["score"]["rows"]["topography"])
+        self.assertNotEqual(result["status"], "PASS")
+
+    def test_srax_below_20_degrees_is_not_scored(self):
+        eye = normal_eye()
+        eye["morphology"] = "INFERIOR_STEEPENING_SRA"
+        eye["srax"] = "YES"
+        eye["srax_deg"] = 19.9
+        result = app.assess_eye(
+            eye, plan("LASIK", sphere=-3, ablation=100, flap=100), 35, MODIFIERS
+        )
+        self.assertEqual(result["topography_classification"]["scoring_category"], "UNCERTAIN")
+        self.assertNotEqual(result["status"], "PASS")
+
+    def test_unquantified_visual_srax_label_is_not_scored(self):
+        eye = normal_eye()
+        eye["morphology"] = "INFERIOR_STEEPENING_SRA"
+        eye["srax"] = "YES"
+        eye["srax_deg"] = None
+        result = app.assess_eye(
+            eye, plan("LASIK", sphere=-3, ablation=100, flap=100), 35, MODIFIERS
+        )
+        self.assertEqual(result["topography_classification"]["scoring_category"], "UNCERTAIN")
+        self.assertNotEqual(result["status"], "PASS")
+
+    def test_quantified_inferior_steepening_alternative_uses_published_category(self):
+        eye = normal_eye()
+        eye["morphology"] = "UNCERTAIN"
+        eye["I_S"] = 1.3
+        eye["inferior_opposite_steepening_D"] = 1.0
+        result = app.assess_eye(
+            eye, plan("LASIK", sphere=-3, ablation=100, flap=100), 35, MODIFIERS
+        )
+        self.assertEqual(result["topography_classification"]["scoring_category"], "INFERIOR_STEEPENING_SRA")
+        self.assertEqual(result["score"]["rows"]["topography"], 3)
+
+    def test_definite_ectatic_morphology_is_not_downgraded_by_srax_fields(self):
+        eye = normal_eye(morphology="ABNORMAL_ECTATIC")
+        eye["srax"] = "YES"
+        eye["srax_deg"] = 5
+        result = app.assess_eye(
+            eye, plan("LASIK", sphere=-3, ablation=100, flap=100), 35, MODIFIERS
+        )
+        self.assertEqual(result["topography_classification"]["scoring_category"], "ABNORMAL_ECTATIC")
+        self.assertEqual(result["status"], "DO NOT PROCEED")
 
     def test_ablation_estimate_uses_zone_specific_ex500_conventions(self):
         zone_6 = plan(ablation=None)
