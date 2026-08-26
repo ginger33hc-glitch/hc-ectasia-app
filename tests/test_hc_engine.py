@@ -274,6 +274,8 @@ class TestScoringAndCompleteness(unittest.TestCase):
 
     def test_lasik_erss_moderate_means_stop_defer(self):
         eye = normal_eye(morphology="ASYMMETRIC_BOWTIE")
+        eye["asymmetric_bow_tie"] = "YES"
+        eye["inferior_opposite_steepening_D"] = 0.7
         result = app.assess_eye(
             eye, plan("LASIK", sphere=-8.5, cylinder=1.0, ablation=100, flap=100), 28, MODIFIERS
         )
@@ -342,16 +344,57 @@ class TestScoringAndCompleteness(unittest.TestCase):
         result = app.assess_eye(merged["eyes"][0], plan(), 35, MODIFIERS)
         self.assertNotEqual(result["status"], "PASS")
 
-    def test_noncritical_numeric_conflict_is_unresolved_and_prohibits_pass(self):
+    def test_minor_keratometry_ocr_variation_is_not_an_unresolved_conflict(self):
         first = normal_eye()
         second = normal_eye()
-        second["K1_D"] = 42.25
+        first["K2_D"] = 46.8
+        second["K2_D"] = 46.6
         merged = app.merge_extractions(
             [{"eyes": [first], "global_warnings": []}, {"eyes": [second], "global_warnings": []}]
         )
+        self.assertEqual(merged["eyes"][0]["K2_D"], 46.8)
+        self.assertFalse(any("K2_D" in item for item in merged["eyes"][0]["data_conflicts"]))
         result = app.assess_eye(merged["eyes"][0], plan(), 35, MODIFIERS)
-        self.assertEqual(result["status"], "DATA INSUFFICIENT")
-        self.assertTrue(any("K1_D" in item for item in result["missing"]))
+        self.assertEqual(result["status"], "PASS")
+
+    def test_material_keratometry_difference_remains_a_conflict(self):
+        first = normal_eye()
+        second = normal_eye()
+        second["K2_D"] = 43.3
+        merged = app.merge_extractions(
+            [{"eyes": [first], "global_warnings": []}, {"eyes": [second], "global_warnings": []}]
+        )
+        self.assertTrue(any("K2_D" in item for item in merged["eyes"][0]["data_conflicts"]))
+
+    def test_uncertain_or_unreadable_page_does_not_conflict_with_readable_page(self):
+        readable = normal_eye()
+        limited = normal_eye()
+        limited.update(
+            morphology="UNCERTAIN",
+            asymmetric_bow_tie="UNCERTAIN",
+            srax="UNCERTAIN",
+            anterior_pattern="UNREADABLE",
+            posterior_pattern="UNREADABLE",
+        )
+        merged = app.merge_extractions(
+            [{"eyes": [readable], "global_warnings": []}, {"eyes": [limited], "global_warnings": []}]
+        )
+        eye = merged["eyes"][0]
+        self.assertEqual(eye["morphology"], "NORMAL_SYMMETRIC")
+        self.assertEqual(eye["posterior_pattern"], "REASSURING")
+        self.assertEqual(eye["data_conflicts"], [])
+
+    def test_unsupported_asymmetric_bowtie_label_does_not_override_supported_normal_map(self):
+        normal = normal_eye()
+        unsupported = normal_eye(morphology="ASYMMETRIC_BOWTIE")
+        unsupported["asymmetric_bow_tie"] = "YES"
+        unsupported["inferior_opposite_steepening_D"] = None
+        merged = app.merge_extractions(
+            [{"eyes": [normal], "global_warnings": []}, {"eyes": [unsupported], "global_warnings": []}]
+        )
+        eye = merged["eyes"][0]
+        self.assertEqual(eye["morphology"], "NORMAL_SYMMETRIC")
+        self.assertFalse(any("morphology" in item for item in eye["data_conflicts"]))
 
     def test_bilateral_engine_keeps_eyes_separate_and_overall_is_worst(self):
         extracted = {"eyes": [normal_eye("OD", 560), normal_eye("OS", 479)], "global_warnings": []}

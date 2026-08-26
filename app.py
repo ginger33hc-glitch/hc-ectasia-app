@@ -153,6 +153,12 @@ thinnest-point location, pachymetric-progression, topometric, corneal-volume, an
 when they are printed; otherwise return null. Classify both visible anterior and posterior maps as
 REASSURING, BORDERLINE, ABNORMAL, or UNREADABLE. ABNORMAL_ECTATIC is reserved for a clearly visible keratoconus,
 forme-fruste keratoconus, pellucid/ectatic pattern; do not infer it from one isolated index.
+Extract K1_D, K2_D, and Kmax_D only from explicitly labeled K1, K2, and Kmax summary-table fields.
+Never use a numeric spot label printed inside a curvature map as K1, K2, or Kmax. If the labeled
+summary field is not visible, return null for that field. Classify morphology only when an axial,
+sagittal, tangential, or Placido curvature/topography map is actually visible. A BAD display without
+such a curvature map does not support a morphology classification; use UNCERTAIN for morphology,
+asymmetric_bow_tie, and srax on that image rather than inferring them from elevation or pachymetry.
 Apply the published Placido-era ERSS morphology definitions strictly. A small or merely nonzero axis
 deviation is not SRAX/SRA. Set srax=YES and use INFERIOR_STEEPENING_SRA only when the image
 supports a skewed radial axis of at least 20 degrees. srax_deg is the angular separation of the two
@@ -255,6 +261,11 @@ def scoring_morphology(eye: Dict[str, Any]) -> Dict[str, Any]:
         and is_number(i_s)
         and i_s < 1.4
     )
+    asymmetric_supported = (
+        is_number(inferior_opposite)
+        and 0.5 < inferior_opposite < 1.0
+        and not srax_supported
+    )
     if reported_category == "ABNORMAL_ECTATIC":
         category = "ABNORMAL_ECTATIC"
     elif is_number(i_s) and i_s >= 1.4:
@@ -275,9 +286,19 @@ def scoring_morphology(eye: Dict[str, Any]) -> Dict[str, Any]:
             "SRAX/inferior-steepening label not scored: neither SRA/SRAX >=20 degrees nor the "
             ">=1.0 D inferior-opposite criterion with I-S <1.4 D was documented."
         )
-    elif eye.get("asymmetric_bow_tie") == "YES" and category == "NORMAL_SYMMETRIC":
-        category = "ASYMMETRIC_BOWTIE"
-        evidence.append("Visible asymmetric bowtie category reported.")
+    elif reported_category == "ASYMMETRIC_BOWTIE" or eye.get("asymmetric_bow_tie") == "YES":
+        if asymmetric_supported:
+            category = "ASYMMETRIC_BOWTIE"
+            evidence.append(
+                "Published ERSS asymmetric-bowtie category supported: >0.5 D and <1.0 D "
+                "versus the region 180 degrees opposite, without SRA."
+            )
+        else:
+            category = "UNCERTAIN"
+            evidence.append(
+                "Asymmetric-bowtie label not scored: the required >0.5 D and <1.0 D "
+                "opposite-region difference without SRA was not documented."
+            )
     return {"category": category, "evidence": list(dict.fromkeys(evidence))}
 
 
@@ -890,7 +911,7 @@ def hc_engine(
         "eyes": results,
         "warnings": extracted.get("global_warnings", []),
         "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.5 / source set 2026-08-25 plus binding HC amendments",
+        "version": "software v0.5.1 / source set 2026-08-25 plus binding HC amendments",
     }
 
 
@@ -912,13 +933,31 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
     quality_rank = {"INADEQUATE": 0, "LIMITED": 1, "ADEQUATE": 2}
     posterior_rank = {"UNREADABLE": 0, "REASSURING": 1, "BORDERLINE": 2, "ABNORMAL": 3}
+    numeric_tolerance = {
+        # These fields are not HC score inputs. Small differences commonly represent OCR of a
+        # nearby map label or display rounding, not a clinically meaningful multi-image conflict.
+        "K1_D": 0.25,
+        "K2_D": 0.25,
+        "Kmax_D": 0.25,
+    }
+
+    def normalized_eye(raw_eye: Dict[str, Any]) -> Dict[str, Any]:
+        eye = dict(raw_eye)
+        derived = scoring_morphology(eye)["category"]
+        eye["morphology"] = derived
+        if eye.get("asymmetric_bow_tie") == "YES" and derived != "ASYMMETRIC_BOWTIE":
+            eye["asymmetric_bow_tie"] = "UNCERTAIN"
+        if eye.get("srax") == "YES" and derived != "INFERIOR_STEEPENING_SRA":
+            eye["srax"] = "UNCERTAIN"
+        return eye
 
     for result in results:
         merged["global_warnings"].extend(result.get("global_warnings", []))
         merged["treatment_corrections"].extend(
             item for item in result.get("treatment_corrections", []) if isinstance(item, dict)
         )
-        for eye in result.get("eyes", []):
+        for raw_eye in result.get("eyes", []):
+            eye = normalized_eye(raw_eye)
             eye_id = eye.get("eye", "UNKNOWN")
             if eye_id not in by_eye:
                 by_eye[eye_id] = dict(eye)
@@ -941,6 +980,36 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     continue
                 if value is None or old == value:
                     continue
+
+                # Missing/uncertain information on a page that lacks the relevant map is not
+                # contradictory evidence against a readable observation on another page.
+                if key == "morphology":
+                    if old == "UNCERTAIN" and value != "UNCERTAIN":
+                        target[key] = value
+                        continue
+                    if value == "UNCERTAIN":
+                        continue
+                elif key in ("anterior_pattern", "posterior_pattern"):
+                    if old == "UNREADABLE" and value != "UNREADABLE":
+                        target[key] = value
+                        continue
+                    if value == "UNREADABLE":
+                        continue
+                elif key in ("asymmetric_bow_tie", "srax"):
+                    if old == "UNCERTAIN" and value != "UNCERTAIN":
+                        target[key] = value
+                        continue
+                    if value == "UNCERTAIN":
+                        continue
+
+                if (
+                    key in numeric_tolerance
+                    and is_number(old)
+                    and is_number(value)
+                    and abs(float(old) - float(value)) <= numeric_tolerance[key]
+                ):
+                    continue
+
                 target["data_conflicts"].append(f"{key}: {old} vs {value}")
                 if key in conservative and is_number(old) and is_number(value):
                     target[key] = min(old, value) if conservative[key] == "min" else max(old, value)
