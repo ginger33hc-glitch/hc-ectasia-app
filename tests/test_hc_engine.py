@@ -119,11 +119,14 @@ MODIFIERS = {
 }
 
 
-def document_context(patient_id="HC-1", dob="2000-01-01", exam_date="2026-08-25", qs="OK"):
+def document_context(
+    patient_id="HC-1", patient_age_years=26, exam_date="2026-08-25", qs="OK",
+    patient_name="Test Patient", laterality="BOTH",
+):
     return {
         "document_type": "PENTACAM_TOPOGRAPHY", "patient_id": patient_id,
-        "patient_name": "Test Patient", "date_of_birth": dob, "exam_date": exam_date,
-        "exam_time": "10:00", "laterality": "BOTH", "pentacam_qs": qs,
+        "patient_name": patient_name, "patient_age_years": patient_age_years, "exam_date": exam_date,
+        "exam_time": "10:00", "laterality": laterality, "pentacam_qs": qs,
         "missing_or_unreadable": [], "source_filename": "pentacam.png",
     }
 
@@ -227,6 +230,50 @@ class TestSafetyGates(unittest.TestCase):
         self.assertTrue(any("Conflicting patient IDs" in item for item in merged["critical_input_issues"]))
         self.assertTrue(any("Conflicting Pentacam" in item for item in merged["critical_input_issues"]))
         self.assertTrue(any("non-OK QS" in item for item in merged["critical_input_issues"]))
+
+    def test_matching_od_os_pentacam_identity_and_printed_age_are_used(self):
+        od_context = document_context(patient_id="P-77", patient_age_years=35, laterality="OD")
+        od_context["source_filename"] = "od.png"
+        os_context = document_context(patient_id="P-77", patient_age_years=35, laterality="OS")
+        os_context["source_filename"] = "os.png"
+        merged = app.merge_extractions([
+            {"document_context": od_context, "eyes": [normal_eye("OD")], "treatment_corrections": [], "global_warnings": []},
+            {"document_context": os_context, "eyes": [normal_eye("OS")], "treatment_corrections": [], "global_warnings": []},
+        ])
+        self.assertEqual(merged["derived_age_years"], 35)
+        self.assertFalse(any("same patient" in item for item in merged["critical_input_issues"]))
+        decision = app.hc_engine(
+            merged, None, {"OD": plan(), "OS": plan()}, MODIFIERS, {"id": "P-77"}
+        )
+        self.assertEqual([eye["values"]["age_years"] for eye in decision["eyes"]], [35, 35])
+
+    def test_conflicting_pentacam_ages_block_overall_pass(self):
+        od_context = document_context(patient_age_years=35, laterality="OD")
+        os_context = document_context(patient_age_years=36, laterality="OS")
+        merged = app.merge_extractions([
+            {"document_context": od_context, "eyes": [normal_eye("OD")], "treatment_corrections": [], "global_warnings": []},
+            {"document_context": os_context, "eyes": [normal_eye("OS")], "treatment_corrections": [], "global_warnings": []},
+        ])
+        self.assertNotIn("derived_age_years", merged)
+        self.assertTrue(any("Conflicting patient ages" in item for item in merged["critical_input_issues"]))
+
+    def test_od_os_sources_without_shared_readable_identifier_cannot_be_verified(self):
+        od_context = document_context(patient_id="P-77", patient_name=None, laterality="OD")
+        os_context = document_context(patient_id=None, patient_name="Test Patient", laterality="OS")
+        merged = app.merge_extractions([
+            {"document_context": od_context, "eyes": [normal_eye("OD")], "treatment_corrections": [], "global_warnings": []},
+            {"document_context": os_context, "eyes": [normal_eye("OS")], "treatment_corrections": [], "global_warnings": []},
+        ])
+        self.assertTrue(any("could not be verified as the same patient" in item for item in merged["critical_input_issues"]))
+
+    def test_date_of_birth_is_removed_and_manual_age_is_requested_only_after_unreadable_age(self):
+        html = Path("static/index.html").read_text(encoding="utf-8")
+        self.assertNotIn('id="date_of_birth"', html)
+        self.assertIn('id="manualAgeRow" hidden', html)
+        self.assertIn("Patient age could not be read from the Pentacam image", html)
+        context_schema = app.SCHEMA["properties"]["document_context"]["properties"]
+        self.assertNotIn("date_of_birth", context_schema)
+        self.assertIn("patient_age_years", context_schema)
 
     def test_clinical_eligibility_modifier_blocks_pass_without_score_points(self):
         modifiers = dict(MODIFIERS, pregnancy_nursing="yes")

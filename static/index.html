@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>HC Ectasia App v0.6</title>
+  <title>HC Ectasia App v0.6.3</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=5">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=4">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=4">
@@ -31,7 +31,7 @@
   </style>
 </head>
 <body>
-<header><h1>HC Ectasia App v0.6</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
+<header><h1>HC Ectasia App v0.6.3</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -42,8 +42,7 @@
       <div class="grid">
         <div class="row"><label>Patient name</label><input id="patient_name" type="text" autocomplete="off"></div>
         <div class="row"><label>Patient ID / record number</label><input id="patient_id" type="text" autocomplete="off"></div>
-        <div class="row"><label>Date of birth</label><input id="date_of_birth" type="date"></div>
-        <div class="row"><label>Patient age (years; may be derived from source)</label><input id="age" name="age" type="number" min="18" max="120" step="1"></div>
+        <div class="row" id="manualAgeRow" hidden><label>Patient age (Pentacam age unreadable; enter years)</label><input id="age" name="age" type="number" min="18" max="120" step="1"></div>
         <div class="row"><label>Reviewer / surgeon</label><input id="reviewer" type="text" autocomplete="off"></div>
         <div class="row"><label>Assessment date</label><input id="report_date" type="date"></div>
       </div>
@@ -95,7 +94,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">HC Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.6.2</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.6.3</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <table class="meta-table"><tbody>
         <tr><th>Patient</th><td id="reportPatient">Not documented</td><th>Patient ID</th><td id="reportPatientId">Not documented</td></tr>
@@ -168,7 +167,15 @@ const printBtn = document.querySelector("#printBtn");
 const imageInput = document.querySelector("#imageInput");
 const sharedImageNotice = document.querySelector("#sharedImageNotice");
 const selectedFiles = document.querySelector("#selectedFiles");
+const manualAgeRow = document.querySelector("#manualAgeRow");
+const ageInput = document.querySelector("#age");
 let selectedFileUrls = [];
+function resetAgeAcquisition(){
+  ageInput.value="";
+  ageInput.readOnly=false;
+  ageInput.required=false;
+  manualAgeRow.hidden=true;
+}
 function renderSelectedFiles(files){
   selectedFileUrls.forEach(url=>URL.revokeObjectURL(url));
   selectedFileUrls=[];
@@ -213,6 +220,7 @@ async function loadSharedImages(){
     await cache.delete(metaUrl);
     if(!loaded.length)throw new Error("No readable image was received. Please share the photos again.");
     sharedImages=loaded;
+    resetAgeAcquisition();
     renderSelectedFiles(loaded);
     imageInput.required=false;
     try{
@@ -231,6 +239,7 @@ async function loadSharedImages(){
 }
 
 imageInput.addEventListener("change",()=>{
+  resetAgeAcquisition();
   renderSelectedFiles(imageInput.files);
   if(imageInput.files.length){
     sharedImages=[];
@@ -361,7 +370,7 @@ function renderEye(r, extracted){
 }
 
 function patientPayload(){return {
-  name:value("patient_name")||null, id:value("patient_id")||null, date_of_birth:value("date_of_birth")||null, age:numberOrNull("age"),
+  name:value("patient_name")||null, id:value("patient_id")||null, age:numberOrNull("age"),
   reviewer:value("reviewer")||null, report_date:value("report_date")||null
 }}
 function setReportMetadata(decision){
@@ -435,14 +444,33 @@ f.addEventListener("submit", async (e) => {
     const r=await fetch("/analyze",{method:"POST",body:fd}); const text=await r.text();
     let j; try{j=JSON.parse(text)}catch{throw new Error("Server returned a non-JSON response: "+text.slice(0,200))}
     if(!r.ok)throw new Error(j.detail||"Request failed");
+    const extractedAge=j.extracted?.derived_age_years;
+    const enteredAge=numberOrNull("age");
+    const agePromptNeeded=!(Number.isInteger(extractedAge))&&enteredAge===null;
+    if(Number.isInteger(extractedAge)&&enteredAge===null){
+      ageInput.value=extractedAge;
+      ageInput.readOnly=true;
+      ageInput.required=false;
+      manualAgeRow.hidden=true;
+    }else if(!Number.isInteger(extractedAge)){
+      ageInput.readOnly=false;
+      ageInput.required=true;
+      manualAgeRow.hidden=false;
+    }
     applyEffectivePlans(j.effective_eye_plans);
     statusBox.textContent=j.decision.status; statusBox.className=`status ${statusClass(j.decision.status)}`;
     overallNote.textContent=j.decision.action||"";
     eyeResults.innerHTML=listBlock("Global source / identity blockers",j.decision.critical_input_issues)+(j.decision.eyes||[]).map(x=>renderEye(x,j.extracted)).join("");
     decisionBox.textContent=JSON.stringify(j.decision,null,2); extractBox.textContent=JSON.stringify(j.extracted,null,2);
     lastReport={patient:patientPayload(),decision:j.decision,extracted:j.extracted};setReportMetadata(j.decision);reportCard.hidden=false;
-    analysisProgress.hidden=true;
-    reportCard.scrollIntoView({behavior:"smooth",block:"start"});
+    if(agePromptNeeded){
+      showFormMessage("Patient age could not be read from the Pentacam image. Enter the age, then run the assessment again.");
+      manualAgeRow.scrollIntoView({behavior:"smooth",block:"center"});
+      ageInput.focus();
+    }else{
+      analysisProgress.hidden=true;
+      reportCard.scrollIntoView({behavior:"smooth",block:"start"});
+    }
   }catch(err){
     statusBox.textContent="ERROR";statusBox.className="status fail";decisionBox.textContent=String(err);
     showFormMessage(`Analysis failed: ${err.message||String(err)}`);
