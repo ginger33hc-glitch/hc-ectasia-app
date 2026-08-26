@@ -18,6 +18,7 @@ def normal_eye(eye="OD", pachy=560, morphology="NORMAL_SYMMETRIC"):
         "screen_types": ["4 Maps", "BAD Display"],
         "quality": "ADEQUATE",
         "missing_or_unreadable": [],
+        "table_verified_numeric_fields": list(app.TABLE_NUMERIC_FIELDS),
         "K1_D": 42.0,
         "K2_D": 43.0,
         "Kmax_D": 44.0,
@@ -267,6 +268,13 @@ class TestBoundaries(unittest.TestCase):
 
 
 class TestScoringAndCompleteness(unittest.TestCase):
+    def test_extraction_contract_prioritizes_labeled_pentacam_numeric_fields(self):
+        eye_schema = app.SCHEMA["properties"]["eyes"]["items"]
+        self.assertIn("table_verified_numeric_fields", eye_schema["required"])
+        self.assertIn("PENTACAM NUMERIC-SOURCE RULE", app.PROMPT)
+        self.assertIn("Never substitute a map spot value", app.PROMPT)
+        self.assertIn("Only the categorical fields", app.PROMPT)
+
     def test_reassuring_prk_can_pass(self):
         result = app.assess_eye(normal_eye(), plan(), 35, MODIFIERS)
         self.assertEqual(result["score"]["total"], 0)
@@ -356,6 +364,36 @@ class TestScoringAndCompleteness(unittest.TestCase):
         self.assertFalse(any("K2_D" in item for item in merged["eyes"][0]["data_conflicts"]))
         result = app.assess_eye(merged["eyes"][0], plan(), 35, MODIFIERS)
         self.assertEqual(result["status"], "PASS")
+
+    def test_unverified_map_spot_number_is_not_accepted_as_a_table_parameter(self):
+        eye = normal_eye()
+        eye["K2_D"] = 46.6
+        eye["table_verified_numeric_fields"].remove("K2_D")
+        merged = app.merge_extractions([{"eyes": [eye], "global_warnings": []}])
+        extracted = merged["eyes"][0]
+        self.assertIsNone(extracted["K2_D"])
+        self.assertIn("K2_D", extracted["missing_or_unreadable"])
+        self.assertEqual(extracted["morphology"], "NORMAL_SYMMETRIC")
+
+    def test_labeled_side_table_number_is_retained(self):
+        eye = normal_eye()
+        eye["K2_D"] = 46.8
+        merged = app.merge_extractions([{"eyes": [eye], "global_warnings": []}])
+        self.assertEqual(merged["eyes"][0]["K2_D"], 46.8)
+
+    def test_table_verified_field_lists_are_unioned_without_conflict(self):
+        first = normal_eye()
+        second = normal_eye()
+        first["table_verified_numeric_fields"] = ["K1_D"]
+        second["table_verified_numeric_fields"] = ["K2_D"]
+        merged = app.merge_extractions(
+            [{"eyes": [first], "global_warnings": []}, {"eyes": [second], "global_warnings": []}]
+        )
+        eye = merged["eyes"][0]
+        self.assertEqual(eye["table_verified_numeric_fields"], ["K1_D", "K2_D"])
+        self.assertEqual(eye["K1_D"], 42.0)
+        self.assertEqual(eye["K2_D"], 43.0)
+        self.assertFalse(any("table_verified" in item for item in eye["data_conflicts"]))
 
     def test_material_keratometry_difference_remains_a_conflict(self):
         first = normal_eye()

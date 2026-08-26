@@ -27,6 +27,13 @@ MORPHOLOGY = (
     "ABNORMAL_ECTATIC",
     "UNCERTAIN",
 )
+TABLE_NUMERIC_FIELDS = (
+    "K1_D", "K2_D", "Kmax_D", "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp",
+    "Dt", "Da", "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI",
+    "CKI", "IHD", "I_S", "KISA", "IHA", "Rmin_mm", "anterior_elevation_thinnest_um",
+    "posterior_elevation_thinnest_um", "thinnest_x_mm", "thinnest_y_mm",
+    "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um",
+)
 
 SCHEMA = {
     "type": "object",
@@ -42,6 +49,10 @@ SCHEMA = {
                     "screen_types": {"type": "array", "items": {"type": "string"}},
                     "quality": {"type": "string", "enum": ["ADEQUATE", "LIMITED", "INADEQUATE"]},
                     "missing_or_unreadable": {"type": "array", "items": {"type": "string"}},
+                    "table_verified_numeric_fields": {
+                        "type": "array",
+                        "items": {"type": "string", "enum": list(TABLE_NUMERIC_FIELDS)},
+                    },
                     "K1_D": {"type": ["number", "null"]},
                     "K2_D": {"type": ["number", "null"]},
                     "Kmax_D": {"type": ["number", "null"]},
@@ -88,7 +99,8 @@ SCHEMA = {
                     },
                 },
                 "required": [
-                    "eye", "screen_types", "quality", "missing_or_unreadable", "K1_D", "K2_D",
+                    "eye", "screen_types", "quality", "missing_or_unreadable",
+                    "table_verified_numeric_fields", "K1_D", "K2_D",
                     "Kmax_D", "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp", "Dt", "Da",
                     "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI", "CKI", "IHD",
                     "I_S", "KISA", "IHA", "Rmin_mm", "anterior_elevation_thinnest_um",
@@ -146,16 +158,37 @@ The image may be a Pentacam/topography screen, an Excimer Laser Follow-up Card (
 Karti), or another clinical document. Extract only values visibly supported by the supplied image.
 Never guess an unreadable or absent
 number. Identify OD/OS and screen type. Return null for unreadable/absent numeric values and list
-them in missing_or_unreadable. Classify the visible Placido/topographic morphology using exactly
+them in missing_or_unreadable.
+
+PENTACAM NUMERIC-SOURCE RULE — this rule has priority over map interpretation:
+First inspect the labeled parameter panels, side tables, summary tables, and the labeled numeric
+boxes around the edge of the Pentacam display. Every numeric output in TABLE_NUMERIC_FIELDS must be
+copied only from its own explicitly labeled printed field. Add the exact output-field name to
+table_verified_numeric_fields only when that labeled field is visible and the value was transcribed
+from it. The list must exactly match the non-null table-derived numeric outputs. If the corresponding
+labeled field is absent, obscured, or unreadable, return null even if a similar-looking number appears
+inside a color map. Never substitute a map spot value, color-scale value, axis label, neighboring
+parameter, calculated value, average, or visual estimate for a printed parameter. Do not calculate
+BAD-D components, PPI, ARTmax, K values, pachymetry, topometric indices, elevation-at-thinnest,
+coordinates, corneal volume, HOA, or coma from other values. A labeled BAD-display center/bottom
+numeric box counts as a printed parameter field; an unlabeled number inside the map does not.
+
+Only the categorical fields that genuinely require map inspection may be produced visually:
+morphology, asymmetric_bow_tie, srax, anterior_pattern, and posterior_pattern. srax_deg and
+inferior_opposite_steepening_D may be returned only when their exact geometric/numeric criteria can
+be directly verified from the visible curvature map; otherwise return null. These two visual-derived
+numeric fields are not members of table_verified_numeric_fields.
+
+Classify the visible Placido/topographic morphology using exactly
 one of: NORMAL_SYMMETRIC, ASYMMETRIC_BOWTIE, INFERIOR_STEEPENING_SRA,
 ABNORMAL_ECTATIC, UNCERTAIN. Transcribe visible anterior/posterior elevation-at-thinnest-point,
 thinnest-point location, pachymetric-progression, topometric, corneal-volume, and HOA/coma values
 when they are printed; otherwise return null. Classify both visible anterior and posterior maps as
 REASSURING, BORDERLINE, ABNORMAL, or UNREADABLE. ABNORMAL_ECTATIC is reserved for a clearly visible keratoconus,
 forme-fruste keratoconus, pellucid/ectatic pattern; do not infer it from one isolated index.
-Extract K1_D, K2_D, and Kmax_D only from explicitly labeled K1, K2, and Kmax summary-table fields.
-Never use a numeric spot label printed inside a curvature map as K1, K2, or Kmax. If the labeled
-summary field is not visible, return null for that field. Classify morphology only when an axial,
+In particular, extract K1_D, K2_D, and Kmax_D only from explicitly labeled K1, K2, and Kmax
+summary-table fields. Never use a numeric spot label printed inside a curvature map as K1, K2, or
+Kmax. If the labeled summary field is not visible, return null for that field. Classify morphology only when an axial,
 sagittal, tangential, or Placido curvature/topography map is actually visible. A BAD display without
 such a curvature map does not support a morphology classification; use UNCERTAIN for morphology,
 asymmetric_bow_tie, and srax on that image rather than inferring them from elevation or pachymetry.
@@ -911,7 +944,7 @@ def hc_engine(
         "eyes": results,
         "warnings": extracted.get("global_warnings", []),
         "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.5.1 / source set 2026-08-25 plus binding HC amendments",
+        "version": "software v0.5.2 / source set 2026-08-25 plus binding HC amendments",
     }
 
 
@@ -943,6 +976,16 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     def normalized_eye(raw_eye: Dict[str, Any]) -> Dict[str, Any]:
         eye = dict(raw_eye)
+        verified = eye.get("table_verified_numeric_fields")
+        if isinstance(verified, list):
+            verified_set = set(verified)
+            missing = list(eye.get("missing_or_unreadable", []))
+            for field in TABLE_NUMERIC_FIELDS:
+                if eye.get(field) is not None and field not in verified_set:
+                    eye[field] = None
+                    missing.append(field)
+            eye["missing_or_unreadable"] = list(dict.fromkeys(missing))
+            eye["table_verified_numeric_fields"] = sorted(verified_set)
         derived = scoring_morphology(eye)["category"]
         eye["morphology"] = derived
         if eye.get("asymmetric_bow_tie") == "YES" and derived != "ASYMMETRIC_BOWTIE":
@@ -965,6 +1008,10 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             target = by_eye[eye_id]
             target.setdefault("data_conflicts", [])
             target["screen_types"] = sorted(set(target.get("screen_types", []) + eye.get("screen_types", [])))
+            target["table_verified_numeric_fields"] = sorted(
+                set(target.get("table_verified_numeric_fields", []))
+                | set(eye.get("table_verified_numeric_fields", []))
+            )
             target["morphology_evidence"] = list(
                 dict.fromkeys(target.get("morphology_evidence", []) + eye.get("morphology_evidence", []))
             )
@@ -972,7 +1019,10 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 target["quality"] = eye.get("quality")
 
             for key, value in eye.items():
-                if key in ("eye", "screen_types", "quality", "missing_or_unreadable", "morphology_evidence"):
+                if key in (
+                    "eye", "screen_types", "quality", "missing_or_unreadable",
+                    "table_verified_numeric_fields", "morphology_evidence",
+                ):
                     continue
                 old = target.get(key)
                 if old is None and value is not None:

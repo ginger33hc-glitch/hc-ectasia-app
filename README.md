@@ -5,6 +5,10 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 ## What v0.5 implements
 
 - Sequential original-detail extraction of each uploaded Pentacam/topography or treatment-card image.
+- Pentacam numeric-source priority: numeric parameters are accepted only from their explicitly
+  labeled side/summary-table fields. Map spot labels and color scales cannot substitute for K,
+  pachymetry, BAD, progression, ARTmax, topometric, elevation, volume, or HOA/coma values; visual
+  inference is reserved for morphology, bow-tie/SRAX, and anterior/posterior map patterns.
 - Installable Android PWA with a Web Share Target: one or multiple images shared from Samsung Gallery can open the HC Ectasia App and populate its image intake.
 - Excimer Laser Takip Kartı reading limited to the eye-specific `Düzeltme Miktarı` row; confident minus-cylinder values can fill otherwise empty sphere/cylinder/axis fields, while manual input wins and uncertain/conflicting readings remain warnings.
 - Independent OD and OS assessment; eye values are never averaged.
