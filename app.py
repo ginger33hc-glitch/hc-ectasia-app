@@ -3,6 +3,7 @@ import base64
 import json
 import mimetypes
 import os
+from datetime import date, datetime
 from io import BytesIO
 from typing import Any, Dict, List, Optional
 
@@ -14,10 +15,11 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="HC Ectasia App v0.5.4")
+app = FastAPI(title="HC Ectasia App v0.6.0")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
+VALIDATED_MODEL = "gpt-5.6-terra"
 
 EYES = ("OD", "OS")
 PRK_EPITHELIUM_UM = 50
@@ -33,7 +35,8 @@ TABLE_NUMERIC_FIELDS = (
     "Dt", "Da", "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI",
     "CKI", "IHD", "I_S", "KISA", "IHA", "Rmin_mm", "anterior_elevation_thinnest_um",
     "posterior_elevation_thinnest_um", "thinnest_x_mm", "thinnest_y_mm",
-    "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um",
+    "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um", "Kmean_D",
+    "total_RMS_um", "spherical_aberration_um",
 )
 MAP_FALLBACK_NUMERIC_FIELDS = (
     # These map values can directly represent the same named measurement when the side table is
@@ -48,6 +51,31 @@ SCHEMA = {
     "type": "object",
     "additionalProperties": False,
     "properties": {
+        "document_context": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "document_type": {
+                    "type": "string",
+                    "enum": ["PENTACAM_TOPOGRAPHY", "TREATMENT_CARD", "OTHER", "UNKNOWN"],
+                },
+                "patient_id": {"type": ["string", "null"]},
+                "patient_name": {"type": ["string", "null"]},
+                "date_of_birth": {"type": ["string", "null"]},
+                "exam_date": {"type": ["string", "null"]},
+                "exam_time": {"type": ["string", "null"]},
+                "laterality": {"type": "string", "enum": ["OD", "OS", "BOTH", "UNKNOWN"]},
+                "pentacam_qs": {
+                    "type": "string",
+                    "enum": ["OK", "NOT_OK", "UNREADABLE", "NOT_SHOWN", "NOT_APPLICABLE"],
+                },
+                "missing_or_unreadable": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": [
+                "document_type", "patient_id", "patient_name", "date_of_birth", "exam_date",
+                "exam_time", "laterality", "pentacam_qs", "missing_or_unreadable",
+            ],
+        },
         "eyes": {
             "type": "array",
             "items": {
@@ -96,6 +124,9 @@ SCHEMA = {
                     "corneal_volume_mm3": {"type": ["number", "null"]},
                     "RMS_HOA_um": {"type": ["number", "null"]},
                     "vertical_coma_um": {"type": ["number", "null"]},
+                    "Kmean_D": {"type": ["number", "null"]},
+                    "total_RMS_um": {"type": ["number", "null"]},
+                    "spherical_aberration_um": {"type": ["number", "null"]},
                     "morphology": {"type": "string", "enum": list(MORPHOLOGY)},
                     "morphology_evidence": {"type": "array", "items": {"type": "string"}},
                     "asymmetric_bow_tie": {"type": "string", "enum": ["YES", "NO", "UNCERTAIN"]},
@@ -118,7 +149,8 @@ SCHEMA = {
                     "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI", "CKI", "IHD",
                     "I_S", "KISA", "IHA", "Rmin_mm", "anterior_elevation_thinnest_um",
                     "posterior_elevation_thinnest_um", "thinnest_x_mm", "thinnest_y_mm",
-                    "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um", "morphology",
+                    "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um", "Kmean_D",
+                    "total_RMS_um", "spherical_aberration_um", "morphology",
                     "morphology_evidence", "asymmetric_bow_tie", "srax", "srax_deg",
                     "inferior_opposite_steepening_D",
                     "anterior_pattern", "posterior_pattern",
@@ -163,7 +195,7 @@ SCHEMA = {
         },
         "global_warnings": {"type": "array", "items": {"type": "string"}},
     },
-    "required": ["eyes", "treatment_corrections", "global_warnings"],
+    "required": ["document_context", "eyes", "treatment_corrections", "global_warnings"],
 }
 
 PROMPT = """You are a strict data-extraction component for preoperative corneal-refractive-surgery images.
@@ -172,6 +204,15 @@ Karti), or another clinical document. Extract only values visibly supported by t
 Never guess an unreadable or absent
 number. Identify OD/OS and screen type. Return null for unreadable/absent numeric values and list
 them in missing_or_unreadable.
+
+DOCUMENT IDENTITY AND ACQUISITION RULE:
+Transcribe the patient ID, patient name, date of birth, exam date, exam time, laterality, and document
+type exactly when visible. Use null/UNKNOWN when absent or unreadable; never infer that two images
+belong to the same patient merely because their laterality matches. For a Pentacam image, transcribe
+the device quality specification only when the literal QS status is visible. Use OK only for an
+explicitly visible acceptable/OK QS. Use NOT_OK for a visible non-OK status, UNREADABLE when the QS
+area is present but cannot be read, and NOT_SHOWN when no QS field is visible. Treatment cards and
+non-Pentacam documents use NOT_APPLICABLE.
 
 PENTACAM NUMERIC-SOURCE RULE — this rule has priority over map interpretation:
 First inspect the labeled parameter panels, side tables, summary tables, and the labeled numeric
@@ -251,6 +292,11 @@ def data_url(raw: bytes, filename: str) -> str:
 
 def openai_client() -> OpenAI:
     global client
+    if MODEL != VALIDATED_MODEL and os.getenv("ALLOW_UNVALIDATED_MODEL") != "1":
+        raise RuntimeError(
+            f"OPENAI_MODEL={MODEL!r} is not the validated extraction configuration. "
+            "Set ALLOW_UNVALIDATED_MODEL=1 only for non-clinical validation testing."
+        )
     if client is None:
         client = OpenAI()
     return client
@@ -274,6 +320,50 @@ def combine_status(current: str, new: str) -> str:
         "DO NOT PROCEED": 5,
     }
     return new if rank[new] > rank[current] else current
+
+
+def parse_iso_date(value: Any) -> Optional[date]:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    cleaned = value.strip().replace(".", "/").replace("-", "/")
+    for fmt in ("%Y/%m/%d", "%d/%m/%Y", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(cleaned, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def age_on_exam(date_of_birth: Any, exam_date: Any) -> Optional[int]:
+    born = parse_iso_date(date_of_birth)
+    examined = parse_iso_date(exam_date)
+    if not born or not examined or examined < born:
+        return None
+    return examined.year - born.year - ((examined.month, examined.day) < (born.month, born.day))
+
+
+def validate_plan(plan: Dict[str, Any]) -> List[str]:
+    """Return decision-blocking input errors; invalid values are never used in calculations."""
+    errors: List[str] = []
+    numeric_ranges = {
+        "manifest_sphere_D": (-30, 20),
+        "manifest_cylinder_magnitude_D": (0, 15),
+        "intended_sphere_D": (-30, 20),
+        "intended_cylinder_magnitude_D": (0, 15),
+        "correction_axis_deg": (0, 180),
+        "ablation_um": (0, 400),
+    }
+    for field, (low, high) in numeric_ranges.items():
+        value = plan.get(field)
+        if value is not None and (not is_number(value) or not low <= float(value) <= high):
+            errors.append(f"invalid {field}: expected {low} to {high}")
+    if plan.get("flap_um") is not None and plan.get("flap_um") not in (90, 100, 110, 120):
+        errors.append("invalid flap_um: HC options are 90, 100, 110, or 120 µm")
+    if plan.get("optical_zone_mm") is not None and plan.get("optical_zone_mm") not in (6.0, 6.5, 7.0):
+        errors.append("invalid optical_zone_mm: HC options are 6.0, 6.5, or 7.0 mm")
+    if plan.get("transition_zone_mm") is not None and plan.get("transition_zone_mm") not in (8.0, 8.5, 9.0):
+        errors.append("invalid transition_zone_mm: HC options are 8.0, 8.5, or 9.0 mm")
+    return errors
 
 
 def bad_classification(value: Optional[float], final: bool = False) -> str:
@@ -491,10 +581,12 @@ def tomography_review(eye: Dict[str, Any]) -> Dict[str, Any]:
 
 def estimate_ablation(plan: Dict[str, Any], warnings: List[str]) -> Optional[float]:
     ablation = plan.get("ablation_um")
-    if is_number(ablation):
+    if is_number(ablation) and 0 <= float(ablation) <= 400:
         return float(ablation)
-    sphere = plan.get("sphere_D")
-    cylinder = plan.get("cylinder_magnitude_D")
+    if ablation is not None:
+        return None
+    sphere = plan.get("intended_sphere_D")
+    cylinder = plan.get("intended_cylinder_magnitude_D")
     optical_zone = plan.get("optical_zone_mm")
     platform = str(plan.get("laser_platform") or "").lower().replace(" ", "")
     is_ex500 = "alcon" in platform and "ex500" in platform
@@ -534,6 +626,30 @@ def required_tomography_missing(eye: Dict[str, Any]) -> List[str]:
         missing.append("readable anterior pattern")
     if eye.get("quality") in ("LIMITED", "INADEQUATE"):
         missing.append("adequate-quality tomography/topography")
+    if eye.get("pentacam_qs") != "OK":
+        missing.append("explicit Pentacam QS: OK")
+    plausible_ranges = {
+        "pachy_thinnest_um": (300, 800), "K1_D": (20, 80), "K2_D": (20, 80),
+        "Kmax_D": (20, 90), "ARTmax_um": (1, 1000), "PPI_min": (0.01, 10),
+        "PPI_avg": (0.01, 10), "PPI_max": (0.01, 10), "Rmin_mm": (3, 15),
+        "thinnest_x_mm": (-10, 10), "thinnest_y_mm": (-10, 10),
+        "anterior_elevation_thinnest_um": (-300, 300),
+        "posterior_elevation_thinnest_um": (-300, 300),
+    }
+    for field, (low, high) in plausible_ranges.items():
+        value = eye.get(field)
+        if value is not None and (not is_number(value) or not low <= float(value) <= high):
+            missing.append(f"plausible {field} ({low} to {high})")
+    ppi_min, ppi_avg, ppi_max = eye.get("PPI_min"), eye.get("PPI_avg"), eye.get("PPI_max")
+    if all(is_number(value) for value in (ppi_min, ppi_avg, ppi_max)) and not (
+        float(ppi_min) <= float(ppi_avg) <= float(ppi_max)
+    ):
+        missing.append("internally consistent PPI minimum/average/maximum")
+    artmax, pachy = eye.get("ARTmax_um"), eye.get("pachy_thinnest_um")
+    if all(is_number(value) for value in (artmax, pachy, ppi_max)) and float(ppi_max) > 0:
+        expected = float(pachy) / float(ppi_max)
+        if abs(float(artmax) - expected) > max(20.0, expected * 0.10):
+            missing.append("ARTmax consistency with thinnest pachymetry / PPImax")
     # Defensive compatibility filter: legacy/cached extraction payloads may still contain
     # conflicts for descriptive, non-decision fields. They must never prohibit PASS.
     non_decision_conflict_fields = {"K1_D", "K2_D", "thinnest_x_mm", "thinnest_y_mm"}
@@ -570,6 +686,31 @@ def assess_eye(
     pregnancy_nursing = tri(patient_modifiers.get("pregnancy_nursing"))
     collagen_tissue_disease = tri(patient_modifiers.get("collagen_tissue_disease"))
     drug_usage = tri(patient_modifiers.get("drug_usage"))
+    dry_eye = tri(patient_modifiers.get("dry_eye"))
+    systemic_disease = tri(patient_modifiers.get("systemic_disease"))
+
+    if prior == "yes":
+        return {
+            "eye": eye_id,
+            "status": "POST-REFRACTIVE PATHWAY REQUIRED",
+            "action": "Do not run the virgin-cornea engine; complete the separate post-refractive pathway.",
+            "reasons": ["Prior PRK/LASIK/SMILE or other corneal refractive surgery requires a separate pathway."],
+            "hard_stops": [], "missing": [], "warnings": list(dict.fromkeys(warnings)),
+            "clinical_modifiers": [], "surgical_load_flags": [], "instrument": None,
+            "score": {"rows": {}, "total": None, "category": None},
+            "topography_classification": {
+                "image_category": eye.get("morphology", "UNCERTAIN"),
+                "scoring_category": None, "evidence": [],
+                "note": "Virgin-cornea scoring was intentionally not executed.",
+            },
+            "values": {
+                "procedure": procedure, "age_years": age, "prior_refractive_surgery": prior,
+                "refractive_stability": stable, "documented_progression": progression,
+                "unexplained_CDVA_below_20_20": cdva, "pentacam_qs": eye.get("pentacam_qs"),
+            },
+            "tomography_review": {"status": "NOT SCORED", "BAD_display": {}, "cross_sectional_flags": []},
+            "evidence_boundaries": {},
+        }
 
     if eye_id not in EYES:
         missing.append("reliable OD/OS identification")
@@ -579,12 +720,18 @@ def assess_eye(
         missing.append("prior corneal refractive surgery status")
     if not is_number(age):
         missing.append("age")
-    elif age < 18:
-        missing.append("age within the published scoring range (>=18 years)")
-    if not is_number(plan.get("sphere_D")):
+    elif age < 18 or age > 120:
+        missing.append("plausible age within the published adult scoring range (18-120 years)")
+    plan_errors = validate_plan(plan)
+    missing.extend(plan_errors)
+    if not is_number(plan.get("manifest_sphere_D")):
+        missing.append("preoperative manifest sphere for LASIK ERSS MRSE")
+    if not is_number(plan.get("manifest_cylinder_magnitude_D")):
+        missing.append("preoperative manifest cylinder magnitude for LASIK ERSS MRSE")
+    if not is_number(plan.get("intended_sphere_D")):
         missing.append("intended sphere")
-    if not is_number(plan.get("cylinder_magnitude_D")):
-        missing.append("cylinder magnitude")
+    if not is_number(plan.get("intended_cylinder_magnitude_D")):
+        missing.append("intended cylinder magnitude")
     if stable == "unknown":
         missing.append("refractive stability")
     if progression == "unknown":
@@ -605,6 +752,15 @@ def assess_eye(
         missing.append("planned transition zone or explicit not-applicable status")
     if tri(plan.get("enhancement_anticipated")) == "unknown":
         missing.append("anticipated enhancement status")
+    for label, value in (
+        ("pregnancy/nursing status", pregnancy_nursing),
+        ("collagen/connective-tissue disease status", collagen_tissue_disease),
+        ("relevant medication status", drug_usage),
+        ("dry-eye status", dry_eye),
+        ("systemic disease status", systemic_disease),
+    ):
+        if value == "unknown":
+            missing.append(label)
     missing.extend(required_tomography_missing(eye))
 
     pachy = eye.get("pachy_thinnest_um") if is_number(eye.get("pachy_thinnest_um")) else None
@@ -643,17 +799,19 @@ def assess_eye(
             "this is an evidence-gap flag, not proof of harm."
         )
 
-    sphere = plan.get("sphere_D")
-    cylinder = plan.get("cylinder_magnitude_D")
-    mrse = sphere - cylinder / 2 if is_number(sphere) and is_number(cylinder) else None
+    intended_sphere = plan.get("intended_sphere_D")
+    intended_cylinder = plan.get("intended_cylinder_magnitude_D")
+    manifest_sphere = plan.get("manifest_sphere_D")
+    manifest_cylinder = plan.get("manifest_cylinder_magnitude_D")
+    mrse = (
+        manifest_sphere - manifest_cylinder / 2
+        if is_number(manifest_sphere) and is_number(manifest_cylinder)
+        else None
+    )
     visible_morphology = eye.get("morphology", "UNCERTAIN")
     derived_morphology = scoring_morphology(eye)
     morphology = derived_morphology["category"]
     tomo = tomography_review(eye)
-
-    if prior == "yes":
-        status = combine_status(status, "POST-REFRACTIVE PATHWAY REQUIRED")
-        reasons.append("Prior corneal refractive surgery requires a separate post-refractive pathway.")
 
     if pachy is not None and pachy < 480:
         hard_stops.append("HC operational hard stop: thinnest preoperative cornea <480 µm.")
@@ -663,6 +821,10 @@ def assess_eye(
         hard_stops.append("HC operational LASIK RSB hard stop: RSB <300 µm.")
     if visible_morphology == "ABNORMAL_ECTATIC":
         hard_stops.append("Definite KC/FFKC/PMD or unequivocal ectatic morphology override.")
+    if is_number(intended_sphere) and intended_sphere < -10.0:
+        hard_stops.append("HC operational treatment-range hard stop: intended sphere <−10.00 D.")
+    if is_number(intended_sphere) and intended_sphere > 6.0:
+        hard_stops.append("HC operational treatment-range hard stop: intended sphere >+6.00 D.")
 
     if hard_stops:
         status = "DO NOT PROCEED"
@@ -682,11 +844,29 @@ def assess_eye(
         status = combine_status(status, "REVIEW — NOT CLEARED")
         modifiers.append("Marked inter-eye asymmetry requires escalated review.")
     if pregnancy_nursing == "yes":
+        status = combine_status(status, "CAUTION — STOP/DEFER")
         modifiers.append("Pregnancy or nursing reported; separate refractive-surgery eligibility review required.")
     if collagen_tissue_disease == "yes":
+        status = combine_status(status, "REVIEW — NOT CLEARED")
         modifiers.append("Collagen/connective-tissue disease reported; separate clinical eligibility review required.")
     if drug_usage == "yes":
+        status = combine_status(status, "REVIEW — NOT CLEARED")
         modifiers.append("Relevant medication/drug usage reported; medication-specific clinical review required.")
+    if dry_eye == "yes":
+        status = combine_status(status, "REVIEW — NOT CLEARED")
+        modifiers.append("Dry-eye disease reported; ocular-surface optimization and eligibility review required.")
+    if systemic_disease == "yes":
+        status = combine_status(status, "REVIEW — NOT CLEARED")
+        modifiers.append("Systemic disease reported; disease-specific refractive-surgery eligibility review required.")
+
+    contact_lens_type = str(patient_modifiers.get("contact_lens_type") or "UNKNOWN").upper()
+    contact_lens_days = patient_modifiers.get("contact_lens_discontinuation_days")
+    if contact_lens_type == "SOFT" and (not is_number(contact_lens_days) or contact_lens_days < 14):
+        missing.append("source-study imaging criterion: soft contact lens discontinued for at least 14 days")
+    elif contact_lens_type == "RIGID" and (not is_number(contact_lens_days) or contact_lens_days < 21):
+        missing.append("source-study imaging criterion: rigid contact lens discontinued for at least 21 days")
+    elif contact_lens_type not in ("NONE", "SOFT", "RIGID"):
+        missing.append("contact-lens type/discontinuation status")
 
     score_rows: Dict[str, Any] = {}
     score_total: Optional[int] = None
@@ -733,7 +913,7 @@ def assess_eye(
                     "PRK-EWSS v1.0 provisional caution category (score 2-3): defer and re-evaluate after >=6 months."
                 )
 
-    if is_number(sphere) and sphere > 0:
+    if is_number(intended_sphere) and intended_sphere > 0:
         status = combine_status(status, "REVIEW — NOT CLEARED")
         reasons.append(
             "The supplied procedure-specific scoring evidence is predominantly myopic; "
@@ -805,8 +985,14 @@ def assess_eye(
         "values": {
             "procedure": procedure,
             "age_years": age,
-            "sphere_D": sphere,
-            "cylinder_magnitude_D": cylinder,
+            "prior_refractive_surgery": prior,
+            "refractive_stability": stable,
+            "documented_progression": progression,
+            "unexplained_CDVA_below_20_20": cdva,
+            "manifest_sphere_D": manifest_sphere,
+            "manifest_cylinder_magnitude_D": manifest_cylinder,
+            "intended_sphere_D": intended_sphere,
+            "intended_cylinder_magnitude_D": intended_cylinder,
             "correction_axis_deg": plan.get("correction_axis_deg"),
             "correction_source": plan.get("correction_source"),
             "MRSE_D": mrse,
@@ -822,6 +1008,7 @@ def assess_eye(
             "transition_zone_not_applicable": tri(plan.get("transition_zone_not_applicable")),
             "laser_platform": plan.get("laser_platform"),
             "enhancement_anticipated": tri(plan.get("enhancement_anticipated")),
+            "pentacam_qs": eye.get("pentacam_qs"),
         },
         "tomography_review": tomo,
         "evidence_boundaries": {
@@ -894,8 +1081,8 @@ def apply_extracted_corrections(
             )
             continue
 
-        manual_sphere = is_number(plan.get("sphere_D"))
-        manual_cylinder = is_number(plan.get("cylinder_magnitude_D"))
+        manual_sphere = is_number(plan.get("intended_sphere_D"))
+        manual_cylinder = is_number(plan.get("intended_cylinder_magnitude_D"))
         if manual_sphere != manual_cylinder:
             plan["correction_warnings"].append(
                 f"{eye} has a partial manual correction; extracted card values were not mixed with manual input."
@@ -903,16 +1090,16 @@ def apply_extracted_corrections(
             continue
         if manual_sphere and manual_cylinder:
             if (
-                abs(float(plan["sphere_D"]) - sphere) > 1e-6
-                or abs(float(plan["cylinder_magnitude_D"]) - abs(signed_cylinder)) > 1e-6
+                abs(float(plan["intended_sphere_D"]) - sphere) > 1e-6
+                or abs(float(plan["intended_cylinder_magnitude_D"]) - abs(signed_cylinder)) > 1e-6
             ):
                 plan["correction_warnings"].append(
                     f"{eye} manual correction differs from the extracted Duzeltme Miktari; manual values retained."
                 )
             continue
 
-        plan["sphere_D"] = sphere
-        plan["cylinder_magnitude_D"] = abs(signed_cylinder)
+        plan["intended_sphere_D"] = sphere
+        plan["intended_cylinder_magnitude_D"] = abs(signed_cylinder)
         plan["correction_source"] = "Excimer Laser Takip Karti — Duzeltme Miktari"
         axes = {
             float(item["axis_deg"])
@@ -940,6 +1127,7 @@ def hc_engine(
     age: Optional[int],
     eye_plans: Dict[str, Dict[str, Any]],
     patient_modifiers: Dict[str, Any],
+    patient_metadata: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     extracted_eyes = [
         eye for eye in extracted.get("eyes", [])
@@ -948,6 +1136,32 @@ def hc_engine(
     assessed_ids = [eye.get("eye") for eye in extracted_eyes]
     patient_modifiers = dict(patient_modifiers)
     patient_modifiers["assessed_eyes"] = assessed_ids
+    patient_metadata = patient_metadata or {}
+    derived_age = extracted.get("derived_age_years")
+    if age is None and is_number(derived_age):
+        age = int(derived_age)
+    global_issues = list(extracted.get("critical_input_issues", []))
+    if set(assessed_ids) != set(EYES):
+        global_issues.append("Both OD and OS tomography assessments are required; fellow-eye assessment is missing.")
+    supplied_id = str(patient_metadata.get("id") or "").strip()
+    extracted_ids = {
+        str(context.get("patient_id")).strip()
+        for context in extracted.get("document_contexts", [])
+        if context.get("patient_id")
+    }
+    if supplied_id and extracted_ids and supplied_id not in extracted_ids:
+        global_issues.append("Entered patient ID does not match the patient ID visible in the uploaded source(s).")
+    if is_number(age) and is_number(derived_age) and int(age) != int(derived_age):
+        global_issues.append("Entered age conflicts with age calculated from source DOB and Pentacam exam date.")
+    supplied_dob = str(patient_metadata.get("date_of_birth") or "").strip()
+    extracted_dobs = {
+        str(context.get("date_of_birth")).strip()
+        for context in extracted.get("document_contexts", []) if context.get("date_of_birth")
+    }
+    if supplied_dob and extracted_dobs:
+        supplied_date = parse_iso_date(supplied_dob)
+        if not supplied_date or any(parse_iso_date(value) != supplied_date for value in extracted_dobs):
+            global_issues.append("Entered date of birth does not match the date visible in the uploaded source(s).")
 
     results = []
     for eye in extracted_eyes:
@@ -960,24 +1174,33 @@ def hc_engine(
             "action": "No eye-specific assessment could be completed.",
             "eyes": [],
             "warnings": extracted.get("global_warnings", []),
+            "critical_input_issues": sorted(set(global_issues + ["No classifiable OD/OS tomography was extracted."])),
+            "document_contexts": extracted.get("document_contexts", []),
         }
 
     overall = "PASS"
     for result in results:
         overall = combine_status(overall, result["status"])
+    if global_issues:
+        overall = combine_status(overall, "DATA INSUFFICIENT")
 
     return {
         "status": overall,
         "action": "Overall result reflects the least favorable eye. Each eye remains independently scored; values are never averaged.",
         "eyes": results,
         "warnings": extracted.get("global_warnings", []),
+        "critical_input_issues": sorted(set(global_issues)),
+        "document_contexts": extracted.get("document_contexts", []),
         "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.5.4 / source set 2026-08-25 plus binding HC amendments",
+        "version": "software v0.6.0 / source set 2026-08-25 plus binding HC amendments",
     }
 
 
 def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
-    merged: Dict[str, Any] = {"eyes": [], "treatment_corrections": [], "global_warnings": []}
+    merged: Dict[str, Any] = {
+        "eyes": [], "treatment_corrections": [], "global_warnings": [],
+        "document_contexts": [], "critical_input_issues": [], "extraction_models": [],
+    }
     by_eye: Dict[str, Dict[str, Any]] = {}
     conservative = {
         "pachy_thinnest_um": "min", "BAD_D": "max", "Df": "max", "Db": "max",
@@ -995,14 +1218,12 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     quality_rank = {"INADEQUATE": 0, "LIMITED": 1, "ADEQUATE": 2}
     posterior_rank = {"UNREADABLE": 0, "REASSURING": 1, "BORDERLINE": 2, "ABNORMAL": 3}
     numeric_tolerance = {
-        "Kmax_D": 0.25,
+        "K1_D": 0.25, "K2_D": 0.25, "Kmax_D": 0.25,
     }
     # Descriptive values that do not drive an HC decision must never become unresolved conflicts
     # that prohibit PASS. Across overlapping Pentacam screens, preserve source priority
     # (labeled table over permitted map fallback); at equal priority retain the first reading.
-    non_decision_conflict_fields = {
-        "K1_D", "K2_D", "thinnest_x_mm", "thinnest_y_mm",
-    }
+    non_decision_conflict_fields = {"thinnest_x_mm", "thinnest_y_mm"}
 
     def normalized_eye(raw_eye: Dict[str, Any]) -> Dict[str, Any]:
         eye = dict(raw_eye)
@@ -1021,7 +1242,9 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             eye["table_verified_numeric_fields"] = sorted(verified_set)
             eye["map_fallback_numeric_fields"] = sorted(fallback_set)
         derived = scoring_morphology(eye)["category"]
-        eye["morphology"] = derived
+        eye["scoring_morphology"] = derived
+        if eye.get("morphology") in ("ASYMMETRIC_BOWTIE", "INFERIOR_STEEPENING_SRA") and derived == "UNCERTAIN":
+            eye["morphology"] = "UNCERTAIN"
         if eye.get("asymmetric_bow_tie") == "YES" and derived != "ASYMMETRIC_BOWTIE":
             eye["asymmetric_bow_tie"] = "UNCERTAIN"
         if eye.get("srax") == "YES" and derived != "INFERIOR_STEEPENING_SRA":
@@ -1029,6 +1252,25 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         return eye
 
     for result in results:
+        if result.get("extraction_model"):
+            merged["extraction_models"].append(result["extraction_model"])
+        context = result.get("document_context")
+        if isinstance(context, dict):
+            merged["document_contexts"].append(dict(context))
+            if context.get("document_type") in ("UNKNOWN", "OTHER"):
+                merged["critical_input_issues"].append(
+                    f"Unclassified uploaded source: {context.get('source_filename', 'unknown file')}."
+                )
+            if context.get("document_type") in ("PENTACAM_TOPOGRAPHY", "TREATMENT_CARD") and not (
+                context.get("patient_id") or context.get("patient_name") or context.get("date_of_birth")
+            ):
+                merged["critical_input_issues"].append(
+                    f"Patient identity is not visible/readable in {context.get('source_filename', 'an uploaded source')}."
+                )
+            if not result.get("eyes") and not result.get("treatment_corrections"):
+                merged["critical_input_issues"].append(
+                    f"Uploaded source yielded no usable eye or treatment data: {context.get('source_filename', 'unknown file')}."
+                )
         merged["global_warnings"].extend(result.get("global_warnings", []))
         merged["treatment_corrections"].extend(
             item for item in result.get("treatment_corrections", []) if isinstance(item, dict)
@@ -1036,6 +1278,21 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         for raw_eye in result.get("eyes", []):
             eye = normalized_eye(raw_eye)
             eye_id = eye.get("eye", "UNKNOWN")
+            source_filename = eye.get("_source_filename")
+            eye["source_files"] = [source_filename] if source_filename else []
+            eye["quality_by_source"] = {source_filename: eye.get("quality")} if source_filename else {}
+            eye["pentacam_qs"] = eye.get("_pentacam_qs", eye.get("pentacam_qs", "NOT_SHOWN"))
+            eye["field_provenance"] = {}
+            if source_filename:
+                for field in eye.get("table_verified_numeric_fields", []):
+                    if eye.get(field) is not None:
+                        eye["field_provenance"][field] = [{"file": source_filename, "source": "LABELED_TABLE"}]
+                for field in eye.get("map_fallback_numeric_fields", []):
+                    if eye.get(field) is not None:
+                        eye["field_provenance"][field] = [{"file": source_filename, "source": "PERMITTED_MAP_FALLBACK"}]
+                for field in ("morphology", "anterior_pattern", "posterior_pattern", "asymmetric_bow_tie", "srax"):
+                    if eye.get(field) is not None:
+                        eye["field_provenance"][field] = [{"file": source_filename, "source": "VISUAL_CLASSIFICATION"}]
             if eye_id not in by_eye:
                 by_eye[eye_id] = dict(eye)
                 continue
@@ -1046,6 +1303,16 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             incoming_table_sources = set(eye.get("table_verified_numeric_fields", []))
             incoming_map_sources = set(eye.get("map_fallback_numeric_fields", []))
             target["screen_types"] = sorted(set(target.get("screen_types", []) + eye.get("screen_types", [])))
+            target["source_files"] = sorted(set(target.get("source_files", []) + eye.get("source_files", [])))
+            target.setdefault("quality_by_source", {}).update(eye.get("quality_by_source", {}))
+            target.setdefault("field_provenance", {})
+            for field, records in eye.get("field_provenance", {}).items():
+                combined_records = target["field_provenance"].setdefault(field, []) + records
+                target["field_provenance"][field] = [
+                    dict(item) for item in {
+                        json.dumps(record, sort_keys=True): record for record in combined_records
+                    }.values()
+                ]
             target["table_verified_numeric_fields"] = sorted(
                 set(target.get("table_verified_numeric_fields", []))
                 | set(eye.get("table_verified_numeric_fields", []))
@@ -1062,12 +1329,22 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             )
             if quality_rank.get(eye.get("quality"), 0) > quality_rank.get(target.get("quality"), 0):
                 target["quality"] = eye.get("quality")
+            if any(value in ("LIMITED", "INADEQUATE") for value in target["quality_by_source"].values()):
+                target.setdefault("data_conflicts", []).append(
+                    "source image quality: limited/inadequate decision source"
+                )
+            qs_values = {target.get("pentacam_qs"), eye.get("pentacam_qs")}
+            if "NOT_OK" in qs_values:
+                target["pentacam_qs"] = "NOT_OK"
+            elif "OK" in qs_values:
+                target["pentacam_qs"] = "OK"
 
             for key, value in eye.items():
                 if key in (
                     "eye", "screen_types", "quality", "missing_or_unreadable",
                     "table_verified_numeric_fields", "map_fallback_numeric_fields",
-                    "morphology_evidence",
+                    "morphology_evidence", "source_files", "quality_by_source", "_source_filename",
+                    "_pentacam_qs", "pentacam_qs", "scoring_morphology", "field_provenance",
                 ):
                     continue
                 old = target.get(key)
@@ -1162,7 +1439,35 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             seen_corrections.add(key)
             unique_corrections.append(correction)
     merged["treatment_corrections"] = unique_corrections
+    ids = {str(c.get("patient_id")).strip() for c in merged["document_contexts"] if c.get("patient_id")}
+    dobs = {str(c.get("date_of_birth")).strip() for c in merged["document_contexts"] if c.get("date_of_birth")}
+    pentacam_dates = {
+        str(c.get("exam_date")).strip() for c in merged["document_contexts"]
+        if c.get("document_type") == "PENTACAM_TOPOGRAPHY" and c.get("exam_date")
+    }
+    if len(ids) > 1:
+        merged["critical_input_issues"].append("Conflicting patient IDs across uploaded sources.")
+    if len(dobs) > 1:
+        merged["critical_input_issues"].append("Conflicting dates of birth across uploaded sources.")
+    if len(pentacam_dates) > 1:
+        merged["critical_input_issues"].append("Conflicting Pentacam examination dates across uploaded sources.")
+    if len(dobs) == 1 and len(pentacam_dates) == 1:
+        derived_age = age_on_exam(next(iter(dobs)), next(iter(pentacam_dates)))
+        if derived_age is not None:
+            merged["derived_age_years"] = derived_age
+    pentacam_contexts = [
+        c for c in merged["document_contexts"] if c.get("document_type") == "PENTACAM_TOPOGRAPHY"
+    ]
+    if pentacam_contexts and (
+        not any(c.get("pentacam_qs") == "OK" for c in pentacam_contexts)
+        or any(c.get("pentacam_qs") == "NOT_OK" for c in pentacam_contexts)
+    ):
+        merged["critical_input_issues"].append(
+            "Pentacam acquisition requires a same-exam explicit QS: OK; a non-OK QS cannot be overridden."
+        )
     merged["global_warnings"] = sorted(set(merged["global_warnings"]))
+    merged["critical_input_issues"] = sorted(set(merged["critical_input_issues"]))
+    merged["extraction_models"] = sorted(set(merged["extraction_models"]))
     return merged
 
 
@@ -1237,7 +1542,15 @@ def extract_one_image(raw: bytes, filename: str) -> Dict[str, Any]:
             f"incomplete_details={getattr(response, 'incomplete_details', None)}"
         )
     try:
-        return json.loads(output_text)
+        result = json.loads(output_text)
+        result["extraction_model"] = MODEL
+        context = result.get("document_context", {})
+        context["source_filename"] = filename
+        result["document_context"] = context
+        for eye in result.get("eyes", []):
+            eye["_source_filename"] = filename
+            eye["_pentacam_qs"] = context.get("pentacam_qs", "NOT_SHOWN")
+        return result
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"OpenAI output was not valid JSON: {exc}") from exc
 
@@ -1248,16 +1561,18 @@ async def analyze(
     age: Optional[int] = Form(None),
     eye_plans: str = Form("{}"),
     patient_modifiers: str = Form("{}"),
+    patient_metadata: str = Form("{}"),
 ):
     if not images:
         raise HTTPException(400, "No images supplied.")
     try:
         plans = json.loads(eye_plans)
         modifiers = json.loads(patient_modifiers)
+        metadata = json.loads(patient_metadata)
     except json.JSONDecodeError as exc:
         raise HTTPException(400, f"Invalid structured clinical input: {exc}") from exc
-    if not isinstance(plans, dict) or not isinstance(modifiers, dict):
-        raise HTTPException(400, "eye_plans and patient_modifiers must be JSON objects.")
+    if not isinstance(plans, dict) or not isinstance(modifiers, dict) or not isinstance(metadata, dict):
+        raise HTTPException(400, "eye_plans, patient_modifiers, and patient_metadata must be JSON objects.")
 
     image_payloads = []
     for image in images:
@@ -1293,5 +1608,5 @@ async def analyze(
     return {
         "extracted": extracted,
         "effective_eye_plans": effective_plans,
-        "decision": hc_engine(extracted, age, effective_plans, modifiers),
+        "decision": hc_engine(extracted, age, effective_plans, modifiers, metadata),
     }

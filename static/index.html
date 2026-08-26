@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>HC Ectasia App v0.5</title>
+  <title>HC Ectasia App v0.6</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=5">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=4">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=4">
@@ -31,7 +31,7 @@
   </style>
 </head>
 <body>
-<header><h1>HC Ectasia App v0.5</h1><p>Image extraction → eye-specific HC assessment → evidence-labeled clinical report</p></header>
+<header><h1>HC Ectasia App v0.6</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -42,7 +42,8 @@
       <div class="grid">
         <div class="row"><label>Patient name</label><input id="patient_name" type="text" autocomplete="off"></div>
         <div class="row"><label>Patient ID / record number</label><input id="patient_id" type="text" autocomplete="off"></div>
-        <div class="row"><label>Patient age (years) <span class="required">*</span></label><input id="age" name="age" type="number" min="0" step="1" required></div>
+        <div class="row"><label>Date of birth</label><input id="date_of_birth" type="date"></div>
+        <div class="row"><label>Patient age (years; may be derived from source)</label><input id="age" name="age" type="number" min="18" max="120" step="1"></div>
         <div class="row"><label>Reviewer / surgeon</label><input id="reviewer" type="text" autocomplete="off"></div>
         <div class="row"><label>Assessment date</label><input id="report_date" type="date"></div>
       </div>
@@ -60,6 +61,8 @@
             <label class="multi-option"><input type="checkbox" name="patient_modifier" value="pregnancy_nursing"><span>Pregnancy or nursing</span></label>
             <label class="multi-option"><input type="checkbox" name="patient_modifier" value="collagen_tissue_disease"><span>Collagen / connective-tissue disease</span></label>
             <label class="multi-option"><input type="checkbox" name="patient_modifier" value="drug_usage"><span>Relevant medication / drug usage</span></label>
+            <label class="multi-option"><input type="checkbox" name="patient_modifier" value="dry_eye"><span>Dry-eye disease / unstable ocular surface</span></label>
+            <label class="multi-option"><input type="checkbox" name="patient_modifier" value="systemic_disease"><span>Other relevant systemic disease</span></label>
             <div class="multi-divider"></div>
             <label class="multi-option"><input type="checkbox" name="patient_modifier" value="none" data-exclusive="true"><span>None of the listed modifiers</span></label>
             <label class="multi-option"><input type="checkbox" name="patient_modifier" value="unknown" data-exclusive="true"><span>Not documented / unknown</span></label>
@@ -67,12 +70,16 @@
         </details>
         <p class="note">Multiple modifiers may be selected. “None” and “Not documented” are exclusive choices.</p>
       </div>
+      <div class="grid">
+        <div class="row"><label>Contact-lens type at imaging</label><select id="contact_lens_type" required><option value="">Select</option><option value="NONE">None</option><option value="SOFT">Soft</option><option value="RIGID">Rigid / RGP</option><option value="UNKNOWN">Unknown</option></select></div>
+        <div class="row"><label>Days discontinued before Pentacam</label><input id="contact_lens_days" type="number" min="0" max="3650" step="1"></div>
+      </div>
       <h3>Eye-specific plans</h3>
       <div class="grid">
         <fieldset><legend>OD</legend><div id="od-fields"></div></fieldset>
         <fieldset><legend>OS</legend><div id="os-fields"></div></fieldset>
       </div>
-      <p class="note">An uploaded Excimer Laser Takip Kartı may auto-fill empty sphere, cylinder, and axis fields only from the Düzeltme Miktarı row. Manual values take priority, and uncertain or conflicting readings are not auto-filled. Cylinder is entered as a non-negative magnitude in minus-cylinder convention. MRSE = sphere − cylinder magnitude/2. If actual maximum ablation is blank, an explicitly documented Alcon EX500 plan may use the HC estimate: 12 µm/D at 6.0 mm, 15 µm/D at 6.5 mm, or 16.33 µm/D at 7.0 mm. Other platforms or optical zones require the actual maximum ablation.</p>
+      <p class="note">Preoperative manifest refraction is used only for LASIK ERSS MRSE. Intended treatment correction is used for ablation and HC treatment-range gates; the two are never substituted for one another. A treatment card may auto-fill only intended correction from Düzeltme Miktarı. Cylinder is a non-negative magnitude in minus-cylinder convention.</p>
       <p id="cardTransferNote" class="note"></p>
       <button id="analyzeBtn" type="submit">Analyze images and run HC assessment</button>
       <p id="analysisProgress" class="alert" role="status" aria-live="polite" hidden></p>
@@ -88,7 +95,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">HC Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.5</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.6</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <table class="meta-table"><tbody>
         <tr><th>Patient</th><td id="reportPatient">Not documented</td><th>Patient ID</th><td id="reportPatientId">Not documented</td></tr>
@@ -110,8 +117,10 @@
 const eyeTemplate = (eye) => `
   <div class="row"><label>Prior corneal refractive surgery?</label><select id="${eye}_prior"><option value="no" selected>No</option><option value="yes">Yes</option><option value="unknown">Unknown</option></select></div>
   <div class="row"><label>Procedure</label><select id="${eye}_procedure"><option value="">Select</option><option value="PRK">PRK</option><option value="LASIK">LASIK</option></select></div>
-  <div class="row"><label>Intended sphere (D)</label><input id="${eye}_sphere" type="number" step=".25"></div>
-  <div class="row"><label>Cylinder magnitude (D)</label><input id="${eye}_cylinder" type="number" step=".25" min="0"></div>
+  <div class="row"><label>Preoperative manifest sphere (D)</label><input id="${eye}_manifest_sphere" type="number" step=".25" min="-30" max="20"></div>
+  <div class="row"><label>Preoperative manifest cylinder magnitude (D)</label><input id="${eye}_manifest_cylinder" type="number" step=".25" min="0" max="15"></div>
+  <div class="row"><label>Intended treatment sphere (D)</label><input id="${eye}_sphere" type="number" step=".25" min="-30" max="20"></div>
+  <div class="row"><label>Intended treatment cylinder magnitude (D)</label><input id="${eye}_cylinder" type="number" step=".25" min="0" max="15"></div>
   <div class="row"><label>Cylinder axis (degrees)</label><input id="${eye}_axis" type="number" step="1" min="0" max="180"></div>
   <div class="row"><label>Actual maximum ablation (µm)</label><input id="${eye}_ablation" type="number" step=".1" min="0"></div>
   <div class="row"><label>Laser platform</label><input id="${eye}_platform" type="text" value="Alcon EX500" readonly aria-readonly="true"></div>
@@ -234,6 +243,7 @@ const modifierLabels={
   eye_rubbing:"Eye rubbing / ocular trauma",family_history:"Family history",
   inter_eye_asymmetry:"Inter-eye asymmetry",pregnancy_nursing:"Pregnancy / nursing",
   collagen_tissue_disease:"Collagen-tissue disease",drug_usage:"Medication / drug usage",
+  dry_eye:"Dry-eye disease",systemic_disease:"Systemic disease",
   none:"None",unknown:"Not documented"
 };
 const modifierDropdown=document.querySelector("#modifierDropdown");
@@ -252,17 +262,20 @@ modifierInputs.forEach(input=>input.addEventListener("change",()=>{
 function patientModifiers(){
   const selected=selectedModifierValues();
   if(!selected.length)throw new Error("Select patient-level modifiers, None, or Not documented.");
-  const keys=["eye_rubbing","family_history","inter_eye_asymmetry","pregnancy_nursing","collagen_tissue_disease","drug_usage"];
+  const keys=["eye_rubbing","family_history","inter_eye_asymmetry","pregnancy_nursing","collagen_tissue_disease","drug_usage","dry_eye","systemic_disease"];
   const state=selected.includes("unknown")?"unknown":"no";
   const result=Object.fromEntries(keys.map(key=>[key,state]));
   if(!selected.includes("unknown")&&!selected.includes("none"))selected.forEach(key=>{if(keys.includes(key))result[key]="yes"});
   result.selected_modifiers=selected.filter(item=>keys.includes(item));
+  result.contact_lens_type=value("contact_lens_type")||"UNKNOWN";
+  result.contact_lens_discontinuation_days=numberOrNull("contact_lens_days");
   return result;
 }
 
 function plan(prefix){return {
   prior:value(`${prefix}_prior`), procedure:value(`${prefix}_procedure`),
-  sphere_D:numberOrNull(`${prefix}_sphere`), cylinder_magnitude_D:numberOrNull(`${prefix}_cylinder`),
+  manifest_sphere_D:numberOrNull(`${prefix}_manifest_sphere`), manifest_cylinder_magnitude_D:numberOrNull(`${prefix}_manifest_cylinder`),
+  intended_sphere_D:numberOrNull(`${prefix}_sphere`), intended_cylinder_magnitude_D:numberOrNull(`${prefix}_cylinder`),
   correction_axis_deg:numberOrNull(`${prefix}_axis`),
   ablation_um:numberOrNull(`${prefix}_ablation`), flap_um:numberOrNull(`${prefix}_flap`),
   epithelium_um:50,
@@ -282,17 +295,21 @@ function statusClass(s){
 const fmt = (x, digits=1) => x === null || x === undefined ? "—" : Number(x).toFixed(digits);
 const safe = (x) => String(x ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
 function correctionText(values){
-  if(values.sphere_D===null||values.sphere_D===undefined||values.cylinder_magnitude_D===null||values.cylinder_magnitude_D===undefined)return "—";
+  if(values.intended_sphere_D===null||values.intended_sphere_D===undefined||values.intended_cylinder_magnitude_D===null||values.intended_cylinder_magnitude_D===undefined)return "—";
   const axis=values.correction_axis_deg===null||values.correction_axis_deg===undefined?"axis unavailable":`${fmt(values.correction_axis_deg,0)}°`;
-  return `${fmt(values.sphere_D,2)} D / -${fmt(values.cylinder_magnitude_D,2)} D × ${axis}`;
+  return `${fmt(values.intended_sphere_D,2)} D / -${fmt(values.intended_cylinder_magnitude_D,2)} D × ${axis}`;
+}
+function manifestText(values){
+  if(values.manifest_sphere_D===null||values.manifest_sphere_D===undefined||values.manifest_cylinder_magnitude_D===null||values.manifest_cylinder_magnitude_D===undefined)return "—";
+  return `${fmt(values.manifest_sphere_D,2)} D / -${fmt(values.manifest_cylinder_magnitude_D,2)} D`;
 }
 function applyEffectivePlans(plans){
   const transferred=[];
   for(const [eye,prefix] of [["OD","od"],["OS","os"]]){
     const p=plans?.[eye]||{};
     if(!p.correction_source)continue;
-    document.querySelector(`#${prefix}_sphere`).value=p.sphere_D;
-    document.querySelector(`#${prefix}_cylinder`).value=p.cylinder_magnitude_D;
+    document.querySelector(`#${prefix}_sphere`).value=p.intended_sphere_D;
+    document.querySelector(`#${prefix}_cylinder`).value=p.intended_cylinder_magnitude_D;
     if(p.correction_axis_deg!==null&&p.correction_axis_deg!==undefined)document.querySelector(`#${prefix}_axis`).value=p.correction_axis_deg;
     transferred.push(`${eye}: ${correctionText(p)}`);
   }
@@ -304,7 +321,8 @@ function renderEye(r, extracted){
   const transition=v.transition_zone_mm===null||v.transition_zone_mm===undefined?(v.transition_zone_not_applicable==="yes"?"Not applicable":"—"):`${fmt(v.transition_zone_mm,1)} mm`;
   const rows=[
     ["Procedure",v.procedure??"—"],["Score / category",`${s.total ?? "—"} / ${s.category ?? "—"}`],
-    ["Intended correction",correctionText(v)],["Correction source",v.correction_source??"Manual / not documented"],
+    ["Prior refractive surgery",v.prior_refractive_surgery??"—"],["Stability / progression / CDVA flag",`${v.refractive_stability??"—"} / ${v.documented_progression??"—"} / ${v.unexplained_CDVA_below_20_20??"—"}`],
+    ["Manifest refraction",manifestText(v)],["Intended correction",correctionText(v)],["Correction source",v.correction_source??"Manual / not documented"],
     ["Thinnest pachymetry",`${fmt(v.pachy_thinnest_um,0)} µm`],["MRSE",`${fmt(v.MRSE_D,2)} D`],
     ["Maximum ablation",`${fmt(v.max_ablation_um,1)} µm`],["Laser platform",v.laser_platform??"—"],
     ["PRK epithelium",`${fmt(v.PRK_epithelium_um,0)} µm`],
@@ -326,7 +344,8 @@ function renderEye(r, extracted){
     ["Anterior elevation at TP",fmt(source.anterior_elevation_thinnest_um,1)+" µm"],["Posterior elevation at TP",fmt(source.posterior_elevation_thinnest_um,1)+" µm"],
     ["Thinnest X / Y",`${fmt(source.thinnest_x_mm,2)} / ${fmt(source.thinnest_y_mm,2)} mm`],["Corneal volume",fmt(source.corneal_volume_mm3,2)+" mm³"],
     ["RMS-HOA",fmt(source.RMS_HOA_um,3)+" µm"],["Vertical coma",fmt(source.vertical_coma_um,3)+" µm"],
-    ["Morphology",source.morphology??"—"],["Anterior pattern",source.anterior_pattern??"—"],["Posterior pattern",source.posterior_pattern??"—"],["Image quality",source.quality??"—"]
+    ["Morphology",source.morphology??"—"],["Anterior pattern",source.anterior_pattern??"—"],["Posterior pattern",source.posterior_pattern??"—"],["Image quality",source.quality??"—"],
+    ["Pentacam QS",source.pentacam_qs??"—"],["Source files",(source.source_files||[]).join(", ")||"—"]
   ];
   return `<section class="eye-result"><div class="eye-head"><strong>${safe(r.eye)} ASSESSMENT</strong><span class="status ${statusClass(r.status)}">${safe(r.status)}</span></div><div class="eye-body">
     <p class="eye-action"><strong>Clinical action:</strong> ${safe(r.action)}</p>
@@ -338,7 +357,7 @@ function renderEye(r, extracted){
 }
 
 function patientPayload(){return {
-  name:value("patient_name")||null, id:value("patient_id")||null, age:numberOrNull("age"),
+  name:value("patient_name")||null, id:value("patient_id")||null, date_of_birth:value("date_of_birth")||null, age:numberOrNull("age"),
   reviewer:value("reviewer")||null, report_date:value("report_date")||null
 }}
 function setReportMetadata(decision){
@@ -408,13 +427,14 @@ f.addEventListener("submit", async (e) => {
     images.forEach(file=>fd.append("images",file,file.name));
     fd.set("eye_plans",JSON.stringify({OD:plan("od"),OS:plan("os")}));
     fd.set("patient_modifiers",JSON.stringify(modifiers));
+    fd.set("patient_metadata",JSON.stringify(patientPayload()));
     const r=await fetch("/analyze",{method:"POST",body:fd}); const text=await r.text();
     let j; try{j=JSON.parse(text)}catch{throw new Error("Server returned a non-JSON response: "+text.slice(0,200))}
     if(!r.ok)throw new Error(j.detail||"Request failed");
     applyEffectivePlans(j.effective_eye_plans);
     statusBox.textContent=j.decision.status; statusBox.className=`status ${statusClass(j.decision.status)}`;
     overallNote.textContent=j.decision.action||"";
-    eyeResults.innerHTML=(j.decision.eyes||[]).map(x=>renderEye(x,j.extracted)).join("");
+    eyeResults.innerHTML=listBlock("Global source / identity blockers",j.decision.critical_input_issues)+(j.decision.eyes||[]).map(x=>renderEye(x,j.extracted)).join("");
     decisionBox.textContent=JSON.stringify(j.decision,null,2); extractBox.textContent=JSON.stringify(j.extracted,null,2);
     lastReport={patient:patientPayload(),decision:j.decision,extracted:j.extracted};setReportMetadata(j.decision);reportCard.hidden=false;
     analysisProgress.hidden=true;

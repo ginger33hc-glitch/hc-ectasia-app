@@ -17,6 +17,7 @@ def normal_eye(eye="OD", pachy=560, morphology="NORMAL_SYMMETRIC"):
         "eye": eye,
         "screen_types": ["4 Maps", "BAD Display"],
         "quality": "ADEQUATE",
+        "pentacam_qs": "OK",
         "missing_or_unreadable": [],
         "table_verified_numeric_fields": list(app.TABLE_NUMERIC_FIELDS),
         "map_fallback_numeric_fields": [],
@@ -50,6 +51,9 @@ def normal_eye(eye="OD", pachy=560, morphology="NORMAL_SYMMETRIC"):
         "corneal_volume_mm3": 60.0,
         "RMS_HOA_um": 0.2,
         "vertical_coma_um": 0.05,
+        "Kmean_D": 42.5,
+        "total_RMS_um": 0.3,
+        "spherical_aberration_um": 0.1,
         "morphology": morphology,
         "morphology_evidence": ["Visible symmetric bowtie"],
         "asymmetric_bow_tie": "NO",
@@ -65,8 +69,10 @@ def plan(procedure="PRK", sphere=-3.0, cylinder=0.0, ablation=60, flap=None):
     return {
         "prior": "no",
         "procedure": procedure,
-        "sphere_D": sphere,
-        "cylinder_magnitude_D": cylinder,
+        "manifest_sphere_D": sphere,
+        "manifest_cylinder_magnitude_D": cylinder,
+        "intended_sphere_D": sphere,
+        "intended_cylinder_magnitude_D": cylinder,
         "ablation_um": ablation,
         "flap_um": flap,
         "laser_platform": "Alcon EX500",
@@ -105,8 +111,86 @@ MODIFIERS = {
     "pregnancy_nursing": "no",
     "collagen_tissue_disease": "no",
     "drug_usage": "no",
+    "dry_eye": "no",
+    "systemic_disease": "no",
+    "contact_lens_type": "NONE",
+    "contact_lens_discontinuation_days": None,
     "assessed_eyes": ["OD"],
 }
+
+
+def document_context(patient_id="HC-1", dob="2000-01-01", exam_date="2026-08-25", qs="OK"):
+    return {
+        "document_type": "PENTACAM_TOPOGRAPHY", "patient_id": patient_id,
+        "patient_name": "Test Patient", "date_of_birth": dob, "exam_date": exam_date,
+        "exam_time": "10:00", "laterality": "BOTH", "pentacam_qs": qs,
+        "missing_or_unreadable": [], "source_filename": "pentacam.png",
+    }
+
+
+class TestSafetyGates(unittest.TestCase):
+    def test_prior_surgery_short_circuits_virgin_engine_even_if_thin(self):
+        prior_plan = plan()
+        prior_plan["prior"] = "yes"
+        result = app.assess_eye(normal_eye(pachy=430), prior_plan, 35, MODIFIERS)
+        self.assertEqual(result["status"], "POST-REFRACTIVE PATHWAY REQUIRED")
+        self.assertEqual(result["score"]["rows"], {})
+        self.assertEqual(result["hard_stops"], [])
+
+    def test_hc_sphere_hard_stops_and_exact_boundaries(self):
+        minus_11 = app.assess_eye(normal_eye(), plan(sphere=-11), 35, MODIFIERS)
+        minus_10 = app.assess_eye(normal_eye(), plan(sphere=-10), 35, MODIFIERS)
+        plus_7 = app.assess_eye(normal_eye(), plan(sphere=7), 35, MODIFIERS)
+        plus_6 = app.assess_eye(normal_eye(), plan(sphere=6), 35, MODIFIERS)
+        self.assertTrue(any("<−10.00" in item for item in minus_11["hard_stops"]))
+        self.assertFalse(any("<−10.00" in item for item in minus_10["hard_stops"]))
+        self.assertTrue(any(">+6.00" in item for item in plus_7["hard_stops"]))
+        self.assertFalse(any(">+6.00" in item for item in plus_6["hard_stops"]))
+
+    def test_manifest_refraction_not_intended_plan_drives_lasik_mrse(self):
+        p = plan("LASIK", sphere=-9, cylinder=2, ablation=70, flap=100)
+        p["manifest_sphere_D"] = -1
+        p["manifest_cylinder_magnitude_D"] = 0
+        result = app.assess_eye(normal_eye(), p, 35, MODIFIERS)
+        self.assertEqual(result["values"]["MRSE_D"], -1)
+        self.assertEqual(result["score"]["rows"]["MRSE"], 0)
+
+    def test_negative_ablation_is_rejected_and_not_used(self):
+        result = app.assess_eye(normal_eye(), plan(ablation=-50), 35, MODIFIERS)
+        self.assertIsNone(result["values"]["max_ablation_um"])
+        self.assertIsNone(result["values"]["PRK_RST_um"])
+        self.assertNotEqual(result["status"], "PASS")
+
+    def test_i_s_merge_does_not_create_definite_disease_override(self):
+        eye = normal_eye()
+        eye["I_S"] = 1.4
+        merged = app.merge_extractions([{"eyes": [eye], "treatment_corrections": [], "global_warnings": []}])
+        self.assertEqual(merged["eyes"][0]["morphology"], "NORMAL_SYMMETRIC")
+        result = app.assess_eye(merged["eyes"][0], plan("LASIK", ablation=60, flap=100), 35, MODIFIERS)
+        self.assertEqual(result["topography_classification"]["scoring_category"], "ABNORMAL_ECTATIC")
+        self.assertFalse(any("Definite KC" in item for item in result["hard_stops"]))
+
+    def test_single_eye_never_yields_overall_pass(self):
+        extracted = {"eyes": [normal_eye("OD")], "global_warnings": []}
+        result = app.hc_engine(extracted, 35, {"OD": plan()}, MODIFIERS)
+        self.assertEqual(result["status"], "DATA INSUFFICIENT")
+        self.assertTrue(any("Both OD and OS" in item for item in result["critical_input_issues"]))
+
+    def test_identity_date_conflicts_and_non_ok_qs_are_global_blockers(self):
+        first = {"document_context": document_context("A", qs="OK"), "eyes": [normal_eye("OD")], "treatment_corrections": [], "global_warnings": []}
+        second_context = document_context("B", exam_date="2026-08-26", qs="NOT_OK")
+        second_context["source_filename"] = "other.png"
+        second = {"document_context": second_context, "eyes": [normal_eye("OS")], "treatment_corrections": [], "global_warnings": []}
+        merged = app.merge_extractions([first, second])
+        self.assertTrue(any("Conflicting patient IDs" in item for item in merged["critical_input_issues"]))
+        self.assertTrue(any("Conflicting Pentacam" in item for item in merged["critical_input_issues"]))
+        self.assertTrue(any("non-OK QS" in item for item in merged["critical_input_issues"]))
+
+    def test_clinical_eligibility_modifier_blocks_pass_without_score_points(self):
+        modifiers = dict(MODIFIERS, pregnancy_nursing="yes")
+        result = app.assess_eye(normal_eye(), plan(), 35, modifiers)
+        self.assertEqual(result["status"], "CAUTION — STOP/DEFER")
+        self.assertEqual(result["score"]["total"], 0)
 
 
 class TestBoundaries(unittest.TestCase):
@@ -336,7 +420,7 @@ class TestScoringAndCompleteness(unittest.TestCase):
             drug_usage="yes",
         )
         result = app.assess_eye(normal_eye(), plan(), 35, modifiers)
-        self.assertEqual(result["status"], "PASS")
+        self.assertEqual(result["status"], "CAUTION — STOP/DEFER")
         self.assertTrue(any("Pregnancy or nursing" in item for item in result["clinical_modifiers"]))
         self.assertTrue(any("Collagen/connective-tissue" in item for item in result["clinical_modifiers"]))
         self.assertTrue(any("medication/drug" in item for item in result["clinical_modifiers"]))
@@ -501,8 +585,8 @@ class TestTreatmentCardTransfer(unittest.TestCase):
         empty = plan(sphere=None, cylinder=None, ablation=None)
         empty["optical_zone_mm"] = 6.5
         effective = app.apply_extracted_corrections(extracted, {"OD": empty})
-        self.assertEqual(effective["OD"]["sphere_D"], -4.5)
-        self.assertEqual(effective["OD"]["cylinder_magnitude_D"], 3.5)
+        self.assertEqual(effective["OD"]["intended_sphere_D"], -4.5)
+        self.assertEqual(effective["OD"]["intended_cylinder_magnitude_D"], 3.5)
         self.assertEqual(effective["OD"]["correction_axis_deg"], 170.0)
         self.assertIn("Duzeltme Miktari", effective["OD"]["correction_source"])
         result = app.assess_eye(normal_eye(), effective["OD"], 35, MODIFIERS)
@@ -511,8 +595,8 @@ class TestTreatmentCardTransfer(unittest.TestCase):
     def test_manual_pair_wins_when_card_differs(self):
         extracted = {"treatment_corrections": [card_correction()]}
         effective = app.apply_extracted_corrections(extracted, {"OD": plan(sphere=-2, cylinder=1)})
-        self.assertEqual(effective["OD"]["sphere_D"], -2)
-        self.assertEqual(effective["OD"]["cylinder_magnitude_D"], 1)
+        self.assertEqual(effective["OD"]["intended_sphere_D"], -2)
+        self.assertEqual(effective["OD"]["intended_cylinder_magnitude_D"], 1)
         self.assertNotIn("correction_source", effective["OD"])
         self.assertTrue(any("manual correction differs" in item for item in effective["OD"]["correction_warnings"]))
 
@@ -521,8 +605,8 @@ class TestTreatmentCardTransfer(unittest.TestCase):
         effective = app.apply_extracted_corrections(
             {"treatment_corrections": [card_correction()]}, {"OD": partial}
         )
-        self.assertEqual(effective["OD"]["sphere_D"], -2)
-        self.assertIsNone(effective["OD"]["cylinder_magnitude_D"])
+        self.assertEqual(effective["OD"]["intended_sphere_D"], -2)
+        self.assertIsNone(effective["OD"]["intended_cylinder_magnitude_D"])
         self.assertTrue(any("partial manual correction" in item for item in effective["OD"]["correction_warnings"]))
 
     def test_uncertain_axis_keeps_confident_sphere_and_cylinder_only(self):
@@ -531,8 +615,8 @@ class TestTreatmentCardTransfer(unittest.TestCase):
             {"treatment_corrections": [correction]},
             {"OD": plan(sphere=None, cylinder=None)},
         )
-        self.assertEqual(effective["OD"]["sphere_D"], -4.5)
-        self.assertEqual(effective["OD"]["cylinder_magnitude_D"], 3.5)
+        self.assertEqual(effective["OD"]["intended_sphere_D"], -4.5)
+        self.assertEqual(effective["OD"]["intended_cylinder_magnitude_D"], 3.5)
         self.assertNotIn("correction_axis_deg", effective["OD"])
         self.assertTrue(any("axis was not confidently readable" in item for item in effective["OD"]["correction_warnings"]))
 
@@ -548,8 +632,8 @@ class TestTreatmentCardTransfer(unittest.TestCase):
         conflict_result = app.apply_extracted_corrections(
             {"treatment_corrections": [card_correction(), conflicting]}, {"OD": empty}
         )
-        self.assertIsNone(uncertain_result["OD"]["sphere_D"])
-        self.assertIsNone(conflict_result["OD"]["sphere_D"])
+        self.assertIsNone(uncertain_result["OD"]["intended_sphere_D"])
+        self.assertIsNone(conflict_result["OD"]["intended_sphere_D"])
         self.assertTrue(any("Conflicting" in item for item in conflict_result["OD"]["correction_warnings"]))
 
     def test_plus_cylinder_is_not_transposed_or_auto_filled(self):
@@ -558,8 +642,8 @@ class TestTreatmentCardTransfer(unittest.TestCase):
             {"treatment_corrections": [plus]},
             {"OD": plan(sphere=None, cylinder=None)},
         )
-        self.assertIsNone(effective["OD"]["sphere_D"])
-        self.assertIsNone(effective["OD"]["cylinder_magnitude_D"])
+        self.assertIsNone(effective["OD"]["intended_sphere_D"])
+        self.assertIsNone(effective["OD"]["intended_cylinder_magnitude_D"])
         self.assertTrue(any("plus-cylinder" in item for item in effective["OD"]["correction_warnings"]))
 
     def test_unknown_eye_from_card_image_is_not_assessed(self):
@@ -610,9 +694,10 @@ class TestApiIntegration(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload["decision"]["status"], "PASS")
+        self.assertEqual(payload["decision"]["status"], "DATA INSUFFICIENT")
+        self.assertTrue(any("Both OD and OS" in item for item in payload["decision"]["critical_input_issues"]))
         self.assertEqual(payload["decision"]["eyes"][0]["eye"], "OD")
-        self.assertEqual(payload["effective_eye_plans"]["OD"]["sphere_D"], -4.5)
+        self.assertEqual(payload["effective_eye_plans"]["OD"]["intended_sphere_D"], -4.5)
         self.assertEqual(payload["decision"]["eyes"][0]["values"]["correction_axis_deg"], 170.0)
 
     def test_professional_pdf_and_word_exports_are_valid(self):

@@ -1,12 +1,12 @@
-# HC Ectasia App v0.5 — Source Compliance Audit
+# HC Ectasia App v0.6 — Source Compliance Audit
 
-Audit date: 25 August 2026  
+Audit date: 26 August 2026
 Protocol: HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery  
 Evidence set: the 10 supplied source/review files dated through 24 August 2026, plus binding HC operational amendments.
 
 ## Compliance matrix
 
-| Domain | Source/protocol requirement | Earlier finding | v0.5 implementation |
+| Domain | Source/protocol requirement | Earlier finding | v0.6 implementation |
 |---|---|---|---|
 | Eye handling | Score each eye separately; never average discordant eyes | Used the most limiting value across all eyes in one decision | Separate OD/OS plans, scores, structural calculations, missing-data lists, and dispositions; overall status is only the least-favorable summary |
 | Override gate | Definite KC/FFKC/PMD/unequivocal ectatic morphology overrides tissue metrics and score | No complete morphology category or override | Explicit morphology extraction; `ABNORMAL_ECTATIC` is a hard override and cannot be canceled by score/RSB/RST/PTA |
@@ -29,18 +29,25 @@ Evidence set: the 10 supplied source/review files dated through 24 August 2026, 
 | Image quality | Missing or unreliable imaging prohibits clearance | `LIMITED` quality could still allow PASS | Both `LIMITED` and `INADEQUATE` quality prohibit PASS |
 | Anterior/posterior phenotype | Review both elevation maps, thickness distribution, and visibly available adjunctive parameters | Only a qualitative posterior pattern was required | Both anterior and posterior patterns are required; visibly printed elevation-at-TP, thinnest-point location, PPI-min/avg/max, topometric, volume, and HOA/coma fields are transcribed and reported without invented cutoffs |
 | PRK direct-cohort PTA envelope | `>35.28%` is an evidence gap, not a validated harm cutoff; it cannot be called reassuring | The flag could coexist with PASS | The plan is labeled outside the supplied 2-year envelope and receives `REVIEW — NOT CLEARED`, not an ectasia diagnosis or hard stop |
-| Treatment-range rules | Do not introduce source-untraceable hard stops | Sphere `<−10 D` and `>+6 D` were coded as hard stops without support in the supplied protocol/source set | Removed; hyperopic or mixed-meridian LASIK/PRK remains outside the predominantly myopic supplied scoring evidence and requires review; the linear HC ablation estimate is not used for such plans |
-| Clinical modifiers | Record stability/progression, CDVA, eye rubbing, family history, inter-eye asymmetry, and other relevant eligibility factors | Only binary stability was collected | One explicit multi-select control records eye rubbing/ocular trauma, family history, inter-eye asymmetry, pregnancy/nursing, collagen/connective-tissue disease, and relevant medication/drug usage. Instability/progression defers and unexplained low CDVA/inter-eye asymmetry prevents clearance; the additional modifiers are reported for separate clinical eligibility review without invented ectasia-score weights or hard stops |
+| Treatment-range rules | Apply binding HC intended-treatment sphere rules separately from the published scores | Rules were absent from the current engine | Intended sphere `<−10.00 D` and `>+6.00 D` are HC operational hard stops; exact −10.00/+6.00 boundaries are allowed by those rules. They are labeled HC policy, not published ERSS/PRK score weights |
+| Manifest versus treatment | LASIK ERSS MRSE must use preoperative manifest refraction; tissue planning must use intended correction | One treatment value drove both MRSE and ablation | Separate manifest and intended sphere/cylinder inputs; no fallback or silent substitution between them. Treatment-card transfer fills intended correction only |
+| Prior refractive surgery | Virgin-cornea scoring must not run after PRK/LASIK/SMILE | Prior surgery was only a low-ranked status and scoring continued | `prior=yes` immediately exits to `POST-REFRACTIVE PATHWAY REQUIRED`; no virgin score, tissue hard stop, or clearance is emitted |
+| Clinical modifiers | Keep clinical eligibility separate from ectasia-score weights | Pregnancy, systemic/collagen disease, medication, and dry eye could coexist with PASS | Pregnancy/nursing causes STOP/DEFER; collagen/systemic disease, relevant medication, and dry eye require review. No ectasia points are invented |
 | Missing data | Missing/unreliable topography, tomography, pachymetry, age, or plan inputs are unscorable; never issue PASS | Some missing fields were ignored; age was collected but unused | Required-data inventory per eye; no PASS when any critical input is missing/unreadable; no surgeon-confirmation checkbox |
 | Caution | CAUTION is STOP/DEFER; repeat/re-evaluate after ≥6 months | Several non-protocol borderline labels without the binding action | One explicit `CAUTION — STOP/DEFER` status and action wording |
-| Merge behavior | Use visibly supported values and identify conflicts | Missing flags persisted after later images supplied the value; worst image quality was retained | Resolved missing flags are cleared; best readable image quality is retained; conflicts generate warnings and specified conservative handling |
+| Source identity | Do not merge unrelated patients or acquisition dates | Images were joined by OD/OS alone | Patient ID/name, DOB, exam date/time, laterality, and filename are extracted. Conflicting ID/DOB/Pentacam dates, mismatch with entered metadata, or an unclassified/unusable file prohibit PASS |
+| Pentacam acquisition quality | Source-study analyses required Pentacam QS `OK` | Generic AI image quality had no literal device-QS field | Literal QS is extracted separately. A same-exam `QS: OK` is required and any visible non-OK QS blocks clearance; generic image quality cannot substitute |
+| Fellow eye | Inter-eye comparison is part of screening | A single eye could yield overall PASS | Both OD and OS are required for overall PASS; eyes remain independently scored |
+| Merge behavior | Use visibly supported values, preserve provenance, and identify conflicts | Best-quality merging could mask a limited decision page and field origin was absent | Filename, quality by source, and field-level source type are retained; limited/inadequate decision-source quality and unresolved decision conflicts prohibit PASS |
+| Numeric integrity | Invalid or internally inconsistent numbers must not enter formulas | Negative ablation could increase calculated residual tissue | Server-side ranges reject invalid plan/tomography values; PPI ordering and `ARTmax = TP/PPImax` consistency are checked before PASS |
+| Contact lenses | Document source-study imaging preparation without inventing an ectasia cutoff | Not collected | Soft-lens ≥14-day and rigid-lens ≥21-day washout are labeled source-study imaging criteria and used only as a data-quality gate |
 
 ## Evidence versus HC policy
 
 The software intentionally distinguishes two layers:
 
 1. **Published evidence/instruments.** LASIK ERSS is a validated retrospective case-control score. PRK-EWSS is provisional and has no validated sensitivity, specificity, calibration, or risk probability. BAD and other Pentacam thresholds in the supplied studies are diagnostic/review signals, not prospective post-refractive ectasia predictors.
-2. **Binding HC operational safety policy.** The `<480 µm` preoperative pachymetry, `<300 µm` LASIK RSB, and `<310 µm` PRK RST rules are enforced as hard stops. The supplied Li et al. appraisal does not independently validate 310 µm as a universal safe PRK cutoff; this limitation is displayed in every eye record.
+2. **Binding HC operational safety policy.** The `<480 µm` preoperative pachymetry, `<300 µm` LASIK RSB, `<310 µm` PRK RST, intended sphere `<−10.00 D`, and intended sphere `>+6.00 D` rules are enforced as hard stops. Exact boundaries are allowed. The supplied Li et al. appraisal does not independently validate 310 µm as a universal safe PRK cutoff; this limitation is displayed in every eye record.
 
 ## Source set checked
 
@@ -57,4 +64,4 @@ The software intentionally distinguishes two layers:
 
 ## Remaining validation limit
 
-Code-rule compliance does not establish clinical validity. Before production clinical reliance, v0.5 still requires prospective locked-rule validation against a labeled case set, image-extraction accuracy testing by screen type/device, and deployment testing with real de-identified cases. The software must not be described as a validated ectasia probability calculator or as autonomous surgical clearance.
+Code-rule compliance does not establish clinical validity. Before production clinical reliance, v0.6 still requires prospective locked-rule validation against a labeled case set, image-extraction accuracy testing by screen type/device, and deployment testing with real de-identified cases. Dependencies and the accepted model configuration are pinned/guarded, but a provider-served model name is not equivalent to an immutable model snapshot. Any model/configuration change requires repeat validation. The software must not be described as a validated ectasia probability calculator or as autonomous surgical clearance.

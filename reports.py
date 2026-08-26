@@ -88,14 +88,20 @@ def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
     values = eye.get("values") or {}
     score = eye.get("score") or {}
     correction = "Not documented"
-    if values.get("sphere_D") is not None and values.get("cylinder_magnitude_D") is not None:
+    if values.get("intended_sphere_D") is not None and values.get("intended_cylinder_magnitude_D") is not None:
         axis = (
             f" x {_fmt(values.get('correction_axis_deg'), 0, ' degrees')}"
             if values.get("correction_axis_deg") is not None else " (axis unavailable)"
         )
         correction = (
-            f"{_fmt(values.get('sphere_D'), 2, ' D')} / "
-            f"-{_fmt(values.get('cylinder_magnitude_D'), 2, ' D')}{axis}"
+            f"{_fmt(values.get('intended_sphere_D'), 2, ' D')} / "
+            f"-{_fmt(values.get('intended_cylinder_magnitude_D'), 2, ' D')}{axis}"
+        )
+    manifest = "Not documented"
+    if values.get("manifest_sphere_D") is not None and values.get("manifest_cylinder_magnitude_D") is not None:
+        manifest = (
+            f"{_fmt(values.get('manifest_sphere_D'), 2, ' D')} / "
+            f"-{_fmt(values.get('manifest_cylinder_magnitude_D'), 2, ' D')}"
         )
     transition = (
         "Not applicable"
@@ -104,6 +110,13 @@ def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
     )
     return [
         ("Procedure", _text(values.get("procedure"))),
+        ("Prior refractive surgery", _text(values.get("prior_refractive_surgery"))),
+        ("Stability / progression / CDVA flag", (
+            f"{_text(values.get('refractive_stability'))} / "
+            f"{_text(values.get('documented_progression'))} / "
+            f"{_text(values.get('unexplained_CDVA_below_20_20'))}"
+        )),
+        ("Manifest refraction", manifest),
         ("Intended correction", correction),
         ("Correction source", _text(values.get("correction_source"), "Manual / not documented")),
         ("Score / category", f"{_text(score.get('total'), '-')} / {_text(score.get('category'), '-') }"),
@@ -118,6 +131,7 @@ def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
         ("LASIK RSB / PTA", f"{_fmt(values.get('LASIK_RSB_um'), 0, ' um')} / {_fmt(values.get('LASIK_PTA_percent'), 1, '%')}"),
         ("Tomography review", _text((eye.get("tomography_review") or {}).get("status"))),
         ("Morphology category", _text((eye.get("topography_classification") or {}).get("scoring_category"))),
+        ("Pentacam QS", _text(values.get("pentacam_qs"))),
     ]
 
 
@@ -165,6 +179,7 @@ def _tomography_rows(extracted: Dict[str, Any], eye_id: str) -> List[tuple[str, 
         ("RMS-HOA", "RMS_HOA_um", " um", 3), ("Vertical coma", "vertical_coma_um", " um", 3),
         ("Morphology", "morphology", "", 0), ("Anterior pattern", "anterior_pattern", "", 0),
         ("Posterior pattern", "posterior_pattern", "", 0), ("Image quality", "quality", "", 0),
+        ("Pentacam QS", "pentacam_qs", "", 0), ("Source files", "source_files", "", 0),
     ]
     return [(label, _fmt(eye.get(key), digits, unit)) for label, key, unit, digits in keys]
 
@@ -198,7 +213,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
 
     story: List[Any] = []
     story.append(Paragraph("HC PREOPERATIVE ECTASIA RISK ASSESSMENT", styles["ReportTitle"]))
-    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.5", styles["ReportSub"]))
+    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.6", styles["ReportSub"]))
 
     metadata = [
         ["Patient", _ascii(patient.get("name")), "Patient ID", _ascii(patient.get("id"))],
@@ -230,6 +245,11 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         ("TEXTCOLOR", (0, 0), (-1, -1), _rl(accent)),
     ]))
     story.append(status_table)
+    blockers = decision.get("critical_input_issues") or []
+    if blockers:
+        story.append(Paragraph("Global source / identity blockers", styles["Section"]))
+        for item in blockers:
+            story.append(Paragraph(f"- {_ascii(item)}", styles["BodySmall"]))
 
     for eye in decision.get("eyes") or []:
         eye_status = eye.get("status") or "NOT ASSESSED"
@@ -427,7 +447,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     run.font.size = Pt(18)
     run.bold = True
     run.font.color.rgb = RGBColor.from_string(NAVY)
-    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.5")
+    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.6")
     subtitle.paragraph_format.space_after = Pt(10)
     for run in subtitle.runs:
         run.font.name = "Arial"
@@ -461,6 +481,12 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
         run.font.name = "Arial"
         run.font.color.rgb = RGBColor.from_string(accent)
         run.bold = idx < 2
+
+    blockers = decision.get("critical_input_issues") or []
+    if blockers:
+        _add_heading(document, "Global source / identity blockers", 1)
+        for item in blockers:
+            _add_bullet(document, item)
 
     for eye in decision.get("eyes") or []:
         _add_heading(document, f"{_text(eye.get('eye'))} assessment", 1)
