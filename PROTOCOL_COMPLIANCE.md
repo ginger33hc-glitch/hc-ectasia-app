@@ -1,4 +1,4 @@
-# HC Ectasia App v0.4 — Source Compliance Audit
+# HC Ectasia App v0.5 — Source Compliance Audit
 
 Audit date: 25 August 2026  
 Protocol: HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery  
@@ -6,7 +6,7 @@ Evidence set: the 10 supplied source/review files dated through 24 August 2026, 
 
 ## Compliance matrix
 
-| Domain | Source/protocol requirement | v0.3 finding | v0.4 implementation |
+| Domain | Source/protocol requirement | Earlier finding | v0.5 implementation |
 |---|---|---|---|
 | Eye handling | Score each eye separately; never average discordant eyes | Used the most limiting value across all eyes in one decision | Separate OD/OS plans, scores, structural calculations, missing-data lists, and dispositions; overall status is only the least-favorable summary |
 | Override gate | Definite KC/FFKC/PMD/unequivocal ectatic morphology overrides tissue metrics and score | No complete morphology category or override | Explicit morphology extraction; `ABNORMAL_ECTATIC` is a hard override and cannot be canceled by score/RSB/RST/PTA |
@@ -22,6 +22,12 @@ Evidence set: the 10 supplied source/review files dated through 24 August 2026, 
 | PRK direct cohort | 310 µm is the cohort minimum, not a validated universal safe cutoff; PTA range to 35.28% is an evidence envelope | Not documented | HC 310 hard stop is explicitly labeled operational policy; `PRK PTA >35.28%` is labeled an evidence-gap flag, not proof of harm |
 | BAD display | Components: `<1.6` normal, `1.6–<2.6` suspicious, `≥2.6` abnormal; final D `≤1.6` normal, `>1.6–<3.0` suspicious, `≥3.0` abnormal | Used `BAD-D ≥1.6` as a generic borderline rule and an unsupported composite with ARTmax | Boundary-specific display classification; no diagnostic or probability claim |
 | ARTmax/TP/Dt/Da | Use as adjunctive cross-sectional concern flags, not validated post-refractive predictors | Unsupported `ARTmax <370` decision threshold | Removed `<370`; reports supplied cutoffs (`ARTmax ≤424`, TP `≤544`, Dt `≥−0.165`, Da `≥0.585`) only as adjunctive flags |
+| Tomography flag disposition | A positive cross-sectional threshold is a review signal; do not present the tomography layer as reassuring | Flags were calculated but could coexist with `REASSURING` and `PASS` | Any supplied ARTmax/TP/Dt/Da concern flag changes the tomography layer to `CONCERN FLAGS` and requires `REVIEW — NOT CLEARED`; no ectasia diagnosis or probability is inferred |
+| Multi-image conflicts | Conflicting extracted values must be surfaced and must not be silently treated as resolved | Some conflicts retained the first value and could still allow PASS | Every value conflict is recorded per eye, the more concerning value is retained for supported directional fields, and any unresolved conflict prohibits PASS |
+| Image quality | Missing or unreliable imaging prohibits clearance | `LIMITED` quality could still allow PASS | Both `LIMITED` and `INADEQUATE` quality prohibit PASS |
+| Anterior/posterior phenotype | Review both elevation maps, thickness distribution, and visibly available adjunctive parameters | Only a qualitative posterior pattern was required | Both anterior and posterior patterns are required; visibly printed elevation-at-TP, thinnest-point location, PPI-min/avg/max, topometric, volume, and HOA/coma fields are transcribed and reported without invented cutoffs |
+| PRK direct-cohort PTA envelope | `>35.28%` is an evidence gap, not a validated harm cutoff; it cannot be called reassuring | The flag could coexist with PASS | The plan is labeled outside the supplied 2-year envelope and receives `REVIEW — NOT CLEARED`, not an ectasia diagnosis or hard stop |
+| Treatment-range rules | Do not introduce source-untraceable hard stops | Sphere `<−10 D` and `>+6 D` were coded as hard stops without support in the supplied protocol/source set | Removed; hyperopic or mixed-meridian LASIK/PRK remains outside the predominantly myopic supplied scoring evidence and requires review; the linear HC ablation estimate is not used for such plans |
 | Clinical modifiers | Record stability/progression, CDVA, eye rubbing, family history, and inter-eye asymmetry | Only binary stability was collected | Explicit yes/no/unknown collection; instability/progression defers, unexplained low CDVA/inter-eye asymmetry prevents clearance, other modifiers are reported without invented point weights |
 | Missing data | Missing/unreliable topography, tomography, pachymetry, age, or plan inputs are unscorable; never issue PASS | Some missing fields were ignored; age was collected but unused | Required-data inventory per eye; no PASS when any critical input is missing/unreadable; no surgeon-confirmation checkbox |
 | Caution | CAUTION is STOP/DEFER; repeat/re-evaluate after ≥6 months | Several non-protocol borderline labels without the binding action | One explicit `CAUTION — STOP/DEFER` status and action wording |
@@ -49,4 +55,4 @@ The software intentionally distinguishes two layers:
 
 ## Remaining validation limit
 
-Code-rule compliance does not establish clinical validity. Before production clinical reliance, v0.4 still requires prospective locked-rule validation against a labeled case set, image-extraction accuracy testing by screen type/device, and deployment testing with real de-identified cases. The software must not be described as a validated ectasia probability calculator or as autonomous surgical clearance.
+Code-rule compliance does not establish clinical validity. Before production clinical reliance, v0.5 still requires prospective locked-rule validation against a labeled case set, image-extraction accuracy testing by screen type/device, and deployment testing with real de-identified cases. The software must not be described as a validated ectasia probability calculator or as autonomous surgical clearance.

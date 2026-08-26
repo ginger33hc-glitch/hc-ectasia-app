@@ -2,7 +2,7 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.4 implements
+## What v0.5 implements
 
 - Sequential original-detail extraction of each uploaded Pentacam/topography image.
 - Independent OD and OS assessment; eye values are never averaged.
@@ -14,9 +14,14 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Zone-specific HC ablation estimates for explicitly documented Alcon EX500 plans: `12 µm/D` at 6.0 mm and `15 µm/D` at 6.5 mm; the actual treatment-plan maximum remains preferred.
 - Procedure-correct PTA formulas for LASIK and PRK.
 - BAD-D/component display interpretation plus adjunctive ARTmax/TP/Dt/Da evidence flags.
+- Positive tomography concern flags require review and cannot receive automatic PASS.
+- Limited/inadequate image quality and unresolved cross-image value conflicts prohibit PASS.
+- PRK PTA above the supplied 35.28% direct-cohort envelope requires review and cannot receive automatic PASS.
+- Expanded extraction/reporting of anterior and posterior elevation, pachymetric progression,
+  topometric, thinnest-point location, corneal-volume, and HOA/coma fields when visibly available.
 - Required clinical modifiers and treatment-plan inputs; missing/unreadable critical data prohibit PASS.
 - Binding CAUTION action: STOP/DEFER, repeat relevant screening, and reassess after at least 6 months.
-- Formal clinical report with patient/reviewer metadata, restrained decision colors (PASS blue,
+- Formal clinical report with patient/reviewer metadata, restrained decision colors (PASS green,
   CAUTION amber, FAIL red, NOT ASSESSED gray), print layout, and validated PDF and DOCX exports.
 - Complete machine-readable extraction and decision records remain available for audit.
 

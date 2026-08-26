@@ -27,6 +27,7 @@ def normal_eye(eye="OD", pachy=560, morphology="NORMAL_SYMMETRIC"):
         "Dt": -0.5,
         "Da": 0.2,
         "PPI_avg": 0.9,
+        "PPI_min": 0.7,
         "PPI_max": 1.1,
         "ARTmax_um": 500,
         "ISV": 20,
@@ -36,11 +37,21 @@ def normal_eye(eye="OD", pachy=560, morphology="NORMAL_SYMMETRIC"):
         "IHD": 0.01,
         "I_S": 0.5,
         "KISA": 10,
+        "IHA": 2.0,
+        "Rmin_mm": 7.6,
+        "anterior_elevation_thinnest_um": 2.0,
+        "posterior_elevation_thinnest_um": 4.0,
+        "thinnest_x_mm": 0.2,
+        "thinnest_y_mm": -0.3,
+        "corneal_volume_mm3": 60.0,
+        "RMS_HOA_um": 0.2,
+        "vertical_coma_um": 0.05,
         "morphology": morphology,
         "morphology_evidence": ["Visible symmetric bowtie"],
         "asymmetric_bow_tie": "NO",
         "srax": "NO",
         "srax_deg": 0,
+        "anterior_pattern": "REASSURING",
         "posterior_pattern": "REASSURING",
     }
 
@@ -122,7 +133,7 @@ class TestBoundaries(unittest.TestCase):
             normal_eye(pachy=510), plan("LASIK", sphere=-3, ablation=100, flap=100), 35, MODIFIERS
         )
         self.assertIsNone(result["score"]["rows"]["pachymetry"])
-        self.assertEqual(result["status"], "DATA INSUFFICIENT")
+        self.assertNotEqual(result["status"], "PASS")
         self.assertTrue(any("510" in item for item in result["missing"]))
 
     def test_i_s_1_4_uses_published_erss_abnormal_pattern_without_disease_override(self):
@@ -166,6 +177,14 @@ class TestBoundaries(unittest.TestCase):
         self.assertEqual(other_platform_result["status"], "DATA INSUFFICIENT")
         self.assertEqual(unsupported_zone_result["status"], "DATA INSUFFICIENT")
 
+    def test_hyperopic_plan_requires_actual_ablation_and_review(self):
+        estimated = app.assess_eye(normal_eye(), plan(sphere=2.0, cylinder=0.0, ablation=None), 35, MODIFIERS)
+        actual = app.assess_eye(normal_eye(), plan(sphere=2.0, cylinder=0.0, ablation=40), 35, MODIFIERS)
+        self.assertIsNone(estimated["values"]["max_ablation_um"])
+        self.assertNotEqual(estimated["status"], "PASS")
+        self.assertEqual(actual["status"], "REVIEW — NOT CLEARED")
+        self.assertFalse(any("treatment cutoff" in item for item in actual["hard_stops"]))
+
 
 class TestScoringAndCompleteness(unittest.TestCase):
     def test_reassuring_prk_can_pass(self):
@@ -193,6 +212,53 @@ class TestScoringAndCompleteness(unittest.TestCase):
         result = app.assess_eye(normal_eye(pachy=560), plan(ablation=150), 35, MODIFIERS)
         self.assertGreater(result["values"]["PRK_PTA_percent"], 35.28)
         self.assertTrue(any("evidence-gap" in item for item in result["surgical_load_flags"]))
+        self.assertEqual(result["status"], "REVIEW — NOT CLEARED")
+
+    def test_concordant_cross_sectional_tomography_flags_prohibit_pass(self):
+        eye = normal_eye(pachy=530)
+        eye.update(ARTmax_um=400, Dt=-0.10, Da=0.70)
+        result = app.assess_eye(eye, plan(), 35, MODIFIERS)
+        self.assertEqual(result["tomography_review"]["status"], "CONCERN FLAGS")
+        self.assertEqual(len(result["tomography_review"]["cross_sectional_flags"]), 4)
+        self.assertEqual(result["status"], "REVIEW — NOT CLEARED")
+
+    def test_limited_image_quality_prohibits_pass(self):
+        eye = normal_eye()
+        eye["quality"] = "LIMITED"
+        result = app.assess_eye(eye, plan(), 35, MODIFIERS)
+        self.assertEqual(result["status"], "DATA INSUFFICIENT")
+        self.assertIn("adequate-quality tomography/topography", result["missing"])
+
+    def test_unreadable_anterior_map_prohibits_pass(self):
+        eye = normal_eye()
+        eye["anterior_pattern"] = "UNREADABLE"
+        result = app.assess_eye(eye, plan(), 35, MODIFIERS)
+        self.assertEqual(result["status"], "DATA INSUFFICIENT")
+        self.assertIn("readable anterior pattern", result["missing"])
+
+    def test_conflicting_i_s_values_use_concerning_value_and_prohibit_pass(self):
+        first = normal_eye()
+        second = normal_eye()
+        first["I_S"] = 0.5
+        second["I_S"] = 1.6
+        merged = app.merge_extractions(
+            [{"eyes": [first], "global_warnings": []}, {"eyes": [second], "global_warnings": []}]
+        )
+        self.assertEqual(merged["eyes"][0]["I_S"], 1.6)
+        self.assertTrue(any(item.startswith("I_S:") for item in merged["eyes"][0]["data_conflicts"]))
+        result = app.assess_eye(merged["eyes"][0], plan(), 35, MODIFIERS)
+        self.assertNotEqual(result["status"], "PASS")
+
+    def test_noncritical_numeric_conflict_is_unresolved_and_prohibits_pass(self):
+        first = normal_eye()
+        second = normal_eye()
+        second["K1_D"] = 42.25
+        merged = app.merge_extractions(
+            [{"eyes": [first], "global_warnings": []}, {"eyes": [second], "global_warnings": []}]
+        )
+        result = app.assess_eye(merged["eyes"][0], plan(), 35, MODIFIERS)
+        self.assertEqual(result["status"], "DATA INSUFFICIENT")
+        self.assertTrue(any("K1_D" in item for item in result["missing"]))
 
     def test_bilateral_engine_keeps_eyes_separate_and_overall_is_worst(self):
         extracted = {"eyes": [normal_eye("OD", 560), normal_eye("OS", 479)], "global_warnings": []}

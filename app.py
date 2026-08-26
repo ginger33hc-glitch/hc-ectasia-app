@@ -13,7 +13,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="HC Ectasia App v0.4")
+app = FastAPI(title="HC Ectasia App v0.5")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -52,6 +52,7 @@ SCHEMA = {
                     "Dt": {"type": ["number", "null"]},
                     "Da": {"type": ["number", "null"]},
                     "PPI_avg": {"type": ["number", "null"]},
+                    "PPI_min": {"type": ["number", "null"]},
                     "PPI_max": {"type": ["number", "null"]},
                     "ARTmax_um": {"type": ["number", "null"]},
                     "ISV": {"type": ["number", "null"]},
@@ -61,11 +62,24 @@ SCHEMA = {
                     "IHD": {"type": ["number", "null"]},
                     "I_S": {"type": ["number", "null"]},
                     "KISA": {"type": ["number", "null"]},
+                    "IHA": {"type": ["number", "null"]},
+                    "Rmin_mm": {"type": ["number", "null"]},
+                    "anterior_elevation_thinnest_um": {"type": ["number", "null"]},
+                    "posterior_elevation_thinnest_um": {"type": ["number", "null"]},
+                    "thinnest_x_mm": {"type": ["number", "null"]},
+                    "thinnest_y_mm": {"type": ["number", "null"]},
+                    "corneal_volume_mm3": {"type": ["number", "null"]},
+                    "RMS_HOA_um": {"type": ["number", "null"]},
+                    "vertical_coma_um": {"type": ["number", "null"]},
                     "morphology": {"type": "string", "enum": list(MORPHOLOGY)},
                     "morphology_evidence": {"type": "array", "items": {"type": "string"}},
                     "asymmetric_bow_tie": {"type": "string", "enum": ["YES", "NO", "UNCERTAIN"]},
                     "srax": {"type": "string", "enum": ["YES", "NO", "UNCERTAIN"]},
                     "srax_deg": {"type": ["number", "null"]},
+                    "anterior_pattern": {
+                        "type": "string",
+                        "enum": ["REASSURING", "BORDERLINE", "ABNORMAL", "UNREADABLE"],
+                    },
                     "posterior_pattern": {
                         "type": "string",
                         "enum": ["REASSURING", "BORDERLINE", "ABNORMAL", "UNREADABLE"],
@@ -74,9 +88,12 @@ SCHEMA = {
                 "required": [
                     "eye", "screen_types", "quality", "missing_or_unreadable", "K1_D", "K2_D",
                     "Kmax_D", "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp", "Dt", "Da",
-                    "PPI_avg", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI", "CKI", "IHD",
-                    "I_S", "KISA", "morphology", "morphology_evidence", "asymmetric_bow_tie",
-                    "srax", "srax_deg", "posterior_pattern",
+                    "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI", "CKI", "IHD",
+                    "I_S", "KISA", "IHA", "Rmin_mm", "anterior_elevation_thinnest_um",
+                    "posterior_elevation_thinnest_um", "thinnest_x_mm", "thinnest_y_mm",
+                    "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um", "morphology",
+                    "morphology_evidence", "asymmetric_bow_tie", "srax", "srax_deg",
+                    "anterior_pattern", "posterior_pattern",
                 ],
             },
         },
@@ -90,7 +107,10 @@ Extract only values visibly supported by the supplied image. Never guess an unre
 number. Identify OD/OS and screen type. Return null for unreadable/absent numeric values and list
 them in missing_or_unreadable. Classify the visible Placido/topographic morphology using exactly
 one of: NORMAL_SYMMETRIC, ASYMMETRIC_BOWTIE, INFERIOR_STEEPENING_SRA,
-ABNORMAL_ECTATIC, UNCERTAIN. ABNORMAL_ECTATIC is reserved for a clearly visible keratoconus,
+ABNORMAL_ECTATIC, UNCERTAIN. Transcribe visible anterior/posterior elevation-at-thinnest-point,
+thinnest-point location, pachymetric-progression, topometric, corneal-volume, and HOA/coma values
+when they are printed; otherwise return null. Classify both visible anterior and posterior maps as
+REASSURING, BORDERLINE, ABNORMAL, or UNREADABLE. ABNORMAL_ECTATIC is reserved for a clearly visible keratoconus,
 forme-fruste keratoconus, pellucid/ectatic pattern; do not infer it from one isolated index.
 INFERIOR_STEEPENING_SRA requires visible inferior steepening or skewed radial axis. Record short
 visible reasons in morphology_evidence. If the relevant map is not sufficiently visible, use
@@ -283,12 +303,15 @@ def tomography_review(eye: Dict[str, Any]) -> Dict[str, Any]:
         flags.append("BAD-Da >=0.585: cross-sectional subclinical-KC concern flag.")
 
     display_values = list(bad.values())
-    if "ABNORMAL" in display_values or eye.get("posterior_pattern") == "ABNORMAL":
+    map_patterns = (eye.get("anterior_pattern"), eye.get("posterior_pattern"))
+    if "ABNORMAL" in display_values or "ABNORMAL" in map_patterns:
         status = "ABNORMAL"
-    elif "SUSPICIOUS" in display_values or eye.get("posterior_pattern") == "BORDERLINE":
+    elif "SUSPICIOUS" in display_values or "BORDERLINE" in map_patterns:
         status = "SUSPICIOUS"
-    elif "UNAVAILABLE" in display_values or eye.get("posterior_pattern") == "UNREADABLE":
+    elif "UNAVAILABLE" in display_values or "UNREADABLE" in map_patterns:
         status = "INCOMPLETE"
+    elif flags:
+        status = "CONCERN FLAGS"
     else:
         status = "REASSURING"
 
@@ -313,6 +336,12 @@ def estimate_ablation(plan: Dict[str, Any], warnings: List[str]) -> Optional[flo
     platform = str(plan.get("laser_platform") or "").lower().replace(" ", "")
     is_ex500 = "alcon" in platform and "ex500" in platform
     ablation_rate = {6.0: 12.0, 6.5: 15.0}.get(optical_zone) if is_ex500 else None
+    if is_number(sphere) and sphere > 0:
+        warnings.append(
+            "The HC linear EX500 ablation estimate is not applied to a hyperopic or mixed-meridian plan; "
+            "enter the actual laser-plan maximum ablation."
+        )
+        return None
     if is_number(sphere) and is_number(cylinder) and ablation_rate is not None:
         warnings.append(
             f"Maximum ablation estimated with the HC Alcon EX500, {optical_zone:.1f}-mm-zone, "
@@ -338,8 +367,12 @@ def required_tomography_missing(eye: Dict[str, Any]) -> List[str]:
         missing.append("classifiable topographic morphology")
     if eye.get("posterior_pattern") in (None, "UNREADABLE"):
         missing.append("readable posterior pattern")
-    if eye.get("quality") == "INADEQUATE":
+    if eye.get("anterior_pattern") in (None, "UNREADABLE"):
+        missing.append("readable anterior pattern")
+    if eye.get("quality") in ("LIMITED", "INADEQUATE"):
         missing.append("adequate-quality tomography/topography")
+    for conflict in eye.get("data_conflicts", []):
+        missing.append(f"unresolved multi-image conflict: {conflict}")
     return missing
 
 
@@ -448,10 +481,6 @@ def assess_eye(
 
     if pachy is not None and pachy < 480:
         hard_stops.append("HC operational hard stop: thinnest preoperative cornea <480 µm.")
-    if is_number(sphere) and sphere < -10:
-        hard_stops.append("HC operational myopic treatment cutoff: intended sphere <-10.00 D.")
-    if is_number(sphere) and sphere > 6:
-        hard_stops.append("HC operational hyperopic treatment cutoff: intended sphere >+6.00 D.")
     if procedure == "PRK" and rst is not None and rst < 310:
         hard_stops.append("HC operational PRK RST hard stop: RST <310 µm.")
     if procedure == "LASIK" and rsb is not None and rsb < 300:
@@ -504,11 +533,6 @@ def assess_eye(
                 reasons.append(
                     "Validated LASIK ERSS moderate-risk category (score 3): defer and re-evaluate after >=6 months."
                 )
-        if mrse is not None and mrse > 0:
-            status = combine_status(status, "REVIEW — NOT CLEARED")
-            reasons.append(
-                "The supplied LASIK ERSS validation evidence is myopic; hyperopic applicability is not established."
-            )
     elif procedure == "PRK":
         score_rows = {
             "morphology": prk_morphology_points(morphology),
@@ -527,12 +551,32 @@ def assess_eye(
                     "PRK-EWSS v1.0 provisional caution category (score 2-3): defer and re-evaluate after >=6 months."
                 )
 
+    if is_number(sphere) and sphere > 0:
+        status = combine_status(status, "REVIEW — NOT CLEARED")
+        reasons.append(
+            "The supplied procedure-specific scoring evidence is predominantly myopic; "
+            "hyperopic or mixed-meridian applicability is not established."
+        )
+
     if tomo["status"] == "ABNORMAL" and visible_morphology != "ABNORMAL_ECTATIC":
         status = combine_status(status, "REVIEW — NOT CLEARED")
         reasons.append("Abnormal adjunctive tomography display: morphology/clinical concordance review required.")
     elif tomo["status"] == "SUSPICIOUS":
         status = combine_status(status, "REVIEW — NOT CLEARED")
         reasons.append("Suspicious adjunctive tomography display: repeat/confirm and review concordance.")
+    elif tomo["status"] == "CONCERN FLAGS":
+        status = combine_status(status, "REVIEW — NOT CLEARED")
+        reasons.append(
+            "One or more supplied cross-sectional tomography concern thresholds are positive; "
+            "confirm repeatability and clinical/map concordance before any clearance."
+        )
+
+    if procedure == "PRK" and surgical_load_flags:
+        status = combine_status(status, "REVIEW — NOT CLEARED")
+        reasons.append(
+            "The PRK plan lies outside the supplied reassuring 2-year direct-cohort PTA envelope; "
+            "the evidence gap requires documented review and cannot receive automatic PASS."
+        )
 
     if missing:
         if not hard_stops:
@@ -643,7 +687,7 @@ def hc_engine(
         "eyes": results,
         "warnings": extracted.get("global_warnings", []),
         "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.4 / source set 2026-08-24 plus binding HC amendments",
+        "version": "software v0.5 / source set 2026-08-25 plus binding HC amendments",
     }
 
 
@@ -653,6 +697,11 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     conservative = {
         "pachy_thinnest_um": "min", "BAD_D": "max", "Df": "max", "Db": "max",
         "Dp": "max", "Dt": "max", "Da": "max", "ARTmax_um": "min", "PPI_max": "max",
+        "PPI_avg": "max", "PPI_min": "max", "Kmax_D": "max", "ISV": "max", "IVA": "max",
+        "KI": "max", "CKI": "max", "IHD": "max", "I_S": "max", "KISA": "max",
+        "IHA": "max", "anterior_elevation_thinnest_um": "max",
+        "posterior_elevation_thinnest_um": "max", "RMS_HOA_um": "max", "vertical_coma_um": "max",
+        "srax_deg": "max",
     }
     morphology_rank = {
         "UNCERTAIN": 0, "NORMAL_SYMMETRIC": 1, "ASYMMETRIC_BOWTIE": 2,
@@ -669,6 +718,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 by_eye[eye_id] = dict(eye)
                 continue
             target = by_eye[eye_id]
+            target.setdefault("data_conflicts", [])
             target["screen_types"] = sorted(set(target.get("screen_types", []) + eye.get("screen_types", [])))
             target["morphology_evidence"] = list(
                 dict.fromkeys(target.get("morphology_evidence", []) + eye.get("morphology_evidence", []))
@@ -685,6 +735,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     continue
                 if value is None or old == value:
                     continue
+                target["data_conflicts"].append(f"{key}: {old} vs {value}")
                 if key in conservative and is_number(old) and is_number(value):
                     target[key] = min(old, value) if conservative[key] == "min" else max(old, value)
                     merged["global_warnings"].append(
@@ -696,6 +747,8 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                         f"Conflicting morphology classifications for {eye_id}; more concerning visible category retained."
                     )
                 elif key == "posterior_pattern":
+                    target[key] = max((old, value), key=lambda item: posterior_rank.get(item, 0))
+                elif key == "anterior_pattern":
                     target[key] = max((old, value), key=lambda item: posterior_rank.get(item, 0))
                 elif key in ("asymmetric_bow_tie", "srax"):
                     if "YES" in (old, value):
@@ -710,6 +763,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     )
 
     for eye in by_eye.values():
+        eye["data_conflicts"] = sorted(set(eye.get("data_conflicts", [])))
         eye["missing_or_unreadable"] = sorted(
             set(key for key in eye.get("missing_or_unreadable", []) if eye.get(key) is None)
         )

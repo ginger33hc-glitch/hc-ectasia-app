@@ -30,6 +30,8 @@ from reportlab.platypus import (
 NAVY = "173B57"
 BLUE = "1F5E8C"
 BLUE_FILL = "EAF3FA"
+GREEN = "176B3A"
+GREEN_FILL = "E6F4EA"
 AMBER = "9A5A00"
 AMBER_FILL = "FFF2DB"
 RED = "A31212"
@@ -64,7 +66,7 @@ def _ascii(value: Any, fallback: str = "Not documented") -> str:
 
 def _status_palette(status: str) -> tuple[str, str]:
     if status == "PASS":
-        return BLUE, BLUE_FILL
+        return GREEN, GREEN_FILL
     if status == "DO NOT PROCEED":
         return RED, RED_FILL
     if status.startswith("CAUTION") or status.startswith("REVIEW"):
@@ -85,12 +87,20 @@ def _fmt(value: Any, digits: int = 1, unit: str = "") -> str:
 def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
     values = eye.get("values") or {}
     score = eye.get("score") or {}
+    transition = (
+        "Not applicable"
+        if values.get("transition_zone_mm") is None and values.get("transition_zone_not_applicable") == "yes"
+        else _fmt(values.get("transition_zone_mm"), 1, " mm")
+    )
     return [
         ("Procedure", _text(values.get("procedure"))),
         ("Score / category", f"{_text(score.get('total'), '-')} / {_text(score.get('category'), '-') }"),
         ("Thinnest pachymetry", _fmt(values.get("pachy_thinnest_um"), 0, " um")),
         ("MRSE", _fmt(values.get("MRSE_D"), 2, " D")),
         ("Maximum ablation", _fmt(values.get("max_ablation_um"), 1, " um")),
+        ("Laser platform", _text(values.get("laser_platform"))),
+        ("Optical / transition zone", f"{_fmt(values.get('optical_zone_mm'), 1, ' mm')} / {transition}"),
+        ("Enhancement anticipated", _text(values.get("enhancement_anticipated"))),
         ("PRK RST / PTA", f"{_fmt(values.get('PRK_RST_um'), 0, ' um')} / {_fmt(values.get('PRK_PTA_percent'), 1, '%')}"),
         ("LASIK RSB / PTA", f"{_fmt(values.get('LASIK_RSB_um'), 0, ' um')} / {_fmt(values.get('LASIK_PTA_percent'), 1, '%')}"),
         ("Tomography review", _text((eye.get("tomography_review") or {}).get("status"))),
@@ -99,6 +109,7 @@ def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
 
 
 def _findings(eye: Dict[str, Any]) -> Iterable[tuple[str, List[str]]]:
+    bad_display = (eye.get("tomography_review") or {}).get("BAD_display") or {}
     groups = [
         ("Hard stops", eye.get("hard_stops") or []),
         ("Decision reasons", eye.get("reasons") or []),
@@ -106,6 +117,8 @@ def _findings(eye: Dict[str, Any]) -> Iterable[tuple[str, List[str]]]:
         ("Surgical-load evidence flags", eye.get("surgical_load_flags") or []),
         ("Clinical modifiers", eye.get("clinical_modifiers") or []),
         ("Warnings", eye.get("warnings") or []),
+        ("Tomography concern flags", (eye.get("tomography_review") or {}).get("cross_sectional_flags") or []),
+        ("BAD display interpretation", [f"{key}: {value}" for key, value in bad_display.items()]),
     ]
     return ((title, [str(item) for item in items]) for title, items in groups if items)
 
@@ -121,12 +134,24 @@ def _tomography_rows(extracted: Dict[str, Any], eye_id: str) -> List[tuple[str, 
     eye = _extracted_eye(extracted, eye_id)
     keys = [
         ("K1", "K1_D", " D", 2), ("K2", "K2_D", " D", 2),
-        ("Kmax", "Kmax_D", " D", 2), ("BAD-D", "BAD_D", "", 2),
-        ("ARTmax", "ARTmax_um", " um", 0), ("PPI max", "PPI_max", "", 2),
+        ("Kmax", "Kmax_D", " D", 2), ("Thinnest pachymetry", "pachy_thinnest_um", " um", 0),
+        ("BAD-D final", "BAD_D", "", 2), ("BAD-Df", "Df", "", 2),
+        ("BAD-Db", "Db", "", 2), ("BAD-Dp", "Dp", "", 2),
+        ("BAD-Dt", "Dt", "", 3), ("BAD-Da", "Da", "", 3),
+        ("ARTmax", "ARTmax_um", " um", 0), ("PPI min", "PPI_min", "", 2),
+        ("PPI avg", "PPI_avg", "", 2), ("PPI max", "PPI_max", "", 2),
         ("ISV", "ISV", "", 0), ("IVA", "IVA", "", 3),
-        ("I-S", "I_S", " D", 2), ("SRAX", "srax_deg", " degrees", 1),
-        ("Posterior pattern", "posterior_pattern", "", 0),
-        ("Image quality", "quality", "", 0),
+        ("KI", "KI", "", 3), ("CKI", "CKI", "", 3),
+        ("IHA", "IHA", "", 3), ("IHD", "IHD", "", 3),
+        ("I-S", "I_S", " D", 2), ("KISA", "KISA", "%", 1),
+        ("Rmin", "Rmin_mm", " mm", 2), ("SRAX", "srax_deg", " degrees", 1),
+        ("Anterior elevation at TP", "anterior_elevation_thinnest_um", " um", 1),
+        ("Posterior elevation at TP", "posterior_elevation_thinnest_um", " um", 1),
+        ("Thinnest X", "thinnest_x_mm", " mm", 2), ("Thinnest Y", "thinnest_y_mm", " mm", 2),
+        ("Corneal volume", "corneal_volume_mm3", " mm3", 2),
+        ("RMS-HOA", "RMS_HOA_um", " um", 3), ("Vertical coma", "vertical_coma_um", " um", 3),
+        ("Morphology", "morphology", "", 0), ("Anterior pattern", "anterior_pattern", "", 0),
+        ("Posterior pattern", "posterior_pattern", "", 0), ("Image quality", "quality", "", 0),
     ]
     return [(label, _fmt(eye.get(key), digits, unit)) for label, key, unit, digits in keys]
 
@@ -160,7 +185,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
 
     story: List[Any] = []
     story.append(Paragraph("HC PREOPERATIVE ECTASIA RISK ASSESSMENT", styles["ReportTitle"]))
-    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Protocol v0.4", styles["ReportSub"]))
+    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.5", styles["ReportSub"]))
 
     metadata = [
         ["Patient", _ascii(patient.get("name")), "Patient ID", _ascii(patient.get("id"))],
@@ -227,14 +252,14 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
 
         story.append(Paragraph("Extracted tomography", styles["Section"]))
         tomo = [["Parameter", "Value", "Parameter", "Value"]] + [
-            [_ascii(value) for value in row]
+            [_ascii(value, "") for value in row]
             for row in _paired_rows(_tomography_rows(extracted, eye.get("eye")))
         ]
-        tomo_table = Table(tomo, colWidths=[1.25 * inch, 1.75 * inch, 1.25 * inch, 1.9 * inch], repeatRows=1)
+        tomo_table = Table(tomo, colWidths=[1.45 * inch, 1.55 * inch, 1.45 * inch, 1.7 * inch], repeatRows=1)
         tomo_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), _rl(GRAY_FILL)), ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"), ("FONTNAME", (2, 1), (2, -1), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 7.6),
+            ("FONTSIZE", (0, 0), (-1, -1), 7.2),
             ("GRID", (0, 0), (-1, -1), 0.35, _rl(LINE)), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
             ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
@@ -389,7 +414,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     run.font.size = Pt(18)
     run.bold = True
     run.font.color.rgb = RGBColor.from_string(NAVY)
-    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Protocol v0.4")
+    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.5")
     subtitle.paragraph_format.space_after = Pt(10)
     for run in subtitle.runs:
         run.font.name = "Arial"
@@ -469,7 +494,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
             cells[0].paragraphs[0].runs[0].bold = True
             if cells[2].paragraphs[0].runs:
                 cells[2].paragraphs[0].runs[0].bold = True
-        _style_doc_table(tomo, [1.1, 1.825, 1.1, 1.825], header=True)
+        _style_doc_table(tomo, [1.35, 1.575, 1.35, 1.575], header=True)
 
     warnings = extracted.get("global_warnings") or []
     if warnings:

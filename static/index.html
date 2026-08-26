@@ -3,20 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>HC Ectasia App v0.4</title>
+  <title>HC Ectasia App v0.5</title>
   <link rel="manifest" href="/static/manifest.webmanifest">
-<link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
-<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-<meta name="theme-color" content="#173b57">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <meta name="theme-color" content="#173b57">
   <style>
-    :root{--navy:#173b57;--ink:#17212b;--muted:#66717d;--line:#d9e0e6;--bg:#f4f6f8;--blue:#eaf3fa;--blueInk:#1f5e8c;--orange:#fff0d8;--orangeInk:#9a4d00;--red:#fde5e5;--redInk:#a31212;--gray:#eef2f5;--grayInk:#4b5965}
+    :root{--navy:#173b57;--ink:#17212b;--muted:#66717d;--line:#d9e0e6;--bg:#f4f6f8;--blue:#eaf3fa;--blueInk:#1f5e8c;--green:#e6f4ea;--greenInk:#176b3a;--orange:#fff0d8;--orangeInk:#9a4d00;--red:#fde5e5;--redInk:#a31212;--gray:#eef2f5;--grayInk:#4b5965}
     *{box-sizing:border-box}body{font-family:Arial,sans-serif;background:var(--bg);margin:0;color:var(--ink);line-height:1.42}
     header{background:var(--navy);color:#fff;padding:22px}header h1{margin:0 0 4px}header p{margin:0;opacity:.88}
     main{max-width:1100px;margin:20px auto;padding:0 14px 40px}.card{background:white;border:1px solid var(--line);border-radius:11px;padding:18px;margin:14px 0;box-shadow:0 1px 2px rgba(0,0,0,.03)}
     .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.row{display:grid;grid-template-columns:1.25fr 1fr;gap:10px;margin:10px 0;align-items:center}
     input,select{padding:9px;width:100%;border:1px solid #bcc8d1;border-radius:5px;background:white}fieldset{border:1px solid var(--line);border-radius:8px;padding:14px}legend{font-weight:bold;padding:0 6px}
     button{background:var(--navy);color:white;border:0;border-radius:8px;padding:13px 18px;font-weight:bold;font-size:15px;cursor:pointer}button:disabled{opacity:.6;cursor:wait}
-    .status{font-size:21px;font-weight:bold;padding:14px;border-radius:6px;background:var(--gray);color:var(--grayInk);border-left:7px solid #8a98a4}.status.pass{background:var(--blue);color:var(--blueInk);border-color:var(--blueInk)}.status.caution,.status.review{background:var(--orange);color:var(--orangeInk);border-color:#d9790d}.status.fail{background:var(--red);color:var(--redInk);border-color:#c52b2b}.status.insufficient{background:var(--gray);color:var(--grayInk);border-color:#8a98a4}
+    .status{font-size:21px;font-weight:bold;padding:14px;border-radius:6px;background:var(--gray);color:var(--grayInk);border-left:7px solid #8a98a4}.status.pass{background:var(--green);color:var(--greenInk);border-color:var(--greenInk)}.status.caution,.status.review{background:var(--orange);color:var(--orangeInk);border-color:#d9790d}.status.fail{background:var(--red);color:var(--redInk);border-color:#c52b2b}.status.insufficient{background:var(--gray);color:var(--grayInk);border-color:#8a98a4}
     .report-card{padding:0;background:transparent;border:0;box-shadow:none}.report-toolbar{display:flex;justify-content:flex-end;gap:9px;margin:0 0 12px}.secondary{background:white;color:var(--navy);border:1px solid var(--navy)}
     .report-sheet{background:#fff;max-width:850px;margin:0 auto;padding:38px 44px;border:1px solid #cfd8df;box-shadow:0 8px 28px rgba(23,59,87,.10);font-family:Arial,sans-serif}.report-masthead{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid var(--navy);padding-bottom:13px;margin-bottom:17px}.report-masthead h2{font-size:20px;letter-spacing:.35px;color:var(--navy);margin:0 0 5px}.report-kicker{font-size:11px;font-weight:bold;letter-spacing:1.1px;color:var(--blueInk);text-transform:uppercase}.report-version{text-align:right;color:var(--muted);font-size:11px;white-space:nowrap}
     .meta-table,.clinical-table{width:100%;border-collapse:collapse}.meta-table{margin-bottom:17px}.meta-table th,.meta-table td{border:1px solid var(--line);padding:7px 9px;font-size:12px;text-align:left}.meta-table th{width:15%;background:#f1f4f6;color:#42515d}.meta-table td{width:35%}.report-section-title{font-size:13px;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--line);padding-bottom:5px;margin:20px 0 8px}
@@ -27,7 +27,7 @@
   </style>
 </head>
 <body>
-<header><h1>HC Ectasia App v0.4</h1><p>Image extraction → eye-specific HC assessment → evidence-labeled clinical report</p></header>
+<header><h1>HC Ectasia App v0.5</h1><p>Image extraction → eye-specific HC assessment → evidence-labeled clinical report</p></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -67,7 +67,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">HC Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Protocol v0.4</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.5</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <table class="meta-table"><tbody>
         <tr><th>Patient</th><td id="reportPatient">Not documented</td><th>Patient ID</th><td id="reportPatientId">Not documented</td></tr>
@@ -142,25 +142,35 @@ const safe = (x) => String(x ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt
 function listBlock(title, items){if(!items || !items.length)return "";return `<div class="finding-group"><h4>${safe(title)}</h4><ul>${items.map(x=>`<li>${safe(x)}</li>`).join("")}</ul></div>`}
 function renderEye(r, extracted){
   const v=r.values||{}, s=r.score||{};
+  const transition=v.transition_zone_mm===null||v.transition_zone_mm===undefined?(v.transition_zone_not_applicable==="yes"?"Not applicable":"—"):`${fmt(v.transition_zone_mm,1)} mm`;
   const rows=[
     ["Procedure",v.procedure??"—"],["Score / category",`${s.total ?? "—"} / ${s.category ?? "—"}`],
     ["Thinnest pachymetry",`${fmt(v.pachy_thinnest_um,0)} µm`],["MRSE",`${fmt(v.MRSE_D,2)} D`],
-    ["Maximum ablation",`${fmt(v.max_ablation_um,1)} µm`],["PRK RST / PTA",`${fmt(v.PRK_RST_um,0)} µm / ${fmt(v.PRK_PTA_percent,1)}%`],
+    ["Maximum ablation",`${fmt(v.max_ablation_um,1)} µm`],["Laser platform",v.laser_platform??"—"],
+    ["Optical / transition zone",`${fmt(v.optical_zone_mm,1)} mm / ${transition}`],["Enhancement anticipated",v.enhancement_anticipated??"—"],
+    ["PRK RST / PTA",`${fmt(v.PRK_RST_um,0)} µm / ${fmt(v.PRK_PTA_percent,1)}%`],
     ["LASIK RSB / PTA",`${fmt(v.LASIK_RSB_um,0)} µm / ${fmt(v.LASIK_PTA_percent,1)}%`],
     ["Tomography review",r.tomography_review?.status??"—"],["Morphology category",r.topography_classification?.scoring_category??"—"]
   ];
   const source=(extracted.eyes||[]).find(x=>x.eye===r.eye)||{};
   const tomoRows=[
     ["K1",fmt(source.K1_D,2)+" D"],["K2",fmt(source.K2_D,2)+" D"],["Kmax",fmt(source.Kmax_D,2)+" D"],
-    ["BAD-D",fmt(source.BAD_D,2)],["ARTmax",fmt(source.ARTmax_um,0)+" µm"],["PPI max",fmt(source.PPI_max,2)],
-    ["ISV",fmt(source.ISV,0)],["IVA",fmt(source.IVA,3)],["I-S",fmt(source.I_S,2)+" D"],
-    ["SRAX",fmt(source.srax_deg,1)+"°"],["Posterior pattern",source.posterior_pattern??"—"],["Image quality",source.quality??"—"]
+    ["Thinnest pachymetry",fmt(source.pachy_thinnest_um,0)+" µm"],["BAD-D final",fmt(source.BAD_D,2)],
+    ["BAD-Df",fmt(source.Df,2)],["BAD-Db",fmt(source.Db,2)],["BAD-Dp",fmt(source.Dp,2)],["BAD-Dt",fmt(source.Dt,3)],["BAD-Da",fmt(source.Da,3)],
+    ["ARTmax",fmt(source.ARTmax_um,0)+" µm"],["PPI min",fmt(source.PPI_min,2)],["PPI avg",fmt(source.PPI_avg,2)],["PPI max",fmt(source.PPI_max,2)],
+    ["ISV",fmt(source.ISV,0)],["IVA",fmt(source.IVA,3)],["KI",fmt(source.KI,3)],["CKI",fmt(source.CKI,3)],
+    ["IHA",fmt(source.IHA,3)],["IHD",fmt(source.IHD,3)],["I-S",fmt(source.I_S,2)+" D"],["KISA",fmt(source.KISA,1)+"%"],
+    ["Rmin",fmt(source.Rmin_mm,2)+" mm"],["SRAX",fmt(source.srax_deg,1)+"°"],
+    ["Anterior elevation at TP",fmt(source.anterior_elevation_thinnest_um,1)+" µm"],["Posterior elevation at TP",fmt(source.posterior_elevation_thinnest_um,1)+" µm"],
+    ["Thinnest X / Y",`${fmt(source.thinnest_x_mm,2)} / ${fmt(source.thinnest_y_mm,2)} mm`],["Corneal volume",fmt(source.corneal_volume_mm3,2)+" mm³"],
+    ["RMS-HOA",fmt(source.RMS_HOA_um,3)+" µm"],["Vertical coma",fmt(source.vertical_coma_um,3)+" µm"],
+    ["Morphology",source.morphology??"—"],["Anterior pattern",source.anterior_pattern??"—"],["Posterior pattern",source.posterior_pattern??"—"],["Image quality",source.quality??"—"]
   ];
   return `<section class="eye-result"><div class="eye-head"><strong>${safe(r.eye)} ASSESSMENT</strong><span class="status ${statusClass(r.status)}">${safe(r.status)}</span></div><div class="eye-body">
     <p class="eye-action"><strong>Clinical action:</strong> ${safe(r.action)}</p>
     <p class="note"><strong>Instrument/source:</strong> ${safe(r.instrument||"Not documented")}</p>
     <table class="clinical-table"><thead><tr><th>Parameter</th><th>Result</th></tr></thead><tbody>${rows.map(([a,b])=>`<tr><td>${safe(a)}</td><td>${safe(b)}</td></tr>`).join("")}</tbody></table>
-    ${listBlock("Reasons",r.reasons)}${listBlock("Hard stops",r.hard_stops)}${listBlock("Missing / unresolved",r.missing)}${listBlock("Surgical-load evidence flags",r.surgical_load_flags)}${listBlock("Clinical modifiers",r.clinical_modifiers)}${listBlock("Warnings",r.warnings)}
+    ${listBlock("Reasons",r.reasons)}${listBlock("Hard stops",r.hard_stops)}${listBlock("Missing / unresolved",r.missing)}${listBlock("Tomography concern flags",r.tomography_review?.cross_sectional_flags)}${listBlock("BAD display interpretation",Object.entries(r.tomography_review?.BAD_display||{}).map(([k,v])=>`${k}: ${v}`))}${listBlock("Surgical-load evidence flags",r.surgical_load_flags)}${listBlock("Clinical modifiers",r.clinical_modifiers)}${listBlock("Warnings",r.warnings)}
     <div class="finding-group"><h4>Extracted tomography</h4><table class="clinical-table"><thead><tr><th>Parameter</th><th>Value</th></tr></thead><tbody>${tomoRows.map(([a,b])=>`<tr><td>${safe(a)}</td><td>${safe(b)}</td></tr>`).join("")}</tbody></table></div>
   </div></section>`;
 }
