@@ -223,13 +223,34 @@ class TestSafetyGates(unittest.TestCase):
 
     def test_identity_date_conflicts_and_non_ok_qs_are_global_blockers(self):
         first = {"document_context": document_context("A", qs="OK"), "eyes": [normal_eye("OD")], "treatment_corrections": [], "global_warnings": []}
-        second_context = document_context("B", exam_date="2026-08-26", qs="NOT_OK")
+        second_context = document_context("B", exam_date="2026-08-26", qs="NOT_OK", patient_name="Different Patient")
         second_context["source_filename"] = "other.png"
         second = {"document_context": second_context, "eyes": [normal_eye("OS")], "treatment_corrections": [], "global_warnings": []}
         merged = app.merge_extractions([first, second])
         self.assertTrue(any("Conflicting patient IDs" in item for item in merged["critical_input_issues"]))
         self.assertTrue(any("Conflicting Pentacam" in item for item in merged["critical_input_issues"]))
         self.assertTrue(any("non-OK QS" in item for item in merged["critical_input_issues"]))
+
+    def test_different_extracted_ids_do_not_block_when_name_and_age_match(self):
+        od_context = document_context(
+            patient_id="P-77", patient_name="Same Patient", patient_age_years=35, laterality="OD"
+        )
+        od_context["source_filename"] = "od.png"
+        os_context = document_context(
+            patient_id="SCAN-88", patient_name="Same Patient", patient_age_years=35, laterality="OS"
+        )
+        os_context["source_filename"] = "os.png"
+        merged = app.merge_extractions([
+            {"document_context": od_context, "eyes": [normal_eye("OD")], "treatment_corrections": [], "global_warnings": []},
+            {"document_context": os_context, "eyes": [normal_eye("OS")], "treatment_corrections": [], "global_warnings": []},
+        ])
+        self.assertFalse(any("Conflicting patient IDs" in item for item in merged["critical_input_issues"]))
+        self.assertTrue(any("Different patient-ID strings" in item for item in merged["global_warnings"]))
+        self.assertEqual(merged["derived_age_years"], 35)
+
+    def test_patient_id_prompt_rejects_scan_and_measurement_numbers(self):
+        self.assertIn("Never use an examination number, measurement number, scan number", app.PROMPT)
+        self.assertIn("return patient_id=null", app.PROMPT)
 
     def test_matching_od_os_pentacam_identity_and_printed_age_are_used(self):
         od_context = document_context(patient_id="P-77", patient_age_years=35, laterality="OD")
