@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="HC Ectasia App v0.5")
+app = FastAPI(title="HC Ectasia App v0.5.4")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -534,7 +534,13 @@ def required_tomography_missing(eye: Dict[str, Any]) -> List[str]:
         missing.append("readable anterior pattern")
     if eye.get("quality") in ("LIMITED", "INADEQUATE"):
         missing.append("adequate-quality tomography/topography")
+    # Defensive compatibility filter: legacy/cached extraction payloads may still contain
+    # conflicts for descriptive, non-decision fields. They must never prohibit PASS.
+    non_decision_conflict_fields = {"K1_D", "K2_D", "thinnest_x_mm", "thinnest_y_mm"}
     for conflict in eye.get("data_conflicts", []):
+        conflict_field = str(conflict).split(":", 1)[0].strip()
+        if conflict_field in non_decision_conflict_fields:
+            continue
         missing.append(f"unresolved multi-image conflict: {conflict}")
     return missing
 
@@ -966,7 +972,7 @@ def hc_engine(
         "eyes": results,
         "warnings": extracted.get("global_warnings", []),
         "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.5.3 / source set 2026-08-25 plus binding HC amendments",
+        "version": "software v0.5.4 / source set 2026-08-25 plus binding HC amendments",
     }
 
 
@@ -1138,7 +1144,11 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     )
 
     for eye in by_eye.values():
-        eye["data_conflicts"] = sorted(set(eye.get("data_conflicts", [])))
+        # Remove any legacy/non-decision entries defensively before returning the payload.
+        eye["data_conflicts"] = sorted(
+            conflict for conflict in set(eye.get("data_conflicts", []))
+            if str(conflict).split(":", 1)[0].strip() not in non_decision_conflict_fields
+        )
         eye["missing_or_unreadable"] = sorted(
             set(key for key in eye.get("missing_or_unreadable", []) if eye.get(key) is None)
         )
