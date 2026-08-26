@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="HC Ectasia App v0.6.5")
+app = FastAPI(title="HC Ectasia App v0.6.6")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -64,7 +64,16 @@ SCHEMA = {
                     "enum": ["PENTACAM_TOPOGRAPHY", "TREATMENT_CARD", "OTHER", "UNKNOWN"],
                 },
                 "patient_id": {"type": ["string", "null"]},
+                "patient_last_name": {"type": ["string", "null"]},
+                "patient_first_name": {"type": ["string", "null"]},
                 "patient_name": {"type": ["string", "null"]},
+                "patient_name_source": {
+                    "type": "string",
+                    "enum": [
+                        "PENTACAM_FIRST_LAST_NAME_FIELDS", "OTHER_LABELED_PATIENT_NAME",
+                        "UNREADABLE", "NOT_SHOWN",
+                    ],
+                },
                 "patient_age_years": {"type": ["integer", "null"]},
                 "exam_date": {"type": ["string", "null"]},
                 "exam_time": {"type": ["string", "null"]},
@@ -76,7 +85,8 @@ SCHEMA = {
                 "missing_or_unreadable": {"type": "array", "items": {"type": "string"}},
             },
             "required": [
-                "document_type", "patient_id", "patient_name", "patient_age_years", "exam_date",
+                "document_type", "patient_id", "patient_last_name", "patient_first_name",
+                "patient_name", "patient_name_source", "patient_age_years", "exam_date",
                 "exam_time", "laterality", "pentacam_qs", "missing_or_unreadable",
             ],
         },
@@ -210,8 +220,20 @@ number. Identify OD/OS and screen type. Return null for unreadable/absent numeri
 them in missing_or_unreadable.
 
 DOCUMENT IDENTITY AND ACQUISITION RULE:
-Transcribe the patient ID, patient name, explicitly printed patient age in completed years, exam date,
-exam time, laterality, and document type exactly when visible. Transcribe patient_id only from an
+For every PENTACAM_TOPOGRAPHY image, read the patient name ONLY from the patient-demographics fields
+explicitly labeled "Last Name" and "First Name". Read the text directly opposite each label. Put those
+exact strings in patient_last_name and patient_first_name, and combine them as "First Name Last Name"
+in patient_name. Set patient_name_source=PENTACAM_FIRST_LAST_NAME_FIELDS. Never use a physician,
+surgeon, operator, examiner, clinic, hospital, account, login, header, footer, or another person's name
+as the patient name. If either labeled Pentacam field or its value is absent or unreadable, return null
+for that component and list it in missing_or_unreadable; never substitute text from another box. If
+neither name component is readable, patient_name must be null and patient_name_source must be
+UNREADABLE or NOT_SHOWN. On a non-Pentacam clinical document, use only an explicitly labeled patient-
+name field, set the two name components to null when they are not separately labeled, and use
+patient_name_source=OTHER_LABELED_PATIENT_NAME, UNREADABLE, or NOT_SHOWN as applicable.
+
+Transcribe the patient ID, explicitly printed patient age in completed years, exam date, exam time,
+laterality, and document type exactly when visible. Transcribe patient_id only from an
 explicitly labeled patient-ID field in the patient-demographics box (for example ID, Patient ID, or
 Pat.-ID). Never use an examination number, measurement number, scan number, accession number,
 page/report number, device serial number, date, time, or another unlabeled number as patient_id.
@@ -1174,6 +1196,7 @@ def hc_engine(
     if age is None and is_number(derived_age):
         age = int(derived_age)
     global_issues = list(extracted.get("critical_input_issues", []))
+    identity_warnings = list(extracted.get("identity_warnings", []))
     if set(assessed_ids) != set(EYES):
         global_issues.append("Both OD and OS tomography assessments are required; fellow-eye assessment is missing.")
     supplied_id = str(patient_metadata.get("id") or "").strip()
@@ -1183,16 +1206,29 @@ def hc_engine(
         if context.get("patient_id")
     }
     if supplied_id and extracted_ids and supplied_id not in extracted_ids:
-        global_issues.append("Entered patient ID does not match the patient ID visible in the uploaded source(s).")
+        identity_warnings.append(
+            "PATIENT IDENTITY NOT VERIFIED: entered patient ID does not match the ID read from the uploaded source(s). Surgeon confirmation is required."
+        )
     if is_number(age) and is_number(derived_age) and int(age) != int(derived_age):
         global_issues.append("Entered age conflicts with the age printed on the Pentacam source(s).")
     supplied_name = " ".join(str(patient_metadata.get("name") or "").casefold().split())
-    extracted_names = {
-        " ".join(str(context.get("patient_name") or "").casefold().split())
-        for context in extracted.get("document_contexts", []) if context.get("patient_name")
-    }
-    if supplied_name and extracted_names and supplied_name not in extracted_names:
-        global_issues.append("Entered patient name does not match the name visible in the uploaded source(s).")
+    extracted_name_variants = set()
+    for context in extracted.get("document_contexts", []):
+        first_name = " ".join(str(context.get("patient_first_name") or "").casefold().split())
+        last_name = " ".join(str(context.get("patient_last_name") or "").casefold().split())
+        if first_name and last_name:
+            extracted_name_variants.update((f"{first_name} {last_name}", f"{last_name} {first_name}"))
+        elif context.get("patient_name"):
+            extracted_name_variants.add(
+                " ".join(str(context.get("patient_name")).casefold().split())
+            )
+    if supplied_name and extracted_name_variants and supplied_name not in extracted_name_variants:
+        identity_warnings.append(
+            "PATIENT IDENTITY NOT VERIFIED: entered patient name does not match the Pentacam First Name / Last Name fields. Surgeon confirmation is required."
+        )
+
+    identity_warnings = sorted(set(identity_warnings))
+    identity_verification = "NOT VERIFIED — SURGEON CONFIRMATION REQUIRED" if identity_warnings else "VERIFIED"
 
     results = []
     for eye in extracted_eyes:
@@ -1205,6 +1241,8 @@ def hc_engine(
             "action": "No eye-specific assessment could be completed.",
             "eyes": [],
             "warnings": extracted.get("global_warnings", []),
+            "identity_verification": identity_verification,
+            "identity_warnings": identity_warnings,
             "critical_input_issues": sorted(set(global_issues + ["No classifiable OD/OS tomography was extracted."])),
             "document_contexts": extracted.get("document_contexts", []),
         }
@@ -1217,19 +1255,24 @@ def hc_engine(
 
     return {
         "status": overall,
-        "action": "Overall result reflects the least favorable eye. Each eye remains independently scored; values are never averaged.",
+        "action": (
+            "Overall result reflects the least favorable eye. Each eye remains independently scored; values are never averaged."
+            + (" Patient identity remains unverified and must be confirmed by the surgeon before clinical use." if identity_warnings else "")
+        ),
         "eyes": results,
         "warnings": extracted.get("global_warnings", []),
+        "identity_verification": identity_verification,
+        "identity_warnings": identity_warnings,
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.6.5 / source set 2026-08-25 plus binding HC amendments",
+        "version": "software v0.6.6 / source set 2026-08-25 plus binding HC amendments",
     }
 
 
 def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     merged: Dict[str, Any] = {
-        "eyes": [], "treatment_corrections": [], "global_warnings": [],
+        "eyes": [], "treatment_corrections": [], "global_warnings": [], "identity_warnings": [],
         "document_contexts": [], "critical_input_issues": [], "extraction_models": [],
     }
     by_eye: Dict[str, Dict[str, Any]] = {}
@@ -1293,6 +1336,19 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 if isinstance(eye, dict) and eye.get("eye") in EYES
             })
             merged["document_contexts"].append(context)
+            if context.get("document_type") == "PENTACAM_TOPOGRAPHY" and not (
+                context.get("patient_first_name") and context.get("patient_last_name")
+            ):
+                missing_name_fields = [
+                    label for field, label in (
+                        ("patient_last_name", "Last Name"), ("patient_first_name", "First Name")
+                    ) if not context.get(field)
+                ]
+                merged["identity_warnings"].append(
+                    "PATIENT NAME NOT VERIFIED: Pentacam "
+                    f"{', '.join(missing_name_fields)} field(s) could not be read in "
+                    f"{context.get('source_filename', 'an uploaded source')}. Surgeon confirmation is required."
+                )
             if context.get("document_type") in ("UNKNOWN", "OTHER"):
                 merged["critical_input_issues"].append(
                     f"Unclassified uploaded source: {context.get('source_filename', 'unknown file')}."
@@ -1300,8 +1356,9 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             if context.get("document_type") in ("PENTACAM_TOPOGRAPHY", "TREATMENT_CARD") and not (
                 context.get("patient_id") or context.get("patient_name")
             ):
-                merged["critical_input_issues"].append(
-                    f"Patient identity is not visible/readable in {context.get('source_filename', 'an uploaded source')}."
+                merged["identity_warnings"].append(
+                    "PATIENT IDENTITY NOT VERIFIED: patient name/ID is not visible or readable in "
+                    f"{context.get('source_filename', 'an uploaded source')}. Surgeon confirmation is required."
                 )
             if not result.get("eyes") and not result.get("treatment_corrections"):
                 merged["critical_input_issues"].append(
@@ -1506,28 +1563,39 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         if is_number(c.get("patient_age_years"))
     }
     shared_readable_name = (
-        bool(normalized_names) and all(normalized_names) and len(set(normalized_names)) == 1
+        bool(normalized_names)
+        and all(normalized_names)
+        and all(c.get("patient_first_name") and c.get("patient_last_name") for c in pentacam_contexts)
+        and len(set(normalized_names)) == 1
     )
     age_is_consistent = len(pentacam_ages) <= 1
     identity_corroborated_by_name_and_age = (
         shared_readable_name and age_is_consistent and len(pentacam_ages) == 1
     )
 
+    identity_readings = "; ".join(
+        f"{c.get('source_filename', 'unknown file')}: {c.get('patient_name') or 'unreadable'}"
+        for c in pentacam_contexts
+    )
     if len(names) > 1:
-        merged["critical_input_issues"].append("Conflicting patient names across Pentacam sources.")
+        merged["identity_warnings"].append(
+            "PATIENT IDENTITY NOT VERIFIED: different patient names were read from the Pentacam "
+            f"First Name / Last Name fields ({identity_readings}). Surgeon confirmation is required."
+        )
     if len(pentacam_ages) > 1:
         merged["critical_input_issues"].append("Conflicting patient ages across Pentacam sources.")
     elif len(pentacam_ages) == 1:
         merged["derived_age_years"] = next(iter(pentacam_ages))
     if len(ids) > 1:
         if identity_corroborated_by_name_and_age:
-            merged["global_warnings"].append(
-                "Different patient-ID strings were extracted from Pentacam sources, but the shared "
-                "readable patient name and consistent printed age corroborate one patient. The ID "
-                "difference is retained for surgeon review and does not independently block assessment."
+            merged["identity_warnings"].append(
+                "PATIENT IDENTITY REQUIRES CONFIRMATION: different patient-ID strings were read, "
+                "although the Pentacam First Name / Last Name fields and printed age agree."
             )
         else:
-            merged["critical_input_issues"].append("Conflicting patient IDs across Pentacam sources.")
+            merged["identity_warnings"].append(
+                "PATIENT IDENTITY NOT VERIFIED: conflicting patient IDs were read across Pentacam sources. Surgeon confirmation is required."
+            )
     if len(pentacam_dates) > 1:
         merged["critical_input_issues"].append("Conflicting Pentacam examination dates across uploaded sources.")
 
@@ -1545,11 +1613,16 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             " ".join(str(c.get("patient_name") or "").casefold().split()) for c in relevant_contexts
         ]
         verified_by_id = bool(normalized_ids) and all(normalized_ids) and len(set(normalized_ids)) == 1
-        verified_by_name = bool(normalized_names) and all(normalized_names) and len(set(normalized_names)) == 1
+        verified_by_name = (
+            bool(normalized_names)
+            and all(normalized_names)
+            and all(c.get("patient_first_name") and c.get("patient_last_name") for c in relevant_contexts)
+            and len(set(normalized_names)) == 1
+        )
         if not (verified_by_id or verified_by_name):
-            merged["critical_input_issues"].append(
-                "OD and OS Pentacam sources could not be verified as the same patient using a "
-                "shared readable patient ID or patient name."
+            merged["identity_warnings"].append(
+                "PATIENT IDENTITY NOT VERIFIED: OD and OS Pentacam sources could not be confirmed "
+                f"as the same patient ({identity_readings}). Surgeon confirmation is required."
             )
     if pentacam_contexts and (
         not any(c.get("pentacam_qs") == "OK" for c in pentacam_contexts)
@@ -1559,6 +1632,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             "Pentacam acquisition requires a same-exam explicit QS: OK; a non-OK QS cannot be overridden."
         )
     merged["global_warnings"] = sorted(set(merged["global_warnings"]))
+    merged["identity_warnings"] = sorted(set(merged["identity_warnings"]))
     merged["critical_input_issues"] = sorted(set(merged["critical_input_issues"]))
     merged["extraction_models"] = sorted(set(merged["extraction_models"]))
     return merged
@@ -1600,6 +1674,26 @@ def report_word(payload: Dict[str, Any] = Body(...)) -> StreamingResponse:
     )
 
 
+def normalize_document_context_identity(context: Dict[str, Any]) -> Dict[str, Any]:
+    """Enforce Pentacam name provenance; never accept a name copied from another box."""
+    context = dict(context)
+    if context.get("document_type") != "PENTACAM_TOPOGRAPHY":
+        return context
+    first_name = str(context.get("patient_first_name") or "").strip() or None
+    last_name = str(context.get("patient_last_name") or "").strip() or None
+    context["patient_first_name"] = first_name
+    context["patient_last_name"] = last_name
+    context["patient_name"] = " ".join(
+        component for component in (first_name, last_name) if component
+    ) or None
+    context["patient_name_source"] = (
+        "PENTACAM_FIRST_LAST_NAME_FIELDS"
+        if first_name or last_name
+        else context.get("patient_name_source", "UNREADABLE")
+    )
+    return context
+
+
 def extract_one_image(raw: bytes, filename: str) -> Dict[str, Any]:
     """Run one independent image extraction outside the async server event loop."""
     content = [
@@ -1637,7 +1731,7 @@ def extract_one_image(raw: bytes, filename: str) -> Dict[str, Any]:
     try:
         result = json.loads(output_text)
         result["extraction_model"] = MODEL
-        context = result.get("document_context", {})
+        context = normalize_document_context_identity(result.get("document_context", {}))
         context["source_filename"] = filename
         result["document_context"] = context
         for eye in result.get("eyes", []):

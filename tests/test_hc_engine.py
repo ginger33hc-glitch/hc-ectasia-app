@@ -123,9 +123,15 @@ def document_context(
     patient_id="HC-1", patient_age_years=26, exam_date="2026-08-25", qs="OK",
     patient_name="Test Patient", laterality="BOTH",
 ):
+    name_parts = str(patient_name or "").split(maxsplit=1)
+    first_name = name_parts[0] if name_parts else None
+    last_name = name_parts[1] if len(name_parts) > 1 else None
     return {
         "document_type": "PENTACAM_TOPOGRAPHY", "patient_id": patient_id,
-        "patient_name": patient_name, "patient_age_years": patient_age_years, "exam_date": exam_date,
+        "patient_first_name": first_name, "patient_last_name": last_name,
+        "patient_name": patient_name,
+        "patient_name_source": "PENTACAM_FIRST_LAST_NAME_FIELDS" if patient_name else "UNREADABLE",
+        "patient_age_years": patient_age_years, "exam_date": exam_date,
         "exam_time": "10:00", "laterality": laterality, "pentacam_qs": qs,
         "missing_or_unreadable": [], "source_filename": "pentacam.png",
     }
@@ -227,7 +233,8 @@ class TestSafetyGates(unittest.TestCase):
         second_context["source_filename"] = "other.png"
         second = {"document_context": second_context, "eyes": [normal_eye("OS")], "treatment_corrections": [], "global_warnings": []}
         merged = app.merge_extractions([first, second])
-        self.assertTrue(any("Conflicting patient IDs" in item for item in merged["critical_input_issues"]))
+        self.assertTrue(any("conflicting patient IDs" in item for item in merged["identity_warnings"]))
+        self.assertTrue(any("different patient names" in item for item in merged["identity_warnings"]))
         self.assertTrue(any("Conflicting Pentacam" in item for item in merged["critical_input_issues"]))
         self.assertTrue(any("non-OK QS" in item for item in merged["critical_input_issues"]))
 
@@ -245,7 +252,7 @@ class TestSafetyGates(unittest.TestCase):
             {"document_context": os_context, "eyes": [normal_eye("OS")], "treatment_corrections": [], "global_warnings": []},
         ])
         self.assertFalse(any("Conflicting patient IDs" in item for item in merged["critical_input_issues"]))
-        self.assertTrue(any("Different patient-ID strings" in item for item in merged["global_warnings"]))
+        self.assertTrue(any("different patient-ID strings" in item for item in merged["identity_warnings"]))
         self.assertEqual(merged["derived_age_years"], 35)
 
     def test_patient_id_prompt_rejects_scan_and_measurement_numbers(self):
@@ -285,7 +292,46 @@ class TestSafetyGates(unittest.TestCase):
             {"document_context": od_context, "eyes": [normal_eye("OD")], "treatment_corrections": [], "global_warnings": []},
             {"document_context": os_context, "eyes": [normal_eye("OS")], "treatment_corrections": [], "global_warnings": []},
         ])
-        self.assertTrue(any("could not be verified as the same patient" in item for item in merged["critical_input_issues"]))
+        self.assertTrue(any("could not be confirmed as the same patient" in item for item in merged["identity_warnings"]))
+
+    def test_pentacam_name_uses_only_first_and_last_name_fields(self):
+        context = document_context(patient_name="Wrong Header Name")
+        context["patient_first_name"] = "Hasan"
+        context["patient_last_name"] = "Can"
+        normalized = app.normalize_document_context_identity(context)
+        self.assertEqual(normalized["patient_name"], "Hasan Can")
+        self.assertEqual(normalized["patient_name_source"], "PENTACAM_FIRST_LAST_NAME_FIELDS")
+        self.assertIn('explicitly labeled "Last Name" and "First Name"', app.PROMPT)
+        self.assertIn("Never use a physician", app.PROMPT)
+
+    def test_unreadable_name_warns_but_eye_analyses_are_not_suppressed(self):
+        od_context = document_context(patient_id=None, patient_name=None, laterality="OD")
+        os_context = document_context(patient_id=None, patient_name=None, laterality="OS")
+        od_context["source_filename"] = "od.png"
+        os_context["source_filename"] = "os.png"
+        merged = app.merge_extractions([
+            {"document_context": od_context, "eyes": [normal_eye("OD")], "treatment_corrections": [], "global_warnings": []},
+            {"document_context": os_context, "eyes": [normal_eye("OS")], "treatment_corrections": [], "global_warnings": []},
+        ])
+        decision = app.hc_engine(merged, None, {"OD": plan(), "OS": plan()}, MODIFIERS)
+        self.assertEqual(len(decision["eyes"]), 2)
+        self.assertNotEqual(decision["status"], "DATA INSUFFICIENT")
+        self.assertEqual(decision["identity_verification"], "NOT VERIFIED — SURGEON CONFIRMATION REQUIRED")
+        self.assertTrue(decision["identity_warnings"])
+        self.assertFalse(any("Patient identity" in item for item in decision["critical_input_issues"]))
+
+    def test_entered_name_may_follow_first_last_or_last_first_order(self):
+        contexts = [document_context(laterality="OD"), document_context(laterality="OS")]
+        contexts[0]["source_filename"] = "od.png"
+        contexts[1]["source_filename"] = "os.png"
+        merged = app.merge_extractions([
+            {"document_context": contexts[0], "eyes": [normal_eye("OD")], "treatment_corrections": [], "global_warnings": []},
+            {"document_context": contexts[1], "eyes": [normal_eye("OS")], "treatment_corrections": [], "global_warnings": []},
+        ])
+        decision = app.hc_engine(
+            merged, None, {"OD": plan(), "OS": plan()}, MODIFIERS, {"name": "Patient Test"}
+        )
+        self.assertFalse(any("entered patient name" in item for item in decision["identity_warnings"]))
 
     def test_date_of_birth_is_removed_and_manual_age_is_requested_only_after_unreadable_age(self):
         html = Path("static/index.html").read_text(encoding="utf-8")
@@ -944,6 +990,14 @@ class TestSignedRefractionInputs(unittest.TestCase):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
         self.assertIn('value=-Math.abs(p.manifest_cylinder_magnitude_D)', html)
         self.assertIn('value=-Math.abs(p.intended_cylinder_magnitude_D)', html)
+
+
+class TestPatientIdentityWarningUi(unittest.TestCase):
+    def test_unverified_identity_has_prominent_warning_without_hiding_eye_results(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn('id="identityWarning" class="identity-alert" hidden', html)
+        self.assertIn("PATIENT IDENTITY NOT VERIFIED — SURGEON CONFIRMATION REQUIRED", html)
+        self.assertIn('(j.decision.eyes||[]).map(x=>renderEye', html)
 
 
 class TestPwaShareTarget(unittest.TestCase):

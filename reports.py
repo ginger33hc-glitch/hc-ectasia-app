@@ -250,9 +250,14 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         ("TEXTCOLOR", (0, 0), (-1, -1), _rl(accent)),
     ]))
     story.append(status_table)
+    identity_warnings = decision.get("identity_warnings") or []
+    if identity_warnings:
+        story.append(Paragraph("PATIENT IDENTITY NOT VERIFIED - SURGEON CONFIRMATION REQUIRED", styles["Section"]))
+        for item in identity_warnings:
+            story.append(Paragraph(f"- {_ascii(item)}", styles["BodySmall"]))
     blockers = decision.get("critical_input_issues") or []
     if blockers:
-        story.append(Paragraph("Global source / identity blockers", styles["Section"]))
+        story.append(Paragraph("Global clinical / source blockers", styles["Section"]))
         for item in blockers:
             story.append(Paragraph(f"- {_ascii(item)}", styles["BodySmall"]))
 
@@ -487,9 +492,15 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
         run.font.color.rgb = RGBColor.from_string(accent)
         run.bold = idx < 2
 
+    identity_warnings = decision.get("identity_warnings") or []
+    if identity_warnings:
+        _add_heading(document, "PATIENT IDENTITY NOT VERIFIED - SURGEON CONFIRMATION REQUIRED", 1)
+        for item in identity_warnings:
+            _add_bullet(document, str(item))
+
     blockers = decision.get("critical_input_issues") or []
     if blockers:
-        _add_heading(document, "Global source / identity blockers", 1)
+        _add_heading(document, "Global clinical / source blockers", 1)
         for item in blockers:
             _add_bullet(document, item)
 

@@ -13,9 +13,9 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Installable Android PWA with a Web Share Target: one or multiple images shared from Samsung Gallery can open the HC Ectasia App and populate its image intake.
 - Excimer Laser Takip Kartı reading limited to the eye-specific `Düzeltme Miktarı` row; confident minus-cylinder values can fill otherwise empty sphere/cylinder/axis fields, while manual input wins and uncertain/conflicting readings remain warnings.
 - Independent OD and OS assessment; eye values are never averaged, and a missing fellow-eye assessment prohibits overall PASS.
-- Source identity gate records patient ID/name, DOB, exam date/time, laterality, filename, extraction model, and field-level provenance; identity/date conflicts or an unclassified/unusable upload prohibit PASS.
+- Source identity review reads Pentacam patient names only from the labeled `First Name` and `Last Name` demographics fields and records the source filename. An unreadable or unverified name produces a prominent surgeon-confirmation warning without suppressing the eye analyses; acquisition-date conflicts and unclassified/unusable uploads remain clinical/source blockers.
 - Pentacam clearance requires a same-exam explicit `QS: OK`; a visible non-OK QS cannot be masked by another page.
-- Age may be calculated from source DOB and exam date; a conflicting manually entered age/DOB/ID prohibits PASS.
+- Age is read from the explicitly printed Pentacam age; a conflicting manually entered age remains a blocker. Date of birth is not collected.
 - Preoperative manifest refraction is separated from intended treatment correction. LASIK ERSS MRSE uses only the former; ablation and HC treatment-range gates use only the latter.
 - Prior PRK/LASIK/SMILE short-circuits virgin-cornea scoring and routes to `POST-REFRACTIVE PATHWAY REQUIRED`.
 - Published five-component LASIK ERSS scoring and categories.
@@ -63,7 +63,7 @@ Railway start command: `python start.py`.
 python -m unittest discover -s tests -v
 ```
 
-The 71-test suite covers the exact structural and treatment-range boundaries, manifest/intended separation, prior-surgery routing, identity/date/QS gates, invalid numeric inputs, fellow-eye completeness, ERSS/PRK-EWSS categories, extraction merging, and valid PDF/DOCX generation.
+The 91-test suite covers the exact structural and treatment-range boundaries, manifest/intended separation, prior-surgery routing, identity warnings, date/QS gates, invalid numeric inputs, fellow-eye completeness, ERSS/PRK-EWSS categories, extraction merging, and valid PDF/DOCX generation.
 
 Dependencies are exact-version pinned. The extraction model is restricted to the reviewed configuration; changing it requires explicit non-clinical override and revalidation.
 
