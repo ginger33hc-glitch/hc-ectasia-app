@@ -358,7 +358,7 @@ class TestScoringAndCompleteness(unittest.TestCase):
         self.assertIn("table_verified_numeric_fields", eye_schema["required"])
         self.assertIn("map_fallback_numeric_fields", eye_schema["required"])
         self.assertIn("PENTACAM NUMERIC-SOURCE RULE", app.PROMPT)
-        self.assertIn("Never substitute a map spot value", app.PROMPT)
+        self.assertIn("Never substitute a generic map spot value", app.PROMPT)
         self.assertIn("Only the categorical fields", app.PROMPT)
 
     def test_reassuring_prk_can_pass(self):
@@ -486,6 +486,51 @@ class TestScoringAndCompleteness(unittest.TestCase):
         self.assertIsNone(extracted["K2_D"])
         self.assertNotIn("K2_D", extracted["map_fallback_numeric_fields"])
 
+    def test_explicit_local_kmax_and_rmin_are_permitted_only_when_edge_boxes_are_unreadable(self):
+        eye = normal_eye()
+        for field in ("Kmax_D", "Rmin_mm"):
+            eye["table_verified_numeric_fields"].remove(field)
+        eye["Kmax_D"] = 47.6
+        eye["Rmin_mm"] = 7.09
+        eye["map_fallback_numeric_fields"] = ["Kmax_D", "Rmin_mm"]
+        extracted = app.merge_extractions([{"eyes": [eye], "global_warnings": []}])["eyes"][0]
+        self.assertEqual(extracted["Kmax_D"], 47.6)
+        self.assertEqual(extracted["Rmin_mm"], 7.09)
+        self.assertEqual(extracted["map_fallback_numeric_fields"], ["Kmax_D", "Rmin_mm"])
+
+    def test_multiple_permitted_local_values_do_not_create_unresolved_conflict(self):
+        first = normal_eye()
+        second = normal_eye()
+        for eye in (first, second):
+            for field in ("Kmax_D", "Rmin_mm"):
+                eye["table_verified_numeric_fields"].remove(field)
+            eye["map_fallback_numeric_fields"] = ["Kmax_D", "Rmin_mm"]
+        first.update(Kmax_D=47.6, Rmin_mm=7.09)
+        second.update(Kmax_D=48.1, Rmin_mm=7.03)
+        merged = app.merge_extractions(
+            [{"eyes": [first], "global_warnings": []}, {"eyes": [second], "global_warnings": []}]
+        )
+        extracted = merged["eyes"][0]
+        self.assertEqual(extracted["Kmax_D"], 48.1)
+        self.assertEqual(extracted["Rmin_mm"], 7.03)
+        self.assertFalse(any("Kmax_D" in item for item in extracted["data_conflicts"]))
+        self.assertFalse(any("Rmin_mm" in item for item in extracted["data_conflicts"]))
+
+    def test_labeled_edge_box_overrides_explicit_local_kmax_without_conflict(self):
+        local = normal_eye()
+        local["table_verified_numeric_fields"].remove("Kmax_D")
+        local["Kmax_D"] = 48.1
+        local["map_fallback_numeric_fields"] = ["Kmax_D"]
+        table = normal_eye()
+        table["Kmax_D"] = 47.6
+        merged = app.merge_extractions(
+            [{"eyes": [local], "global_warnings": []}, {"eyes": [table], "global_warnings": []}]
+        )
+        extracted = merged["eyes"][0]
+        self.assertEqual(extracted["Kmax_D"], 47.6)
+        self.assertNotIn("Kmax_D", extracted["map_fallback_numeric_fields"])
+        self.assertFalse(any("Kmax_D" in item for item in extracted["data_conflicts"]))
+
     def test_later_labeled_table_value_overrides_earlier_local_map_fallback_without_conflict(self):
         map_eye = normal_eye(pachy=565)
         map_eye["table_verified_numeric_fields"].remove("pachy_thinnest_um")
@@ -585,6 +630,8 @@ class TestTreatmentCardTransfer(unittest.TestCase):
         empty = plan(sphere=None, cylinder=None, ablation=None)
         empty["optical_zone_mm"] = 6.5
         effective = app.apply_extracted_corrections(extracted, {"OD": empty})
+        self.assertEqual(effective["OD"]["manifest_sphere_D"], -4.5)
+        self.assertEqual(effective["OD"]["manifest_cylinder_magnitude_D"], 3.5)
         self.assertEqual(effective["OD"]["intended_sphere_D"], -4.5)
         self.assertEqual(effective["OD"]["intended_cylinder_magnitude_D"], 3.5)
         self.assertEqual(effective["OD"]["correction_axis_deg"], 170.0)
@@ -598,7 +645,20 @@ class TestTreatmentCardTransfer(unittest.TestCase):
         self.assertEqual(effective["OD"]["intended_sphere_D"], -2)
         self.assertEqual(effective["OD"]["intended_cylinder_magnitude_D"], 1)
         self.assertNotIn("correction_source", effective["OD"])
-        self.assertTrue(any("manual correction differs" in item for item in effective["OD"]["correction_warnings"]))
+        self.assertTrue(any("manual intended correction differs" in item for item in effective["OD"]["correction_warnings"]))
+
+    def test_role_specific_manual_value_only_overrides_that_role(self):
+        entered = plan(sphere=None, cylinder=None)
+        entered["intended_sphere_D"] = -2.0
+        entered["intended_cylinder_magnitude_D"] = 1.0
+        effective = app.apply_extracted_corrections(
+            {"treatment_corrections": [card_correction()]}, {"OD": entered}
+        )
+        self.assertEqual(effective["OD"]["manifest_sphere_D"], -4.5)
+        self.assertEqual(effective["OD"]["manifest_cylinder_magnitude_D"], 3.5)
+        self.assertEqual(effective["OD"]["intended_sphere_D"], -2.0)
+        self.assertEqual(effective["OD"]["intended_cylinder_magnitude_D"], 1.0)
+        self.assertIn("(manifest)", effective["OD"]["correction_source"])
 
     def test_partial_manual_pair_is_never_mixed_with_card(self):
         partial = plan(sphere=-2, cylinder=None)
@@ -607,7 +667,7 @@ class TestTreatmentCardTransfer(unittest.TestCase):
         )
         self.assertEqual(effective["OD"]["intended_sphere_D"], -2)
         self.assertIsNone(effective["OD"]["intended_cylinder_magnitude_D"])
-        self.assertTrue(any("partial manual correction" in item for item in effective["OD"]["correction_warnings"]))
+        self.assertTrue(any("partial manual intended correction" in item for item in effective["OD"]["correction_warnings"]))
 
     def test_uncertain_axis_keeps_confident_sphere_and_cylinder_only(self):
         correction = card_correction(axis=None, axis_status="UNCERTAIN")
@@ -697,6 +757,7 @@ class TestApiIntegration(unittest.TestCase):
         self.assertEqual(payload["decision"]["status"], "DATA INSUFFICIENT")
         self.assertTrue(any("Both OD and OS" in item for item in payload["decision"]["critical_input_issues"]))
         self.assertEqual(payload["decision"]["eyes"][0]["eye"], "OD")
+        self.assertEqual(payload["effective_eye_plans"]["OD"]["manifest_sphere_D"], -4.5)
         self.assertEqual(payload["effective_eye_plans"]["OD"]["intended_sphere_D"], -4.5)
         self.assertEqual(payload["decision"]["eyes"][0]["values"]["correction_axis_deg"], 170.0)
 

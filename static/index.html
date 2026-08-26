@@ -79,7 +79,7 @@
         <fieldset><legend>OD</legend><div id="od-fields"></div></fieldset>
         <fieldset><legend>OS</legend><div id="os-fields"></div></fieldset>
       </div>
-      <p class="note">Preoperative manifest refraction is used only for LASIK ERSS MRSE. Intended treatment correction is used for ablation and HC treatment-range gates; the two are never substituted for one another. A treatment card may auto-fill only intended correction from Düzeltme Miktarı. Cylinder is a non-negative magnitude in minus-cylinder convention.</p>
+      <p class="note">Preoperative manifest refraction is used only for LASIK ERSS MRSE. Intended treatment correction is used for ablation and HC treatment-range gates. Unless a different role-specific value is entered, the treatment card’s Düzeltme Miktarı auto-fills both manifest and intended correction. Cylinder is a non-negative magnitude in minus-cylinder convention.</p>
       <p id="cardTransferNote" class="note"></p>
       <button id="analyzeBtn" type="submit">Analyze images and run HC assessment</button>
       <p id="analysisProgress" class="alert" role="status" aria-live="polite" hidden></p>
@@ -95,7 +95,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">HC Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.6</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.6.1</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <table class="meta-table"><tbody>
         <tr><th>Patient</th><td id="reportPatient">Not documented</td><th>Patient ID</th><td id="reportPatientId">Not documented</td></tr>
@@ -308,6 +308,8 @@ function applyEffectivePlans(plans){
   for(const [eye,prefix] of [["OD","od"],["OS","os"]]){
     const p=plans?.[eye]||{};
     if(!p.correction_source)continue;
+    document.querySelector(`#${prefix}_manifest_sphere`).value=p.manifest_sphere_D;
+    document.querySelector(`#${prefix}_manifest_cylinder`).value=p.manifest_cylinder_magnitude_D;
     document.querySelector(`#${prefix}_sphere`).value=p.intended_sphere_D;
     document.querySelector(`#${prefix}_cylinder`).value=p.intended_cylinder_magnitude_D;
     if(p.correction_axis_deg!==null&&p.correction_axis_deg!==undefined)document.querySelector(`#${prefix}_axis`).value=p.correction_axis_deg;

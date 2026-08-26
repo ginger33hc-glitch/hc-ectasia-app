@@ -15,7 +15,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="HC Ectasia App v0.6.0")
+app = FastAPI(title="HC Ectasia App v0.6.1")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -39,9 +39,11 @@ TABLE_NUMERIC_FIELDS = (
     "total_RMS_um", "spherical_aberration_um",
 )
 MAP_FALLBACK_NUMERIC_FIELDS = (
-    # These map values can directly represent the same named measurement when the side table is
-    # unreadable. Summary/calculated indices such as K1/K2/Kmax, BAD, PPI, ARTmax, and topometric
-    # indices cannot be reconstructed from local map labels.
+    # These directly labeled local map values can represent the same named measurement when the
+    # corresponding edge/side box is unreadable. Calculated indices such as K1/K2, BAD, PPI,
+    # ARTmax, and topometric indices cannot be reconstructed from unlabeled map spots.
+    "Kmax_D",
+    "Rmin_mm",
     "pachy_thinnest_um",
     "anterior_elevation_thinnest_um",
     "posterior_elevation_thinnest_um",
@@ -225,12 +227,13 @@ If and only if the corresponding side/summary-table field is absent, obscured, o
 map number may be used as a second-priority fallback when it directly represents the same named
 measurement and that field is allowed by MAP_FALLBACK_NUMERIC_FIELDS. Record it in
 map_fallback_numeric_fields and not in table_verified_numeric_fields. The marker/location and map
-type must make the identity unambiguous. Currently this fallback is limited to the explicitly marked
-thinnest pachymetry and the anterior/posterior elevation at that same marked thinnest point. If the
-identity or location is uncertain, return null.
+type must make the identity unambiguous. This fallback is limited to an explicitly labeled local Kmax
+or Rmin measurement, the explicitly marked thinnest pachymetry, and the anterior/posterior elevation
+at that same marked thinnest point. A generic curvature-map spot is not Kmax or Rmin. If the identity
+or location is uncertain, return null.
 
-Never substitute a map spot value, color-scale value, axis label, neighboring parameter, calculated
-value, average, or visual estimate for K1, K2, Kmax, BAD-D/components, PPI, ARTmax, topometric
+Never substitute a generic map spot value, color-scale value, axis label, neighboring parameter,
+calculated value, average, or visual estimate for K1, K2, Kmax, Rmin, BAD-D/components, PPI, ARTmax, topometric
 indices, coordinates, corneal volume, HOA, or coma. Those summary/calculated fields must remain null
 when their own labeled table value is unreadable. A labeled BAD-display center/bottom numeric box
 counts as a printed parameter field; an unlabeled number inside the map does not. The table source
@@ -249,9 +252,10 @@ thinnest-point location, pachymetric-progression, topometric, corneal-volume, an
 when they are printed; otherwise return null. Classify both visible anterior and posterior maps as
 REASSURING, BORDERLINE, ABNORMAL, or UNREADABLE. ABNORMAL_ECTATIC is reserved for a clearly visible keratoconus,
 forme-fruste keratoconus, pellucid/ectatic pattern; do not infer it from one isolated index.
-In particular, extract K1_D, K2_D, and Kmax_D only from explicitly labeled K1, K2, and Kmax
-summary-table fields. Never use a numeric spot label printed inside a curvature map as K1, K2, or
-Kmax. If the labeled summary field is not visible, return null for that field. Classify morphology only when an axial,
+In particular, extract K1_D and K2_D only from explicitly labeled K1 and K2 summary-table fields.
+Kmax_D and Rmin_mm may use the restricted, explicitly labeled local fallback described above only
+when their edge/side boxes are unreadable. Never use an ordinary numeric spot label printed inside a
+curvature map as K1, K2, Kmax, or Rmin. Classify morphology only when an axial,
 sagittal, tangential, or Placido curvature/topography map is actually visible. A BAD display without
 such a curvature map does not support a morphology classification; use UNCERTAIN for morphology,
 asymmetric_bow_tie, and srax on that image rather than inferring them from elevation or pachymetry.
@@ -282,7 +286,9 @@ does not require discarding an otherwise confident sphere/cylinder pair; report 
 axis_status and set axis_deg to null when uncertain. Never transpose cylinder notation and never
 infer the laser platform, optical zone, procedure, or ablation depth from the card. For a card-only
 image with no corneal tomography/topography data, return an empty eyes array. For a tomography-only
-image with no treatment card, return an empty treatment_corrections array."""
+image with no treatment card, return an empty treatment_corrections array. Downstream, a confident
+Duzeltme Miktari is treated as both preoperative manifest refraction and intended correction unless
+the clinician separately enters or otherwise explicitly identifies a different value for either role."""
 
 
 def data_url(raw: bytes, filename: str) -> str:
@@ -1028,10 +1034,10 @@ def assess_eye(
 def apply_extracted_corrections(
     extracted: Dict[str, Any], eye_plans: Dict[str, Dict[str, Any]]
 ) -> Dict[str, Dict[str, Any]]:
-    """Auto-fill an empty eye plan from an unambiguous Duzeltme Miktari entry.
+    """Auto-fill empty manifest and intended pairs from unambiguous Duzeltme Miktari.
 
-    Manual sphere/cylinder values always take priority. A partial manual pair is never mixed with
-    an extracted value, and conflicting cards never produce an automatic treatment plan.
+    Each complete manually supplied role-specific pair takes priority. A partial manual pair is never
+    mixed with extracted values, and conflicting cards never produce an automatic treatment plan.
     """
     effective = {
         eye: dict(eye_plans.get(eye, {})) if isinstance(eye_plans.get(eye, {}), dict) else {}
@@ -1077,47 +1083,60 @@ def apply_extracted_corrections(
         sphere, signed_cylinder = next(iter(pairs))
         if signed_cylinder > 0:
             plan["correction_warnings"].append(
-                f"{eye} card uses plus-cylinder notation; automatic transposition is prohibited. Enter the intended minus-cylinder plan manually."
+                f"{eye} card uses plus-cylinder notation; automatic transposition is prohibited. Enter the manifest and intended minus-cylinder values manually."
             )
             continue
 
-        manual_sphere = is_number(plan.get("intended_sphere_D"))
-        manual_cylinder = is_number(plan.get("intended_cylinder_magnitude_D"))
-        if manual_sphere != manual_cylinder:
-            plan["correction_warnings"].append(
-                f"{eye} has a partial manual correction; extracted card values were not mixed with manual input."
-            )
-            continue
-        if manual_sphere and manual_cylinder:
-            if (
-                abs(float(plan["intended_sphere_D"]) - sphere) > 1e-6
-                or abs(float(plan["intended_cylinder_magnitude_D"]) - abs(signed_cylinder)) > 1e-6
-            ):
+        transferred_roles: List[str] = []
+        for role, sphere_field, cylinder_field in (
+            ("manifest", "manifest_sphere_D", "manifest_cylinder_magnitude_D"),
+            ("intended", "intended_sphere_D", "intended_cylinder_magnitude_D"),
+        ):
+            manual_sphere = is_number(plan.get(sphere_field))
+            manual_cylinder = is_number(plan.get(cylinder_field))
+            if manual_sphere != manual_cylinder:
                 plan["correction_warnings"].append(
-                    f"{eye} manual correction differs from the extracted Duzeltme Miktari; manual values retained."
+                    f"{eye} has a partial manual {role} correction; extracted card values were not mixed with that role."
                 )
+                continue
+            if manual_sphere and manual_cylinder:
+                if (
+                    abs(float(plan[sphere_field]) - sphere) > 1e-6
+                    or abs(float(plan[cylinder_field]) - abs(signed_cylinder)) > 1e-6
+                ):
+                    plan["correction_warnings"].append(
+                        f"{eye} manual {role} correction differs from the extracted Duzeltme Miktari; manual values retained."
+                    )
+                continue
+            plan[sphere_field] = sphere
+            plan[cylinder_field] = abs(signed_cylinder)
+            transferred_roles.append(role)
+
+        if not transferred_roles:
             continue
 
-        plan["intended_sphere_D"] = sphere
-        plan["intended_cylinder_magnitude_D"] = abs(signed_cylinder)
-        plan["correction_source"] = "Excimer Laser Takip Karti — Duzeltme Miktari"
-        axes = {
-            float(item["axis_deg"])
-            for item in confident
-            if item.get("axis_status") == "CONFIDENT"
-            and is_number(item.get("axis_deg"))
-            and 0 <= float(item["axis_deg"]) <= 180
-        }
-        if len(axes) == 1:
-            plan["correction_axis_deg"] = next(iter(axes))
-        elif len(axes) > 1:
-            plan["correction_warnings"].append(
-                f"Conflicting {eye} cylinder axes were extracted; sphere/cylinder were transferred but the axis was not."
-            )
-        else:
-            plan["correction_warnings"].append(
-                f"{eye} cylinder axis was not confidently readable; sphere/cylinder were transferred without an axis."
-            )
+        plan["correction_source"] = (
+            "Excimer Laser Takip Karti — Duzeltme Miktari "
+            f"({', '.join(transferred_roles)})"
+        )
+        if "intended" in transferred_roles:
+            axes = {
+                float(item["axis_deg"])
+                for item in confident
+                if item.get("axis_status") == "CONFIDENT"
+                and is_number(item.get("axis_deg"))
+                and 0 <= float(item["axis_deg"]) <= 180
+            }
+            if len(axes) == 1:
+                plan["correction_axis_deg"] = next(iter(axes))
+            elif len(axes) > 1:
+                plan["correction_warnings"].append(
+                    f"Conflicting {eye} cylinder axes were extracted; sphere/cylinder were transferred but the axis was not."
+                )
+            else:
+                plan["correction_warnings"].append(
+                    f"{eye} cylinder axis was not confidently readable; sphere/cylinder were transferred without an axis."
+                )
 
     return effective
 
@@ -1192,7 +1211,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.6.0 / source set 2026-08-25 plus binding HC amendments",
+        "version": "software v0.6.1 / source set 2026-08-25 plus binding HC amendments",
     }
 
 
@@ -1207,7 +1226,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         "Dp": "max", "Dt": "max", "Da": "max", "ARTmax_um": "min", "PPI_max": "max",
         "PPI_avg": "max", "PPI_min": "max", "Kmax_D": "max", "ISV": "max", "IVA": "max",
         "KI": "max", "CKI": "max", "IHD": "max", "I_S": "max", "KISA": "max",
-        "IHA": "max", "anterior_elevation_thinnest_um": "max",
+        "IHA": "max", "Rmin_mm": "min", "anterior_elevation_thinnest_um": "max",
         "posterior_elevation_thinnest_um": "max", "RMS_HOA_um": "max", "vertical_coma_um": "max",
         "srax_deg": "max", "inferior_opposite_steepening_D": "max",
     }
@@ -1359,6 +1378,17 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                         target[key] = value
                         continue
                     if key in target_table_sources and key in incoming_map_sources:
+                        continue
+                    if key in target_map_sources and key in incoming_map_sources:
+                        # Same-parameter local readings are a lower-priority substitute for one
+                        # unreadable edge box. Preserve the safety-limiting value but do not label
+                        # this permitted fallback-source merge as an unresolved clinical conflict.
+                        if key in conservative and is_number(old) and is_number(value):
+                            target[key] = min(old, value) if conservative[key] == "min" else max(old, value)
+                        merged["global_warnings"].append(
+                            f"Multiple permitted local-map {key} readings for {eye_id}; "
+                            "a conservative value was retained without creating an unresolved conflict."
+                        )
                         continue
 
                 # Missing/uncertain information on a page that lacks the relevant map is not
