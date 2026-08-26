@@ -75,6 +75,24 @@ def plan(procedure="PRK", sphere=-3.0, cylinder=0.0, ablation=60, flap=None):
     }
 
 
+def card_correction(
+    eye="OD", sphere=-4.5, cylinder=-3.5, axis=170,
+    sphere_cylinder_status="CONFIDENT", axis_status="CONFIDENT",
+):
+    return {
+        "eye": eye,
+        "source_document": "EXCIMER_LASER_FOLLOW_UP_CARD",
+        "source_label": "DUZELTME_MIKTARI",
+        "sphere_D": sphere,
+        "cylinder_D": cylinder,
+        "axis_deg": axis,
+        "sphere_cylinder_status": sphere_cylinder_status,
+        "axis_status": axis_status,
+        "raw_text": f"{sphere} ({cylinder} x {axis})",
+        "missing_or_unreadable": [],
+    }
+
+
 MODIFIERS = {
     "eye_rubbing": "no",
     "family_history": "no",
@@ -283,9 +301,106 @@ class TestScoringAndCompleteness(unittest.TestCase):
         self.assertNotIn("BAD_D", merged["eyes"][0]["missing_or_unreadable"])
 
 
+class TestTreatmentCardTransfer(unittest.TestCase):
+    def test_confident_card_fills_empty_plan_and_drives_zone_specific_ablation(self):
+        extracted = {
+            "eyes": [normal_eye()],
+            "treatment_corrections": [card_correction()],
+            "global_warnings": [],
+        }
+        empty = plan(sphere=None, cylinder=None, ablation=None)
+        empty["optical_zone_mm"] = 6.5
+        effective = app.apply_extracted_corrections(extracted, {"OD": empty})
+        self.assertEqual(effective["OD"]["sphere_D"], -4.5)
+        self.assertEqual(effective["OD"]["cylinder_magnitude_D"], 3.5)
+        self.assertEqual(effective["OD"]["correction_axis_deg"], 170.0)
+        self.assertIn("Duzeltme Miktari", effective["OD"]["correction_source"])
+        result = app.assess_eye(normal_eye(), effective["OD"], 35, MODIFIERS)
+        self.assertEqual(result["values"]["max_ablation_um"], 120.0)
+
+    def test_manual_pair_wins_when_card_differs(self):
+        extracted = {"treatment_corrections": [card_correction()]}
+        effective = app.apply_extracted_corrections(extracted, {"OD": plan(sphere=-2, cylinder=1)})
+        self.assertEqual(effective["OD"]["sphere_D"], -2)
+        self.assertEqual(effective["OD"]["cylinder_magnitude_D"], 1)
+        self.assertNotIn("correction_source", effective["OD"])
+        self.assertTrue(any("manual correction differs" in item for item in effective["OD"]["correction_warnings"]))
+
+    def test_partial_manual_pair_is_never_mixed_with_card(self):
+        partial = plan(sphere=-2, cylinder=None)
+        effective = app.apply_extracted_corrections(
+            {"treatment_corrections": [card_correction()]}, {"OD": partial}
+        )
+        self.assertEqual(effective["OD"]["sphere_D"], -2)
+        self.assertIsNone(effective["OD"]["cylinder_magnitude_D"])
+        self.assertTrue(any("partial manual correction" in item for item in effective["OD"]["correction_warnings"]))
+
+    def test_uncertain_axis_keeps_confident_sphere_and_cylinder_only(self):
+        correction = card_correction(axis=None, axis_status="UNCERTAIN")
+        effective = app.apply_extracted_corrections(
+            {"treatment_corrections": [correction]},
+            {"OD": plan(sphere=None, cylinder=None)},
+        )
+        self.assertEqual(effective["OD"]["sphere_D"], -4.5)
+        self.assertEqual(effective["OD"]["cylinder_magnitude_D"], 3.5)
+        self.assertNotIn("correction_axis_deg", effective["OD"])
+        self.assertTrue(any("axis was not confidently readable" in item for item in effective["OD"]["correction_warnings"]))
+
+    def test_uncertain_or_conflicting_values_do_not_auto_fill(self):
+        uncertain = card_correction(
+            sphere=None, cylinder=None, sphere_cylinder_status="UNCERTAIN"
+        )
+        conflicting = card_correction(sphere=-3.5, cylinder=-3.0, axis=3)
+        empty = plan(sphere=None, cylinder=None)
+        uncertain_result = app.apply_extracted_corrections(
+            {"treatment_corrections": [uncertain]}, {"OD": empty}
+        )
+        conflict_result = app.apply_extracted_corrections(
+            {"treatment_corrections": [card_correction(), conflicting]}, {"OD": empty}
+        )
+        self.assertIsNone(uncertain_result["OD"]["sphere_D"])
+        self.assertIsNone(conflict_result["OD"]["sphere_D"])
+        self.assertTrue(any("Conflicting" in item for item in conflict_result["OD"]["correction_warnings"]))
+
+    def test_plus_cylinder_is_not_transposed_or_auto_filled(self):
+        plus = card_correction(cylinder=3.5)
+        effective = app.apply_extracted_corrections(
+            {"treatment_corrections": [plus]},
+            {"OD": plan(sphere=None, cylinder=None)},
+        )
+        self.assertIsNone(effective["OD"]["sphere_D"])
+        self.assertIsNone(effective["OD"]["cylinder_magnitude_D"])
+        self.assertTrue(any("plus-cylinder" in item for item in effective["OD"]["correction_warnings"]))
+
+    def test_unknown_eye_from_card_image_is_not_assessed(self):
+        unknown = normal_eye("UNKNOWN")
+        extracted = {
+            "eyes": [normal_eye(), unknown],
+            "treatment_corrections": [card_correction()],
+            "global_warnings": [],
+        }
+        effective = app.apply_extracted_corrections(
+            extracted, {"OD": plan(sphere=None, cylinder=None)}
+        )
+        decision = app.hc_engine(extracted, 35, effective, MODIFIERS)
+        self.assertEqual([eye["eye"] for eye in decision["eyes"]], ["OD"])
+
+    def test_merge_keeps_and_deduplicates_card_readings(self):
+        correction = card_correction()
+        merged = app.merge_extractions([
+            {"eyes": [normal_eye()], "treatment_corrections": [correction], "global_warnings": []},
+            {"eyes": [], "treatment_corrections": [correction], "global_warnings": []},
+        ])
+        self.assertEqual(merged["treatment_corrections"], [correction])
+
+
 class TestApiIntegration(unittest.TestCase):
     def test_analyze_endpoint_accepts_eye_specific_payload(self):
-        extraction = {"eyes": [normal_eye()], "global_warnings": []}
+        extraction = {
+            "eyes": [normal_eye()],
+            "treatment_corrections": [card_correction()],
+            "global_warnings": [],
+        }
         fake_response = SimpleNamespace(
             output_text=json.dumps(extraction), status="completed", incomplete_details=None
         )
@@ -299,7 +414,7 @@ class TestApiIntegration(unittest.TestCase):
                 files={"images": ("od.png", b"synthetic-image-bytes", "image/png")},
                 data={
                     "age": "35",
-                    "eye_plans": json.dumps({"OD": plan()}),
+                    "eye_plans": json.dumps({"OD": plan(sphere=None, cylinder=None, ablation=None)}),
                     "patient_modifiers": json.dumps(MODIFIERS),
                 },
             )
@@ -307,6 +422,8 @@ class TestApiIntegration(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload["decision"]["status"], "PASS")
         self.assertEqual(payload["decision"]["eyes"][0]["eye"], "OD")
+        self.assertEqual(payload["effective_eye_plans"]["OD"]["sphere_D"], -4.5)
+        self.assertEqual(payload["decision"]["eyes"][0]["values"]["correction_axis_deg"], 170.0)
 
     def test_professional_pdf_and_word_exports_are_valid(self):
         extracted = {"eyes": [normal_eye()], "global_warnings": []}

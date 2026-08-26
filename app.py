@@ -97,13 +97,51 @@ SCHEMA = {
                 ],
             },
         },
+        "treatment_corrections": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "eye": {"type": "string", "enum": ["OD", "OS", "UNKNOWN"]},
+                    "source_document": {
+                        "type": "string",
+                        "enum": ["EXCIMER_LASER_FOLLOW_UP_CARD", "OTHER", "UNKNOWN"],
+                    },
+                    "source_label": {
+                        "type": "string",
+                        "enum": ["DUZELTME_MIKTARI", "OTHER", "UNREADABLE"],
+                    },
+                    "sphere_D": {"type": ["number", "null"]},
+                    "cylinder_D": {"type": ["number", "null"]},
+                    "axis_deg": {"type": ["number", "null"]},
+                    "sphere_cylinder_status": {
+                        "type": "string",
+                        "enum": ["CONFIDENT", "UNCERTAIN", "UNREADABLE"],
+                    },
+                    "axis_status": {
+                        "type": "string",
+                        "enum": ["CONFIDENT", "UNCERTAIN", "UNREADABLE"],
+                    },
+                    "raw_text": {"type": ["string", "null"]},
+                    "missing_or_unreadable": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": [
+                    "eye", "source_document", "source_label", "sphere_D", "cylinder_D",
+                    "axis_deg", "sphere_cylinder_status", "axis_status", "raw_text",
+                    "missing_or_unreadable",
+                ],
+            },
+        },
         "global_warnings": {"type": "array", "items": {"type": "string"}},
     },
-    "required": ["eyes", "global_warnings"],
+    "required": ["eyes", "treatment_corrections", "global_warnings"],
 }
 
-PROMPT = """You are a data-extraction component for Pentacam corneal tomography photographs.
-Extract only values visibly supported by the supplied image. Never guess an unreadable or absent
+PROMPT = """You are a strict data-extraction component for preoperative corneal-refractive-surgery images.
+The image may be a Pentacam/topography screen, an Excimer Laser Follow-up Card (Excimer Laser Takip
+Karti), or another clinical document. Extract only values visibly supported by the supplied image.
+Never guess an unreadable or absent
 number. Identify OD/OS and screen type. Return null for unreadable/absent numeric values and list
 them in missing_or_unreadable. Classify the visible Placido/topographic morphology using exactly
 one of: NORMAL_SYMMETRIC, ASYMMETRIC_BOWTIE, INFERIOR_STEEPENING_SRA,
@@ -116,7 +154,19 @@ INFERIOR_STEEPENING_SRA requires visible inferior steepening or skewed radial ax
 visible reasons in morphology_evidence. If the relevant map is not sufficiently visible, use
 UNCERTAIN. Do not make a surgical recommendation. Do not calculate or infer missing BAD-D,
 component D values, ARTmax, or other indices from related measurements. Treat this as strict
-transcription and structured image interpretation, not autonomous diagnosis."""
+transcription and structured image interpretation, not autonomous diagnosis.
+
+For an Excimer Laser Takip Karti, extract treatment_corrections only from the row explicitly labeled
+"Duzeltme Miktari" (including Turkish characters). Do not substitute values from "Subjektif
+Refraksiyon" or any other row. Map SAG/right to OD and SOL/left to OS. Transcribe sphere, signed
+cylinder, and axis exactly as written. sphere_cylinder_status may be CONFIDENT only when the sphere
+and cylinder digits and signs are unambiguous. If either is ambiguous, set both numeric fields to
+null and use UNCERTAIN or UNREADABLE while preserving visible characters in raw_text. Axis ambiguity
+does not require discarding an otherwise confident sphere/cylinder pair; report it separately in
+axis_status and set axis_deg to null when uncertain. Never transpose cylinder notation and never
+infer the laser platform, optical zone, procedure, or ablation depth from the card. For a card-only
+image with no corneal tomography/topography data, return an empty eyes array. For a tomography-only
+image with no treatment card, return an empty treatment_corrections array."""
 
 
 def data_url(raw: bytes, filename: str) -> str:
@@ -384,7 +434,7 @@ def assess_eye(
 ) -> Dict[str, Any]:
     eye_id = eye.get("eye", "UNKNOWN")
     procedure = plan.get("procedure")
-    warnings: List[str] = []
+    warnings: List[str] = list(plan.get("correction_warnings", []))
     reasons: List[str] = []
     hard_stops: List[str] = []
     missing: List[str] = []
@@ -625,6 +675,8 @@ def assess_eye(
             "age_years": age,
             "sphere_D": sphere,
             "cylinder_magnitude_D": cylinder,
+            "correction_axis_deg": plan.get("correction_axis_deg"),
+            "correction_source": plan.get("correction_source"),
             "MRSE_D": mrse,
             "pachy_thinnest_um": pachy,
             "max_ablation_um": ablation,
@@ -653,14 +705,114 @@ def assess_eye(
     }
 
 
+def apply_extracted_corrections(
+    extracted: Dict[str, Any], eye_plans: Dict[str, Dict[str, Any]]
+) -> Dict[str, Dict[str, Any]]:
+    """Auto-fill an empty eye plan from an unambiguous Duzeltme Miktari entry.
+
+    Manual sphere/cylinder values always take priority. A partial manual pair is never mixed with
+    an extracted value, and conflicting cards never produce an automatic treatment plan.
+    """
+    effective = {
+        eye: dict(eye_plans.get(eye, {})) if isinstance(eye_plans.get(eye, {}), dict) else {}
+        for eye in EYES
+    }
+    grouped: Dict[str, List[Dict[str, Any]]] = {eye: [] for eye in EYES}
+    for correction in extracted.get("treatment_corrections", []):
+        if not isinstance(correction, dict):
+            continue
+        eye = correction.get("eye")
+        if (
+            eye in EYES
+            and correction.get("source_document") == "EXCIMER_LASER_FOLLOW_UP_CARD"
+            and correction.get("source_label") == "DUZELTME_MIKTARI"
+        ):
+            grouped[eye].append(correction)
+
+    for eye, candidates in grouped.items():
+        if not candidates:
+            continue
+        plan = effective[eye]
+        plan.setdefault("correction_warnings", [])
+        confident = [
+            item for item in candidates
+            if item.get("sphere_cylinder_status") == "CONFIDENT"
+            and is_number(item.get("sphere_D"))
+            and is_number(item.get("cylinder_D"))
+        ]
+        pairs = {
+            (float(item["sphere_D"]), float(item["cylinder_D"])) for item in confident
+        }
+        if not pairs:
+            plan["correction_warnings"].append(
+                f"{eye} Duzeltme Miktari was present but not confidently readable; no treatment correction was auto-filled."
+            )
+            continue
+        if len(pairs) > 1:
+            plan["correction_warnings"].append(
+                f"Conflicting {eye} Duzeltme Miktari readings were extracted; no treatment correction was auto-filled."
+            )
+            continue
+
+        sphere, signed_cylinder = next(iter(pairs))
+        if signed_cylinder > 0:
+            plan["correction_warnings"].append(
+                f"{eye} card uses plus-cylinder notation; automatic transposition is prohibited. Enter the intended minus-cylinder plan manually."
+            )
+            continue
+
+        manual_sphere = is_number(plan.get("sphere_D"))
+        manual_cylinder = is_number(plan.get("cylinder_magnitude_D"))
+        if manual_sphere != manual_cylinder:
+            plan["correction_warnings"].append(
+                f"{eye} has a partial manual correction; extracted card values were not mixed with manual input."
+            )
+            continue
+        if manual_sphere and manual_cylinder:
+            if (
+                abs(float(plan["sphere_D"]) - sphere) > 1e-6
+                or abs(float(plan["cylinder_magnitude_D"]) - abs(signed_cylinder)) > 1e-6
+            ):
+                plan["correction_warnings"].append(
+                    f"{eye} manual correction differs from the extracted Duzeltme Miktari; manual values retained."
+                )
+            continue
+
+        plan["sphere_D"] = sphere
+        plan["cylinder_magnitude_D"] = abs(signed_cylinder)
+        plan["correction_source"] = "Excimer Laser Takip Karti — Duzeltme Miktari"
+        axes = {
+            float(item["axis_deg"])
+            for item in confident
+            if item.get("axis_status") == "CONFIDENT"
+            and is_number(item.get("axis_deg"))
+            and 0 <= float(item["axis_deg"]) <= 180
+        }
+        if len(axes) == 1:
+            plan["correction_axis_deg"] = next(iter(axes))
+        elif len(axes) > 1:
+            plan["correction_warnings"].append(
+                f"Conflicting {eye} cylinder axes were extracted; sphere/cylinder were transferred but the axis was not."
+            )
+        else:
+            plan["correction_warnings"].append(
+                f"{eye} cylinder axis was not confidently readable; sphere/cylinder were transferred without an axis."
+            )
+
+    return effective
+
+
 def hc_engine(
     extracted: Dict[str, Any],
     age: Optional[int],
     eye_plans: Dict[str, Dict[str, Any]],
     patient_modifiers: Dict[str, Any],
 ) -> Dict[str, Any]:
-    extracted_eyes = [eye for eye in extracted.get("eyes", []) if isinstance(eye, dict)]
-    assessed_ids = [eye.get("eye") for eye in extracted_eyes if eye.get("eye") in EYES]
+    extracted_eyes = [
+        eye for eye in extracted.get("eyes", [])
+        if isinstance(eye, dict) and eye.get("eye") in EYES
+    ]
+    assessed_ids = [eye.get("eye") for eye in extracted_eyes]
     patient_modifiers = dict(patient_modifiers)
     patient_modifiers["assessed_eyes"] = assessed_ids
 
@@ -692,7 +844,7 @@ def hc_engine(
 
 
 def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
-    merged: Dict[str, Any] = {"eyes": [], "global_warnings": []}
+    merged: Dict[str, Any] = {"eyes": [], "treatment_corrections": [], "global_warnings": []}
     by_eye: Dict[str, Dict[str, Any]] = {}
     conservative = {
         "pachy_thinnest_um": "min", "BAD_D": "max", "Df": "max", "Db": "max",
@@ -712,6 +864,9 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     for result in results:
         merged["global_warnings"].extend(result.get("global_warnings", []))
+        merged["treatment_corrections"].extend(
+            item for item in result.get("treatment_corrections", []) if isinstance(item, dict)
+        )
         for eye in result.get("eyes", []):
             eye_id = eye.get("eye", "UNKNOWN")
             if eye_id not in by_eye:
@@ -769,6 +924,14 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         )
 
     merged["eyes"] = list(by_eye.values())
+    unique_corrections: List[Dict[str, Any]] = []
+    seen_corrections = set()
+    for correction in merged["treatment_corrections"]:
+        key = json.dumps(correction, sort_keys=True, ensure_ascii=False)
+        if key not in seen_corrections:
+            seen_corrections.add(key)
+            unique_corrections.append(correction)
+    merged["treatment_corrections"] = unique_corrections
     merged["global_warnings"] = sorted(set(merged["global_warnings"]))
     return merged
 
@@ -834,7 +997,7 @@ async def analyze(
             input=[{"role": "user", "content": content}],
             text={
                 "format": {
-                    "type": "json_schema", "name": "pentacam_extraction",
+                    "type": "json_schema", "name": "hc_preoperative_image_extraction",
                     "strict": True, "schema": SCHEMA,
                 }
             },
@@ -862,7 +1025,9 @@ async def analyze(
     if not extraction_results:
         raise HTTPException(400, "No readable images supplied.")
     extracted = merge_extractions(extraction_results)
+    effective_plans = apply_extracted_corrections(extracted, plans)
     return {
         "extracted": extracted,
-        "decision": hc_engine(extracted, age, plans, modifiers),
+        "effective_eye_plans": effective_plans,
+        "decision": hc_engine(extracted, age, effective_plans, modifiers),
     }

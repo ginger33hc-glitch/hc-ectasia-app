@@ -41,7 +41,7 @@
         <div class="row"><label>Reviewer / surgeon</label><input id="reviewer" type="text" autocomplete="off"></div>
         <div class="row"><label>Assessment date</label><input id="report_date" type="date"></div>
       </div>
-      <div class="row"><label>Pentacam/topography images <span class="required">*</span></label><input name="images" type="file" accept="image/*" multiple required></div>
+      <div class="row"><label>Pentacam/topography and treatment-card images <span class="required">*</span></label><input name="images" type="file" accept="image/*" multiple required></div>
       <h3>Patient-level clinical modifiers</h3>
       <div class="grid">
         <div class="row"><label>Chronic eye rubbing / repetitive ocular trauma?</label><select id="eye_rubbing"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
@@ -53,7 +53,8 @@
         <fieldset><legend>OD</legend><div id="od-fields"></div></fieldset>
         <fieldset><legend>OS</legend><div id="os-fields"></div></fieldset>
       </div>
-      <p class="note">Cylinder is entered as a non-negative magnitude in minus-cylinder convention. MRSE = sphere − cylinder magnitude/2. If actual maximum ablation is blank, an explicitly documented Alcon EX500 plan may use the HC estimate: 12 µm/D at 6.0 mm or 15 µm/D at 6.5 mm. Other platforms or optical zones require the actual maximum ablation.</p>
+      <p class="note">An uploaded Excimer Laser Takip Kartı may auto-fill empty sphere, cylinder, and axis fields only from the Düzeltme Miktarı row. Manual values take priority, and uncertain or conflicting readings are not auto-filled. Cylinder is entered as a non-negative magnitude in minus-cylinder convention. MRSE = sphere − cylinder magnitude/2. If actual maximum ablation is blank, an explicitly documented Alcon EX500 plan may use the HC estimate: 12 µm/D at 6.0 mm or 15 µm/D at 6.5 mm. Other platforms or optical zones require the actual maximum ablation.</p>
+      <p id="cardTransferNote" class="note"></p>
       <button id="analyzeBtn" type="submit">Analyze images and run HC assessment</button>
     </form>
   </div>
@@ -91,6 +92,7 @@ const eyeTemplate = (eye) => `
   <div class="row"><label>Procedure</label><select id="${eye}_procedure"><option value="">Select</option><option value="PRK">PRK</option><option value="LASIK">LASIK</option></select></div>
   <div class="row"><label>Intended sphere (D)</label><input id="${eye}_sphere" type="number" step=".25"></div>
   <div class="row"><label>Cylinder magnitude (D)</label><input id="${eye}_cylinder" type="number" step=".25" min="0"></div>
+  <div class="row"><label>Cylinder axis (degrees)</label><input id="${eye}_axis" type="number" step="1" min="0" max="180"></div>
   <div class="row"><label>Actual maximum ablation (µm)</label><input id="${eye}_ablation" type="number" step=".1" min="0"></div>
   <div class="row"><label>Laser platform</label><input id="${eye}_platform" type="text" placeholder="e.g., Alcon EX500"></div>
   <div class="row"><label>Planned LASIK flap (µm)</label><input id="${eye}_flap" type="number" step="1" min="0"></div>
@@ -112,6 +114,7 @@ const eyeResults = document.querySelector("#eye-results");
 const overallNote = document.querySelector("#overall-note");
 const analyzeBtn = document.querySelector("#analyzeBtn");
 const reportCard = document.querySelector("#reportCard");
+const cardTransferNote = document.querySelector("#cardTransferNote");
 const pdfBtn = document.querySelector("#pdfBtn");
 const wordBtn = document.querySelector("#wordBtn");
 const printBtn = document.querySelector("#printBtn");
@@ -123,6 +126,7 @@ document.querySelector("#report_date").value = new Date().toISOString().slice(0,
 function plan(prefix){return {
   prior:value(`${prefix}_prior`), procedure:value(`${prefix}_procedure`),
   sphere_D:numberOrNull(`${prefix}_sphere`), cylinder_magnitude_D:numberOrNull(`${prefix}_cylinder`),
+  correction_axis_deg:numberOrNull(`${prefix}_axis`),
   ablation_um:numberOrNull(`${prefix}_ablation`), flap_um:numberOrNull(`${prefix}_flap`),
   laser_platform:value(`${prefix}_platform`), optical_zone_mm:numberOrNull(`${prefix}_optical`),
   transition_zone_mm:numberOrNull(`${prefix}_transition`), transition_zone_not_applicable:value(`${prefix}_transition_na`),
@@ -139,12 +143,30 @@ function statusClass(s){
 }
 const fmt = (x, digits=1) => x === null || x === undefined ? "—" : Number(x).toFixed(digits);
 const safe = (x) => String(x ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
+function correctionText(values){
+  if(values.sphere_D===null||values.sphere_D===undefined||values.cylinder_magnitude_D===null||values.cylinder_magnitude_D===undefined)return "—";
+  const axis=values.correction_axis_deg===null||values.correction_axis_deg===undefined?"axis unavailable":`${fmt(values.correction_axis_deg,0)}°`;
+  return `${fmt(values.sphere_D,2)} D / -${fmt(values.cylinder_magnitude_D,2)} D × ${axis}`;
+}
+function applyEffectivePlans(plans){
+  const transferred=[];
+  for(const [eye,prefix] of [["OD","od"],["OS","os"]]){
+    const p=plans?.[eye]||{};
+    if(!p.correction_source)continue;
+    document.querySelector(`#${prefix}_sphere`).value=p.sphere_D;
+    document.querySelector(`#${prefix}_cylinder`).value=p.cylinder_magnitude_D;
+    if(p.correction_axis_deg!==null&&p.correction_axis_deg!==undefined)document.querySelector(`#${prefix}_axis`).value=p.correction_axis_deg;
+    transferred.push(`${eye}: ${correctionText(p)}`);
+  }
+  cardTransferNote.textContent=transferred.length?`Card values transferred: ${transferred.join("; ")}`:"";
+}
 function listBlock(title, items){if(!items || !items.length)return "";return `<div class="finding-group"><h4>${safe(title)}</h4><ul>${items.map(x=>`<li>${safe(x)}</li>`).join("")}</ul></div>`}
 function renderEye(r, extracted){
   const v=r.values||{}, s=r.score||{};
   const transition=v.transition_zone_mm===null||v.transition_zone_mm===undefined?(v.transition_zone_not_applicable==="yes"?"Not applicable":"—"):`${fmt(v.transition_zone_mm,1)} mm`;
   const rows=[
     ["Procedure",v.procedure??"—"],["Score / category",`${s.total ?? "—"} / ${s.category ?? "—"}`],
+    ["Intended correction",correctionText(v)],["Correction source",v.correction_source??"Manual / not documented"],
     ["Thinnest pachymetry",`${fmt(v.pachy_thinnest_um,0)} µm`],["MRSE",`${fmt(v.MRSE_D,2)} D`],
     ["Maximum ablation",`${fmt(v.max_ablation_um,1)} µm`],["Laser platform",v.laser_platform??"—"],
     ["Optical / transition zone",`${fmt(v.optical_zone_mm,1)} mm / ${transition}`],["Enhancement anticipated",v.enhancement_anticipated??"—"],
@@ -209,7 +231,7 @@ f.addEventListener("submit", async (e) => {
   e.preventDefault(); const originalText=analyzeBtn.textContent;
   analyzeBtn.disabled=true; analyzeBtn.textContent="Analyzing images... Please wait";
   statusBox.className="status insufficient"; statusBox.textContent="ANALYZING...";
-  reportCard.hidden=true;lastReport=null;eyeResults.innerHTML=""; decisionBox.textContent=""; extractBox.textContent=""; overallNote.textContent="";
+  reportCard.hidden=true;lastReport=null;eyeResults.innerHTML=""; decisionBox.textContent=""; extractBox.textContent=""; overallNote.textContent="";cardTransferNote.textContent="";
   try{
     const fd=new FormData(f);
     fd.set("eye_plans",JSON.stringify({OD:plan("od"),OS:plan("os")}));
@@ -220,6 +242,7 @@ f.addEventListener("submit", async (e) => {
     const r=await fetch("/analyze",{method:"POST",body:fd}); const text=await r.text();
     let j; try{j=JSON.parse(text)}catch{throw new Error("Server returned a non-JSON response: "+text.slice(0,200))}
     if(!r.ok)throw new Error(j.detail||"Request failed");
+    applyEffectivePlans(j.effective_eye_plans);
     statusBox.textContent=j.decision.status; statusBox.className=`status ${statusClass(j.decision.status)}`;
     overallNote.textContent=j.decision.action||"";
     eyeResults.innerHTML=(j.decision.eyes||[]).map(x=>renderEye(x,j.extracted)).join("");

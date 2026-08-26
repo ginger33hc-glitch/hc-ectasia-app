@@ -4,7 +4,8 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 
 ## What v0.5 implements
 
-- Sequential original-detail extraction of each uploaded Pentacam/topography image.
+- Sequential original-detail extraction of each uploaded Pentacam/topography or treatment-card image.
+- Excimer Laser Takip Kartı reading limited to the eye-specific `Düzeltme Miktarı` row; confident minus-cylinder values can fill otherwise empty sphere/cylinder/axis fields, while manual input wins and uncertain/conflicting readings remain warnings.
 - Independent OD and OS assessment; eye values are never averaged.
 - Published five-component LASIK ERSS scoring and categories.
 - PRK-EWSS v1.0 provisional morphology/pachymetry/age triage score, explicitly labeled as unvalidated.

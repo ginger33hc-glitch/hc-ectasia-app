@@ -87,6 +87,16 @@ def _fmt(value: Any, digits: int = 1, unit: str = "") -> str:
 def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
     values = eye.get("values") or {}
     score = eye.get("score") or {}
+    correction = "Not documented"
+    if values.get("sphere_D") is not None and values.get("cylinder_magnitude_D") is not None:
+        axis = (
+            f" x {_fmt(values.get('correction_axis_deg'), 0, ' degrees')}"
+            if values.get("correction_axis_deg") is not None else " (axis unavailable)"
+        )
+        correction = (
+            f"{_fmt(values.get('sphere_D'), 2, ' D')} / "
+            f"-{_fmt(values.get('cylinder_magnitude_D'), 2, ' D')}{axis}"
+        )
     transition = (
         "Not applicable"
         if values.get("transition_zone_mm") is None and values.get("transition_zone_not_applicable") == "yes"
@@ -94,6 +104,8 @@ def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
     )
     return [
         ("Procedure", _text(values.get("procedure"))),
+        ("Intended correction", correction),
+        ("Correction source", _text(values.get("correction_source"), "Manual / not documented")),
         ("Score / category", f"{_text(score.get('total'), '-')} / {_text(score.get('category'), '-') }"),
         ("Thinnest pachymetry", _fmt(values.get("pachy_thinnest_um"), 0, " um")),
         ("MRSE", _fmt(values.get("MRSE_D"), 2, " D")),
