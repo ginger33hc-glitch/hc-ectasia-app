@@ -589,6 +589,12 @@ class TestClinicalEligibilityGroupUi(unittest.TestCase):
         group = html[group_start:group_end]
         for field in ("stable", "progression", "cdva", "enhancement"):
             self.assertEqual(group.count(f'id="${{eye}}_{field}"'), 1)
+        self.assertIn(
+            'id="${eye}_stable"><option value="yes" selected>Yes</option>'
+            '<option value="no">No</option><option value="unknown">Unknown</option>',
+            group,
+        )
+        for field in ("progression", "cdva", "enhancement"):
             self.assertIn(
                 f'id="${{eye}}_{field}"><option value="no" selected>No</option>'
                 '<option value="yes">Yes</option><option value="unknown">Unknown</option>',
