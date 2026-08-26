@@ -525,6 +525,20 @@ class TestPwaShareTarget(unittest.TestCase):
         self.assertIn('navigator.serviceWorker.register("/sw.js",{scope:"/"})', html)
 
 
+class TestAnalyzeLoadingStateUi(unittest.TestCase):
+    def test_loading_message_paints_before_network_request_and_validation_is_visible(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn('<form id="f" novalidate>', html)
+        self.assertIn('id="analysisProgress"', html)
+        self.assertIn('role="status" aria-live="polite"', html)
+        self.assertIn('analyzeBtn.textContent="Analyzing images... Please wait"', html)
+        self.assertIn('showFormMessage("Analyzing images... Please wait.")', html)
+        self.assertIn("await allowLoadingStateToPaint()", html)
+        self.assertLess(html.index("await allowLoadingStateToPaint()"), html.index('fetch("/analyze"'))
+        self.assertIn("f.reportValidity()", html)
+        self.assertIn('showFormMessage(`Analysis failed:', html)
+
+
 class TestPatientModifierUi(unittest.TestCase):
     def test_single_dropdown_contains_all_multi_select_modifier_options(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
