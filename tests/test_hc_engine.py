@@ -524,5 +524,17 @@ class TestFixedLaserPlatformUi(unittest.TestCase):
         self.assertNotIn('placeholder="e.g., Alcon EX500"', html)
 
 
+class TestLasikFlapDropdownUi(unittest.TestCase):
+    def test_flap_field_is_a_dropdown_with_only_hc_options(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        expected = (
+            '<select id="${eye}_flap"><option value="">Select</option>'
+            '<option value="90">90 µm</option><option value="100">100 µm</option>'
+            '<option value="110">110 µm</option><option value="120">120 µm</option></select>'
+        )
+        self.assertIn(expected, html)
+        self.assertNotIn('id="${eye}_flap" type="number"', html)
+
+
 if __name__ == "__main__":
     unittest.main()
