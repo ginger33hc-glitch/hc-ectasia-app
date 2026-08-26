@@ -995,6 +995,14 @@ class TestSignedRefractionInputs(unittest.TestCase):
             self.assertIn(f'data-negative-target="${{eye}}_{target}"', html)
         self.assertIn('String(-Math.abs(parsed||0.25))', html)
 
+    def test_manifest_and_intended_spheres_have_phone_safe_positive_buttons(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        for target in ("manifest_sphere", "sphere"):
+            self.assertIn(f'data-positive-target="${{eye}}_{target}"', html)
+        self.assertIn('String(Math.abs(parsed||0.25))', html)
+        self.assertNotIn('data-positive-target="${eye}_manifest_cylinder"', html)
+        self.assertNotIn('data-positive-target="${eye}_cylinder"', html)
+
     def test_autofilled_internal_cylinder_magnitudes_render_as_negative(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
         self.assertIn('value=-Math.abs(p.manifest_cylinder_magnitude_D)', html)

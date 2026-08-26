@@ -63,7 +63,7 @@ Railway start command: `python start.py`.
 python -m unittest discover -s tests -v
 ```
 
-The 91-test suite covers the exact structural and treatment-range boundaries, manifest/intended separation, prior-surgery routing, identity warnings, date/QS gates, invalid numeric inputs, fellow-eye completeness, ERSS/PRK-EWSS categories, extraction merging, and valid PDF/DOCX generation.
+The 92-test suite covers the exact structural and treatment-range boundaries, signed manifest/intended input, prior-surgery routing, identity warnings, date/QS gates, invalid numeric inputs, fellow-eye completeness, ERSS/PRK-EWSS categories, extraction merging, and valid PDF/DOCX generation.
 
 Dependencies are exact-version pinned. The extraction model is restricted to the reviewed configuration; changing it requires explicit non-clinical override and revalidation.
 
