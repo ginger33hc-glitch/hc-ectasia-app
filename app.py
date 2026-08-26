@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="HC Ectasia App v0.6.3")
+app = FastAPI(title="HC Ectasia App v0.6.4")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -211,8 +211,12 @@ them in missing_or_unreadable.
 
 DOCUMENT IDENTITY AND ACQUISITION RULE:
 Transcribe the patient ID, patient name, explicitly printed patient age in completed years, exam date,
-exam time, laterality, and document type exactly when visible. Use null/UNKNOWN when absent or
-unreadable. Do not extract or return date of birth. Never calculate age from another field and never
+exam time, laterality, and document type exactly when visible. Transcribe patient_id only from an
+explicitly labeled patient-ID field in the patient-demographics box (for example ID, Patient ID, or
+Pat.-ID). Never use an examination number, measurement number, scan number, accession number,
+page/report number, device serial number, date, time, or another unlabeled number as patient_id.
+If the patient-ID label or its value is not clearly readable, return patient_id=null. Use null/UNKNOWN
+when other identity fields are absent or unreadable. Do not extract or return date of birth. Never calculate age from another field and never
 infer that two images belong to the same patient merely because their laterality matches. For a Pentacam image, transcribe
 the device quality specification only when the literal QS status is visible. Use OK only for an
 explicitly visible acceptable/OK QS. Use NOT_OK for a visible non-OK status, UNREADABLE when the QS
@@ -1219,7 +1223,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.6.3 / source set 2026-08-25 plus binding HC amendments",
+        "version": "software v0.6.4 / source set 2026-08-25 plus binding HC amendments",
     }
 
 
@@ -1482,32 +1486,50 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             seen_corrections.add(key)
             unique_corrections.append(correction)
     merged["treatment_corrections"] = unique_corrections
-    ids = {str(c.get("patient_id")).strip() for c in merged["document_contexts"] if c.get("patient_id")}
-    names = {
-        " ".join(str(c.get("patient_name")).casefold().split())
-        for c in merged["document_contexts"] if c.get("patient_name")
-    }
-    pentacam_dates = {
-        str(c.get("exam_date")).strip() for c in merged["document_contexts"]
-        if c.get("document_type") == "PENTACAM_TOPOGRAPHY" and c.get("exam_date")
-    }
-    if len(ids) > 1:
-        merged["critical_input_issues"].append("Conflicting patient IDs across uploaded sources.")
-    if len(names) > 1:
-        merged["critical_input_issues"].append("Conflicting patient names across uploaded sources.")
-    if len(pentacam_dates) > 1:
-        merged["critical_input_issues"].append("Conflicting Pentacam examination dates across uploaded sources.")
     pentacam_contexts = [
         c for c in merged["document_contexts"] if c.get("document_type") == "PENTACAM_TOPOGRAPHY"
     ]
+    ids = {
+        str(c.get("patient_id")).strip().casefold()
+        for c in pentacam_contexts if c.get("patient_id")
+    }
+    normalized_names = [
+        " ".join(str(c.get("patient_name") or "").casefold().split())
+        for c in pentacam_contexts
+    ]
+    names = {name for name in normalized_names if name}
+    pentacam_dates = {
+        str(c.get("exam_date")).strip() for c in pentacam_contexts if c.get("exam_date")
+    }
     pentacam_ages = {
         int(c["patient_age_years"]) for c in pentacam_contexts
         if is_number(c.get("patient_age_years"))
     }
+    shared_readable_name = (
+        bool(normalized_names) and all(normalized_names) and len(set(normalized_names)) == 1
+    )
+    age_is_consistent = len(pentacam_ages) <= 1
+    identity_corrobated_by_name_and_age = (
+        shared_readable_name and age_is_consistent and len(pentacam_ages) == 1
+    )
+
+    if len(names) > 1:
+        merged["critical_input_issues"].append("Conflicting patient names across Pentacam sources.")
     if len(pentacam_ages) > 1:
         merged["critical_input_issues"].append("Conflicting patient ages across Pentacam sources.")
     elif len(pentacam_ages) == 1:
         merged["derived_age_years"] = next(iter(pentacam_ages))
+    if len(ids) > 1:
+        if identity_corrobated_by_name_and_age:
+            merged["global_warnings"].append(
+                "Different patient-ID strings were extracted from Pentacam sources, but the shared "
+                "readable patient name and consistent printed age corroborate one patient. The ID "
+                "difference is retained for surgeon review and does not independently block assessment."
+            )
+        else:
+            merged["critical_input_issues"].append("Conflicting patient IDs across Pentacam sources.")
+    if len(pentacam_dates) > 1:
+        merged["critical_input_issues"].append("Conflicting Pentacam examination dates across uploaded sources.")
 
     assessed_eyes = {
         eye for context in pentacam_contexts for eye in context.get("extracted_eyes", [])
