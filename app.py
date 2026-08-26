@@ -988,11 +988,13 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     quality_rank = {"INADEQUATE": 0, "LIMITED": 1, "ADEQUATE": 2}
     posterior_rank = {"UNREADABLE": 0, "REASSURING": 1, "BORDERLINE": 2, "ABNORMAL": 3}
     numeric_tolerance = {
-        # These fields are not HC score inputs. Small differences commonly represent OCR of a
-        # nearby map label or display rounding, not a clinically meaningful multi-image conflict.
-        "K1_D": 0.25,
-        "K2_D": 0.25,
         "Kmax_D": 0.25,
+    }
+    # Descriptive values that do not drive an HC decision must never become unresolved conflicts
+    # that prohibit PASS. Across overlapping Pentacam screens, preserve source priority
+    # (labeled table over permitted map fallback); at equal priority retain the first reading.
+    non_decision_conflict_fields = {
+        "K1_D", "K2_D", "thinnest_x_mm", "thinnest_y_mm",
     }
 
     def normalized_eye(raw_eye: Dict[str, Any]) -> Dict[str, Any]:
@@ -1095,6 +1097,9 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                         continue
                     if value == "UNCERTAIN":
                         continue
+
+                if key in non_decision_conflict_fields:
+                    continue
 
                 if (
                     key in numeric_tolerance
