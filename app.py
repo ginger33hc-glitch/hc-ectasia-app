@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import json
 import mimetypes
@@ -1191,6 +1192,46 @@ def report_word(payload: Dict[str, Any] = Body(...)) -> StreamingResponse:
     )
 
 
+def extract_one_image(raw: bytes, filename: str) -> Dict[str, Any]:
+    """Run one independent image extraction outside the async server event loop."""
+    content = [
+        {"type": "input_text", "text": PROMPT},
+        {
+            "type": "input_image",
+            "image_url": data_url(raw, filename),
+            "detail": "original",
+        },
+    ]
+    response = openai_client().responses.create(
+        model=MODEL,
+        store=False,
+        reasoning={"effort": "low"},
+        input=[{"role": "user", "content": content}],
+        text={
+            "format": {
+                "type": "json_schema", "name": "hc_preoperative_image_extraction",
+                "strict": True, "schema": SCHEMA,
+            }
+        },
+    )
+    output_text = response.output_text
+    print(
+        "OPENAI DEBUG:", "status=", getattr(response, "status", None),
+        "incomplete_details=", getattr(response, "incomplete_details", None),
+        "output_length=", len(output_text or ""), flush=True,
+    )
+    if not output_text or not output_text.strip():
+        raise RuntimeError(
+            "OpenAI returned empty output_text. "
+            f"status={getattr(response, 'status', None)}, "
+            f"incomplete_details={getattr(response, 'incomplete_details', None)}"
+        )
+    try:
+        return json.loads(output_text)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"OpenAI output was not valid JSON: {exc}") from exc
+
+
 @app.post("/analyze")
 async def analyze(
     images: List[UploadFile] = File(...),
@@ -1208,53 +1249,35 @@ async def analyze(
     if not isinstance(plans, dict) or not isinstance(modifiers, dict):
         raise HTTPException(400, "eye_plans and patient_modifiers must be JSON objects.")
 
-    extraction_results = []
+    image_payloads = []
     for image in images:
         raw = await image.read()
-        if not raw:
-            continue
-        content = [
-            {"type": "input_text", "text": PROMPT},
-            {
-                "type": "input_image",
-                "image_url": data_url(raw, image.filename or "image.jpg"),
-                "detail": "original",
-            },
-        ]
-        response = openai_client().responses.create(
-            model=MODEL,
-            store=False,
-            reasoning={"effort": "low"},
-            input=[{"role": "user", "content": content}],
-            text={
-                "format": {
-                    "type": "json_schema", "name": "hc_preoperative_image_extraction",
-                    "strict": True, "schema": SCHEMA,
-                }
-            },
-        )
-        output_text = response.output_text
-        print(
-            "OPENAI DEBUG:", "status=", getattr(response, "status", None),
-            "incomplete_details=", getattr(response, "incomplete_details", None),
-            "output_length=", len(output_text or ""),
-            "output_preview=", repr((output_text or "")[:300]), flush=True,
-        )
-        if not output_text or not output_text.strip():
-            raise RuntimeError(
-                "OpenAI returned empty output_text. "
-                f"status={getattr(response, 'status', None)}, "
-                f"incomplete_details={getattr(response, 'incomplete_details', None)}"
-            )
-        try:
-            extraction_results.append(json.loads(output_text))
-        except json.JSONDecodeError as exc:
-            raise RuntimeError(
-                f"OpenAI output was not valid JSON: {exc}; preview={output_text[:300]!r}"
-            ) from exc
+        if raw:
+            image_payloads.append((raw, image.filename or "image.jpg"))
 
-    if not extraction_results:
+    if not image_payloads:
         raise HTTPException(400, "No readable images supplied.")
+
+    # Every image remains an independent extraction. Bounded concurrency prevents the total
+    # request time from becoming the sum of all upstream calls and keeps FastAPI responsive.
+    concurrency = max(1, min(int(os.getenv("IMAGE_EXTRACTION_CONCURRENCY", "3")), 4))
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async def extract_bounded(raw: bytes, filename: str) -> Dict[str, Any]:
+        async with semaphore:
+            return await asyncio.to_thread(extract_one_image, raw, filename)
+
+    try:
+        extraction_results = await asyncio.gather(
+            *(extract_bounded(raw, filename) for raw, filename in image_payloads)
+        )
+    except Exception as exc:
+        print(f"IMAGE EXTRACTION ERROR: {type(exc).__name__}: {exc}", flush=True)
+        raise HTTPException(
+            502,
+            "Image extraction service failed before the HC assessment. Please retry once.",
+        ) from exc
+
     extracted = merge_extractions(extraction_results)
     effective_plans = apply_extracted_corrections(extracted, plans)
     return {
