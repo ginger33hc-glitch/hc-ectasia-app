@@ -186,7 +186,7 @@ class TestBoundaries(unittest.TestCase):
         zone_6 = plan(ablation=None)
         zone_65 = dict(zone_6, optical_zone_mm=6.5)
         other_platform = dict(zone_65, laser_platform="Other platform")
-        unsupported_zone = dict(zone_6, optical_zone_mm=6.25)
+        unsupported_zone = dict(zone_6, optical_zone_mm=7.0)
 
         zone_6_result = app.assess_eye(normal_eye(), zone_6, 35, MODIFIERS)
         zone_65_result = app.assess_eye(normal_eye(), zone_65, 35, MODIFIERS)
@@ -545,6 +545,25 @@ class TestFixedPrkEpitheliumUi(unittest.TestCase):
             html,
         )
         self.assertIn("epithelium_um:50", html)
+
+
+class TestZoneDropdownUi(unittest.TestCase):
+    def test_zone_fields_use_only_the_requested_dropdown_options(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        optical = (
+            '<select id="${eye}_optical"><option value="">Select</option>'
+            '<option value="6.0">6.0 mm</option><option value="6.5">6.5 mm</option>'
+            '<option value="7.0">7.0 mm</option></select>'
+        )
+        transition = (
+            '<select id="${eye}_transition"><option value="">Select</option>'
+            '<option value="8.0">8.0 mm</option><option value="8.5">8.5 mm</option>'
+            '<option value="9.0">9.0 mm</option></select>'
+        )
+        self.assertIn(optical, html)
+        self.assertIn(transition, html)
+        self.assertNotIn('id="${eye}_transition_na"', html)
+        self.assertIn('transition_zone_not_applicable:"no"', html)
 
 
 if __name__ == "__main__":

@@ -113,9 +113,8 @@ const eyeTemplate = (eye) => `
   <div class="row"><label>Laser platform</label><input id="${eye}_platform" type="text" value="Alcon EX500" readonly aria-readonly="true"></div>
   <div class="row"><label>Planned LASIK flap (µm)</label><select id="${eye}_flap"><option value="">Select</option><option value="90">90 µm</option><option value="100">100 µm</option><option value="110">110 µm</option><option value="120">120 µm</option></select></div>
   <div class="row"><label>PRK epithelial thickness (µm)</label><input id="${eye}_epithelium" type="text" value="50" readonly aria-readonly="true"></div>
-  <div class="row"><label>Optical zone (mm)</label><input id="${eye}_optical" type="number" step=".1" min="0"></div>
-  <div class="row"><label>Transition zone (mm)</label><input id="${eye}_transition" type="number" step=".1" min="0"></div>
-  <div class="row"><label>Transition zone not applicable?</label><select id="${eye}_transition_na"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+  <div class="row"><label>Optical zone (mm)</label><select id="${eye}_optical"><option value="">Select</option><option value="6.0">6.0 mm</option><option value="6.5">6.5 mm</option><option value="7.0">7.0 mm</option></select></div>
+  <div class="row"><label>Transition zone (mm)</label><select id="${eye}_transition"><option value="">Select</option><option value="8.0">8.0 mm</option><option value="8.5">8.5 mm</option><option value="9.0">9.0 mm</option></select></div>
   <div class="row"><label>Refraction stable?</label><select id="${eye}_stable"><option value="unknown">Unknown</option><option value="yes">Yes</option><option value="no">No</option></select></div>
   <div class="row"><label>Documented progression?</label><select id="${eye}_progression"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
   <div class="row"><label>Unexplained CDVA &lt;20/20?</label><select id="${eye}_cdva"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
@@ -175,7 +174,7 @@ function plan(prefix){return {
   ablation_um:numberOrNull(`${prefix}_ablation`), flap_um:numberOrNull(`${prefix}_flap`),
   epithelium_um:50,
   laser_platform:"Alcon EX500", optical_zone_mm:numberOrNull(`${prefix}_optical`),
-  transition_zone_mm:numberOrNull(`${prefix}_transition`), transition_zone_not_applicable:value(`${prefix}_transition_na`),
+  transition_zone_mm:numberOrNull(`${prefix}_transition`), transition_zone_not_applicable:"no",
   stable:value(`${prefix}_stable`), progression:value(`${prefix}_progression`),
   cdva_below_20_20:value(`${prefix}_cdva`), enhancement_anticipated:value(`${prefix}_enhancement`)
 }}
