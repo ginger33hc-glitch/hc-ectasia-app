@@ -12,8 +12,8 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Morphology-first override gate for definite KC/FFKC/PMD or unequivocal ectatic morphology.
 - HC operational hard stops: preoperative thinnest pachymetry `<480 µm`, LASIK RSB `<300 µm`, and PRK RST `<310 µm`.
 - Standard HC PRK calculation: `RST = pachymetry - 50 µm epithelium - maximum stromal ablation`.
-- Zone-specific HC ablation estimates for explicitly documented Alcon EX500 plans: `12 µm/D` at 6.0 mm and `15 µm/D` at 6.5 mm; the actual treatment-plan maximum remains preferred.
-- Optical-zone selection is limited to `6.0`, `6.5`, or `7.0 mm`; transition-zone selection is limited to `8.0`, `8.5`, or `9.0 mm`. No HC linear ablation coefficient is assigned to 7.0 mm, so an actual maximum ablation depth is required for that option.
+- Zone-specific HC ablation estimates for explicitly documented Alcon EX500 plans: `12 µm/D` at 6.0 mm, `15 µm/D` at 6.5 mm, and `16.33 µm/D` at 7.0 mm; the actual treatment-plan maximum remains preferred.
+- Optical-zone selection is limited to `6.0`, `6.5`, or `7.0 mm`; transition-zone selection is limited to `8.0`, `8.5`, or `9.0 mm`.
 - The visible laser-platform field is fixed and read-only as `Alcon EX500` for both eyes; the optical zone remains an explicit eye-specific input.
 - Planned LASIK flap thickness is selected per eye from `90`, `100`, `110`, or `120 µm`; PRK plans leave the flap selection blank.
 - PRK epithelial thickness is shown per eye as a fixed, read-only `50 µm` HC value and is used in the PRK RST/PTA calculations.

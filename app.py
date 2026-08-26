@@ -386,7 +386,7 @@ def estimate_ablation(plan: Dict[str, Any], warnings: List[str]) -> Optional[flo
     optical_zone = plan.get("optical_zone_mm")
     platform = str(plan.get("laser_platform") or "").lower().replace(" ", "")
     is_ex500 = "alcon" in platform and "ex500" in platform
-    ablation_rate = {6.0: 12.0, 6.5: 15.0}.get(optical_zone) if is_ex500 else None
+    ablation_rate = {6.0: 12.0, 6.5: 15.0, 7.0: 16.33}.get(optical_zone) if is_ex500 else None
     if is_number(sphere) and sphere > 0:
         warnings.append(
             "The HC linear EX500 ablation estimate is not applied to a hyperopic or mixed-meridian plan; "
@@ -396,14 +396,14 @@ def estimate_ablation(plan: Dict[str, Any], warnings: List[str]) -> Optional[flo
     if is_number(sphere) and is_number(cylinder) and ablation_rate is not None:
         warnings.append(
             f"Maximum ablation estimated with the HC Alcon EX500, {optical_zone:.1f}-mm-zone, "
-            f"{ablation_rate:.0f} µm/D convention; "
+            f"{ablation_rate:g} µm/D convention; "
             "actual laser-plan maximum is preferred."
         )
         return (abs(float(sphere)) + abs(float(cylinder))) * ablation_rate
     if is_number(sphere) and is_number(cylinder):
         warnings.append(
-            "The HC ablation estimate was not applied because an Alcon EX500 with either a 6.0-mm "
-            "or 6.5-mm optical zone was not explicitly documented."
+            "The HC ablation estimate was not applied because an Alcon EX500 with a 6.0-mm, "
+            "6.5-mm, or 7.0-mm optical zone was not explicitly documented."
         )
     return None
 
