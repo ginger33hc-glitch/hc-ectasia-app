@@ -385,7 +385,6 @@ f.addEventListener("submit", async (e) => {
     const labels=unreviewedEyes.map(eye=>eye.toUpperCase()).join(" and ");
     unreviewedEyes.forEach(eye=>document.querySelector(`#${eye}_clinical`).classList.add("review-required"));
     const first=document.querySelector(`#${unreviewedEyes[0]}_clinical`);
-    first.open=true;
     first.scrollIntoView({behavior:"smooth",block:"center"});
     showFormMessage(`Before analysis, open and review the Clinical eligibility and stability options for ${labels}. Changes are not required.`);
     return;
