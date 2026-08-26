@@ -110,7 +110,7 @@ const eyeTemplate = (eye) => `
   <div class="row"><label>Cylinder magnitude (D)</label><input id="${eye}_cylinder" type="number" step=".25" min="0"></div>
   <div class="row"><label>Cylinder axis (degrees)</label><input id="${eye}_axis" type="number" step="1" min="0" max="180"></div>
   <div class="row"><label>Actual maximum ablation (µm)</label><input id="${eye}_ablation" type="number" step=".1" min="0"></div>
-  <div class="row"><label>Laser platform</label><input id="${eye}_platform" type="text" placeholder="e.g., Alcon EX500"></div>
+  <div class="row"><label>Laser platform</label><input id="${eye}_platform" type="text" value="Alcon EX500" readonly aria-readonly="true"></div>
   <div class="row"><label>Planned LASIK flap (µm)</label><input id="${eye}_flap" type="number" step="1" min="0"></div>
   <div class="row"><label>Optical zone (mm)</label><input id="${eye}_optical" type="number" step=".1" min="0"></div>
   <div class="row"><label>Transition zone (mm)</label><input id="${eye}_transition" type="number" step=".1" min="0"></div>
@@ -172,7 +172,7 @@ function plan(prefix){return {
   sphere_D:numberOrNull(`${prefix}_sphere`), cylinder_magnitude_D:numberOrNull(`${prefix}_cylinder`),
   correction_axis_deg:numberOrNull(`${prefix}_axis`),
   ablation_um:numberOrNull(`${prefix}_ablation`), flap_um:numberOrNull(`${prefix}_flap`),
-  laser_platform:value(`${prefix}_platform`), optical_zone_mm:numberOrNull(`${prefix}_optical`),
+  laser_platform:"Alcon EX500", optical_zone_mm:numberOrNull(`${prefix}_optical`),
   transition_zone_mm:numberOrNull(`${prefix}_transition`), transition_zone_not_applicable:value(`${prefix}_transition_na`),
   stable:value(`${prefix}_stable`), progression:value(`${prefix}_progression`),
   cdva_below_20_20:value(`${prefix}_cdva`), enhancement_anticipated:value(`${prefix}_enhancement`)

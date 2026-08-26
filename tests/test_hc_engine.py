@@ -513,5 +513,16 @@ class TestPatientModifierUi(unittest.TestCase):
         self.assertIn('value="unknown" data-exclusive="true"', html)
 
 
+class TestFixedLaserPlatformUi(unittest.TestCase):
+    def test_each_eye_keeps_a_read_only_alcon_ex500_box(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn(
+            'id="${eye}_platform" type="text" value="Alcon EX500" readonly aria-readonly="true"',
+            html,
+        )
+        self.assertIn('laser_platform:"Alcon EX500"', html)
+        self.assertNotIn('placeholder="e.g., Alcon EX500"', html)
+
+
 if __name__ == "__main__":
     unittest.main()
