@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>HC Ectasia App v0.6.6</title>
+  <title>HC Ectasia App v0.6.7</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=5">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=4">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=4">
@@ -28,12 +28,13 @@
     .eye-result{border:1px solid var(--line);margin:18px 0;page-break-inside:avoid}.eye-head{padding:10px 12px;background:#f1f4f6;display:flex;justify-content:space-between;gap:10px;align-items:center;border-bottom:1px solid var(--line)}.eye-head strong{color:var(--navy);font-size:15px}.eye-head .status{font-size:13px;padding:6px 9px;border-left-width:4px}.eye-body{padding:13px}.eye-action{margin:0 0 11px;padding:9px 11px;background:#f7f9fb;border-left:4px solid var(--navy);font-size:12px}.clinical-table{margin:9px 0 12px}.clinical-table th,.clinical-table td{border:1px solid var(--line);padding:6px 8px;font-size:11px;text-align:left;vertical-align:middle}.clinical-table th{background:var(--navy);color:white}.clinical-table td:first-child{font-weight:bold;width:38%;background:#f7f9fb}.finding-group{page-break-inside:avoid}.finding-group h4{color:var(--navy);font-size:12px;margin:12px 0 4px}.finding-group ul{margin:4px 0 8px;padding-left:21px}.finding-group li{font-size:11px;margin:3px 0}.report-footer-note{margin-top:19px;padding-top:10px;border-top:1px solid var(--line);font-size:9px;color:var(--muted)}
     .note{font-size:12px;color:var(--muted)}.file-picker-wrap{min-width:0}.selected-files{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}.selected-file{display:inline-block;max-width:100%;padding:6px 9px;border:1px solid #b8c9d6;border-radius:6px;background:#f2f7fa;color:var(--blueInk);font-size:12px;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.selected-file:hover,.selected-file:focus{background:#e3f0f8;text-decoration:underline}.alert{background:#fff7e8;border-left:5px solid #dc8b1a;padding:11px 13px;border-radius:5px}.liability-notice{color:#a31212;font-weight:bold;font-size:14px;margin:4px 0 12px}.required{color:#a31212}details{margin-top:12px}pre{white-space:pre-wrap;overflow:auto;background:#f7f9fb;padding:12px;border-radius:7px;font-size:12px}
     .identity-alert{background:#fff0d8;color:#7a3d00;border:2px solid #d9790d;border-left-width:7px;padding:12px 14px;border-radius:6px;margin:10px 0 16px;font-size:12px}.identity-alert strong{display:block;font-size:13px;margin-bottom:5px}.identity-alert ul{margin:5px 0 0;padding-left:20px}
+    .report-liability-notice{color:var(--redInk);font-weight:bold;font-size:12px;border:1px solid #c52b2b;border-left:6px solid #c52b2b;background:var(--red);padding:9px 11px;margin:0 0 16px;border-radius:5px}
     @media(max-width:760px){.grid{grid-template-columns:1fr}.row{grid-template-columns:1fr}.eye-head,.report-masthead{align-items:flex-start;flex-direction:column}.report-sheet{padding:24px 18px}.report-version{text-align:left}.meta-table th,.meta-table td{display:block;width:100%}}
     @media print{@page{size:A4;margin:12mm}body{background:white}.no-print,body>header,.card:first-of-type{display:none!important}main{max-width:none;margin:0;padding:0}.report-card{display:block!important;margin:0}.report-sheet{max-width:none;border:0;box-shadow:none;padding:0}.eye-result{break-inside:avoid-page}.status,.meta-table th,.clinical-table th,.clinical-table td:first-child{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
   </style>
 </head>
 <body>
-<header><h1>HC Ectasia App v0.6.6</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
+<header><h1>HC Ectasia App v0.6.7</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -96,8 +97,9 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">HC Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.6.6</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.6.7</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
+      <p class="report-liability-notice">Final decision and liability always rests on the surgeon, this app is only an aid tool.</p>
       <table class="meta-table"><tbody>
         <tr><th>Patient</th><td id="reportPatient">Not documented</td><th>Patient ID</th><td id="reportPatientId">Not documented</td></tr>
         <tr><th>Age</th><td id="reportAge">Not documented</td><th>Date</th><td id="reportDate">Not documented</td></tr>

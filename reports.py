@@ -40,6 +40,7 @@ GRAY = "52616D"
 GRAY_FILL = "EEF2F5"
 LINE = "D7E0E7"
 INK = "17212B"
+LIABILITY_NOTICE = "Final decision and liability always rests on the surgeon, this app is only an aid tool."
 
 
 def _rl(value: str):
@@ -215,10 +216,12 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     styles.add(ParagraphStyle(name="Section", parent=styles["Heading2"], fontName="Helvetica-Bold", fontSize=10.5, leading=13, textColor=_rl(NAVY), spaceBefore=10, spaceAfter=5))
     styles.add(ParagraphStyle(name="BodySmall", parent=styles["BodyText"], fontName="Helvetica", fontSize=8.5, leading=11, textColor=_rl(INK), spaceAfter=3))
     styles.add(ParagraphStyle(name="Tiny", parent=styles["BodyText"], fontName="Helvetica", fontSize=7.2, leading=9, textColor=_rl(GRAY)))
+    styles.add(ParagraphStyle(name="Liability", parent=styles["BodyText"], fontName="Helvetica-Bold", fontSize=9, leading=12, textColor=_rl(RED), backColor=_rl(RED_FILL), borderColor=_rl(RED), borderWidth=0.8, borderPadding=7, spaceAfter=11))
 
     story: List[Any] = []
     story.append(Paragraph("HC PREOPERATIVE ECTASIA RISK ASSESSMENT", styles["ReportTitle"]))
-    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.6.3", styles["ReportSub"]))
+    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.6.7", styles["ReportSub"]))
+    story.append(Paragraph(LIABILITY_NOTICE, styles["Liability"]))
 
     metadata = [
         ["Patient", _ascii(patient.get("name")), "Patient ID", _ascii(patient.get("id"))],
@@ -457,12 +460,21 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     run.font.size = Pt(18)
     run.bold = True
     run.font.color.rgb = RGBColor.from_string(NAVY)
-    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.6.3")
+    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.6.7")
     subtitle.paragraph_format.space_after = Pt(10)
     for run in subtitle.runs:
         run.font.name = "Arial"
         run.font.size = Pt(8.5)
         run.font.color.rgb = RGBColor.from_string(GRAY)
+
+    liability = document.add_paragraph()
+    liability.paragraph_format.space_after = Pt(10)
+    liability.paragraph_format.left_indent = Inches(0.08)
+    liability_run = liability.add_run(LIABILITY_NOTICE)
+    liability_run.font.name = "Arial"
+    liability_run.font.size = Pt(9)
+    liability_run.font.bold = True
+    liability_run.font.color.rgb = RGBColor.from_string(RED)
 
     meta = document.add_table(rows=3, cols=4)
     meta.style = "Table Grid"

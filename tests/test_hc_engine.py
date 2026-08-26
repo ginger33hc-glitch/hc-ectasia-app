@@ -934,10 +934,19 @@ class TestApiIntegration(unittest.TestCase):
         word = client.post("/report/word", json=payload)
         self.assertEqual(pdf.status_code, 200)
         self.assertEqual(pdf.headers["content-type"], "application/pdf")
-        self.assertGreaterEqual(len(PdfReader(BytesIO(pdf.content)).pages), 1)
+        pdf_reader = PdfReader(BytesIO(pdf.content))
+        self.assertGreaterEqual(len(pdf_reader.pages), 1)
+        self.assertIn(
+            "Final decision and liability always rests on the surgeon, this app is only an aid tool.",
+            "\n".join(page.extract_text() or "" for page in pdf_reader.pages),
+        )
         self.assertEqual(word.status_code, 200)
         self.assertIn("wordprocessingml.document", word.headers["content-type"])
         document = Document(BytesIO(word.content))
+        self.assertIn(
+            "Final decision and liability always rests on the surgeon, this app is only an aid tool.",
+            "\n".join(paragraph.text for paragraph in document.paragraphs),
+        )
         text = "\n".join(paragraph.text for paragraph in document.paragraphs)
         self.assertIn("HC PREOPERATIVE ECTASIA RISK ASSESSMENT", text)
         self.assertIn("PASS", text)
@@ -1151,13 +1160,17 @@ class TestClinicalEligibilityGroupUi(unittest.TestCase):
 
 
 class TestLiabilityNoticeUi(unittest.TestCase):
-    def test_top_input_box_contains_the_red_surgeon_liability_notice(self):
+    def test_input_and_report_contain_the_same_surgeon_liability_notice(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
         notice = (
             '<p class="liability-notice">Final decision and liability always rests on the surgeon, '
             'this app is only an aid tool.</p>'
         )
         self.assertIn(notice, html)
+        self.assertIn(
+            '<p class="report-liability-notice">Final decision and liability always rests on the surgeon, '
+            'this app is only an aid tool.</p>', html,
+        )
         self.assertIn('.liability-notice{color:#a31212;', html)
 
 
