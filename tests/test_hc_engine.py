@@ -576,5 +576,20 @@ class TestPriorSurgeryDefaultUi(unittest.TestCase):
         self.assertIn(expected, html)
 
 
+class TestClinicalEligibilityGroupUi(unittest.TestCase):
+    def test_four_eye_specific_clinical_controls_share_one_collapsible_box(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn(
+            'id="${eye}_clinical" class="clinical-select-group">\n'
+            '    <summary>Clinical eligibility and stability</summary>',
+            html,
+        )
+        group_start = html.index('id="${eye}_clinical"')
+        group_end = html.index('</details>`;', group_start)
+        group = html[group_start:group_end]
+        for field in ("stable", "progression", "cdva", "enhancement"):
+            self.assertEqual(group.count(f'id="${{eye}}_{field}"'), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

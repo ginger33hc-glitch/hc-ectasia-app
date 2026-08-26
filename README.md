@@ -16,6 +16,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Optical-zone selection is limited to `6.0`, `6.5`, or `7.0 mm`; transition-zone selection is limited to `8.0`, `8.5`, or `9.0 mm`.
 - The visible laser-platform field is fixed and read-only as `Alcon EX500` for both eyes; the optical zone remains an explicit eye-specific input.
 - Planned LASIK flap thickness is selected per eye from `90`, `100`, `110`, or `120 µm`; PRK plans leave the flap selection blank.
+- Refraction stability, documented progression, unexplained CDVA loss, and anticipated enhancement remain separate eye-specific values inside one compact clinical-eligibility dropdown box.
 - PRK epithelial thickness is shown per eye as a fixed, read-only `50 µm` HC value and is used in the PRK RST/PTA calculations.
 - Procedure-correct PTA formulas for LASIK and PRK.
 - BAD-D/component display interpretation plus adjunctive ARTmax/TP/Dt/Da evidence flags.

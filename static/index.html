@@ -18,6 +18,7 @@
     .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.row{display:grid;grid-template-columns:1.25fr 1fr;gap:10px;margin:10px 0;align-items:center}
     input,select{padding:9px;width:100%;border:1px solid #bcc8d1;border-radius:5px;background:white}fieldset{border:1px solid var(--line);border-radius:8px;padding:14px}legend{font-weight:bold;padding:0 6px}
     .modifier-row{max-width:720px}.multi-select{position:relative;margin:8px 0 0}.multi-select summary{list-style:none;padding:10px 38px 10px 12px;border:1px solid #bcc8d1;border-radius:6px;background:#fff;cursor:pointer;position:relative}.multi-select summary::-webkit-details-marker{display:none}.multi-select summary::after{content:"▼";position:absolute;right:13px;color:var(--muted);font-size:11px}.multi-select[open] summary::after{content:"▲"}.multi-options{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 4px);background:#fff;border:1px solid #bcc8d1;border-radius:7px;box-shadow:0 8px 24px rgba(23,59,87,.16);padding:7px;max-height:330px;overflow:auto}.multi-option{display:flex;gap:9px;align-items:flex-start;padding:9px 8px;border-radius:5px;cursor:pointer}.multi-option:hover{background:#f1f6f9}.multi-option input{width:auto;margin:3px 0 0;padding:0}.multi-divider{border-top:1px solid var(--line);margin:5px 0}
+    .clinical-select-group{border:1px solid #bcc8d1;border-radius:7px;background:#f8fafb;margin-top:12px;overflow:hidden}.clinical-select-group summary{list-style:none;padding:10px 38px 10px 12px;background:#fff;cursor:pointer;position:relative;font-weight:bold;color:var(--navy)}.clinical-select-group summary::-webkit-details-marker{display:none}.clinical-select-group summary::after{content:"▼";position:absolute;right:13px;color:var(--muted);font-size:11px}.clinical-select-group[open] summary::after{content:"▲"}.clinical-select-options{padding:2px 12px 8px;border-top:1px solid var(--line)}
     button{background:var(--navy);color:white;border:0;border-radius:8px;padding:13px 18px;font-weight:bold;font-size:15px;cursor:pointer}button:disabled{opacity:.6;cursor:wait}
     .status{font-size:21px;font-weight:bold;padding:14px;border-radius:6px;background:var(--gray);color:var(--grayInk);border-left:7px solid #8a98a4}.status.pass{background:var(--green);color:var(--greenInk);border-color:var(--greenInk)}.status.caution,.status.review{background:var(--orange);color:var(--orangeInk);border-color:#d9790d}.status.fail{background:var(--red);color:var(--redInk);border-color:#c52b2b}.status.insufficient{background:var(--gray);color:var(--grayInk);border-color:#8a98a4}
     .report-card{padding:0;background:transparent;border:0;box-shadow:none}.report-toolbar{display:flex;justify-content:flex-end;gap:9px;margin:0 0 12px}.secondary{background:white;color:var(--navy);border:1px solid var(--navy)}
@@ -115,10 +116,15 @@ const eyeTemplate = (eye) => `
   <div class="row"><label>PRK epithelial thickness (µm)</label><input id="${eye}_epithelium" type="text" value="50" readonly aria-readonly="true"></div>
   <div class="row"><label>Optical zone (mm)</label><select id="${eye}_optical"><option value="">Select</option><option value="6.0">6.0 mm</option><option value="6.5">6.5 mm</option><option value="7.0">7.0 mm</option></select></div>
   <div class="row"><label>Transition zone (mm)</label><select id="${eye}_transition"><option value="">Select</option><option value="8.0">8.0 mm</option><option value="8.5">8.5 mm</option><option value="9.0">9.0 mm</option></select></div>
-  <div class="row"><label>Refraction stable?</label><select id="${eye}_stable"><option value="unknown">Unknown</option><option value="yes">Yes</option><option value="no">No</option></select></div>
-  <div class="row"><label>Documented progression?</label><select id="${eye}_progression"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
-  <div class="row"><label>Unexplained CDVA &lt;20/20?</label><select id="${eye}_cdva"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
-  <div class="row"><label>Enhancement anticipated?</label><select id="${eye}_enhancement"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>`;
+  <details id="${eye}_clinical" class="clinical-select-group">
+    <summary>Clinical eligibility and stability</summary>
+    <div class="clinical-select-options">
+      <div class="row"><label>Refraction stable?</label><select id="${eye}_stable"><option value="unknown">Unknown</option><option value="yes">Yes</option><option value="no">No</option></select></div>
+      <div class="row"><label>Documented progression?</label><select id="${eye}_progression"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+      <div class="row"><label>Unexplained CDVA &lt;20/20?</label><select id="${eye}_cdva"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+      <div class="row"><label>Enhancement anticipated?</label><select id="${eye}_enhancement"><option value="unknown">Unknown</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+    </div>
+  </details>`;
 document.querySelector("#od-fields").innerHTML = eyeTemplate("od");
 document.querySelector("#os-fields").innerHTML = eyeTemplate("os");
 
