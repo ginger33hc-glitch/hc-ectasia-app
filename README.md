@@ -15,6 +15,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Zone-specific HC ablation estimates for explicitly documented Alcon EX500 plans: `12 µm/D` at 6.0 mm and `15 µm/D` at 6.5 mm; the actual treatment-plan maximum remains preferred.
 - The visible laser-platform field is fixed and read-only as `Alcon EX500` for both eyes; the optical zone remains an explicit eye-specific input.
 - Planned LASIK flap thickness is selected per eye from `90`, `100`, `110`, or `120 µm`; PRK plans leave the flap selection blank.
+- PRK epithelial thickness is shown per eye as a fixed, read-only `50 µm` HC value and is used in the PRK RST/PTA calculations.
 - Procedure-correct PTA formulas for LASIK and PRK.
 - BAD-D/component display interpretation plus adjunctive ARTmax/TP/Dt/Da evidence flags.
 - Positive tomography concern flags require review and cannot receive automatic PASS.

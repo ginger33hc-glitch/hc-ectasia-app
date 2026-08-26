@@ -131,6 +131,7 @@ class TestBoundaries(unittest.TestCase):
 
     def test_prk_rst_310_allowed_by_structural_rule(self):
         result = app.assess_eye(normal_eye(pachy=520), plan(ablation=160), 35, MODIFIERS)
+        self.assertEqual(result["values"]["PRK_epithelium_um"], 50)
         self.assertEqual(result["values"]["PRK_RST_um"], 310)
         self.assertFalse(any("RST" in item for item in result["hard_stops"]))
 
@@ -534,6 +535,16 @@ class TestLasikFlapDropdownUi(unittest.TestCase):
         )
         self.assertIn(expected, html)
         self.assertNotIn('id="${eye}_flap" type="number"', html)
+
+
+class TestFixedPrkEpitheliumUi(unittest.TestCase):
+    def test_each_eye_has_a_read_only_50_micron_prk_epithelium_box(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn(
+            'id="${eye}_epithelium" type="text" value="50" readonly aria-readonly="true"',
+            html,
+        )
+        self.assertIn("epithelium_um:50", html)
 
 
 if __name__ == "__main__":

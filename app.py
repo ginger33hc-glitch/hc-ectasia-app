@@ -19,6 +19,7 @@ client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
 
 EYES = ("OD", "OS")
+PRK_EPITHELIUM_UM = 50
 MORPHOLOGY = (
     "NORMAL_SYMMETRIC",
     "ASYMMETRIC_BOWTIE",
@@ -497,14 +498,18 @@ def assess_eye(
     if procedure == "LASIK" and not is_number(flap):
         missing.append("planned LASIK flap thickness")
 
-    rst = pachy - 50 - ablation if procedure == "PRK" and pachy is not None and ablation is not None else None
+    rst = (
+        pachy - PRK_EPITHELIUM_UM - ablation
+        if procedure == "PRK" and pachy is not None and ablation is not None
+        else None
+    )
     rsb = (
         pachy - flap - ablation
         if procedure == "LASIK" and pachy is not None and is_number(flap) and ablation is not None
         else None
     )
     prk_pta = (
-        (50 + ablation) / pachy * 100
+        (PRK_EPITHELIUM_UM + ablation) / pachy * 100
         if procedure == "PRK" and pachy and ablation is not None
         else None
     )
@@ -689,6 +694,7 @@ def assess_eye(
             "MRSE_D": mrse,
             "pachy_thinnest_um": pachy,
             "max_ablation_um": ablation,
+            "PRK_epithelium_um": PRK_EPITHELIUM_UM if procedure == "PRK" else None,
             "PRK_RST_um": rst,
             "PRK_PTA_percent": prk_pta,
             "LASIK_RSB_um": rsb,

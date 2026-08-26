@@ -111,6 +111,7 @@ def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
         ("MRSE", _fmt(values.get("MRSE_D"), 2, " D")),
         ("Maximum ablation", _fmt(values.get("max_ablation_um"), 1, " um")),
         ("Laser platform", _text(values.get("laser_platform"))),
+        ("PRK epithelium", _fmt(values.get("PRK_epithelium_um"), 0, " um")),
         ("Optical / transition zone", f"{_fmt(values.get('optical_zone_mm'), 1, ' mm')} / {transition}"),
         ("Enhancement anticipated", _text(values.get("enhancement_anticipated"))),
         ("PRK RST / PTA", f"{_fmt(values.get('PRK_RST_um'), 0, ' um')} / {_fmt(values.get('PRK_PTA_percent'), 1, '%')}"),
