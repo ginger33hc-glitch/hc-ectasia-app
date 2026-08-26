@@ -19,6 +19,7 @@ def normal_eye(eye="OD", pachy=560, morphology="NORMAL_SYMMETRIC"):
         "quality": "ADEQUATE",
         "missing_or_unreadable": [],
         "table_verified_numeric_fields": list(app.TABLE_NUMERIC_FIELDS),
+        "map_fallback_numeric_fields": [],
         "K1_D": 42.0,
         "K2_D": 43.0,
         "Kmax_D": 44.0,
@@ -271,6 +272,7 @@ class TestScoringAndCompleteness(unittest.TestCase):
     def test_extraction_contract_prioritizes_labeled_pentacam_numeric_fields(self):
         eye_schema = app.SCHEMA["properties"]["eyes"]["items"]
         self.assertIn("table_verified_numeric_fields", eye_schema["required"])
+        self.assertIn("map_fallback_numeric_fields", eye_schema["required"])
         self.assertIn("PENTACAM NUMERIC-SOURCE RULE", app.PROMPT)
         self.assertIn("Never substitute a map spot value", app.PROMPT)
         self.assertIn("Only the categorical fields", app.PROMPT)
@@ -380,6 +382,38 @@ class TestScoringAndCompleteness(unittest.TestCase):
         eye["K2_D"] = 46.8
         merged = app.merge_extractions([{"eyes": [eye], "global_warnings": []}])
         self.assertEqual(merged["eyes"][0]["K2_D"], 46.8)
+
+    def test_same_measurement_local_map_fallback_is_accepted_when_table_is_unreadable(self):
+        eye = normal_eye(pachy=566)
+        eye["table_verified_numeric_fields"].remove("pachy_thinnest_um")
+        eye["map_fallback_numeric_fields"] = ["pachy_thinnest_um"]
+        merged = app.merge_extractions([{"eyes": [eye], "global_warnings": []}])
+        extracted = merged["eyes"][0]
+        self.assertEqual(extracted["pachy_thinnest_um"], 566)
+        self.assertEqual(extracted["map_fallback_numeric_fields"], ["pachy_thinnest_um"])
+
+    def test_map_spot_cannot_substitute_for_k2_even_when_model_labels_it_as_fallback(self):
+        eye = normal_eye()
+        eye["K2_D"] = 46.6
+        eye["table_verified_numeric_fields"].remove("K2_D")
+        eye["map_fallback_numeric_fields"] = ["K2_D"]
+        merged = app.merge_extractions([{"eyes": [eye], "global_warnings": []}])
+        extracted = merged["eyes"][0]
+        self.assertIsNone(extracted["K2_D"])
+        self.assertNotIn("K2_D", extracted["map_fallback_numeric_fields"])
+
+    def test_later_labeled_table_value_overrides_earlier_local_map_fallback_without_conflict(self):
+        map_eye = normal_eye(pachy=565)
+        map_eye["table_verified_numeric_fields"].remove("pachy_thinnest_um")
+        map_eye["map_fallback_numeric_fields"] = ["pachy_thinnest_um"]
+        table_eye = normal_eye(pachy=566)
+        merged = app.merge_extractions(
+            [{"eyes": [map_eye], "global_warnings": []}, {"eyes": [table_eye], "global_warnings": []}]
+        )
+        extracted = merged["eyes"][0]
+        self.assertEqual(extracted["pachy_thinnest_um"], 566)
+        self.assertNotIn("pachy_thinnest_um", extracted["map_fallback_numeric_fields"])
+        self.assertFalse(any("pachy_thinnest_um" in item for item in extracted["data_conflicts"]))
 
     def test_table_verified_field_lists_are_unioned_without_conflict(self):
         first = normal_eye()

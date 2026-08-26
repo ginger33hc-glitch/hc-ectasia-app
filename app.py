@@ -34,6 +34,14 @@ TABLE_NUMERIC_FIELDS = (
     "posterior_elevation_thinnest_um", "thinnest_x_mm", "thinnest_y_mm",
     "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um",
 )
+MAP_FALLBACK_NUMERIC_FIELDS = (
+    # These map values can directly represent the same named measurement when the side table is
+    # unreadable. Summary/calculated indices such as K1/K2/Kmax, BAD, PPI, ARTmax, and topometric
+    # indices cannot be reconstructed from local map labels.
+    "pachy_thinnest_um",
+    "anterior_elevation_thinnest_um",
+    "posterior_elevation_thinnest_um",
+)
 
 SCHEMA = {
     "type": "object",
@@ -52,6 +60,10 @@ SCHEMA = {
                     "table_verified_numeric_fields": {
                         "type": "array",
                         "items": {"type": "string", "enum": list(TABLE_NUMERIC_FIELDS)},
+                    },
+                    "map_fallback_numeric_fields": {
+                        "type": "array",
+                        "items": {"type": "string", "enum": list(MAP_FALLBACK_NUMERIC_FIELDS)},
                     },
                     "K1_D": {"type": ["number", "null"]},
                     "K2_D": {"type": ["number", "null"]},
@@ -100,7 +112,7 @@ SCHEMA = {
                 },
                 "required": [
                     "eye", "screen_types", "quality", "missing_or_unreadable",
-                    "table_verified_numeric_fields", "K1_D", "K2_D",
+                    "table_verified_numeric_fields", "map_fallback_numeric_fields", "K1_D", "K2_D",
                     "Kmax_D", "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp", "Dt", "Da",
                     "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI", "CKI", "IHD",
                     "I_S", "KISA", "IHA", "Rmin_mm", "anterior_elevation_thinnest_um",
@@ -163,15 +175,24 @@ them in missing_or_unreadable.
 PENTACAM NUMERIC-SOURCE RULE — this rule has priority over map interpretation:
 First inspect the labeled parameter panels, side tables, summary tables, and the labeled numeric
 boxes around the edge of the Pentacam display. Every numeric output in TABLE_NUMERIC_FIELDS must be
-copied only from its own explicitly labeled printed field. Add the exact output-field name to
+copied preferentially from its own explicitly labeled printed field. Add the exact output-field name to
 table_verified_numeric_fields only when that labeled field is visible and the value was transcribed
-from it. The list must exactly match the non-null table-derived numeric outputs. If the corresponding
-labeled field is absent, obscured, or unreadable, return null even if a similar-looking number appears
-inside a color map. Never substitute a map spot value, color-scale value, axis label, neighboring
-parameter, calculated value, average, or visual estimate for a printed parameter. Do not calculate
-BAD-D components, PPI, ARTmax, K values, pachymetry, topometric indices, elevation-at-thinnest,
-coordinates, corneal volume, HOA, or coma from other values. A labeled BAD-display center/bottom
-numeric box counts as a printed parameter field; an unlabeled number inside the map does not.
+from it. The list must exactly match the non-null table-derived numeric outputs.
+
+If and only if the corresponding side/summary-table field is absent, obscured, or unreadable, a local
+map number may be used as a second-priority fallback when it directly represents the same named
+measurement and that field is allowed by MAP_FALLBACK_NUMERIC_FIELDS. Record it in
+map_fallback_numeric_fields and not in table_verified_numeric_fields. The marker/location and map
+type must make the identity unambiguous. Currently this fallback is limited to the explicitly marked
+thinnest pachymetry and the anterior/posterior elevation at that same marked thinnest point. If the
+identity or location is uncertain, return null.
+
+Never substitute a map spot value, color-scale value, axis label, neighboring parameter, calculated
+value, average, or visual estimate for K1, K2, Kmax, BAD-D/components, PPI, ARTmax, topometric
+indices, coordinates, corneal volume, HOA, or coma. Those summary/calculated fields must remain null
+when their own labeled table value is unreadable. A labeled BAD-display center/bottom numeric box
+counts as a printed parameter field; an unlabeled number inside the map does not. The table source
+always overrides a local-map fallback when both are visible.
 
 Only the categorical fields that genuinely require map inspection may be produced visually:
 morphology, asymmetric_bow_tie, srax, anterior_pattern, and posterior_pattern. srax_deg and
@@ -944,7 +965,7 @@ def hc_engine(
         "eyes": results,
         "warnings": extracted.get("global_warnings", []),
         "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.5.2 / source set 2026-08-25 plus binding HC amendments",
+        "version": "software v0.5.3 / source set 2026-08-25 plus binding HC amendments",
     }
 
 
@@ -979,13 +1000,17 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         verified = eye.get("table_verified_numeric_fields")
         if isinstance(verified, list):
             verified_set = set(verified)
+            fallback_set = set(eye.get("map_fallback_numeric_fields", []))
+            fallback_set &= set(MAP_FALLBACK_NUMERIC_FIELDS)
+            fallback_set -= verified_set  # A readable labeled table value always has priority.
             missing = list(eye.get("missing_or_unreadable", []))
             for field in TABLE_NUMERIC_FIELDS:
-                if eye.get(field) is not None and field not in verified_set:
+                if eye.get(field) is not None and field not in verified_set and field not in fallback_set:
                     eye[field] = None
                     missing.append(field)
             eye["missing_or_unreadable"] = list(dict.fromkeys(missing))
             eye["table_verified_numeric_fields"] = sorted(verified_set)
+            eye["map_fallback_numeric_fields"] = sorted(fallback_set)
         derived = scoring_morphology(eye)["category"]
         eye["morphology"] = derived
         if eye.get("asymmetric_bow_tie") == "YES" and derived != "ASYMMETRIC_BOWTIE":
@@ -1007,10 +1032,21 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 continue
             target = by_eye[eye_id]
             target.setdefault("data_conflicts", [])
+            target_table_sources = set(target.get("table_verified_numeric_fields", []))
+            target_map_sources = set(target.get("map_fallback_numeric_fields", []))
+            incoming_table_sources = set(eye.get("table_verified_numeric_fields", []))
+            incoming_map_sources = set(eye.get("map_fallback_numeric_fields", []))
             target["screen_types"] = sorted(set(target.get("screen_types", []) + eye.get("screen_types", [])))
             target["table_verified_numeric_fields"] = sorted(
                 set(target.get("table_verified_numeric_fields", []))
                 | set(eye.get("table_verified_numeric_fields", []))
+            )
+            target["map_fallback_numeric_fields"] = sorted(
+                (
+                    set(target.get("map_fallback_numeric_fields", []))
+                    | set(eye.get("map_fallback_numeric_fields", []))
+                )
+                - set(target["table_verified_numeric_fields"])
             )
             target["morphology_evidence"] = list(
                 dict.fromkeys(target.get("morphology_evidence", []) + eye.get("morphology_evidence", []))
@@ -1021,7 +1057,8 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             for key, value in eye.items():
                 if key in (
                     "eye", "screen_types", "quality", "missing_or_unreadable",
-                    "table_verified_numeric_fields", "morphology_evidence",
+                    "table_verified_numeric_fields", "map_fallback_numeric_fields",
+                    "morphology_evidence",
                 ):
                     continue
                 old = target.get(key)
@@ -1030,6 +1067,13 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     continue
                 if value is None or old == value:
                     continue
+
+                if key in TABLE_NUMERIC_FIELDS:
+                    if key in incoming_table_sources and key in target_map_sources and key not in target_table_sources:
+                        target[key] = value
+                        continue
+                    if key in target_table_sources and key in incoming_map_sources:
+                        continue
 
                 # Missing/uncertain information on a page that lacks the relevant map is not
                 # contradictory evidence against a readable observation on another page.
