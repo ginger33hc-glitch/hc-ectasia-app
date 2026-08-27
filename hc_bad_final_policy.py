@@ -5,7 +5,7 @@ isolated suspicious/abnormal component does not determine the HC BAD status.
 Final BAD-D:
 - <=1.6: NORMAL
 - >1.6 and <3.0: SUSPICIOUS -> REVIEW / NOT CLEARED
-- >=3.0: ABNORMAL -> DO NOT PROCEED hard stop
+- >=3.0: ABNORMAL CORNEA -> DO NOT PROCEED hard stop
 """
 import bootstrap
 
@@ -62,8 +62,9 @@ core.tomography_review = hc_tomography_review
 def assess_eye_with_final_bad_cutoff(eye, plan, age, patient_modifiers):
     result = _original_assess_eye(eye, plan, age, patient_modifiers)
     bad_d_status = final_bad_status(eye)
+    result["final_bad_d_interpretation"] = bad_d_status
     if bad_d_status == "ABNORMAL":
-        hard_stop = "HC operational hard stop: Final BAD-D abnormal (>=3.0)."
+        hard_stop = "HC operational hard stop: Final BAD-D abnormal (>=3.0); cornea classified ABNORMAL by the HC BAD-D gate."
         hard_stops = result.setdefault("hard_stops", [])
         reasons = result.setdefault("reasons", [])
         if hard_stop not in hard_stops:
@@ -71,7 +72,7 @@ def assess_eye_with_final_bad_cutoff(eye, plan, age, patient_modifiers):
         if hard_stop not in reasons:
             reasons.append(hard_stop)
         result["status"] = "DO NOT PROCEED"
-        result["action"] = "DO NOT PROCEED. Final BAD-D is abnormal and meets the HC cutoff."
+        result["action"] = "DO NOT PROCEED — ABNORMAL CORNEA. Final BAD-D is >=3.0 and meets the HC abnormal cutoff."
     elif bad_d_status == "SUSPICIOUS" and result.get("status") == "PASS":
         result["status"] = "REVIEW — NOT CLEARED"
         result["action"] = "NOT CLEARED. Final BAD-D is suspicious; confirm/review tomography before any surgical decision."
