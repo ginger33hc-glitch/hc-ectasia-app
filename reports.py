@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from io import BytesIO
+from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
+import reportlab
 from docx import Document
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -16,6 +18,8 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     KeepTogether,
     PageBreak,
@@ -44,6 +48,11 @@ LIABILITY_NOTICE = (
     "The final surgical decision and all associated responsibility and liability rest with the surgeon. "
     "This application is a clinical decision-support aid only."
 )
+PDF_UNICODE_BOLD = "HC-Vera-Bold"
+pdfmetrics.registerFont(TTFont(
+    PDF_UNICODE_BOLD,
+    str(Path(reportlab.__file__).resolve().parent / "fonts" / "VeraBd.ttf"),
+))
 
 
 def _rl(value: str):
@@ -249,10 +258,11 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     styles.add(ParagraphStyle(name="BodySmall", parent=styles["BodyText"], fontName="Helvetica", fontSize=8.5, leading=11, textColor=_rl(INK), spaceAfter=3))
     styles.add(ParagraphStyle(name="Tiny", parent=styles["BodyText"], fontName="Helvetica", fontSize=7.2, leading=9, textColor=_rl(GRAY)))
     styles.add(ParagraphStyle(name="Liability", parent=styles["BodyText"], fontName="Helvetica-Bold", fontSize=9, leading=12, textColor=_rl(RED), backColor=_rl(RED_FILL), borderColor=_rl(RED), borderWidth=0.8, borderPadding=7, spaceAfter=11))
+    styles.add(ParagraphStyle(name="PatientName", parent=styles["BodyText"], fontName=PDF_UNICODE_BOLD, fontSize=15, leading=18, textColor=_rl(NAVY), spaceBefore=2, spaceAfter=6))
 
     story: List[Any] = []
     story.append(Paragraph("HC PREOPERATIVE ECTASIA RISK ASSESSMENT", styles["ReportTitle"]))
-    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.7.3", styles["ReportSub"]))
+    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.7.4", styles["ReportSub"]))
     story.append(Paragraph(LIABILITY_NOTICE, styles["Liability"]))
 
     metadata = [
@@ -272,6 +282,8 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     ]))
     story.append(meta_table)
     story.append(Spacer(1, 10))
+    patient_banner = _ascii(patient.get("name"), "PATIENT NAME NOT DOCUMENTED").upper()
+    story.append(Paragraph(patient_banner, styles["PatientName"]))
 
     overall = _ascii(decision.get("status") or "NOT ASSESSED")
     accent, fill = _status_palette(decision.get("status") or "")
@@ -493,7 +505,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     run.font.size = Pt(18)
     run.bold = True
     run.font.color.rgb = RGBColor.from_string(NAVY)
-    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.7.3")
+    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.7.4")
     subtitle.paragraph_format.space_after = Pt(10)
     for run in subtitle.runs:
         run.font.name = "Arial"
@@ -524,9 +536,19 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
                 meta.cell(r_idx, c_idx).paragraphs[0].runs[0].bold = True
     _style_doc_table(meta, [0.8, 2.1, 1.0, 1.95], header=False)
 
+    patient_banner = document.add_paragraph()
+    patient_banner.paragraph_format.space_before = Pt(10)
+    patient_banner.paragraph_format.space_after = Pt(6)
+    patient_banner_run = patient_banner.add_run(
+        _text(patient.get("name"), "PATIENT NAME NOT DOCUMENTED").upper()
+    )
+    patient_banner_run.font.name = "Arial"
+    patient_banner_run.font.size = Pt(15)
+    patient_banner_run.font.bold = True
+    patient_banner_run.font.color.rgb = RGBColor.from_string(NAVY)
+
     status = decision.get("status") or "NOT ASSESSED"
     accent, fill = _status_palette(status)
-    document.add_paragraph()
     box = document.add_table(rows=1, cols=1)
     box.style = "Table Grid"
     box.cell(0, 0).text = f"OVERALL DISPOSITION\n{status}\n{_text(decision.get('action'), '')}"

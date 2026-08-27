@@ -9,6 +9,7 @@ from unittest.mock import patch
 import app
 import reports
 from docx import Document
+from docx.shared import Pt
 from fastapi.testclient import TestClient
 from pypdf import PdfReader
 
@@ -993,11 +994,14 @@ class TestApiIntegration(unittest.TestCase):
         self.assertEqual(pdf.headers["content-type"], "application/pdf")
         pdf_reader = PdfReader(BytesIO(pdf.content))
         self.assertGreaterEqual(len(pdf_reader.pages), 1)
+        pdf_text = "\n".join(page.extract_text() or "" for page in pdf_reader.pages)
         self.assertIn(
             "The final surgical decision and all associated responsibility and liability rest with the surgeon. "
             "This application is a clinical decision-support aid only.",
-            " ".join("\n".join(page.extract_text() or "" for page in pdf_reader.pages).split()),
+            " ".join(pdf_text.split()),
         )
+        self.assertGreaterEqual(pdf_text.count("TEST PATIENT"), 1)
+        self.assertLess(pdf_text.rindex("TEST PATIENT"), pdf_text.index("OVERALL DISPOSITION"))
         self.assertEqual(word.status_code, 200)
         self.assertIn("wordprocessingml.document", word.headers["content-type"])
         document = Document(BytesIO(word.content))
@@ -1009,6 +1013,30 @@ class TestApiIntegration(unittest.TestCase):
         text = "\n".join(paragraph.text for paragraph in document.paragraphs)
         self.assertIn("HC PREOPERATIVE ECTASIA RISK ASSESSMENT", text)
         self.assertIn("PASS", text)
+        patient_paragraph = next(p for p in document.paragraphs if p.text == "TEST PATIENT")
+        self.assertTrue(patient_paragraph.runs[0].bold)
+        self.assertEqual(patient_paragraph.runs[0].font.size, Pt(15))
+        body_children = list(document.element.body)
+        patient_index = next(
+            index for index, child in enumerate(body_children)
+            if "".join(node.text or "" for node in child.xpath(".//w:t")) == "TEST PATIENT"
+        )
+        next_text = "".join(
+            node.text or "" for node in body_children[patient_index + 1].xpath(".//w:t")
+        )
+        self.assertIn("OVERALL DISPOSITION", next_text)
+
+    def test_browser_report_places_large_bold_patient_name_immediately_before_status(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        patient_banner = '<div id="reportPatientBanner" class="report-patient-name">'
+        status = '<div id="status" class="status insufficient">'
+        self.assertLess(html.index(patient_banner), html.index(status))
+        between = html[html.index(patient_banner):html.index(status)]
+        self.assertNotIn("<table", between)
+        self.assertIn(".report-patient-name{font-size:24px", html)
+        self.assertIn("font-weight:800", html)
+        self.assertIn("text-transform:uppercase", html)
+        self.assertIn('document.querySelector("#reportPatientBanner").textContent=p.name', html)
 
     def test_reports_always_render_od_before_os(self):
         modifiers = dict(MODIFIERS, assessed_eyes=["OD", "OS"])

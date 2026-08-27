@@ -2,7 +2,7 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.3 implements
+## What v0.7.4 implements
 
 - Sequential original-detail extraction of each uploaded Pentacam/topography or treatment-card image.
 - Pentacam numeric-source priority: explicitly labeled side/summary-table fields are used first.
@@ -43,6 +43,8 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Binding CAUTION action: STOP/DEFER, repeat relevant screening, and reassess after at least 6 months.
 - Formal clinical report with patient/reviewer metadata, restrained decision colors (PASS green,
   CAUTION amber, FAIL red, NOT ASSESSED gray), print layout, and validated PDF and DOCX exports.
+- The patient name is repeated in large bold uppercase immediately above the overall disposition
+  box in the browser, print, PDF, and DOCX reports.
 - Complete machine-readable extraction and decision records remain available for audit.
 
 See [HC_PROTOCOL_v0.7.md](HC_PROTOCOL_v0.7.md) for the locked operational rules and
@@ -63,7 +65,7 @@ Railway start command: `python start.py`.
 python -m unittest discover -s tests -v
 ```
 
-The 104-test suite covers the exact structural and treatment-range boundaries, signed manifest/intended input and axis requirements, phone-safe sign-only entry, fixed OD-before-OS reporting, prior-surgery routing, identity warnings, date/QS gates, invalid numeric inputs, fellow-eye completeness, ERSS/PRK-EWSS categories, extraction merging, and valid PDF/DOCX generation.
+The 105-test suite covers the exact structural and treatment-range boundaries, signed manifest/intended input and axis requirements, phone-safe sign-only entry, fixed OD-before-OS reporting, prior-surgery routing, identity warnings, date/QS gates, invalid numeric inputs, fellow-eye completeness, ERSS/PRK-EWSS categories, extraction merging, and valid PDF/DOCX generation.
 
 Dependencies are exact-version pinned. The extraction model is restricted to the reviewed configuration; changing it requires explicit non-clinical override and revalidation.
 

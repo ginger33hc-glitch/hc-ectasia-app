@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>HC Ectasia App v0.7.3</title>
+  <title>HC Ectasia App v0.7.4</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=5">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=4">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=4">
@@ -24,7 +24,7 @@
     .status{font-size:21px;font-weight:bold;padding:14px;border-radius:6px;background:var(--gray);color:var(--grayInk);border-left:7px solid #8a98a4}.status.pass{background:var(--green);color:var(--greenInk);border-color:var(--greenInk)}.status.caution,.status.review{background:var(--orange);color:var(--orangeInk);border-color:#d9790d}.status.fail{background:var(--red);color:var(--redInk);border-color:#c52b2b}.status.insufficient{background:var(--gray);color:var(--grayInk);border-color:#8a98a4}
     .report-card{padding:0;background:transparent;border:0;box-shadow:none}.report-toolbar{display:flex;justify-content:flex-end;gap:9px;margin:0 0 12px}.secondary{background:white;color:var(--navy);border:1px solid var(--navy)}
     .report-sheet{background:#fff;max-width:850px;margin:0 auto;padding:38px 44px;border:1px solid #cfd8df;box-shadow:0 8px 28px rgba(23,59,87,.10);font-family:Arial,sans-serif}.report-masthead{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid var(--navy);padding-bottom:13px;margin-bottom:17px}.report-masthead h2{font-size:20px;letter-spacing:.35px;color:var(--navy);margin:0 0 5px}.report-kicker{font-size:11px;font-weight:bold;letter-spacing:1.1px;color:var(--blueInk);text-transform:uppercase}.report-version{text-align:right;color:var(--muted);font-size:11px;white-space:nowrap}
-    .meta-table,.clinical-table{width:100%;border-collapse:collapse}.meta-table{margin-bottom:17px}.meta-table th,.meta-table td{border:1px solid var(--line);padding:7px 9px;font-size:12px;text-align:left}.meta-table th{width:15%;background:#f1f4f6;color:#42515d}.meta-table td{width:35%}.report-section-title{font-size:13px;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--line);padding-bottom:5px;margin:20px 0 8px}
+    .meta-table,.clinical-table{width:100%;border-collapse:collapse}.meta-table{margin-bottom:17px}.meta-table th,.meta-table td{border:1px solid var(--line);padding:7px 9px;font-size:12px;text-align:left}.meta-table th{width:15%;background:#f1f4f6;color:#42515d}.meta-table td{width:35%}.report-section-title{font-size:13px;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--line);padding-bottom:5px;margin:20px 0 8px}.report-patient-name{font-size:24px;line-height:1.2;font-weight:800;color:var(--navy);text-transform:uppercase;letter-spacing:.6px;margin:0 0 8px;overflow-wrap:anywhere}
     .eye-result{border:1px solid var(--line);margin:18px 0;page-break-inside:avoid}.eye-head{padding:10px 12px;background:#f1f4f6;display:flex;justify-content:space-between;gap:10px;align-items:center;border-bottom:1px solid var(--line)}.eye-head strong{color:var(--navy);font-size:15px}.eye-head .status{font-size:13px;padding:6px 9px;border-left-width:4px}.eye-body{padding:13px}.eye-action{margin:0 0 11px;padding:9px 11px;background:#f7f9fb;border-left:4px solid var(--navy);font-size:12px}.clinical-table{margin:9px 0 12px}.clinical-table th,.clinical-table td{border:1px solid var(--line);padding:6px 8px;font-size:11px;text-align:left;vertical-align:middle}.clinical-table th{background:var(--navy);color:white}.clinical-table td:first-child{font-weight:bold;width:38%;background:#f7f9fb}.finding-group{page-break-inside:avoid}.finding-group h4{color:var(--navy);font-size:12px;margin:12px 0 4px}.finding-group ul{margin:4px 0 8px;padding-left:21px}.finding-group li{font-size:11px;margin:3px 0}.report-footer-note{margin-top:19px;padding-top:10px;border-top:1px solid var(--line);font-size:9px;color:var(--muted)}
     .note{font-size:12px;color:var(--muted)}.file-picker-wrap{min-width:0}.selected-files{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}.selected-file{display:inline-block;max-width:100%;padding:6px 9px;border:1px solid #b8c9d6;border-radius:6px;background:#f2f7fa;color:var(--blueInk);font-size:12px;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.selected-file:hover,.selected-file:focus{background:#e3f0f8;text-decoration:underline}.alert{background:#fff7e8;border-left:5px solid #dc8b1a;padding:11px 13px;border-radius:5px}.liability-notice{color:#a31212;font-weight:bold;font-size:14px;margin:4px 0 12px}.required{color:#a31212}details{margin-top:12px}pre{white-space:pre-wrap;overflow:auto;background:#f7f9fb;padding:12px;border-radius:7px;font-size:12px}
     .identity-alert{background:#fff0d8;color:#7a3d00;border:2px solid #d9790d;border-left-width:7px;padding:12px 14px;border-radius:6px;margin:10px 0 16px;font-size:12px}.identity-alert strong{display:block;font-size:13px;margin-bottom:5px}.identity-alert ul{margin:5px 0 0;padding-left:20px}
@@ -34,7 +34,7 @@
   </style>
 </head>
 <body>
-<header><h1>HC Ectasia App v0.7.3</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
+<header><h1>HC Ectasia App v0.7.4</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -97,7 +97,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">HC Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.7.3</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.7.4</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <p class="report-liability-notice">The final surgical decision and all associated responsibility and liability rest with the surgeon. This application is a clinical decision-support aid only.</p>
       <table class="meta-table"><tbody>
@@ -106,6 +106,7 @@
         <tr><th>Reviewer</th><td id="reportReviewer">Not documented</td><th>Eyes</th><td id="reportEyes">—</td></tr>
       </tbody></table>
       <div class="report-section-title">Overall disposition</div>
+      <div id="reportPatientBanner" class="report-patient-name">PATIENT NAME NOT DOCUMENTED</div>
       <div id="status" class="status insufficient">NOT ASSESSED</div>
       <p id="overall-note" class="eye-action"></p>
       <div id="identityWarning" class="identity-alert" hidden></div>
@@ -414,6 +415,7 @@ const orderedEyes=(eyes)=>[...(eyes||[])].sort((a,b)=>({OD:0,OS:1}[a.eye]??2)-({
 function setReportMetadata(decision){
   const p=patientPayload();
   document.querySelector("#reportPatient").textContent=p.name||"Not documented";
+  document.querySelector("#reportPatientBanner").textContent=p.name||"PATIENT NAME NOT DOCUMENTED";
   document.querySelector("#reportPatientId").textContent=p.id||"Not documented";
   document.querySelector("#reportAge").textContent=p.age??"Not documented";
   document.querySelector("#reportDate").textContent=p.report_date||"Not documented";
