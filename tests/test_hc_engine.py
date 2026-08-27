@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import app
+import reports
 from docx import Document
 from fastapi.testclient import TestClient
 from pypdf import PdfReader
@@ -506,6 +507,62 @@ class TestBoundaries(unittest.TestCase):
         self.assertNotEqual(estimated["status"], "PASS")
         self.assertEqual(actual["status"], "REVIEW — NOT CLEARED")
         self.assertFalse(any("treatment cutoff" in item for item in actual["hard_stops"]))
+
+    def test_hyperopic_report_is_populated_and_contains_case_specific_surgeon_attention(self):
+        result = app.assess_eye(
+            normal_eye(), plan("LASIK", sphere=3.0, cylinder=1.0, ablation=55, flap=100), 35, MODIFIERS
+        )
+        self.assertEqual(result["values"]["intended_refractive_pattern"], "HYPEROPIC")
+        self.assertEqual(result["values"]["intended_principal_meridians_D"], [3.0, 2.0])
+        self.assertIsNotNone(result["values"]["LASIK_RSB_um"])
+        self.assertTrue(any("cycloplegic" in item for item in result["surgeon_attention"]))
+        self.assertTrue(any("PMD" in item for item in result["surgeon_attention"]))
+        self.assertTrue(any("+6.00 D sphere" in item for item in result["surgeon_attention"]))
+
+    def test_mixed_plan_does_not_use_mrse_or_kmean_as_surgical_load_reassurance(self):
+        result = app.assess_eye(
+            normal_eye(), plan("LASIK", sphere=3.0, cylinder=6.0, ablation=90, flap=100), 35, MODIFIERS
+        )
+        self.assertEqual(result["values"]["intended_refractive_pattern"], "MIXED_ASTIGMATISM")
+        self.assertEqual(result["values"]["intended_principal_meridians_D"], [3.0, -3.0])
+        self.assertEqual(result["values"]["intended_MRSE_D"], 0.0)
+        self.assertIsNone(result["values"]["estimated_final_Kmean_D"])
+        self.assertIsNotNone(result["values"]["LASIK_RSB_um"])
+        self.assertEqual(result["status"], "REVIEW — NOT CLEARED")
+        self.assertTrue(any("near-zero MRSE" in item for item in result["surgeon_attention"]))
+        self.assertTrue(any("meridional K" in item for item in result["surgeon_attention"]))
+
+    def test_mixed_classification_is_invariant_to_plus_cylinder_entry(self):
+        signed = plan("LASIK", sphere=None, cylinder=None, ablation=90, flap=100)
+        signed.update({
+            "manifest_entered_sphere_D": -3.0, "manifest_cylinder_signed_D": 6.0,
+            "intended_entered_sphere_D": -3.0, "intended_cylinder_signed_D": 6.0,
+            "entered_axis_deg": 90,
+        })
+        result = app.assess_eye(normal_eye(), signed, 35, MODIFIERS)
+        self.assertEqual(result["values"]["intended_sphere_D"], 3.0)
+        self.assertEqual(result["values"]["intended_cylinder_magnitude_D"], 6.0)
+        self.assertEqual(result["values"]["intended_refractive_pattern"], "MIXED_ASTIGMATISM")
+
+    def test_mixed_lasik_label_limits_are_reported_as_review_not_ectasia_score(self):
+        young = app.assess_eye(
+            normal_eye(), plan("LASIK", sphere=3.0, cylinder=6.0, ablation=90, flap=100), 20, MODIFIERS
+        )
+        outside_cylinder = app.assess_eye(
+            normal_eye(), plan("LASIK", sphere=3.0, cylinder=6.25, ablation=90, flap=100), 35, MODIFIERS
+        )
+        self.assertTrue(any("labeled age range" in item for item in young["reasons"]))
+        self.assertTrue(any("labeled range" in item for item in outside_cylinder["reasons"]))
+        self.assertFalse(any("mixed" in item.lower() for item in outside_cylinder["hard_stops"]))
+
+    def test_hyperopic_mixed_attention_is_routed_to_browser_pdf_and_word_reports(self):
+        result = app.assess_eye(
+            normal_eye(), plan("LASIK", sphere=3.0, cylinder=6.0, ablation=90, flap=100), 35, MODIFIERS
+        )
+        findings = dict(reports._findings(result))
+        self.assertIn("Surgeon attention - hyperopic/mixed pathway", findings)
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn("Surgeon attention — hyperopic/mixed pathway", html)
 
 
 class TestScoringAndCompleteness(unittest.TestCase):

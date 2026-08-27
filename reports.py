@@ -138,6 +138,13 @@ def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
         ("Thinnest pachymetry", _fmt(values.get("pachy_thinnest_um"), 0, " um")),
         ("Manifest MRSE", _fmt(values.get("MRSE_D"), 2, " D")),
         ("Intended MRSE", _fmt(values.get("intended_MRSE_D"), 2, " D")),
+        ("Manifest / intended pattern", (
+            f"{_text(values.get('manifest_refractive_pattern'))} / "
+            f"{_text(values.get('intended_refractive_pattern'))}"
+        )),
+        ("Intended principal meridians", " / ".join(
+            _fmt(item, 2, " D") for item in (values.get("intended_principal_meridians_D") or [])
+        ) or "Not documented"),
         ("Preoperative / estimated final Kmean", (
             f"{_fmt(values.get('preoperative_Kmean_D'), 2, ' D')} / "
             f"{_fmt(values.get('estimated_final_Kmean_D'), 2, ' D')}"
@@ -164,6 +171,7 @@ def _findings(eye: Dict[str, Any]) -> Iterable[tuple[str, List[str]]]:
         ("Surgical-load evidence flags", eye.get("surgical_load_flags") or []),
         ("Clinical modifiers", eye.get("clinical_modifiers") or []),
         ("Warnings", eye.get("warnings") or []),
+        ("Surgeon attention - hyperopic/mixed pathway", eye.get("surgeon_attention") or []),
         ("Tomography concern flags", (eye.get("tomography_review") or {}).get("cross_sectional_flags") or []),
         ("BAD display interpretation", [f"{key}: {value}" for key, value in bad_display.items()]),
     ]
@@ -234,7 +242,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
 
     story: List[Any] = []
     story.append(Paragraph("HC PREOPERATIVE ECTASIA RISK ASSESSMENT", styles["ReportTitle"]))
-    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.6.9", styles["ReportSub"]))
+    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.7.0", styles["ReportSub"]))
     story.append(Paragraph(LIABILITY_NOTICE, styles["Liability"]))
 
     metadata = [
@@ -474,7 +482,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     run.font.size = Pt(18)
     run.bold = True
     run.font.color.rgb = RGBColor.from_string(NAVY)
-    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.6.9")
+    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.7.0")
     subtitle.paragraph_format.space_after = Pt(10)
     for run in subtitle.runs:
         run.font.name = "Arial"

@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="HC Ectasia App v0.6.9")
+app = FastAPI(title="HC Ectasia App v0.7.0")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -697,6 +697,34 @@ def estimate_ablation(plan: Dict[str, Any], warnings: List[str]) -> Optional[flo
     return None
 
 
+def refractive_pattern(sphere: Any, cylinder_magnitude: Any) -> Dict[str, Any]:
+    """Classify a correction from its two principal meridians in minus-cylinder notation."""
+    if not is_number(sphere) or not is_number(cylinder_magnitude):
+        return {"category": "UNAVAILABLE", "principal_meridians_D": [None, None]}
+    meridian_1 = float(sphere)
+    meridian_2 = float(sphere) - float(cylinder_magnitude)
+    eps = 1e-9
+    if abs(meridian_1) <= eps:
+        meridian_1 = 0.0
+    if abs(meridian_2) <= eps:
+        meridian_2 = 0.0
+    if meridian_1 > 0 and meridian_2 > 0:
+        category = "HYPEROPIC"
+    elif meridian_1 > 0 and meridian_2 < 0:
+        category = "MIXED_ASTIGMATISM"
+    elif meridian_1 < 0 and meridian_2 < 0:
+        category = "MYOPIC"
+    elif meridian_1 > 0 and meridian_2 == 0:
+        category = "SIMPLE_HYPEROPIC_ASTIGMATISM"
+    elif meridian_1 == 0 and meridian_2 < 0:
+        category = "SIMPLE_MYOPIC_ASTIGMATISM"
+    elif meridian_1 == 0 and meridian_2 == 0:
+        category = "PLANO"
+    else:
+        category = "UNCLASSIFIED"
+    return {"category": category, "principal_meridians_D": [meridian_1, meridian_2]}
+
+
 def required_tomography_missing(eye: Dict[str, Any]) -> List[str]:
     required = (
         "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp", "Dt", "Da", "ARTmax_um", "PPI_max"
@@ -910,9 +938,15 @@ def assess_eye(
         if is_number(intended_sphere) and is_number(intended_cylinder)
         else None
     )
+    intended_pattern = refractive_pattern(intended_sphere, intended_cylinder)
+    manifest_pattern = refractive_pattern(manifest_sphere, manifest_cylinder)
+    hyperopic_or_mixed = intended_pattern["category"] in {
+        "HYPEROPIC", "SIMPLE_HYPEROPIC_ASTIGMATISM", "MIXED_ASTIGMATISM"
+    }
+    mixed_plan = intended_pattern["category"] == "MIXED_ASTIGMATISM"
     estimated_final_kmean = (
         preoperative_kmean + CORNEAL_EFFECT_PER_INTENDED_MRSE_D * intended_mrse
-        if preoperative_kmean is not None and intended_mrse is not None
+        if preoperative_kmean is not None and intended_mrse is not None and not mixed_plan
         else None
     )
     mrse = (
@@ -924,6 +958,35 @@ def assess_eye(
     derived_morphology = scoring_morphology(eye)
     morphology = derived_morphology["category"]
     tomo = tomography_review(eye)
+    surgeon_attention: List[str] = []
+
+    if hyperopic_or_mixed:
+        surgeon_attention.extend([
+            "Confirm manifest-versus-cycloplegic refraction and exclude clinically significant latent hyperopia before finalizing the treatment target.",
+            "Confirm refractive stability over at least one year; an apparent change caused by unmasking latent hyperopia must not be treated as stability.",
+            "Review the actual laser treatment plan and maximum stromal ablation; the HC myopic linear µm/D estimate is not valid for this annular/bitoric profile.",
+            "Review full-diameter anterior and posterior tomography, inferior peripheral pachymetry, and PMD/inferior-steepening morphology; a positive refraction does not exclude ectasia susceptibility.",
+            "Review optical and transition zones, centration strategy, and the residual stromal calculation against the actual planned ablation profile.",
+        ])
+    if procedure == "LASIK" and intended_pattern["category"] in {
+        "HYPEROPIC", "SIMPLE_HYPEROPIC_ASTIGMATISM"
+    }:
+        surgeon_attention.append(
+            "For Alcon WaveLight LASIK, verify the planned treatment remains within the applicable device labeling (up to +6.00 D sphere, up to 5.00 D cylinder, and maximum +6.00 D MRSE); labeling is not an ectasia-safety guarantee."
+        )
+    if mixed_plan:
+        surgeon_attention.extend([
+            "Do not use a near-zero MRSE as evidence of low surgical load: mixed treatment steepens one principal meridian while flattening the other.",
+            "Do not use estimated postoperative Kmean alone for clearance; review planned postoperative meridional K values/K1-K2 and the steepest and flattest expected corneal powers.",
+        ])
+        if procedure == "LASIK":
+            surgeon_attention.append(
+                "For Alcon WaveLight mixed-astigmatism LASIK, verify age ≥21 years and cylinder ≤6.00 D under the applicable device labeling; labeling is not an ectasia-safety guarantee."
+            )
+    if procedure == "PRK" and hyperopic_or_mixed:
+        surgeon_attention.append(
+            "No validated hyperopic/mixed PRK ectasia score was identified; document procedure-specific review of the actual peripheral ablation profile and separately consider regression/haze risk."
+        )
 
     if pachy is not None and pachy < 480:
         hard_stops.append("HC operational hard stop: thinnest preoperative cornea <480 µm.")
@@ -1033,11 +1096,21 @@ def assess_eye(
                     "PRK-EWSS v1.0 provisional caution category (score 2-3): defer and re-evaluate after >=6 months."
                 )
 
-    if is_number(intended_sphere) and intended_sphere > 0:
+    if hyperopic_or_mixed:
         status = combine_status(status, "REVIEW — NOT CLEARED")
         reasons.append(
             "The supplied procedure-specific scoring evidence is predominantly myopic; "
             "hyperopic or mixed-meridian applicability is not established."
+        )
+    if procedure == "LASIK" and mixed_plan and is_number(age) and age < 21:
+        status = combine_status(status, "REVIEW — NOT CLEARED")
+        reasons.append(
+            "The planned mixed-astigmatism LASIK profile is outside the Alcon WaveLight labeled age range (<21 years)."
+        )
+    if procedure == "LASIK" and mixed_plan and is_number(intended_cylinder) and intended_cylinder > 6.0:
+        status = combine_status(status, "REVIEW — NOT CLEARED")
+        reasons.append(
+            "The planned mixed-astigmatism cylinder exceeds the Alcon WaveLight labeled range (>6.00 D)."
         )
 
     if tomo["status"] == "ABNORMAL" and visible_morphology != "ABNORMAL_ECTATIC":
@@ -1087,10 +1160,15 @@ def assess_eye(
         "missing": sorted(set(missing)),
         "warnings": list(dict.fromkeys(warnings)),
         "clinical_modifiers": modifiers,
+        "surgeon_attention": list(dict.fromkeys(surgeon_attention)),
         "surgical_load_flags": surgical_load_flags,
         "instrument": (
-            "LASIK ERSS validated case-control score"
+            "LASIK ERSS components displayed; hyperopic/mixed applicability is not validated"
+            if procedure == "LASIK" and hyperopic_or_mixed
+            else "LASIK ERSS validated case-control score"
             if procedure == "LASIK"
+            else "PRK-EWSS v1.0 provisional evidence-weighted triage score; not validated; hyperopic/mixed applicability is not established"
+            if procedure == "PRK" and hyperopic_or_mixed
             else "PRK-EWSS v1.0 provisional evidence-weighted triage score; not validated"
             if procedure == "PRK"
             else None
@@ -1125,6 +1203,10 @@ def assess_eye(
             "correction_source": plan.get("correction_source"),
             "MRSE_D": mrse,
             "intended_MRSE_D": intended_mrse,
+            "manifest_refractive_pattern": manifest_pattern["category"],
+            "manifest_principal_meridians_D": manifest_pattern["principal_meridians_D"],
+            "intended_refractive_pattern": intended_pattern["category"],
+            "intended_principal_meridians_D": intended_pattern["principal_meridians_D"],
             "preoperative_Kmean_D": preoperative_kmean,
             "corneal_effect_per_intended_MRSE_D": CORNEAL_EFFECT_PER_INTENDED_MRSE_D,
             "estimated_final_Kmean_D": estimated_final_kmean,
@@ -1148,8 +1230,8 @@ def assess_eye(
                 "CCT <480 µm is a hard stop; exactly 480 µm is not stopped by that rule alone.",
                 "LASIK RSB <300 µm and PRK RST <310 µm are HC operational hard stops.",
                 "PRK epithelial thickness is standardized to 50 µm for HC calculations.",
-                "Estimated postoperative Kmean = preoperative Kmean + (0.8 × intended MRSE); "
-                "values <36.00 D or >48.00 D are HC operational hard stops.",
+                "For non-mixed plans, estimated postoperative Kmean = preoperative Kmean + "
+                "(0.8 × intended MRSE); values <36.00 D or >48.00 D are HC operational hard stops.",
             ],
             "literature_limit": (
                 "The supplied evidence does not validate 310 µm as a universal safe PRK cutoff; "
@@ -1359,7 +1441,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.6.9 / source set 2026-08-25 plus binding HC amendments",
+        "version": "software v0.7.0 / source set 2026-08-25 plus binding HC amendments",
     }
 
 

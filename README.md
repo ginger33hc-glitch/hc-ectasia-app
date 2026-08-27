@@ -45,7 +45,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
   CAUTION amber, FAIL red, NOT ASSESSED gray), print layout, and validated PDF and DOCX exports.
 - Complete machine-readable extraction and decision records remain available for audit.
 
-See [HC_PROTOCOL_v0.6.md](HC_PROTOCOL_v0.6.md) for the locked operational rules and
+See [HC_PROTOCOL_v0.7.md](HC_PROTOCOL_v0.7.md) for the locked operational rules and
 [PROTOCOL_COMPLIANCE.md](PROTOCOL_COMPLIANCE.md) for the source-to-code audit and evidence limitations.
 
 ## Run

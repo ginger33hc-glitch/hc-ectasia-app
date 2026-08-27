@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>HC Ectasia App v0.6.9</title>
+  <title>HC Ectasia App v0.7.0</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=5">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=4">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=4">
@@ -34,7 +34,7 @@
   </style>
 </head>
 <body>
-<header><h1>HC Ectasia App v0.6.9</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
+<header><h1>HC Ectasia App v0.7.0</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -97,7 +97,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">HC Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.6.9</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.7.0</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <p class="report-liability-notice">Final decision and liability always rests on the surgeon, this app is only an aid tool.</p>
       <table class="meta-table"><tbody>
@@ -362,6 +362,8 @@ function renderEye(r, extracted){
     ["Intended entered notation",enteredRefractionText(v,"intended")],["Intended normalized (minus-cylinder)",correctionText(v)],["Correction source",v.correction_source??"Manual / not documented"],
     ["Thinnest pachymetry",`${fmt(v.pachy_thinnest_um,0)} µm`],["Manifest MRSE",`${fmt(v.MRSE_D,2)} D`],
     ["Intended MRSE",`${fmt(v.intended_MRSE_D,2)} D`],["Preoperative Kmean",`${fmt(v.preoperative_Kmean_D,2)} D`],
+    ["Manifest / intended pattern",`${v.manifest_refractive_pattern??"—"} / ${v.intended_refractive_pattern??"—"}`],
+    ["Intended principal meridians",(v.intended_principal_meridians_D||[]).map(x=>`${fmt(x,2)} D`).join(" / ")||"—"],
     ["Estimated final Kmean",`${fmt(v.estimated_final_Kmean_D,2)} D`],["Corneal effect factor",`${fmt(v.corneal_effect_per_intended_MRSE_D,1)} D/D`],
     ["Maximum ablation",`${fmt(v.max_ablation_um,1)} µm`],["Laser platform",v.laser_platform??"—"],
     ["PRK epithelium",`${fmt(v.PRK_epithelium_um,0)} µm`],
@@ -390,7 +392,7 @@ function renderEye(r, extracted){
     <p class="eye-action"><strong>Clinical action:</strong> ${safe(r.action)}</p>
     <p class="note"><strong>Instrument/source:</strong> ${safe(r.instrument||"Not documented")}</p>
     <table class="clinical-table"><thead><tr><th>Parameter</th><th>Result</th></tr></thead><tbody>${rows.map(([a,b])=>`<tr><td>${safe(a)}</td><td>${safe(b)}</td></tr>`).join("")}</tbody></table>
-    ${listBlock("Reasons",r.reasons)}${listBlock("Hard stops",r.hard_stops)}${listBlock("Missing / unresolved",r.missing)}${listBlock("Tomography concern flags",r.tomography_review?.cross_sectional_flags)}${listBlock("BAD display interpretation",Object.entries(r.tomography_review?.BAD_display||{}).map(([k,v])=>`${k}: ${v}`))}${listBlock("Surgical-load evidence flags",r.surgical_load_flags)}${listBlock("Clinical modifiers",r.clinical_modifiers)}${listBlock("Warnings",r.warnings)}
+    ${listBlock("Reasons",r.reasons)}${listBlock("Hard stops",r.hard_stops)}${listBlock("Missing / unresolved",r.missing)}${listBlock("Surgeon attention — hyperopic/mixed pathway",r.surgeon_attention)}${listBlock("Tomography concern flags",r.tomography_review?.cross_sectional_flags)}${listBlock("BAD display interpretation",Object.entries(r.tomography_review?.BAD_display||{}).map(([k,v])=>`${k}: ${v}`))}${listBlock("Surgical-load evidence flags",r.surgical_load_flags)}${listBlock("Clinical modifiers",r.clinical_modifiers)}${listBlock("Warnings",r.warnings)}
     <div class="finding-group"><h4>Extracted tomography</h4><table class="clinical-table"><thead><tr><th>Parameter</th><th>Value</th></tr></thead><tbody>${tomoRows.map(([a,b])=>`<tr><td>${safe(a)}</td><td>${safe(b)}</td></tr>`).join("")}</tbody></table></div>
   </div></section>`;
 }

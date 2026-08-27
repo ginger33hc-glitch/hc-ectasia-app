@@ -1,12 +1,12 @@
-# HC Ectasia App v0.6 — Source Compliance Audit
+# HC Ectasia App v0.7 — Source Compliance Audit
 
 Audit date: 26 August 2026
 Protocol: HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery  
-Evidence set: the 10 supplied source/review files dated through 24 August 2026, plus binding HC operational amendments.
+Evidence set: the 10 supplied source/review files dated through 24 August 2026, focused hyperopic/mixed literature and WaveLight labeling reviewed 27 August 2026, plus binding HC operational amendments.
 
 ## Compliance matrix
 
-| Domain | Source/protocol requirement | Earlier finding | v0.6 implementation |
+| Domain | Source/protocol requirement | Earlier finding | v0.7 implementation |
 |---|---|---|---|
 | Eye handling | Score each eye separately; never average discordant eyes | Used the most limiting value across all eyes in one decision | Separate OD/OS plans, scores, structural calculations, missing-data lists, and dispositions; overall status is only the least-favorable summary |
 | Override gate | Definite KC/FFKC/PMD/unequivocal ectatic morphology overrides tissue metrics and score | No complete morphology category or override | Explicit morphology extraction; `ABNORMAL_ECTATIC` is a hard override and cannot be canceled by score/RSB/RST/PTA |
@@ -41,6 +41,7 @@ Evidence set: the 10 supplied source/review files dated through 24 August 2026, 
 | Merge behavior | Use visibly supported values, preserve provenance, and identify conflicts | Best-quality merging could mask a limited decision page and field origin was absent | Filename, quality by source, and field-level source type are retained; limited/inadequate decision-source quality and unresolved decision conflicts prohibit PASS |
 | Numeric integrity | Invalid or internally inconsistent numbers must not enter formulas | Negative ablation could increase calculated residual tissue | Server-side ranges reject invalid plan/tomography values; PPI ordering and `ARTmax = TP/PPImax` consistency are checked before PASS |
 | Contact lenses | Document source-study imaging preparation without inventing an ectasia cutoff | Not collected | Soft-lens ≥14-day and rigid-lens ≥21-day washout are labeled source-study imaging criteria and used only as a data-quality gate |
+| Hyperopic/mixed pathway | Do not reverse myopic tissue estimates or use near-zero mixed MRSE as reassurance; retain the analysis while directing the surgeon to unresolved procedure-specific issues | Positive inputs were accepted, but the report did not classify principal meridians or provide a dedicated surgeon checklist | Equivalent plus/minus-cylinder entries are normalized and classified from the two principal meridians. Actual maximum ablation is required, mixed Kmean estimation is suppressed, available tomography/RSB/RST/PTA remain reported, and web/PDF/DOCX outputs contain case-specific surgeon-attention items. Hyperopic/mixed cases remain `REVIEW — NOT CLEARED`; no new ectasia score is invented |
 
 ## Evidence versus HC policy
 
@@ -61,7 +62,11 @@ The software intentionally distinguishes two layers:
 8. Toprak I et al. *Revisiting Pentacam Parameters in Subclinical and Mild Keratoconus* (2023).
 9. Focused appraisal of Li H et al. (2023) for the 310–348 µm PRK RST cohort envelope.
 10. HC evidence reviews and the master protocol supplied on 25 August 2026.
+11. Randleman JB et al. *Corneal Ectasia After Hyperopic LASIK* (2007).
+12. Fatseas G et al. *Role of Percent Peripheral Tissue Ablated on Refractive Outcomes Following Hyperopic LASIK* (2017).
+13. Moshirfar M et al. *Refractive Outcomes After LASIK for Mixed Astigmatism with the WaveLight EX500* (2022).
+14. Alcon WaveLight platform labeling for hyperopic and naturally occurring mixed-astigmatism LASIK.
 
 ## Remaining validation limit
 
-Code-rule compliance does not establish clinical validity. Before production clinical reliance, v0.6 still requires prospective locked-rule validation against a labeled case set, image-extraction accuracy testing by screen type/device, and deployment testing with real de-identified cases. Dependencies and the accepted model configuration are pinned/guarded, but a provider-served model name is not equivalent to an immutable model snapshot. Any model/configuration change requires repeat validation. The software must not be described as a validated ectasia probability calculator or as autonomous surgical clearance.
+Code-rule compliance does not establish clinical validity. Before production clinical reliance, v0.7 still requires prospective locked-rule validation against a labeled case set, image-extraction accuracy testing by screen type/device, and deployment testing with real de-identified cases. Dependencies and the accepted model configuration are pinned/guarded, but a provider-served model name is not equivalent to an immutable model snapshot. Any model/configuration change requires repeat validation. The software must not be described as a validated ectasia probability calculator or as autonomous surgical clearance.
