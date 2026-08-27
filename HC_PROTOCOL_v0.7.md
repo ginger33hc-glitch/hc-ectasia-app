@@ -34,6 +34,8 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 - Manifest and intended corrections are normalized to minus-cylinder notation, then classified
   from their two principal meridians as myopic, hyperopic, simple astigmatism, or mixed
   astigmatism. Entering an equivalent plus-cylinder notation must not change the classification.
+- A valid axis is required whenever the manifest or intended cylinder is non-zero. Missing or
+  invalid axis data prohibit PASS; plus-cylinder transposition without an axis is never cleared.
 
 ## Hyperopic and mixed-astigmatism pathway
 
@@ -106,5 +108,6 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 - `CAUTION` always means STOP/DEFER and reassessment after at least six months.
 - Overall status is the least favorable eye or global integrity gate.
 - PASS is decision support, not a guarantee of zero ectasia risk and not autonomous surgical clearance.
-- Every hyperopic/mixed report contains a case-specific `Surgeon attention` section. Final decision
-  and liability always remain with the surgeon; the application is only an aid.
+- Every hyperopic/mixed report contains a case-specific `Surgeon attention` section. The final
+  surgical decision and all associated responsibility and liability rest with the surgeon. The
+  application is a clinical decision-support aid only.

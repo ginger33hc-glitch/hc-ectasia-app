@@ -994,14 +994,16 @@ class TestApiIntegration(unittest.TestCase):
         pdf_reader = PdfReader(BytesIO(pdf.content))
         self.assertGreaterEqual(len(pdf_reader.pages), 1)
         self.assertIn(
-            "Final decision and liability always rests on the surgeon, this app is only an aid tool.",
-            "\n".join(page.extract_text() or "" for page in pdf_reader.pages),
+            "The final surgical decision and all associated responsibility and liability rest with the surgeon. "
+            "This application is a clinical decision-support aid only.",
+            " ".join("\n".join(page.extract_text() or "" for page in pdf_reader.pages).split()),
         )
         self.assertEqual(word.status_code, 200)
         self.assertIn("wordprocessingml.document", word.headers["content-type"])
         document = Document(BytesIO(word.content))
         self.assertIn(
-            "Final decision and liability always rests on the surgeon, this app is only an aid tool.",
+            "The final surgical decision and all associated responsibility and liability rest with the surgeon. "
+            "This application is a clinical decision-support aid only.",
             "\n".join(paragraph.text for paragraph in document.paragraphs),
         )
         text = "\n".join(paragraph.text for paragraph in document.paragraphs)
@@ -1104,6 +1106,20 @@ class TestSignedRefractionInputs(unittest.TestCase):
     def test_plus_cylinder_axis_rotation_wraps_at_180(self):
         self.assertEqual(app._transpose_axis(90), 180.0)
         self.assertEqual(app._transpose_axis(180), 90.0)
+
+    def test_nonzero_cylinder_without_axis_prohibits_pass(self):
+        entered = plan("LASIK", sphere=None, cylinder=None, ablation=55, flap=100)
+        entered.update({
+            "manifest_entered_sphere_D": -5.0,
+            "manifest_cylinder_signed_D": 2.0,
+            "intended_entered_sphere_D": -5.0,
+            "intended_cylinder_signed_D": 2.0,
+            "entered_axis_deg": None,
+        })
+        result = app.assess_eye(normal_eye(), entered, 35, MODIFIERS)
+        self.assertEqual(result["status"], "DATA INSUFFICIENT")
+        self.assertIn("manifest cylinder axis for non-zero cylinder", result["missing"])
+        self.assertIn("intended cylinder axis for non-zero cylinder", result["missing"])
 
     def test_reports_disclose_entered_and_normalized_notation(self):
         source = (Path(__file__).resolve().parents[1] / "reports.py").read_text()
@@ -1278,13 +1294,13 @@ class TestLiabilityNoticeUi(unittest.TestCase):
     def test_input_and_report_contain_the_same_surgeon_liability_notice(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
         notice = (
-            '<p class="liability-notice">Final decision and liability always rests on the surgeon, '
-            'this app is only an aid tool.</p>'
+            '<p class="liability-notice">The final surgical decision and all associated responsibility and '
+            'liability rest with the surgeon. This application is a clinical decision-support aid only.</p>'
         )
         self.assertIn(notice, html)
         self.assertIn(
-            '<p class="report-liability-notice">Final decision and liability always rests on the surgeon, '
-            'this app is only an aid tool.</p>', html,
+            '<p class="report-liability-notice">The final surgical decision and all associated responsibility and '
+            'liability rest with the surgeon. This application is a clinical decision-support aid only.</p>', html,
         )
         self.assertIn('.liability-notice{color:#a31212;', html)
 

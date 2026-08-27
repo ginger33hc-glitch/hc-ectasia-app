@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="HC Ectasia App v0.7.0")
+app = FastAPI(title="HC Ectasia App v0.7.1")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -859,6 +859,11 @@ def assess_eye(
         missing.append("intended sphere")
     if not is_number(plan.get("intended_cylinder_magnitude_D")):
         missing.append("intended cylinder magnitude")
+    for role in ("manifest", "intended"):
+        cylinder = plan.get(f"{role}_cylinder_magnitude_D")
+        axis = plan.get(f"{role}_normalized_axis_deg")
+        if is_number(cylinder) and float(cylinder) > 0 and not is_number(axis):
+            missing.append(f"{role} cylinder axis for non-zero cylinder")
     if stable == "unknown":
         missing.append("refractive stability")
     if progression == "unknown":
@@ -1441,7 +1446,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.0 / source set 2026-08-25 plus binding HC amendments",
+        "version": "software v0.7.1 / source set 2026-08-25 plus binding HC amendments",
     }
 
 
