@@ -1,6 +1,7 @@
 """UI patch: color-code ERSS score and Pentacam BAD-D tomography findings."""
 from pathlib import Path
 
+import hc_age_policy
 import bootstrap
 
 index_path = Path(__file__).parent / "static" / "index.html"
@@ -12,7 +13,7 @@ CSS = """
 td.hc-critical-score-box,.hc-bad-abnormal{background:#fde5e5!important;color:#a31212!important;border:2px solid #c52b2b!important;font-weight:900!important}
 td.hc-moderate-score-box,.hc-bad-suspicious{background:#fff1d6!important;color:#9a4d00!important;border:2px solid #e58a00!important;font-weight:900!important}
 .hc-bad-normal{background:#e6f4ea!important;color:#176b3a!important;border:1px solid #76a987!important;font-weight:800!important}
-@media print{.critical-score-alert,td.hc-critical-score-box,.hc-bad-abnormal{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#fde5e5!important;color:#a31212!important;border-color:#c52b2b!important}td.hc-moderate-score-box,.hc-bad-suspicious{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#fff1d6!important;color:#9a4d00!important;border-color:#e58a00!important}.hc-bad-normal{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#e6f4ea!important;color:#176b3a!important;border-color:#76a987!important}}
+@media print{.critical-score-alert,td.hc-critical-score-box,.hc-bad-abnormal{-webkit-print-color-adjust:exact!important;print-color-adjust-adjust:exact!important;background:#fde5e5!important;color:#a31212!important;border-color:#c52b2b!important}td.hc-moderate-score-box,.hc-bad-suspicious{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#fff1d6!important;color:#9a4d00!important;border-color:#e58a00!important}.hc-bad-normal{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#e6f4ea!important;color:#176b3a!important;border-color:#76a987!important}}
 </style>
 """
 
@@ -21,8 +22,6 @@ SCRIPT = r"""
 (function(){
   function markClinicalSignals(root){
     const scope=root&&root.querySelectorAll?root:document;
-
-    // ERSS score/category table: score 3 = moderate (orange); >=4 = high (red).
     scope.querySelectorAll('tr').forEach(function(row){
       const cells=row.querySelectorAll('th,td');
       if(cells.length<2)return;
@@ -31,63 +30,20 @@ SCRIPT = r"""
         const result=cells[1];
         const m=(result.textContent||'').trim().match(/^\s*([0-9]+(?:\.[0-9]+)?)/);
         result.classList.remove('hc-critical-score-box','hc-moderate-score-box');
-        if(m){
-          const score=parseFloat(m[1]);
-          if(Number.isFinite(score)){
-            if(score>=4)result.classList.add('hc-critical-score-box');
-            else if(score===3)result.classList.add('hc-moderate-score-box');
-          }
-        }
+        if(m){const score=parseFloat(m[1]);if(Number.isFinite(score)){if(score>=4)result.classList.add('hc-critical-score-box');else if(score===3)result.classList.add('hc-moderate-score-box');}}
       }
-
-      // Pentacam BAD-D/tomography report rows. Color only cells that explicitly
-      // carry NORMAL/SUSPICIOUS/ABNORMAL classification text; do not infer a diagnosis.
       const rowText=(row.textContent||'').replace(/\s+/g,' ').trim();
       const isBadRow=/\bBAD[-_ ]?D\b|\bDf\b|\bDb\b|\bDp\b|\bDt\b|\bDa\b|tomography review/i.test(rowText);
-      if(isBadRow){
-        cells.forEach(function(cell,idx){
-          if(idx===0)return;
-          cell.classList.remove('hc-bad-normal','hc-bad-suspicious','hc-bad-abnormal');
-          const t=(cell.textContent||'').toUpperCase();
-          if(/\bABNORMAL\b/.test(t))cell.classList.add('hc-bad-abnormal');
-          else if(/\bSUSPICIOUS\b|\bBORDERLINE\b/.test(t))cell.classList.add('hc-bad-suspicious');
-          else if(/\bNORMAL\b|\bREASSURING\b/.test(t))cell.classList.add('hc-bad-normal');
-        });
-      }
+      if(isBadRow){cells.forEach(function(cell,idx){if(idx===0)return;cell.classList.remove('hc-bad-normal','hc-bad-suspicious','hc-bad-abnormal');const t=(cell.textContent||'').toUpperCase();if(/\bABNORMAL\b/.test(t))cell.classList.add('hc-bad-abnormal');else if(/\bSUSPICIOUS\b|\bBORDERLINE\b/.test(t))cell.classList.add('hc-bad-suspicious');else if(/\bNORMAL\b|\bREASSURING\b/.test(t))cell.classList.add('hc-bad-normal');});}
     });
-
-    // Detailed HC SCORE TOTAL numeric value: red for >=4.
-    scope.querySelectorAll('.critical-score-alert').forEach(function(el){
-      if(!el.classList.contains('hc-score-value'))el.classList.remove('critical-score-alert');
-    });
+    scope.querySelectorAll('.critical-score-alert').forEach(function(el){if(!el.classList.contains('hc-score-value'))el.classList.remove('critical-score-alert');});
     const nodes=scope.querySelectorAll('li, p, div, td, span');
     nodes.forEach(function(el){
       if(el.querySelector&&el.querySelector('.hc-score-value'))return;
-      const text=(el.textContent||'').trim();
-      if(!text.includes('HC SCORE — SOURCE & BREAKDOWN'))return;
-      const m=text.match(/TOTAL:\s*([0-9]+(?:\.[0-9]+)?)/i);
-      if(!m)return;
-      const score=parseFloat(m[1]);
-      if(!Number.isFinite(score)||score<4)return;
-      const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);
-      let node;
-      while((node=walker.nextNode())){
-        const match=node.nodeValue.match(/TOTAL:\s*([0-9]+(?:\.[0-9]+)?)/i);
-        if(!match)continue;
-        const full=match[0], value=match[1], start=node.nodeValue.indexOf(full);
-        if(start<0)continue;
-        const valueStart=start+full.lastIndexOf(value);
-        const before=node.nodeValue.slice(0,valueStart), after=node.nodeValue.slice(valueStart+value.length);
-        const frag=document.createDocumentFragment();
-        frag.appendChild(document.createTextNode(before));
-        const span=document.createElement('span');
-        span.className='hc-score-value critical-score-alert';
-        span.textContent=value;
-        frag.appendChild(span);
-        frag.appendChild(document.createTextNode(after));
-        node.parentNode.replaceChild(frag,node);
-        break;
-      }
+      const text=(el.textContent||'').trim();if(!text.includes('HC SCORE — SOURCE & BREAKDOWN'))return;
+      const m=text.match(/TOTAL:\s*([0-9]+(?:\.[0-9]+)?)/i);if(!m)return;const score=parseFloat(m[1]);if(!Number.isFinite(score)||score<4)return;
+      const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);let node;
+      while((node=walker.nextNode())){const match=node.nodeValue.match(/TOTAL:\s*([0-9]+(?:\.[0-9]+)?)/i);if(!match)continue;const full=match[0],value=match[1],start=node.nodeValue.indexOf(full);if(start<0)continue;const valueStart=start+full.lastIndexOf(value);const before=node.nodeValue.slice(0,valueStart),after=node.nodeValue.slice(valueStart+value.length);const frag=document.createDocumentFragment();frag.appendChild(document.createTextNode(before));const span=document.createElement('span');span.className='hc-score-value critical-score-alert';span.textContent=value;frag.appendChild(span);frag.appendChild(document.createTextNode(after));node.parentNode.replaceChild(frag,node);break;}
     });
   }
   function run(){markClinicalSignals(document);}
@@ -99,10 +55,9 @@ SCRIPT = r"""
 
 try:
     html=index_path.read_text(encoding="utf-8")
-    for old in ("HC Ectasia App v0.7.11","HC Ectasia App v0.7.12","HC Ectasia App v0.7.13","HC Ectasia App v0.7.14"):
-        html=html.replace(old,"HC Ectasia App v0.7.15")
+    for old in ("HC Ectasia App v0.7.11","HC Ectasia App v0.7.12","HC Ectasia App v0.7.13","HC Ectasia App v0.7.14","HC Ectasia App v0.7.15"):
+        html=html.replace(old,"HC Ectasia App v0.7.16")
     import re
-    # Callable replacements preserve JavaScript backslashes literally.
     html=re.sub(r'<style id="hc-critical-score-style">.*?</style>',lambda _m: CSS.strip(),html,flags=re.S)
     html=re.sub(r'<script id="hc-critical-score-script">.*?</script>',lambda _m: SCRIPT.strip(),html,flags=re.S)
     if 'id="hc-critical-score-style"' not in html: html=html.replace("</head>",CSS+"\n</head>")
@@ -111,5 +66,5 @@ try:
 except OSError:
     pass
 
-bootstrap.core.app.title="HC Ectasia App v0.7.15"
+bootstrap.core.app.title="HC Ectasia App v0.7.16"
 app=bootstrap.app
