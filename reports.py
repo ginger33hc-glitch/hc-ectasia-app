@@ -245,7 +245,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
 
     story: List[Any] = []
     story.append(Paragraph("HC PREOPERATIVE ECTASIA RISK ASSESSMENT", styles["ReportTitle"]))
-    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.7.1", styles["ReportSub"]))
+    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.7.2", styles["ReportSub"]))
     story.append(Paragraph(LIABILITY_NOTICE, styles["Liability"]))
 
     metadata = [
@@ -485,7 +485,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     run.font.size = Pt(18)
     run.bold = True
     run.font.color.rgb = RGBColor.from_string(NAVY)
-    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.7.1")
+    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.7.2")
     subtitle.paragraph_format.space_after = Pt(10)
     for run in subtitle.runs:
         run.font.name = "Arial"

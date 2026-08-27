@@ -1043,8 +1043,8 @@ class TestPwaIcons(unittest.TestCase):
 class TestSignedRefractionInputs(unittest.TestCase):
     def test_all_refraction_fields_accept_positive_and_negative_values(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
-        self.assertIn('id="${eye}_manifest_cylinder" type="number" step=".25" min="-15" max="15"', html)
-        self.assertIn('id="${eye}_cylinder" type="number" step=".25" min="-15" max="15"', html)
+        self.assertIn('id="${eye}_manifest_cylinder" type="text" inputmode="decimal"', html)
+        self.assertIn('id="${eye}_cylinder" type="text" inputmode="decimal"', html)
         self.assertIn('manifest_cylinder_signed_D:numberOrNull', html)
         self.assertIn('intended_cylinder_signed_D:numberOrNull', html)
 
@@ -1052,13 +1052,19 @@ class TestSignedRefractionInputs(unittest.TestCase):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
         for target in ("manifest_sphere", "manifest_cylinder", "sphere", "cylinder"):
             self.assertIn(f'data-negative-target="${{eye}}_{target}"', html)
-        self.assertIn('String(-Math.abs(parsed||0.25))', html)
+        self.assertIn('applySign(input,"-")', html)
 
     def test_all_refraction_fields_have_phone_safe_positive_buttons(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
         for target in ("manifest_sphere", "manifest_cylinder", "sphere", "cylinder"):
             self.assertIn(f'data-positive-target="${{eye}}_{target}"', html)
-        self.assertIn('String(Math.abs(parsed||0.25))', html)
+        self.assertIn('applySign(input,"+")', html)
+
+    def test_empty_sign_button_inserts_only_sign_and_sign_only_is_not_numeric(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn('input.value=unsigned?`${sign}${unsigned}`:sign;', html)
+        self.assertIn('if(raw===""||raw==="+"||raw==="-")return null;', html)
+        self.assertNotIn('parsed||0.25', html)
 
     def test_autofilled_internal_cylinder_magnitudes_render_as_negative(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()

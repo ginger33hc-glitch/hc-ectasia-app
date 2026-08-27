@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>HC Ectasia App v0.7.1</title>
+  <title>HC Ectasia App v0.7.2</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=5">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=4">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=4">
@@ -34,7 +34,7 @@
   </style>
 </head>
 <body>
-<header><h1>HC Ectasia App v0.7.1</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
+<header><h1>HC Ectasia App v0.7.2</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -97,7 +97,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">HC Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.7.1</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.7.2</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <p class="report-liability-notice">The final surgical decision and all associated responsibility and liability rest with the surgeon. This application is a clinical decision-support aid only.</p>
       <table class="meta-table"><tbody>
@@ -121,10 +121,10 @@
 const eyeTemplate = (eye) => `
   <div class="row"><label>Prior corneal refractive surgery?</label><select id="${eye}_prior"><option value="no" selected>No</option><option value="yes">Yes</option><option value="unknown">Unknown</option></select></div>
   <div class="row"><label>Procedure</label><select id="${eye}_procedure"><option value="">Select</option><option value="PRK">PRK</option><option value="LASIK">LASIK</option></select></div>
-  <div class="row"><label>Preoperative manifest sphere (D)</label><div class="signed-number sphere"><input id="${eye}_manifest_sphere" type="number" step=".25" min="-30" max="20"><button type="button" class="sign-button" data-positive-target="${eye}_manifest_sphere" aria-label="Make manifest sphere positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_manifest_sphere" aria-label="Make manifest sphere negative">−</button></div></div>
-  <div class="row"><label>Preoperative manifest cylinder (D; + or −)</label><div class="signed-number"><input id="${eye}_manifest_cylinder" type="number" step=".25" min="-15" max="15"><button type="button" class="sign-button" data-positive-target="${eye}_manifest_cylinder" aria-label="Make manifest cylinder positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_manifest_cylinder" aria-label="Make manifest cylinder negative">−</button></div></div>
-  <div class="row"><label>Intended treatment sphere (D)</label><div class="signed-number sphere"><input id="${eye}_sphere" type="number" step=".25" min="-30" max="20"><button type="button" class="sign-button" data-positive-target="${eye}_sphere" aria-label="Make intended sphere positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_sphere" aria-label="Make intended sphere negative">−</button></div></div>
-  <div class="row"><label>Intended treatment cylinder (D; + or −)</label><div class="signed-number"><input id="${eye}_cylinder" type="number" step=".25" min="-15" max="15"><button type="button" class="sign-button" data-positive-target="${eye}_cylinder" aria-label="Make intended cylinder positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_cylinder" aria-label="Make intended cylinder negative">−</button></div></div>
+  <div class="row"><label>Preoperative manifest sphere (D)</label><div class="signed-number sphere"><input id="${eye}_manifest_sphere" type="text" inputmode="decimal" autocomplete="off" data-min="-30" data-max="20"><button type="button" class="sign-button" data-positive-target="${eye}_manifest_sphere" aria-label="Make manifest sphere positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_manifest_sphere" aria-label="Make manifest sphere negative">−</button></div></div>
+  <div class="row"><label>Preoperative manifest cylinder (D; + or −)</label><div class="signed-number"><input id="${eye}_manifest_cylinder" type="text" inputmode="decimal" autocomplete="off" data-min="-15" data-max="15"><button type="button" class="sign-button" data-positive-target="${eye}_manifest_cylinder" aria-label="Make manifest cylinder positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_manifest_cylinder" aria-label="Make manifest cylinder negative">−</button></div></div>
+  <div class="row"><label>Intended treatment sphere (D)</label><div class="signed-number sphere"><input id="${eye}_sphere" type="text" inputmode="decimal" autocomplete="off" data-min="-30" data-max="20"><button type="button" class="sign-button" data-positive-target="${eye}_sphere" aria-label="Make intended sphere positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_sphere" aria-label="Make intended sphere negative">−</button></div></div>
+  <div class="row"><label>Intended treatment cylinder (D; + or −)</label><div class="signed-number"><input id="${eye}_cylinder" type="text" inputmode="decimal" autocomplete="off" data-min="-15" data-max="15"><button type="button" class="sign-button" data-positive-target="${eye}_cylinder" aria-label="Make intended cylinder positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_cylinder" aria-label="Make intended cylinder negative">−</button></div></div>
   <div class="row"><label>Cylinder axis (degrees)</label><input id="${eye}_axis" type="number" step="1" min="0" max="180"></div>
   <div class="row"><label>Actual maximum ablation (µm)</label><input id="${eye}_ablation" type="number" step=".1" min="0"></div>
   <div class="row"><label>Laser platform</label><input id="${eye}_platform" type="text" value="Alcon EX500" readonly aria-readonly="true"></div>
@@ -143,17 +143,21 @@ const eyeTemplate = (eye) => `
   </details>`;
 document.querySelector("#od-fields").innerHTML = eyeTemplate("od");
 document.querySelector("#os-fields").innerHTML = eyeTemplate("os");
+function applySign(input,sign){
+  const raw=input.value.trim();
+  const unsigned=raw.replace(/^[+-]/,"");
+  input.value=unsigned?`${sign}${unsigned}`:sign;
+  input.focus();
+  input.setSelectionRange(input.value.length,input.value.length);
+  input.dispatchEvent(new Event("input",{bubbles:true}));
+}
 document.querySelectorAll("[data-negative-target]").forEach(button=>button.addEventListener("click",()=>{
   const input=document.getElementById(button.dataset.negativeTarget);
-  const parsed=Number(input.value);
-  input.value=input.value===""||!Number.isFinite(parsed)?"-0.25":String(-Math.abs(parsed||0.25));
-  input.dispatchEvent(new Event("input",{bubbles:true}));
+  applySign(input,"-");
 }));
 document.querySelectorAll("[data-positive-target]").forEach(button=>button.addEventListener("click",()=>{
   const input=document.getElementById(button.dataset.positiveTarget);
-  const parsed=Number(input.value);
-  input.value=input.value===""||!Number.isFinite(parsed)?"0.25":String(Math.abs(parsed||0.25));
-  input.dispatchEvent(new Event("input",{bubbles:true}));
+  applySign(input,"+");
 }));
 
 const clinicalReviewState={od:false,os:false};
@@ -215,7 +219,12 @@ window.addEventListener("beforeunload",()=>selectedFileUrls.forEach(url=>URL.rev
 let lastReport = null;
 let sharedImages = [];
 const value = (id) => document.querySelector(`#${id}`).value;
-const numberOrNull = (id) => value(id) === "" ? null : Number(value(id));
+const numberOrNull = (id) => {
+  const raw=value(id).trim().replace(",",".");
+  if(raw===""||raw==="+"||raw==="-")return null;
+  const parsed=Number(raw);
+  return Number.isFinite(parsed)?parsed:null;
+};
 document.querySelector("#report_date").value = new Date().toISOString().slice(0,10);
 
 async function loadSharedImages(){
