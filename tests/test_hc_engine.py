@@ -812,7 +812,7 @@ class TestScoringAndCompleteness(unittest.TestCase):
         self.assertFalse(any("morphology" in item for item in eye["data_conflicts"]))
 
     def test_bilateral_engine_keeps_eyes_separate_and_overall_is_worst(self):
-        extracted = {"eyes": [normal_eye("OD", 560), normal_eye("OS", 479)], "global_warnings": []}
+        extracted = {"eyes": [normal_eye("OS", 479), normal_eye("OD", 560)], "global_warnings": []}
         modifiers = dict(MODIFIERS, assessed_eyes=["OD", "OS"])
         decision = app.hc_engine(
             extracted, 35, {"OD": plan(), "OS": plan()}, modifiers
@@ -1010,6 +1010,30 @@ class TestApiIntegration(unittest.TestCase):
         self.assertIn("HC PREOPERATIVE ECTASIA RISK ASSESSMENT", text)
         self.assertIn("PASS", text)
 
+    def test_reports_always_render_od_before_os(self):
+        modifiers = dict(MODIFIERS, assessed_eyes=["OD", "OS"])
+        extracted = {"eyes": [normal_eye("OS"), normal_eye("OD")], "global_warnings": []}
+        decision = app.hc_engine(extracted, 35, {"OD": plan(), "OS": plan()}, modifiers)
+        self.assertEqual([eye["eye"] for eye in decision["eyes"]], ["OD", "OS"])
+
+        reversed_payload = {
+            "patient": {},
+            "decision": dict(decision, eyes=list(reversed(decision["eyes"]))),
+            "extracted": extracted,
+        }
+        pdf_text = "\n".join(
+            page.extract_text() or ""
+            for page in PdfReader(BytesIO(reports.build_pdf(reversed_payload))).pages
+        )
+        self.assertLess(pdf_text.index("OD ASSESSMENT"), pdf_text.index("OS ASSESSMENT"))
+
+        document = Document(BytesIO(reports.build_docx(reversed_payload)))
+        word_text = "\n".join(paragraph.text for paragraph in document.paragraphs)
+        self.assertLess(word_text.index("OD assessment"), word_text.index("OS assessment"))
+
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn("orderedEyes(j.decision.eyes).map", html)
+
 
 class TestPwaIcons(unittest.TestCase):
     def test_icon_files_are_real_pngs_with_declared_dimensions(self):
@@ -1143,7 +1167,7 @@ class TestPatientIdentityWarningUi(unittest.TestCase):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
         self.assertIn('id="identityWarning" class="identity-alert" hidden', html)
         self.assertIn("PATIENT IDENTITY NOT VERIFIED — SURGEON CONFIRMATION REQUIRED", html)
-        self.assertIn('(j.decision.eyes||[]).map(x=>renderEye', html)
+        self.assertIn('orderedEyes(j.decision.eyes).map(x=>renderEye', html)
 
 
 class TestPwaShareTarget(unittest.TestCase):

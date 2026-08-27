@@ -224,10 +224,17 @@ def _paired_rows(rows: List[tuple[str, str]]) -> List[List[str]]:
     return paired
 
 
+def _ordered_eyes(decision: Dict[str, Any]) -> List[Dict[str, Any]]:
+    order = {"OD": 0, "OS": 1}
+    eyes = [eye for eye in decision.get("eyes") or [] if isinstance(eye, dict)]
+    return sorted(eyes, key=lambda eye: order.get(str(eye.get("eye")), 2))
+
+
 def build_pdf(payload: Dict[str, Any]) -> bytes:
     patient = payload.get("patient") or {}
     decision = payload.get("decision") or {}
     extracted = payload.get("extracted") or {}
+    report_eyes = _ordered_eyes(decision)
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=letter, rightMargin=0.65 * inch, leftMargin=0.65 * inch,
@@ -245,13 +252,13 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
 
     story: List[Any] = []
     story.append(Paragraph("HC PREOPERATIVE ECTASIA RISK ASSESSMENT", styles["ReportTitle"]))
-    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.7.2", styles["ReportSub"]))
+    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.7.3", styles["ReportSub"]))
     story.append(Paragraph(LIABILITY_NOTICE, styles["Liability"]))
 
     metadata = [
         ["Patient", _ascii(patient.get("name")), "Patient ID", _ascii(patient.get("id"))],
         ["Age", _ascii(patient.get("age")), "Assessment date", _ascii(patient.get("report_date"))],
-        ["Reviewer", _ascii(patient.get("reviewer")), "Eyes assessed", ", ".join(_ascii(e.get("eye")) for e in decision.get("eyes") or []) or "None"],
+        ["Reviewer", _ascii(patient.get("reviewer")), "Eyes assessed", ", ".join(_ascii(e.get("eye")) for e in report_eyes) or "None"],
     ]
     meta_table = Table(metadata, colWidths=[0.85 * inch, 2.2 * inch, 1.0 * inch, 2.1 * inch], hAlign="LEFT")
     meta_table.setStyle(TableStyle([
@@ -289,7 +296,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         for item in blockers:
             story.append(Paragraph(f"- {_ascii(item)}", styles["BodySmall"]))
 
-    for eye in decision.get("eyes") or []:
+    for eye in report_eyes:
         eye_status = eye.get("status") or "NOT ASSESSED"
         eye_accent, eye_fill = _status_palette(eye_status)
         story.append(Paragraph(f"{_ascii(eye.get('eye'))} ASSESSMENT", styles["Section"]))
@@ -432,6 +439,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     patient = payload.get("patient") or {}
     decision = payload.get("decision") or {}
     extracted = payload.get("extracted") or {}
+    report_eyes = _ordered_eyes(decision)
     document = Document()
     section = document.sections[0]
     section.top_margin = Inches(0.72)
@@ -485,7 +493,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     run.font.size = Pt(18)
     run.bold = True
     run.font.color.rgb = RGBColor.from_string(NAVY)
-    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.7.2")
+    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.7.3")
     subtitle.paragraph_format.space_after = Pt(10)
     for run in subtitle.runs:
         run.font.name = "Arial"
@@ -506,7 +514,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     rows = [
         ("Patient", _text(patient.get("name")), "Patient ID", _text(patient.get("id"))),
         ("Age", _text(patient.get("age")), "Assessment date", _text(patient.get("report_date"))),
-        ("Reviewer", _text(patient.get("reviewer")), "Eyes assessed", ", ".join(_text(e.get("eye")) for e in decision.get("eyes") or []) or "None"),
+        ("Reviewer", _text(patient.get("reviewer")), "Eyes assessed", ", ".join(_text(e.get("eye")) for e in report_eyes) or "None"),
     ]
     for r_idx, values in enumerate(rows):
         for c_idx, value in enumerate(values):
@@ -541,7 +549,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
         for item in blockers:
             _add_bullet(document, item)
 
-    for eye in decision.get("eyes") or []:
+    for eye in report_eyes:
         _add_heading(document, f"{_text(eye.get('eye'))} assessment", 1)
         eye_status = eye.get("status") or "NOT ASSESSED"
         eye_accent, eye_fill = _status_palette(eye_status)

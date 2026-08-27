@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="HC Ectasia App v0.7.2")
+app = FastAPI(title="HC Ectasia App v0.7.3")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -1368,6 +1368,7 @@ def hc_engine(
         eye for eye in extracted.get("eyes", [])
         if isinstance(eye, dict) and eye.get("eye") in EYES
     ]
+    extracted_eyes.sort(key=lambda eye: EYES.index(eye.get("eye")))
     assessed_ids = [eye.get("eye") for eye in extracted_eyes]
     patient_modifiers = dict(patient_modifiers)
     patient_modifiers["assessed_eyes"] = assessed_ids
@@ -1446,7 +1447,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.2 / source set 2026-08-25 plus binding HC amendments",
+        "version": "software v0.7.3 / source set 2026-08-25 plus binding HC amendments",
     }
 
 

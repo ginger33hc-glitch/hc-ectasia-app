@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>HC Ectasia App v0.7.2</title>
+  <title>HC Ectasia App v0.7.3</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=5">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=4">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=4">
@@ -34,7 +34,7 @@
   </style>
 </head>
 <body>
-<header><h1>HC Ectasia App v0.7.2</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
+<header><h1>HC Ectasia App v0.7.3</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -97,7 +97,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">HC Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.7.2</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.7.3</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <p class="report-liability-notice">The final surgical decision and all associated responsibility and liability rest with the surgeon. This application is a clinical decision-support aid only.</p>
       <table class="meta-table"><tbody>
@@ -410,6 +410,7 @@ function patientPayload(){return {
   name:value("patient_name")||null, id:value("patient_id")||null, age:numberOrNull("age"),
   reviewer:value("reviewer")||null, report_date:value("report_date")||null
 }}
+const orderedEyes=(eyes)=>[...(eyes||[])].sort((a,b)=>({OD:0,OS:1}[a.eye]??2)-({OD:0,OS:1}[b.eye]??2));
 function setReportMetadata(decision){
   const p=patientPayload();
   document.querySelector("#reportPatient").textContent=p.name||"Not documented";
@@ -417,7 +418,7 @@ function setReportMetadata(decision){
   document.querySelector("#reportAge").textContent=p.age??"Not documented";
   document.querySelector("#reportDate").textContent=p.report_date||"Not documented";
   document.querySelector("#reportReviewer").textContent=p.reviewer||"Not documented";
-  document.querySelector("#reportEyes").textContent=(decision.eyes||[]).map(x=>x.eye).join(", ")||"None";
+  document.querySelector("#reportEyes").textContent=orderedEyes(decision.eyes).map(x=>x.eye).join(", ")||"None";
   document.querySelector("#generatedAt").textContent=`Generated ${new Date().toLocaleString()}`;
 }
 async function downloadReport(kind){
@@ -500,7 +501,7 @@ f.addEventListener("submit", async (e) => {
     const identityWarnings=j.decision.identity_warnings||[];
     identityWarning.hidden=!identityWarnings.length;
     identityWarning.innerHTML=identityWarnings.length?`<strong>PATIENT IDENTITY NOT VERIFIED — SURGEON CONFIRMATION REQUIRED</strong><ul>${identityWarnings.map(item=>`<li>${safe(item)}</li>`).join("")}</ul>`:"";
-    eyeResults.innerHTML=listBlock("Global clinical / source blockers",j.decision.critical_input_issues)+(j.decision.eyes||[]).map(x=>renderEye(x,j.extracted)).join("");
+    eyeResults.innerHTML=listBlock("Global clinical / source blockers",j.decision.critical_input_issues)+orderedEyes(j.decision.eyes).map(x=>renderEye(x,j.extracted)).join("");
     decisionBox.textContent=JSON.stringify(j.decision,null,2); extractBox.textContent=JSON.stringify(j.extracted,null,2);
     lastReport={patient:patientPayload(),decision:j.decision,extracted:j.extracted};setReportMetadata(j.decision);reportCard.hidden=false;
     if(agePromptNeeded){
