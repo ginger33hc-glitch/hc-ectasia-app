@@ -65,8 +65,10 @@ try:
     html=html.replace("HC Ectasia App v0.7.11","HC Ectasia App v0.7.12")
     # Replace the prior v0.7.11 injected blocks rather than stacking styles/scripts.
     import re
-    html=re.sub(r'<style id="hc-critical-score-style">.*?</style>',CSS.strip(),html,flags=re.S)
-    html=re.sub(r'<script id="hc-critical-score-script">.*?</script>',SCRIPT.strip(),html,flags=re.S)
+    # Use callable replacements so JavaScript backslashes (for example \\s)
+    # are returned literally instead of being parsed as Python re.sub escapes.
+    html=re.sub(r'<style id="hc-critical-score-style">.*?</style>',lambda _m: CSS.strip(),html,flags=re.S)
+    html=re.sub(r'<script id="hc-critical-score-script">.*?</script>',lambda _m: SCRIPT.strip(),html,flags=re.S)
     if 'id="hc-critical-score-style"' not in html: html=html.replace("</head>",CSS+"\n</head>")
     if 'id="hc-critical-score-script"' not in html: html=html.replace("</body>",SCRIPT+"\n</body>")
     index_path.write_text(html,encoding="utf-8")
