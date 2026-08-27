@@ -4,7 +4,7 @@ from pathlib import Path
 import hc_age_policy
 import bootstrap
 
-APP_VERSION = "0.7.16"
+APP_VERSION = "0.7.17"
 APP_LABEL = f"HC Ectasia App v{APP_VERSION}"
 index_path = Path(__file__).parent / "static" / "index.html"
 
@@ -28,6 +28,15 @@ SCRIPT = r"""
       const cells=row.querySelectorAll('th,td');
       if(cells.length<2)return;
       const label=(cells[0].textContent||'').replace(/\s+/g,' ').trim().toLowerCase();
+
+      // Morphology remains available to the internal engine, but the derived
+      // "Morphology category" row is intentionally omitted from the visible
+      // parameter report because it can be confused with the final HC decision.
+      if(label==='morphology category'){
+        row.remove();
+        return;
+      }
+
       if(label==='score / category' || label==='score/category'){
         const result=cells[1];
         const m=(result.textContent||'').trim().match(/^\s*([0-9]+(?:\.[0-9]+)?)/);
@@ -58,9 +67,8 @@ SCRIPT = r"""
 try:
     import re
     html=index_path.read_text(encoding="utf-8")
-    # Canonicalize every previously embedded HC Ectasia App semantic version,
-    # including versions introduced by earlier runtime patches (e.g. v0.7.10).
     html=re.sub(r'HC Ectasia App v\d+\.\d+\.\d+',APP_LABEL,html)
+    html=re.sub(r'Software v\d+\.\d+\.\d+',f'Software v{APP_VERSION}',html)
     html=re.sub(r'<style id="hc-critical-score-style">.*?</style>',lambda _m: CSS.strip(),html,flags=re.S)
     html=re.sub(r'<script id="hc-critical-score-script">.*?</script>',lambda _m: SCRIPT.strip(),html,flags=re.S)
     if 'id="hc-critical-score-style"' not in html: html=html.replace("</head>",CSS+"\n</head>")
