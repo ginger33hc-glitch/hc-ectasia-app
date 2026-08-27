@@ -3,7 +3,8 @@ from pathlib import Path
 import hc_age_policy
 import hc_bad_final_policy
 import bootstrap
-APP_VERSION="0.7.22"
+import extraction_guard
+APP_VERSION="0.7.23"
 APP_LABEL=f"HC Ectasia App v{APP_VERSION}"
 index_path=Path(__file__).parent/"static"/"index.html"
 CSS="""
