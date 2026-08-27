@@ -1,4 +1,4 @@
-"""UI patch: highlight HC score 3 orange and critical scores (>=4) red."""
+"""UI patch: color-code ERSS score and Pentacam BAD-D tomography findings."""
 from pathlib import Path
 
 import bootstrap
@@ -9,16 +9,17 @@ CSS = """
 <style id="hc-critical-score-style">
 .critical-score-alert{background:#fde5e5!important;color:#a31212!important;border:2px solid #c52b2b!important;border-radius:5px!important;padding:2px 6px!important;font-weight:900!important;display:inline-block!important}
 .critical-score-alert::before{content:none!important}
-td.hc-critical-score-box{background:#fde5e5!important;color:#a31212!important;border:2px solid #c52b2b!important;font-weight:900!important}
-td.hc-moderate-score-box{background:#fff1d6!important;color:#9a4d00!important;border:2px solid #e58a00!important;font-weight:900!important}
-@media print{.critical-score-alert,td.hc-critical-score-box{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#fde5e5!important;color:#a31212!important;border-color:#c52b2b!important}td.hc-moderate-score-box{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#fff1d6!important;color:#9a4d00!important;border-color:#e58a00!important}}
+td.hc-critical-score-box,.hc-bad-abnormal{background:#fde5e5!important;color:#a31212!important;border:2px solid #c52b2b!important;font-weight:900!important}
+td.hc-moderate-score-box,.hc-bad-suspicious{background:#fff1d6!important;color:#9a4d00!important;border:2px solid #e58a00!important;font-weight:900!important}
+.hc-bad-normal{background:#e6f4ea!important;color:#176b3a!important;border:1px solid #76a987!important;font-weight:800!important}
+@media print{.critical-score-alert,td.hc-critical-score-box,.hc-bad-abnormal{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#fde5e5!important;color:#a31212!important;border-color:#c52b2b!important}td.hc-moderate-score-box,.hc-bad-suspicious{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#fff1d6!important;color:#9a4d00!important;border-color:#e58a00!important}.hc-bad-normal{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#e6f4ea!important;color:#176b3a!important;border-color:#76a987!important}}
 </style>
 """
 
 SCRIPT = r"""
 <script id="hc-critical-score-script">
 (function(){
-  function markCriticalScores(root){
+  function markClinicalSignals(root){
     const scope=root&&root.querySelectorAll?root:document;
 
     // ERSS score/category table: score 3 = moderate (orange); >=4 = high (red).
@@ -26,18 +27,36 @@ SCRIPT = r"""
       const cells=row.querySelectorAll('th,td');
       if(cells.length<2)return;
       const label=(cells[0].textContent||'').replace(/\s+/g,' ').trim().toLowerCase();
-      if(label!=='score / category' && label!=='score/category')return;
-      const result=cells[1];
-      const m=(result.textContent||'').trim().match(/^\s*([0-9]+(?:\.[0-9]+)?)/);
-      result.classList.remove('hc-critical-score-box','hc-moderate-score-box');
-      if(!m)return;
-      const score=parseFloat(m[1]);
-      if(!Number.isFinite(score))return;
-      if(score>=4)result.classList.add('hc-critical-score-box');
-      else if(score===3)result.classList.add('hc-moderate-score-box');
+      if(label==='score / category' || label==='score/category'){
+        const result=cells[1];
+        const m=(result.textContent||'').trim().match(/^\s*([0-9]+(?:\.[0-9]+)?)/);
+        result.classList.remove('hc-critical-score-box','hc-moderate-score-box');
+        if(m){
+          const score=parseFloat(m[1]);
+          if(Number.isFinite(score)){
+            if(score>=4)result.classList.add('hc-critical-score-box');
+            else if(score===3)result.classList.add('hc-moderate-score-box');
+          }
+        }
+      }
+
+      // Pentacam BAD-D/tomography report rows. Color only cells that explicitly
+      // carry NORMAL/SUSPICIOUS/ABNORMAL classification text; do not infer a diagnosis.
+      const rowText=(row.textContent||'').replace(/\s+/g,' ').trim();
+      const isBadRow=/\bBAD[-_ ]?D\b|\bDf\b|\bDb\b|\bDp\b|\bDt\b|\bDa\b|tomography review/i.test(rowText);
+      if(isBadRow){
+        cells.forEach(function(cell,idx){
+          if(idx===0)return;
+          cell.classList.remove('hc-bad-normal','hc-bad-suspicious','hc-bad-abnormal');
+          const t=(cell.textContent||'').toUpperCase();
+          if(/\bABNORMAL\b/.test(t))cell.classList.add('hc-bad-abnormal');
+          else if(/\bSUSPICIOUS\b|\bBORDERLINE\b/.test(t))cell.classList.add('hc-bad-suspicious');
+          else if(/\bNORMAL\b|\bREASSURING\b/.test(t))cell.classList.add('hc-bad-normal');
+        });
+      }
     });
 
-    // Keep the detailed HC SCORE TOTAL numeric value highlighted red for >=4.
+    // Detailed HC SCORE TOTAL numeric value: red for >=4.
     scope.querySelectorAll('.critical-score-alert').forEach(function(el){
       if(!el.classList.contains('hc-score-value'))el.classList.remove('critical-score-alert');
     });
@@ -71,7 +90,7 @@ SCRIPT = r"""
       }
     });
   }
-  function run(){markCriticalScores(document);}
+  function run(){markClinicalSignals(document);}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run);else run();
   new MutationObserver(function(){run();}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});
 })();
@@ -80,9 +99,8 @@ SCRIPT = r"""
 
 try:
     html=index_path.read_text(encoding="utf-8")
-    html=html.replace("HC Ectasia App v0.7.11","HC Ectasia App v0.7.14")
-    html=html.replace("HC Ectasia App v0.7.12","HC Ectasia App v0.7.14")
-    html=html.replace("HC Ectasia App v0.7.13","HC Ectasia App v0.7.14")
+    for old in ("HC Ectasia App v0.7.11","HC Ectasia App v0.7.12","HC Ectasia App v0.7.13","HC Ectasia App v0.7.14"):
+        html=html.replace(old,"HC Ectasia App v0.7.15")
     import re
     # Callable replacements preserve JavaScript backslashes literally.
     html=re.sub(r'<style id="hc-critical-score-style">.*?</style>',lambda _m: CSS.strip(),html,flags=re.S)
@@ -93,5 +111,5 @@ try:
 except OSError:
     pass
 
-bootstrap.core.app.title="HC Ectasia App v0.7.14"
+bootstrap.core.app.title="HC Ectasia App v0.7.15"
 app=bootstrap.app
