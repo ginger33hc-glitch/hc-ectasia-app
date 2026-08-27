@@ -982,12 +982,12 @@ class TestPwaIcons(unittest.TestCase):
 
 
 class TestSignedRefractionInputs(unittest.TestCase):
-    def test_manifest_and_intended_cylinders_accept_minus_cylinder_notation(self):
+    def test_all_refraction_fields_accept_positive_and_negative_values(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
-        self.assertIn('id="${eye}_manifest_cylinder" type="number" step=".25" min="-15" max="0"', html)
-        self.assertIn('id="${eye}_cylinder" type="number" step=".25" min="-15" max="0"', html)
-        self.assertIn('manifest_cylinder_magnitude_D:cylinderMagnitudeOrNull', html)
-        self.assertIn('intended_cylinder_magnitude_D:cylinderMagnitudeOrNull', html)
+        self.assertIn('id="${eye}_manifest_cylinder" type="number" step=".25" min="-15" max="15"', html)
+        self.assertIn('id="${eye}_cylinder" type="number" step=".25" min="-15" max="15"', html)
+        self.assertIn('manifest_cylinder_signed_D:numberOrNull', html)
+        self.assertIn('intended_cylinder_signed_D:numberOrNull', html)
 
     def test_all_refraction_fields_have_phone_safe_negative_buttons(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
@@ -995,18 +995,68 @@ class TestSignedRefractionInputs(unittest.TestCase):
             self.assertIn(f'data-negative-target="${{eye}}_{target}"', html)
         self.assertIn('String(-Math.abs(parsed||0.25))', html)
 
-    def test_manifest_and_intended_spheres_have_phone_safe_positive_buttons(self):
+    def test_all_refraction_fields_have_phone_safe_positive_buttons(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
-        for target in ("manifest_sphere", "sphere"):
+        for target in ("manifest_sphere", "manifest_cylinder", "sphere", "cylinder"):
             self.assertIn(f'data-positive-target="${{eye}}_{target}"', html)
         self.assertIn('String(Math.abs(parsed||0.25))', html)
-        self.assertNotIn('data-positive-target="${eye}_manifest_cylinder"', html)
-        self.assertNotIn('data-positive-target="${eye}_cylinder"', html)
 
     def test_autofilled_internal_cylinder_magnitudes_render_as_negative(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
         self.assertIn('value=-Math.abs(p.manifest_cylinder_magnitude_D)', html)
         self.assertIn('value=-Math.abs(p.intended_cylinder_magnitude_D)', html)
+
+    def test_plus_cylinder_is_transposed_to_equivalent_minus_cylinder(self):
+        entered = plan()
+        entered.pop("manifest_sphere_D")
+        entered.pop("manifest_cylinder_magnitude_D")
+        entered.pop("intended_sphere_D")
+        entered.pop("intended_cylinder_magnitude_D")
+        entered.update({
+            "manifest_entered_sphere_D": -5.0,
+            "manifest_cylinder_signed_D": 2.0,
+            "intended_entered_sphere_D": -5.0,
+            "intended_cylinder_signed_D": 2.0,
+            "entered_axis_deg": 90.0,
+        })
+        result = app.assess_eye(normal_eye(), entered, 35, MODIFIERS)
+        values = result["values"]
+        self.assertEqual(values["manifest_sphere_D"], -3.0)
+        self.assertEqual(values["manifest_cylinder_magnitude_D"], 2.0)
+        self.assertEqual(values["intended_sphere_D"], -3.0)
+        self.assertEqual(values["correction_axis_deg"], 180.0)
+        self.assertEqual(values["manifest_normalized_axis_deg"], 180.0)
+        self.assertEqual(values["MRSE_D"], -4.0)
+        self.assertEqual(values["manifest_entered_sphere_D"], -5.0)
+        self.assertEqual(values["manifest_cylinder_signed_D"], 2.0)
+        self.assertTrue(any("plus-cylinder notation was transposed" in item for item in result["warnings"]))
+
+    def test_minus_cylinder_keeps_sphere_and_axis(self):
+        normalized = app.normalize_signed_refraction_plan({
+            "manifest_entered_sphere_D": 2.0,
+            "manifest_cylinder_signed_D": -1.5,
+            "intended_entered_sphere_D": 2.0,
+            "intended_cylinder_signed_D": -1.5,
+            "entered_axis_deg": 180.0,
+        })
+        self.assertEqual(normalized["manifest_sphere_D"], 2.0)
+        self.assertEqual(normalized["manifest_cylinder_magnitude_D"], 1.5)
+        self.assertEqual(normalized["intended_sphere_D"], 2.0)
+        self.assertEqual(normalized["correction_axis_deg"], 180.0)
+
+    def test_plus_cylinder_axis_rotation_wraps_at_180(self):
+        self.assertEqual(app._transpose_axis(90), 180.0)
+        self.assertEqual(app._transpose_axis(180), 90.0)
+
+    def test_reports_disclose_entered_and_normalized_notation(self):
+        source = (Path(__file__).resolve().parents[1] / "reports.py").read_text()
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        for label in (
+            "Manifest entered notation", "Manifest normalized (minus-cylinder)",
+            "Intended entered notation", "Intended normalized (minus-cylinder)",
+        ):
+            self.assertIn(label, source)
+            self.assertIn(label, html)
 
 
 class TestPatientIdentityWarningUi(unittest.TestCase):

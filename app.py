@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="HC Ectasia App v0.6.8")
+app = FastAPI(title="HC Ectasia App v0.6.9")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -357,6 +357,71 @@ def combine_status(current: str, new: str) -> str:
     return new if rank[new] > rank[current] else current
 
 
+def _transpose_axis(axis: Optional[float]) -> Optional[float]:
+    """Rotate a plus-cylinder axis into its equivalent minus-cylinder axis."""
+    if not is_number(axis):
+        return None
+    rotated = (float(axis) + 90.0) % 180.0
+    return 180.0 if abs(rotated) < 1e-9 else rotated
+
+
+def normalize_signed_refraction_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
+    """Preserve entered notation and provide one canonical minus-cylinder plan to the engine.
+
+    Legacy/API plans that already provide ``*_cylinder_magnitude_D`` remain supported. The
+    browser sends the explicit entered fields, so a positive cylinder is transposed rather than
+    silently converted to an absolute magnitude.
+    """
+    normalized = dict(plan or {})
+    warnings = list(normalized.get("correction_warnings", []))
+    entered_axis = normalized.get("entered_axis_deg")
+    if entered_axis is None and any(
+        normalized.get(field) is not None
+        for field in ("manifest_entered_sphere_D", "manifest_cylinder_signed_D",
+                      "intended_entered_sphere_D", "intended_cylinder_signed_D")
+    ):
+        entered_axis = normalized.get("correction_axis_deg")
+    if entered_axis is not None:
+        normalized["entered_axis_deg"] = entered_axis
+
+    for role in ("manifest", "intended"):
+        entered_sphere_field = f"{role}_entered_sphere_D"
+        signed_cylinder_field = f"{role}_cylinder_signed_D"
+        sphere_field = f"{role}_sphere_D"
+        magnitude_field = f"{role}_cylinder_magnitude_D"
+        entered_sphere = normalized.get(entered_sphere_field)
+        signed_cylinder = normalized.get(signed_cylinder_field)
+        raw_supplied = entered_sphere is not None or signed_cylinder is not None
+        if not raw_supplied:
+            continue
+        if not is_number(entered_sphere) or not is_number(signed_cylinder):
+            normalized[sphere_field] = None
+            normalized[magnitude_field] = None
+            continue
+
+        entered_sphere = float(entered_sphere)
+        signed_cylinder = float(signed_cylinder)
+        plus_cylinder = signed_cylinder > 0
+        normalized[sphere_field] = entered_sphere + signed_cylinder if plus_cylinder else entered_sphere
+        normalized[magnitude_field] = abs(signed_cylinder)
+        normalized_axis = _transpose_axis(entered_axis) if plus_cylinder else entered_axis
+        normalized[f"{role}_normalized_axis_deg"] = normalized_axis
+        if role == "intended":
+            normalized["correction_axis_deg"] = normalized_axis
+        if plus_cylinder:
+            note = (
+                f"{role.capitalize()} plus-cylinder notation was transposed for calculation: "
+                f"{entered_sphere:+.2f} {signed_cylinder:+.2f} D"
+                + (f" x {float(entered_axis):.0f}°" if is_number(entered_axis) else " (axis unavailable)")
+                + f" -> {normalized[sphere_field]:+.2f} {-normalized[magnitude_field]:+.2f} D"
+                + (f" x {float(normalized_axis):.0f}°." if is_number(normalized_axis) else ".")
+            )
+            warnings.append(note)
+
+    normalized["correction_warnings"] = list(dict.fromkeys(warnings))
+    return normalized
+
+
 def validate_plan(plan: Dict[str, Any]) -> List[str]:
     """Return decision-blocking input errors; invalid values are never used in calculations."""
     errors: List[str] = []
@@ -365,6 +430,11 @@ def validate_plan(plan: Dict[str, Any]) -> List[str]:
         "manifest_cylinder_magnitude_D": (0, 15),
         "intended_sphere_D": (-30, 20),
         "intended_cylinder_magnitude_D": (0, 15),
+        "manifest_entered_sphere_D": (-30, 20),
+        "manifest_cylinder_signed_D": (-15, 15),
+        "intended_entered_sphere_D": (-30, 20),
+        "intended_cylinder_signed_D": (-15, 15),
+        "entered_axis_deg": (0, 180),
         "correction_axis_deg": (0, 180),
         "ablation_um": (0, 400),
     }
@@ -682,6 +752,7 @@ def assess_eye(
     age: Optional[int],
     patient_modifiers: Dict[str, Any],
 ) -> Dict[str, Any]:
+    plan = normalize_signed_refraction_plan(plan)
     eye_id = eye.get("eye", "UNKNOWN")
     procedure = plan.get("procedure")
     warnings: List[str] = list(plan.get("correction_warnings", []))
@@ -722,6 +793,19 @@ def assess_eye(
                 "procedure": procedure, "age_years": age, "prior_refractive_surgery": prior,
                 "refractive_stability": stable, "documented_progression": progression,
                 "unexplained_CDVA_below_20_20": cdva, "pentacam_qs": eye.get("pentacam_qs"),
+                "manifest_entered_sphere_D": plan.get("manifest_entered_sphere_D"),
+                "manifest_cylinder_signed_D": plan.get("manifest_cylinder_signed_D"),
+                "manifest_entered_axis_deg": plan.get("entered_axis_deg"),
+                "manifest_sphere_D": plan.get("manifest_sphere_D"),
+                "manifest_cylinder_magnitude_D": plan.get("manifest_cylinder_magnitude_D"),
+                "manifest_normalized_axis_deg": plan.get("manifest_normalized_axis_deg", plan.get("correction_axis_deg")),
+                "intended_entered_sphere_D": plan.get("intended_entered_sphere_D"),
+                "intended_cylinder_signed_D": plan.get("intended_cylinder_signed_D"),
+                "intended_entered_axis_deg": plan.get("entered_axis_deg"),
+                "intended_sphere_D": plan.get("intended_sphere_D"),
+                "intended_cylinder_magnitude_D": plan.get("intended_cylinder_magnitude_D"),
+                "intended_normalized_axis_deg": plan.get("intended_normalized_axis_deg", plan.get("correction_axis_deg")),
+                "correction_axis_deg": plan.get("correction_axis_deg"),
             },
             "tomography_review": {"status": "NOT SCORED", "BAD_display": {}, "cross_sectional_flags": []},
             "evidence_boundaries": {},
@@ -1027,8 +1111,16 @@ def assess_eye(
             "unexplained_CDVA_below_20_20": cdva,
             "manifest_sphere_D": manifest_sphere,
             "manifest_cylinder_magnitude_D": manifest_cylinder,
+            "manifest_entered_sphere_D": plan.get("manifest_entered_sphere_D"),
+            "manifest_cylinder_signed_D": plan.get("manifest_cylinder_signed_D"),
+            "manifest_entered_axis_deg": plan.get("entered_axis_deg"),
+            "manifest_normalized_axis_deg": plan.get("manifest_normalized_axis_deg", plan.get("correction_axis_deg")),
             "intended_sphere_D": intended_sphere,
             "intended_cylinder_magnitude_D": intended_cylinder,
+            "intended_entered_sphere_D": plan.get("intended_entered_sphere_D"),
+            "intended_cylinder_signed_D": plan.get("intended_cylinder_signed_D"),
+            "intended_entered_axis_deg": plan.get("entered_axis_deg"),
+            "intended_normalized_axis_deg": plan.get("intended_normalized_axis_deg", plan.get("correction_axis_deg")),
             "correction_axis_deg": plan.get("correction_axis_deg"),
             "correction_source": plan.get("correction_source"),
             "MRSE_D": mrse,
@@ -1076,7 +1168,8 @@ def apply_extracted_corrections(
     mixed with extracted values, and conflicting cards never produce an automatic treatment plan.
     """
     effective = {
-        eye: dict(eye_plans.get(eye, {})) if isinstance(eye_plans.get(eye, {}), dict) else {}
+        eye: normalize_signed_refraction_plan(eye_plans.get(eye, {}))
+        if isinstance(eye_plans.get(eye, {}), dict) else {}
         for eye in EYES
     }
     grouped: Dict[str, List[Dict[str, Any]]] = {eye: [] for eye in EYES}
@@ -1266,7 +1359,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.6.8 / source set 2026-08-25 plus binding HC amendments",
+        "version": "software v0.6.9 / source set 2026-08-25 plus binding HC amendments",
     }
 
 

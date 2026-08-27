@@ -100,10 +100,22 @@ def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
         )
     manifest = "Not documented"
     if values.get("manifest_sphere_D") is not None and values.get("manifest_cylinder_magnitude_D") is not None:
+        manifest_axis = (
+            f" x {_fmt(values.get('manifest_normalized_axis_deg'), 0, ' degrees')}"
+            if values.get("manifest_normalized_axis_deg") is not None else " (axis unavailable)"
+        )
         manifest = (
             f"{_fmt(values.get('manifest_sphere_D'), 2, ' D')} / "
-            f"-{_fmt(values.get('manifest_cylinder_magnitude_D'), 2, ' D')}"
+            f"-{_fmt(values.get('manifest_cylinder_magnitude_D'), 2, ' D')}{manifest_axis}"
         )
+    def entered_refraction(role: str) -> str:
+        sphere = values.get(f"{role}_entered_sphere_D")
+        cylinder = values.get(f"{role}_cylinder_signed_D")
+        axis = values.get(f"{role}_entered_axis_deg")
+        if sphere is None or cylinder is None:
+            return "Not documented"
+        axis_text = f" x {_fmt(axis, 0, ' degrees')}" if axis is not None else " (axis unavailable)"
+        return f"{float(sphere):+.2f} D / {float(cylinder):+.2f} D{axis_text}"
     transition = (
         "Not applicable"
         if values.get("transition_zone_mm") is None and values.get("transition_zone_not_applicable") == "yes"
@@ -117,8 +129,10 @@ def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
             f"{_text(values.get('documented_progression'))} / "
             f"{_text(values.get('unexplained_CDVA_below_20_20'))}"
         )),
-        ("Manifest refraction", manifest),
-        ("Intended correction", correction),
+        ("Manifest entered notation", entered_refraction("manifest")),
+        ("Manifest normalized (minus-cylinder)", manifest),
+        ("Intended entered notation", entered_refraction("intended")),
+        ("Intended normalized (minus-cylinder)", correction),
         ("Correction source", _text(values.get("correction_source"), "Manual / not documented")),
         ("Score / category", f"{_text(score.get('total'), '-')} / {_text(score.get('category'), '-') }"),
         ("Thinnest pachymetry", _fmt(values.get("pachy_thinnest_um"), 0, " um")),
@@ -220,7 +234,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
 
     story: List[Any] = []
     story.append(Paragraph("HC PREOPERATIVE ECTASIA RISK ASSESSMENT", styles["ReportTitle"]))
-    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.6.8", styles["ReportSub"]))
+    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.6.9", styles["ReportSub"]))
     story.append(Paragraph(LIABILITY_NOTICE, styles["Liability"]))
 
     metadata = [
@@ -460,7 +474,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     run.font.size = Pt(18)
     run.bold = True
     run.font.color.rgb = RGBColor.from_string(NAVY)
-    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.6.8")
+    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.6.9")
     subtitle.paragraph_format.space_after = Pt(10)
     for run in subtitle.runs:
         run.font.name = "Arial"
