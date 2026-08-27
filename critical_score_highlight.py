@@ -1,4 +1,4 @@
-"""UI patch: highlight critical HC scores (>=4) in the score/category result box and score breakdown."""
+"""UI patch: highlight HC score 3 orange and critical scores (>=4) red."""
 from pathlib import Path
 
 import bootstrap
@@ -10,7 +10,8 @@ CSS = """
 .critical-score-alert{background:#fde5e5!important;color:#a31212!important;border:2px solid #c52b2b!important;border-radius:5px!important;padding:2px 6px!important;font-weight:900!important;display:inline-block!important}
 .critical-score-alert::before{content:none!important}
 td.hc-critical-score-box{background:#fde5e5!important;color:#a31212!important;border:2px solid #c52b2b!important;font-weight:900!important}
-@media print{.critical-score-alert,td.hc-critical-score-box{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#fde5e5!important;color:#a31212!important;border-color:#c52b2b!important}}
+td.hc-moderate-score-box{background:#fff1d6!important;color:#9a4d00!important;border:2px solid #e58a00!important;font-weight:900!important}
+@media print{.critical-score-alert,td.hc-critical-score-box{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#fde5e5!important;color:#a31212!important;border-color:#c52b2b!important}td.hc-moderate-score-box{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#fff1d6!important;color:#9a4d00!important;border-color:#e58a00!important}}
 </style>
 """
 
@@ -20,7 +21,7 @@ SCRIPT = r"""
   function markCriticalScores(root){
     const scope=root&&root.querySelectorAll?root:document;
 
-    // Score/category table: make the entire Result cell red when numeric score >=4.
+    // ERSS score/category table: score 3 = moderate (orange); >=4 = high (red).
     scope.querySelectorAll('tr').forEach(function(row){
       const cells=row.querySelectorAll('th,td');
       if(cells.length<2)return;
@@ -28,12 +29,15 @@ SCRIPT = r"""
       if(label!=='score / category' && label!=='score/category')return;
       const result=cells[1];
       const m=(result.textContent||'').trim().match(/^\s*([0-9]+(?:\.[0-9]+)?)/);
+      result.classList.remove('hc-critical-score-box','hc-moderate-score-box');
       if(!m)return;
       const score=parseFloat(m[1]);
-      result.classList.toggle('hc-critical-score-box',Number.isFinite(score)&&score>=4);
+      if(!Number.isFinite(score))return;
+      if(score>=4)result.classList.add('hc-critical-score-box');
+      else if(score===3)result.classList.add('hc-moderate-score-box');
     });
 
-    // Keep the detailed HC SCORE TOTAL numeric value highlighted as well.
+    // Keep the detailed HC SCORE TOTAL numeric value highlighted red for >=4.
     scope.querySelectorAll('.critical-score-alert').forEach(function(el){
       if(!el.classList.contains('hc-score-value'))el.classList.remove('critical-score-alert');
     });
@@ -76,8 +80,9 @@ SCRIPT = r"""
 
 try:
     html=index_path.read_text(encoding="utf-8")
-    html=html.replace("HC Ectasia App v0.7.11","HC Ectasia App v0.7.13")
-    html=html.replace("HC Ectasia App v0.7.12","HC Ectasia App v0.7.13")
+    html=html.replace("HC Ectasia App v0.7.11","HC Ectasia App v0.7.14")
+    html=html.replace("HC Ectasia App v0.7.12","HC Ectasia App v0.7.14")
+    html=html.replace("HC Ectasia App v0.7.13","HC Ectasia App v0.7.14")
     import re
     # Callable replacements preserve JavaScript backslashes literally.
     html=re.sub(r'<style id="hc-critical-score-style">.*?</style>',lambda _m: CSS.strip(),html,flags=re.S)
@@ -88,5 +93,5 @@ try:
 except OSError:
     pass
 
-bootstrap.core.app.title="HC Ectasia App v0.7.13"
+bootstrap.core.app.title="HC Ectasia App v0.7.14"
 app=bootstrap.app
