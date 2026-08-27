@@ -1,4 +1,4 @@
-"""UI patch: highlight only the numeric score box when HC score is >=4."""
+"""UI patch: highlight critical HC scores (>=4) in the score/category result box and score breakdown."""
 from pathlib import Path
 
 import bootstrap
@@ -7,9 +7,10 @@ index_path = Path(__file__).parent / "static" / "index.html"
 
 CSS = """
 <style id="hc-critical-score-style">
-.critical-score-alert{background:var(--red)!important;color:var(--redInk)!important;border:2px solid #c52b2b!important;border-radius:5px!important;padding:2px 6px!important;font-weight:900!important;display:inline-block!important}
+.critical-score-alert{background:#fde5e5!important;color:#a31212!important;border:2px solid #c52b2b!important;border-radius:5px!important;padding:2px 6px!important;font-weight:900!important;display:inline-block!important}
 .critical-score-alert::before{content:none!important}
-@media print{.critical-score-alert{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#fde5e5!important;color:#a31212!important;border-color:#c52b2b!important}}
+td.hc-critical-score-box{background:#fde5e5!important;color:#a31212!important;border:2px solid #c52b2b!important;font-weight:900!important}
+@media print{.critical-score-alert,td.hc-critical-score-box{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#fde5e5!important;color:#a31212!important;border-color:#c52b2b!important}}
 </style>
 """
 
@@ -18,7 +19,21 @@ SCRIPT = r"""
 (function(){
   function markCriticalScores(root){
     const scope=root&&root.querySelectorAll?root:document;
-    // Restore any legacy whole-row highlighting from v0.7.11.
+
+    // Score/category table: make the entire Result cell red when numeric score >=4.
+    scope.querySelectorAll('tr').forEach(function(row){
+      const cells=row.querySelectorAll('th,td');
+      if(cells.length<2)return;
+      const label=(cells[0].textContent||'').replace(/\s+/g,' ').trim().toLowerCase();
+      if(label!=='score / category' && label!=='score/category')return;
+      const result=cells[1];
+      const m=(result.textContent||'').trim().match(/^\s*([0-9]+(?:\.[0-9]+)?)/);
+      if(!m)return;
+      const score=parseFloat(m[1]);
+      result.classList.toggle('hc-critical-score-box',Number.isFinite(score)&&score>=4);
+    });
+
+    // Keep the detailed HC SCORE TOTAL numeric value highlighted as well.
     scope.querySelectorAll('.critical-score-alert').forEach(function(el){
       if(!el.classList.contains('hc-score-value'))el.classList.remove('critical-score-alert');
     });
@@ -31,7 +46,6 @@ SCRIPT = r"""
       if(!m)return;
       const score=parseFloat(m[1]);
       if(!Number.isFinite(score)||score<4)return;
-      // Highlight only the TOTAL score value, leaving the rest of the report unchanged.
       const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);
       let node;
       while((node=walker.nextNode())){
@@ -62,11 +76,10 @@ SCRIPT = r"""
 
 try:
     html=index_path.read_text(encoding="utf-8")
-    html=html.replace("HC Ectasia App v0.7.11","HC Ectasia App v0.7.12")
-    # Replace the prior v0.7.11 injected blocks rather than stacking styles/scripts.
+    html=html.replace("HC Ectasia App v0.7.11","HC Ectasia App v0.7.13")
+    html=html.replace("HC Ectasia App v0.7.12","HC Ectasia App v0.7.13")
     import re
-    # Use callable replacements so JavaScript backslashes (for example \\s)
-    # are returned literally instead of being parsed as Python re.sub escapes.
+    # Callable replacements preserve JavaScript backslashes literally.
     html=re.sub(r'<style id="hc-critical-score-style">.*?</style>',lambda _m: CSS.strip(),html,flags=re.S)
     html=re.sub(r'<script id="hc-critical-score-script">.*?</script>',lambda _m: SCRIPT.strip(),html,flags=re.S)
     if 'id="hc-critical-score-style"' not in html: html=html.replace("</head>",CSS+"\n</head>")
@@ -75,5 +88,5 @@ try:
 except OSError:
     pass
 
-bootstrap.core.app.title="HC Ectasia App v0.7.12"
+bootstrap.core.app.title="HC Ectasia App v0.7.13"
 app=bootstrap.app
