@@ -4,6 +4,8 @@ from pathlib import Path
 import hc_age_policy
 import bootstrap
 
+APP_VERSION = "0.7.16"
+APP_LABEL = f"HC Ectasia App v{APP_VERSION}"
 index_path = Path(__file__).parent / "static" / "index.html"
 
 CSS = """
@@ -13,7 +15,7 @@ CSS = """
 td.hc-critical-score-box,.hc-bad-abnormal{background:#fde5e5!important;color:#a31212!important;border:2px solid #c52b2b!important;font-weight:900!important}
 td.hc-moderate-score-box,.hc-bad-suspicious{background:#fff1d6!important;color:#9a4d00!important;border:2px solid #e58a00!important;font-weight:900!important}
 .hc-bad-normal{background:#e6f4ea!important;color:#176b3a!important;border:1px solid #76a987!important;font-weight:800!important}
-@media print{.critical-score-alert,td.hc-critical-score-box,.hc-bad-abnormal{-webkit-print-color-adjust:exact!important;print-color-adjust-adjust:exact!important;background:#fde5e5!important;color:#a31212!important;border-color:#c52b2b!important}td.hc-moderate-score-box,.hc-bad-suspicious{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#fff1d6!important;color:#9a4d00!important;border-color:#e58a00!important}.hc-bad-normal{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#e6f4ea!important;color:#176b3a!important;border-color:#76a987!important}}
+@media print{.critical-score-alert,td.hc-critical-score-box,.hc-bad-abnormal{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#fde5e5!important;color:#a31212!important;border-color:#c52b2b!important}td.hc-moderate-score-box,.hc-bad-suspicious{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#fff1d6!important;color:#9a4d00!important;border-color:#e58a00!important}.hc-bad-normal{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;background:#e6f4ea!important;color:#176b3a!important;border-color:#76a987!important}}
 </style>
 """
 
@@ -54,10 +56,11 @@ SCRIPT = r"""
 """
 
 try:
-    html=index_path.read_text(encoding="utf-8")
-    for old in ("HC Ectasia App v0.7.11","HC Ectasia App v0.7.12","HC Ectasia App v0.7.13","HC Ectasia App v0.7.14","HC Ectasia App v0.7.15"):
-        html=html.replace(old,"HC Ectasia App v0.7.16")
     import re
+    html=index_path.read_text(encoding="utf-8")
+    # Canonicalize every previously embedded HC Ectasia App semantic version,
+    # including versions introduced by earlier runtime patches (e.g. v0.7.10).
+    html=re.sub(r'HC Ectasia App v\d+\.\d+\.\d+',APP_LABEL,html)
     html=re.sub(r'<style id="hc-critical-score-style">.*?</style>',lambda _m: CSS.strip(),html,flags=re.S)
     html=re.sub(r'<script id="hc-critical-score-script">.*?</script>',lambda _m: SCRIPT.strip(),html,flags=re.S)
     if 'id="hc-critical-score-style"' not in html: html=html.replace("</head>",CSS+"\n</head>")
@@ -66,5 +69,6 @@ try:
 except OSError:
     pass
 
-bootstrap.core.app.title="HC Ectasia App v0.7.16"
+bootstrap.core.APP_VERSION = APP_VERSION
+bootstrap.core.app.title = APP_LABEL
 app=bootstrap.app
