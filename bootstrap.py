@@ -102,6 +102,25 @@ core.apply_extracted_corrections=apply_extracted_corrections_with_ex500
 
 _original_assess_eye=core.assess_eye
 
+def _score_risk_interpretation(procedure, score_total, category):
+    if procedure == "LASIK":
+        return {
+            "risk_category": category,
+            "absolute_probability": "Not established for an individual ERSS score by the source study.",
+            "published_evidence": "Independent LASIK ERSS validation: 92% of eyes that developed ectasia were classified high risk (score >=4), versus 6% of control eyes.",
+            "interpretation_limit": "The 92% and 6% figures are case/control classification performance, not the probability that this patient will develop ectasia. They must not be displayed or interpreted as an individual absolute-risk percentage.",
+            "source": "Randleman et al., Validation of the Ectasia Risk Score System for Preoperative LASIK Screening."
+        }
+    if procedure == "PRK":
+        return {
+            "risk_category": category,
+            "absolute_probability": "Not established for an individual PRK score.",
+            "published_evidence": "In the cited post-PRK ectasia series with complete ERSS data, 77% of ectasia eyes had cumulative ERSS >=4, 9% had score 3, and 14% had score <=2. The surgical cohort incidence reported in that study was 9/31,045 eyes (0.029%).",
+            "interpretation_limit": "These are distributions among ectasia cases and an overall cohort incidence, not score-specific patient probabilities. The LASIK ERSS is not validated as an absolute-risk calculator for PRK; the 0.029% cohort incidence must not be assigned to an individual score.",
+            "source": "Risk Assessment for Corneal Ectasia following Photorefractive Keratectomy."
+        }
+    return None
+
 def _score_audit(result):
     score=result.get("score") or {}; rows=score.get("rows") or {}; values=result.get("values") or {}; topo=result.get("topography_classification") or {}
     if score.get("total") is None or not rows: return None
@@ -114,7 +133,7 @@ def _score_audit(result):
         mapping=[("morphology",f"morphology {topo.get('scoring_category') or 'unavailable'}"),("pachymetry",f"thinnest pachymetry {values.get('pachy_thinnest_um')} µm"),("age",f"age {values.get('age_years')} years")]
     for key,label in mapping:
         if key in rows: details.append(f"{key}: +{rows[key]} ({label})")
-    return {"source":source,"breakdown":details,"total":score.get("total"),"category":score.get("category")}
+    return {"source":source,"breakdown":details,"total":score.get("total"),"category":score.get("category"),"risk":_score_risk_interpretation(procedure,score.get("total"),score.get("category"))}
 
 def assess_eye_with_ablation_source(eye,plan,age,patient_modifiers):
     result=_original_assess_eye(eye,plan,age,patient_modifiers)
@@ -122,8 +141,12 @@ def assess_eye_with_ablation_source(eye,plan,age,patient_modifiers):
     audit=_score_audit(result)
     if audit:
         result["score"]["source"]=audit["source"]; result["score"]["breakdown"]=audit["breakdown"]
+        if audit.get("risk"): result["score"]["risk_interpretation"]=audit["risk"]
         warnings=list(result.get("warnings") or [])
         warnings.append("HC SCORE — SOURCE & BREAKDOWN: "+audit["source"]+". "+"; ".join(audit["breakdown"])+f". TOTAL: {audit['total']} ({audit['category']}). Hard stops are independent of this numeric score and are not counted as score points.")
+        risk=audit.get("risk")
+        if risk:
+            warnings.append("ECTASIA RISK INTERPRETATION: "+risk["published_evidence"]+" ABSOLUTE PROBABILITY: "+risk["absolute_probability"]+" LIMITATION: "+risk["interpretation_limit"]+" SOURCE: "+risk["source"])
         result["warnings"]=list(dict.fromkeys(warnings))
     return result
 core.assess_eye=assess_eye_with_ablation_source
@@ -132,7 +155,7 @@ index_path=Path(__file__).parent/"static"/"index.html"
 try:
     html=index_path.read_text(encoding="utf-8")
     replacements={
-        "HC Ectasia App v0.7.4":"HC Ectasia App v0.7.9","HC Ectasia App v0.7.5":"HC Ectasia App v0.7.9","HC Ectasia App v0.7.6":"HC Ectasia App v0.7.9","HC Ectasia App v0.7.7":"HC Ectasia App v0.7.9","HC Ectasia App v0.7.8":"HC Ectasia App v0.7.9",
+        "HC Ectasia App v0.7.4":"HC Ectasia App v0.7.10","HC Ectasia App v0.7.5":"HC Ectasia App v0.7.10","HC Ectasia App v0.7.6":"HC Ectasia App v0.7.10","HC Ectasia App v0.7.7":"HC Ectasia App v0.7.10","HC Ectasia App v0.7.8":"HC Ectasia App v0.7.10","HC Ectasia App v0.7.9":"HC Ectasia App v0.7.10",
         '<option value="100">100 µm</option>':'<option value="100" selected>100 µm</option>','<option value="6.5">6.5 mm</option>':'<option value="6.5" selected>6.5 mm</option>','<option value="9.0">9.0 mm</option>':'<option value="9.0" selected>9.0 mm</option>',
         'function renderEye(r, extracted){':'''function lasikPlanHeadline(r){ const v=r.values||{}; if(r.status!=="PASS"||v.procedure!=="LASIK")return ""; const plan=r.lasik_selected_plan||v.LASIK_selected_plan; if(!plan)return ""; const parts=[plan]; if(v.LASIK_flap_um!=null)parts.push(`FLAP ${fmt(v.LASIK_flap_um,0)} µm`); if(v.optical_zone_mm!=null)parts.push(`OPTICAL ZONE ${fmt(v.optical_zone_mm,1)} mm`); if(v.transition_zone_mm!=null)parts.push(`TRANSITION ZONE ${fmt(v.transition_zone_mm,1)} mm`); return parts.join(" • "); }
 function statusHeadline(r){ const plan=lasikPlanHeadline(r); return plan?`${r.status} — ${plan}`:r.status; }
@@ -143,5 +166,5 @@ function renderEye(r, extracted){''',
     if patched!=html: index_path.write_text(patched,encoding="utf-8")
 except OSError: pass
 
-core.app.title="HC Ectasia App v0.7.9"
+core.app.title="HC Ectasia App v0.7.10"
 app=core.app
