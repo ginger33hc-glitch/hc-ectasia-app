@@ -31,6 +31,8 @@ class ScoreValues:
     age_points: Optional[int]
     pachymetry_points: Optional[int]
     topography_points: Optional[int]
+    rsb_points: Optional[int]
+    mrse_points: Optional[int]
     erss_total: Optional[int]
 
 
