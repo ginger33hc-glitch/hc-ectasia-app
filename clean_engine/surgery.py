@@ -55,6 +55,30 @@ def final_kmean_within_hc_range(value: float) -> bool:
     return POLICY.final_kmean_min_d <= float(value) <= POLICY.final_kmean_max_d
 
 
+def lasik_independent_hard_stop(
+    *,
+    pachy_thinnest_um: Optional[float],
+    morphology: str,
+    intended_sphere_d: Optional[float],
+    final_kmean: Optional[float],
+) -> bool:
+    """Return whether changing LASIK flap/zone parameters cannot cure the stop.
+
+    This is explicit typed policy rather than the legacy string-marker search.
+    The clean engine intentionally follows the active HC pachymetry rule (<=480),
+    while the legacy '<480' marker mismatch remains characterized separately.
+    """
+    if pachy_thinnest_um is not None and float(pachy_thinnest_um) <= POLICY.pachymetry_hard_stop_um:
+        return True
+    if morphology == "ABNORMAL_ECTATIC":
+        return True
+    if intended_sphere_d is not None and (float(intended_sphere_d) < -10.0 or float(intended_sphere_d) > 6.0):
+        return True
+    if final_kmean is not None and not final_kmean_within_hc_range(final_kmean):
+        return True
+    return False
+
+
 def lasik_pta_cutoff(pta_percent: Optional[float]) -> bool:
     return isinstance(pta_percent, (int, float)) and not isinstance(pta_percent, bool) and float(pta_percent) >= POLICY.lasik_pta_cutoff_percent
 
