@@ -1,4 +1,4 @@
-"""Direct old-vs-clean equivalence tests for provisional PRK scoring."""
+"""Old-vs-clean PRK component equivalence plus explicit HC decision override."""
 import canonical_engine
 
 from clean_engine import prk
@@ -19,9 +19,17 @@ def test_prk_pachymetry_equivalence_at_boundaries_and_neighbors():
         assert prk.prk_pachymetry_points(pachy) == legacy.prk_pachy_points(pachy)
 
 
-def test_prk_category_equivalence():
-    for score in range(0, 11):
-        assert prk.prk_score_category(score) == legacy.score_category("PRK", score)
+def test_prk_decision_category_uses_unified_hc_boundary():
+    expected = {
+        0: "NO_SCORE_ESCALATION",
+        1: "NO_SCORE_ESCALATION",
+        2: "NO_SCORE_ESCALATION",
+        3: "CAUTION",
+        4: "HIGH_CONCERN",
+        5: "HIGH_CONCERN",
+    }
+    for score, category in expected.items():
+        assert prk.prk_score_category(score) == category
 
 
 def test_prk_total_uses_same_runtime_components():
@@ -33,11 +41,7 @@ def test_prk_total_uses_same_runtime_components():
         (30, 520, "INFERIOR_STEEPENING_SRA"),
     ]
     for age, pachy, morphology in cases:
-        expected = (
-            legacy.age_points(age)
-            + legacy.prk_pachy_points(pachy)
-            + legacy.prk_morphology_points(morphology)
-        )
+        expected = legacy.age_points(age) + legacy.prk_pachy_points(pachy) + legacy.prk_morphology_points(morphology)
         assert prk.prk_score_total(age, pachy, morphology) == expected
 
 
