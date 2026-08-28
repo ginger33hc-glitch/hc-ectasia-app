@@ -71,7 +71,7 @@ def test_prk_score_two_has_no_score_escalation():
     out = assess(base(procedure="PRK", flap_um=None, pachy_thinnest_um=520, morphology="ASYMMETRIC_BOWTIE", age_years=30, ablation_um=60))
     assert out.prk_scores.total == 2
     assert out.prk_scores.category == "NO_SCORE_ESCALATION"
-    assert out.status == "PASS WITH CAUTION"
+    assert out.status == "PASS"
 
 
 def test_prk_score_three_defers():
@@ -81,11 +81,11 @@ def test_prk_score_three_defers():
     assert out.status == "CAUTION — STOP/DEFER"
 
 
-def test_prk_score_four_or_more_stops():
+def test_prk_score_four_or_more_is_score_driven_stop_not_independent_hard_stop():
     out = assess(base(procedure="PRK", flap_um=None, pachy_thinnest_um=520, morphology="INFERIOR_STEEPENING_SRA", age_years=30, ablation_um=60))
     assert out.prk_scores.total == 5
     assert out.prk_scores.category == "HIGH_CONCERN"
-    assert "PRK_SCORE_GE_4" in out.hard_stops
+    assert "PRK_SCORE_GE_4" not in out.hard_stops
     assert out.status == "DO NOT PROCEED"
 
 
