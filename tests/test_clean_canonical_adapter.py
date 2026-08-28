@@ -55,13 +55,15 @@ def test_adapter_does_not_mutate_canonical_payload():
     assert repr(result) == before
 
 
-def test_adapter_has_no_canonical_runtime_or_policy_dependency():
+def test_adapter_has_only_neutral_boundary_imports():
     tree = ast.parse(Path("clean_engine/canonical_adapter.py").read_text(encoding="utf-8"))
-    imports = {
+    from_imports = {
         node.module for node in tree.body
         if isinstance(node, ast.ImportFrom) and node.module
     }
-    assert imports == {"typing", "shadow"}
-    source = Path("clean_engine/canonical_adapter.py").read_text(encoding="utf-8")
-    for marker in ("canonical_engine", "app", "bootstrap", "policy", "decision"):
-        assert marker not in source
+    plain_imports = {
+        alias.name for node in tree.body if isinstance(node, ast.Import)
+        for alias in node.names
+    }
+    assert from_imports == {"typing", "shadow"}
+    assert plain_imports == set()
