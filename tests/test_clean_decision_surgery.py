@@ -41,6 +41,35 @@ def test_exact_480_marker_mismatch_is_documented_not_silently_changed():
     })
 
 
+def test_clean_independent_hard_stop_uses_active_480_boundary():
+    common = dict(morphology="NORMAL_SYMMETRIC", intended_sphere_d=-3.0, final_kmean=42.0)
+    assert surgery.lasik_independent_hard_stop(pachy_thinnest_um=480.0, **common)
+    assert not surgery.lasik_independent_hard_stop(pachy_thinnest_um=480.001, **common)
+
+
+def test_clean_independent_hard_stop_recognizes_ectatic_morphology():
+    assert surgery.lasik_independent_hard_stop(
+        pachy_thinnest_um=520, morphology="ABNORMAL_ECTATIC",
+        intended_sphere_d=-3.0, final_kmean=42.0,
+    )
+
+
+def test_clean_independent_hard_stop_refractive_boundaries_are_strict():
+    common = dict(pachy_thinnest_um=520, morphology="NORMAL_SYMMETRIC", final_kmean=42.0)
+    assert not surgery.lasik_independent_hard_stop(intended_sphere_d=-10.0, **common)
+    assert surgery.lasik_independent_hard_stop(intended_sphere_d=-10.001, **common)
+    assert not surgery.lasik_independent_hard_stop(intended_sphere_d=6.0, **common)
+    assert surgery.lasik_independent_hard_stop(intended_sphere_d=6.001, **common)
+
+
+def test_clean_independent_hard_stop_final_k_boundaries_are_inclusive():
+    common = dict(pachy_thinnest_um=520, morphology="NORMAL_SYMMETRIC", intended_sphere_d=-3.0)
+    assert not surgery.lasik_independent_hard_stop(final_kmean=36.0, **common)
+    assert not surgery.lasik_independent_hard_stop(final_kmean=48.0, **common)
+    assert surgery.lasik_independent_hard_stop(final_kmean=35.999, **common)
+    assert surgery.lasik_independent_hard_stop(final_kmean=48.001, **common)
+
+
 def outcome(index, status="PASS WITH CAUTION", pta=35.0, hard_stop=False):
     return surgery.LasikPlanOutcome(surgery.LASIK_PLANS[index], status, pta, hard_stop)
 
