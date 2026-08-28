@@ -1,9 +1,11 @@
 """Pure final-decision hierarchy for the parallel clean engine.
 
-No production wiring. This mirrors the locked v0.7.43 principal hierarchy.
+No production wiring. This mirrors the locked principal hierarchy while using
+the shared HC score disposition policy.
 """
 from dataclasses import dataclass
-from typing import Tuple
+
+from .policy import score_decision_band
 
 
 @dataclass(frozen=True)
@@ -31,7 +33,8 @@ def decide(inp: DecisionInput) -> DecisionOutput:
         return DecisionOutput(inp.upstream_status, "PRESERVE_UNAVAILABLE_PRINCIPAL_INPUT")
     if inp.bad_d_status == "ABNORMAL":
         return DecisionOutput("DO NOT PROCEED", "FINAL_BAD_D_ABNORMAL")
-    if float(inp.erss_total) >= 3:
+    score_band = score_decision_band(inp.erss_total)
+    if score_band in {"DEFER", "STOP"}:
         if status_upper in {"PASS", "PASS WITH CAUTION"}:
             return DecisionOutput("CAUTION — DEFER", "ERSS_GE_3")
         return DecisionOutput(inp.upstream_status, "ERSS_GE_3_PRESERVE_MORE_ADVERSE_UPSTREAM")
