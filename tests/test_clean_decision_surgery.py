@@ -24,6 +24,53 @@ def test_lasik_plan_sequence():
     ]
 
 
+def outcome(index, status="PASS WITH CAUTION", pta=35.0, hard_stop=False):
+    return surgery.LasikPlanOutcome(surgery.LASIK_PLANS[index], status, pta, hard_stop)
+
+
+def test_lasik_fallback_stops_when_plan_a_is_acceptable():
+    seq = surgery.select_lasik_sequence([outcome(0), outcome(1), outcome(2)])
+    assert [x.plan.name for x in seq] == ["Plan A"]
+
+
+def test_lasik_failure_falls_back_a_to_b_and_preserves_a():
+    seq = surgery.select_lasik_sequence([
+        outcome(0, status="DO NOT PROCEED", pta=35.0),
+        outcome(1, status="PASS WITH CAUTION", pta=35.0),
+        outcome(2),
+    ])
+    assert [x.plan.name for x in seq] == ["Plan A", "Plan B"]
+    assert surgery.final_lasik_status(seq) == "PASS WITH CAUTION"
+
+
+def test_pta_at_exactly_40_triggers_fallback():
+    seq = surgery.select_lasik_sequence([
+        outcome(0, pta=40.0),
+        outcome(1, pta=39.999),
+        outcome(2),
+    ])
+    assert [x.plan.name for x in seq] == ["Plan A", "Plan B"]
+
+
+def test_independent_hard_stop_prevents_parameter_fallback():
+    seq = surgery.select_lasik_sequence([
+        outcome(0, status="DO NOT PROCEED", pta=45.0, hard_stop=True),
+        outcome(1), outcome(2),
+    ])
+    assert [x.plan.name for x in seq] == ["Plan A"]
+    assert surgery.final_lasik_status(seq) == "DO NOT PROCEED"
+
+
+def test_plan_c_pta_cutoff_forces_final_do_not_proceed():
+    seq = surgery.select_lasik_sequence([
+        outcome(0, status="DO NOT PROCEED", pta=42.0),
+        outcome(1, status="DO NOT PROCEED", pta=41.0),
+        outcome(2, status="PASS WITH CAUTION", pta=40.0),
+    ])
+    assert [x.plan.name for x in seq] == ["Plan A", "Plan B", "Plan C"]
+    assert surgery.final_lasik_status(seq) == "DO NOT PROCEED"
+
+
 def test_lasik_calculations():
     assert surgery.lasik_rsb_um(520, 100, 80) == 340
     assert surgery.lasik_pta_percent(500, 100, 100) == 40.0
