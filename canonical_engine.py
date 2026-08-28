@@ -10,10 +10,11 @@ import bootstrap
 import reports
 import randleman_bad_independence  # noqa: F401
 import erss_visual_morphology_policy  # noqa: F401
+import hc_final_decision_policy  # noqa: F401
 
 core = bootstrap.core
 app = _runtime.app
-CANONICAL_VERSION = "0.7.40"
+CANONICAL_VERSION = "0.7.41"
 core.APP_VERSION = CANONICAL_VERSION
 core.app.title = f"HC Ectasia App v{CANONICAL_VERSION}"
 # One version authority for browser, API title, PDF and DOCX exports.
@@ -47,6 +48,7 @@ def runtime_invariants():
 
     if not getattr(core,"_erss_visual_morphology_policy_installed",False):errors.append("Improved ERSS visual morphology policy is not active")
     if not getattr(core,"_randleman_bad_independence_installed",False):errors.append("BAD-independent Randleman ERSS pathway is not active")
+    if not getattr(core,"_hc_final_decision_hierarchy_installed",False):errors.append("HC final BAD-D/Randleman decision hierarchy is not active")
     if not getattr(core,"_hc_lasik_fallback_installed",False):errors.append("LASIK fallback planner is not active")
     if getattr(core,"PRK_EPITHELIUM_UM",None) != 50:errors.append("PRK epithelial convention is not 50 µm")
     if getattr(core,"FINAL_KMEAN_MIN_D",None) != 36.0 or getattr(core,"FINAL_KMEAN_MAX_D",None) != 48.0:errors.append("Final keratometry safety bounds are not 36-48 D")
