@@ -14,6 +14,7 @@ def base(**changes):
         flap_um=100,
         preop_kmean_d=44,
         intended_mrse_d=-3,
+        intended_sphere_d=-3,
     )
     values.update(changes)
     return EyeInput(**values)
@@ -67,3 +68,13 @@ def test_final_kmean_boundaries_are_inclusive():
     assert "FINAL_KMEAN_OUTSIDE_36_48" not in assess(base(preop_kmean_d=40, intended_mrse_d=-5)).hard_stops
     assert "FINAL_KMEAN_OUTSIDE_36_48" not in assess(base(preop_kmean_d=44, intended_mrse_d=5)).hard_stops
     assert "FINAL_KMEAN_OUTSIDE_36_48" in assess(base(preop_kmean_d=44, intended_mrse_d=5.001)).hard_stops
+
+
+def test_myopic_refractive_magnitude_boundary_is_strict():
+    assert "INTENDED_SPHERE_LT_MINUS_10" not in assess(base(intended_sphere_d=-10.0)).hard_stops
+    assert "INTENDED_SPHERE_LT_MINUS_10" in assess(base(intended_sphere_d=-10.001)).hard_stops
+
+
+def test_hyperopic_refractive_magnitude_boundary_is_strict():
+    assert "INTENDED_SPHERE_GT_PLUS_6" not in assess(base(intended_sphere_d=6.0)).hard_stops
+    assert "INTENDED_SPHERE_GT_PLUS_6" in assess(base(intended_sphere_d=6.001)).hard_stops
