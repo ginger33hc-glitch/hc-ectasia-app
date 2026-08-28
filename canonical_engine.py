@@ -7,10 +7,11 @@ from pathlib import Path
 import re
 import pachymetry_policy as _runtime
 import bootstrap
+import randleman_bad_independence  # noqa: F401
 
 core = bootstrap.core
 app = _runtime.app
-CANONICAL_VERSION = "0.7.37"
+CANONICAL_VERSION = "0.7.38"
 core.APP_VERSION = CANONICAL_VERSION
 core.app.title = f"HC Ectasia App v{CANONICAL_VERSION}"
 
@@ -58,6 +59,10 @@ def runtime_invariants():
             errors.append("Dedicated ERSS morphology handoff is not active")
     except Exception as exc:
         errors.append(f"ERSS source-isolation module unavailable: {type(exc).__name__}")
+
+    # Randleman ERSS and BAD tomography must remain hard-separated.
+    if not getattr(core, "_randleman_bad_independence_installed", False):
+        errors.append("BAD-independent Randleman ERSS pathway is not active")
 
     # LASIK automatic fallback must be installed exactly once.
     if not getattr(core, "_hc_lasik_fallback_installed", False):
