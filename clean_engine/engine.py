@@ -5,7 +5,15 @@ This module remains isolated from production until full equivalence is proven.
 """
 from .decision import DecisionInput, decide
 from .models import AssessmentResult, CalculatedValues, EyeInput, ScoreValues
-from .policy import POLICY, age_points, final_bad_d_classification, lasik_pachymetry_points, randleman_topography_points
+from .policy import (
+    POLICY,
+    age_points,
+    final_bad_d_classification,
+    lasik_mrse_points,
+    lasik_pachymetry_points,
+    lasik_rsb_points,
+    randleman_topography_points,
+)
 from .surgery import final_kmean_d, lasik_pta_percent, lasik_rsb_um, prk_pta_percent, prk_rst_um
 
 
@@ -47,8 +55,13 @@ def assess(inp: EyeInput) -> AssessmentResult:
     age = age_points(inp.age_years)
     pachy = lasik_pachymetry_points(inp.pachy_thinnest_um)
     topo = randleman_topography_points(inp.morphology)
-    erss_total = None if None in (age, pachy, topo) else int(age + pachy + topo)
-    scores = ScoreValues(age, pachy, topo, erss_total)
+    rsb = lasik_rsb_points(calc.lasik_rsb_um) if procedure == "LASIK" else None
+    mrse = lasik_mrse_points(inp.intended_mrse_d) if procedure == "LASIK" else None
+    if procedure == "LASIK":
+        erss_total = None if None in (age, pachy, topo, rsb, mrse) else int(age + pachy + topo + rsb + mrse)
+    else:
+        erss_total = None
+    scores = ScoreValues(age, pachy, topo, rsb, mrse, erss_total)
     bad_status = final_bad_d_classification(inp.bad_d)
 
     if inp.pachy_thinnest_um is not None and inp.pachy_thinnest_um <= POLICY.pachymetry_hard_stop_um:
