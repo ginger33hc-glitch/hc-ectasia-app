@@ -43,6 +43,36 @@ def test_fallback_independent_pachymetry_stop_never_advances_to_plan_b():
     assert out.status == "DO NOT PROCEED" and "PACHYMETRY_LE_480" in out.hard_stops
 
 
+def test_fallback_independent_ectatic_topography_never_advances_to_plan_b():
+    out = assess(base(use_lasik_fallback_planning=True, morphology="ABNORMAL_ECTATIC", ablation_um=121))
+    assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A"]
+    assert out.status == "DO NOT PROCEED"
+    assert "ABNORMAL_ECTATIC_TOPOGRAPHY" in out.hard_stops
+
+
+def test_fallback_independent_myopic_magnitude_stop_never_advances_to_plan_b():
+    out = assess(base(use_lasik_fallback_planning=True, intended_sphere_d=-10.001, ablation_um=121))
+    assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A"]
+    assert out.status == "DO NOT PROCEED"
+    assert "INTENDED_SPHERE_LT_MINUS_10" in out.hard_stops
+
+
+def test_fallback_independent_hyperopic_magnitude_stop_never_advances_to_plan_b():
+    out = assess(base(use_lasik_fallback_planning=True, intended_sphere_d=6.001, intended_mrse_d=5, ablation_um=121))
+    assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A"]
+    assert out.status == "DO NOT PROCEED"
+    assert "INTENDED_SPHERE_GT_PLUS_6" in out.hard_stops
+
+
+def test_fallback_independent_final_k_stop_never_advances_to_plan_b():
+    # Plan A also fails tissue geometry, proving fallback would otherwise advance.
+    out = assess(base(use_lasik_fallback_planning=True, preop_kmean_d=44, intended_mrse_d=5.001, intended_sphere_d=5, ablation_um=121))
+    assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A"]
+    assert out.calculations.final_kmean_d > 48
+    assert out.status == "DO NOT PROCEED"
+    assert "FINAL_KMEAN_OUTSIDE_36_48" in out.hard_stops
+
+
 def test_fallback_plan_c_pta_at_40_is_final_hard_stop():
     out = assess(base(use_lasik_fallback_planning=True, pachy_thinnest_um=500, ablation_um=120, intended_sphere_d=-5.5, intended_cylinder_magnitude_d=5.5))
     assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A", "Plan B", "Plan C"]
