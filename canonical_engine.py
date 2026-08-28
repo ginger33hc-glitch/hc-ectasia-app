@@ -8,10 +8,11 @@ import re
 import pachymetry_policy as _runtime
 import bootstrap
 import randleman_bad_independence  # noqa: F401
+import erss_visual_morphology_policy  # noqa: F401
 
 core = bootstrap.core
 app = _runtime.app
-CANONICAL_VERSION = "0.7.38"
+CANONICAL_VERSION = "0.7.39"
 core.APP_VERSION = CANONICAL_VERSION
 core.app.title = f"HC Ectasia App v{CANONICAL_VERSION}"
 
@@ -59,6 +60,10 @@ def runtime_invariants():
             errors.append("Dedicated ERSS morphology handoff is not active")
     except Exception as exc:
         errors.append(f"ERSS source-isolation module unavailable: {type(exc).__name__}")
+
+    # Improved visual morphology policy must be active; numeric unreadability alone must not suppress a visible pattern.
+    if not getattr(core, "_erss_visual_morphology_policy_installed", False):
+        errors.append("Improved ERSS visual morphology policy is not active")
 
     # Randleman ERSS and BAD tomography must remain hard-separated.
     if not getattr(core, "_randleman_bad_independence_installed", False):
