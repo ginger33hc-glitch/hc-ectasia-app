@@ -8,6 +8,7 @@ from .models import AssessmentResult, CalculatedValues, EyeInput, LasikPlanningS
 from .policy import (
     POLICY, age_points, final_bad_d_classification, lasik_mrse_points,
     lasik_pachymetry_points, lasik_rsb_points, randleman_topography_points,
+    score_decision_band,
 )
 from .prk import prk_morphology_points, prk_pachymetry_points, prk_pta_evidence_gap, prk_score_category, prk_score_total
 from .status import combine_status
@@ -122,7 +123,7 @@ def assess(inp: EyeInput) -> AssessmentResult:
         hard_stops.append("PRK_RST_LT_310")
     if calc.final_kmean_d is not None and not (POLICY.final_kmean_min_d <= calc.final_kmean_d <= POLICY.final_kmean_max_d):
         hard_stops.append("FINAL_KMEAN_OUTSIDE_36_48")
-    if erss_total is not None and erss_total >= 4: hard_stops.append("ERSS_GE_4")
+    if score_decision_band(erss_total) == "STOP": hard_stops.append("ERSS_GE_4")
 
     upstream = "DO NOT PROCEED" if hard_stops else ("DATA INSUFFICIENT" if missing else "PASS")
     if procedure == "PRK" and not hard_stops and not missing:
