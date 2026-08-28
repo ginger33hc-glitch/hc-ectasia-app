@@ -82,6 +82,52 @@ def test_typed_evaluator_stops_immediately_on_independent_hard_stop():
     assert surgery.final_lasik_status(seq) == "DO NOT PROCEED"
 
 
+def test_plan_a_preserves_actual_laser_ablation():
+    result = surgery.plan_specific_ablation(
+        surgery.LASIK_PLANS[0], actual_ablation_um=77.0,
+        intended_sphere_d=-3.0, intended_cylinder_magnitude_d=1.0,
+        laser_platform="Alcon EX500", is_fallback_plan=False,
+    )
+    assert result.ablation_um == 77.0
+    assert result.source == "ACTUAL"
+
+
+def test_plan_b_c_clear_plan_a_actual_and_recalculate_for_new_zone():
+    for plan in surgery.LASIK_PLANS[1:]:
+        result = surgery.plan_specific_ablation(
+            plan, actual_ablation_um=77.0,
+            intended_sphere_d=-3.0, intended_cylinder_magnitude_d=1.0,
+            laser_platform="Alcon EX500", is_fallback_plan=True,
+        )
+        assert result.ablation_um == 48.0
+        assert result.source == "HC_EX500_ESTIMATE"
+
+
+def test_plan_a_and_plan_b_use_different_locked_zone_rates_when_estimating():
+    a = surgery.plan_specific_ablation(
+        surgery.LASIK_PLANS[0], actual_ablation_um=None,
+        intended_sphere_d=-3.0, intended_cylinder_magnitude_d=1.0,
+        laser_platform="Alcon EX500", is_fallback_plan=False,
+    )
+    b = surgery.plan_specific_ablation(
+        surgery.LASIK_PLANS[1], actual_ablation_um=None,
+        intended_sphere_d=-3.0, intended_cylinder_magnitude_d=1.0,
+        laser_platform="Alcon EX500", is_fallback_plan=True,
+    )
+    assert a.ablation_um == 60.0
+    assert b.ablation_um == 48.0
+
+
+def test_fallback_does_not_invent_ablation_for_hyperopic_positive_sphere():
+    result = surgery.plan_specific_ablation(
+        surgery.LASIK_PLANS[1], actual_ablation_um=77.0,
+        intended_sphere_d=2.0, intended_cylinder_magnitude_d=1.0,
+        laser_platform="Alcon EX500", is_fallback_plan=True,
+    )
+    assert result.ablation_um is None
+    assert result.source == "ACTUAL_REQUIRED_HYPEROPIC_OR_MIXED"
+
+
 def test_pta_at_exactly_40_triggers_fallback():
     seq = surgery.select_lasik_sequence([
         outcome(0, pta=40.0),
