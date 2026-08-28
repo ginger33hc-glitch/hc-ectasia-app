@@ -36,8 +36,6 @@ def test_legacy_independent_hard_stop_marker_contract_is_characterized():
 
 
 def test_exact_480_marker_mismatch_is_documented_not_silently_changed():
-    # Current active pachymetry policy emits <=480 while legacy fallback searches for <480.
-    # Preserve this characterization until migration replaces string matching with typed stops.
     assert not legacy_lasik._independent_hard_stop({
         "hard_stops": ["HC operational hard stop: thinnest preoperative cornea <=480 µm."]
     })
@@ -60,6 +58,28 @@ def test_lasik_failure_falls_back_a_to_b_and_preserves_a():
     ])
     assert [x.plan.name for x in seq] == ["Plan A", "Plan B"]
     assert surgery.final_lasik_status(seq) == "PASS WITH CAUTION"
+
+
+def test_typed_evaluator_is_lazy_and_stops_after_acceptable_plan_b():
+    called = []
+    def evaluator(plan):
+        called.append(plan.name)
+        if plan.name == "Plan A":
+            return surgery.LasikPlanOutcome(plan, "DO NOT PROCEED", 41.0)
+        return surgery.LasikPlanOutcome(plan, "PASS WITH CAUTION", 39.0)
+    seq = surgery.evaluate_lasik_fallback(evaluator)
+    assert called == ["Plan A", "Plan B"]
+    assert [x.plan.name for x in seq] == called
+
+
+def test_typed_evaluator_stops_immediately_on_independent_hard_stop():
+    called = []
+    def evaluator(plan):
+        called.append(plan.name)
+        return surgery.LasikPlanOutcome(plan, "DO NOT PROCEED", 45.0, independent_hard_stop=True)
+    seq = surgery.evaluate_lasik_fallback(evaluator)
+    assert called == ["Plan A"]
+    assert surgery.final_lasik_status(seq) == "DO NOT PROCEED"
 
 
 def test_pta_at_exactly_40_triggers_fallback():
