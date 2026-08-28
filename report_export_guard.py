@@ -17,6 +17,7 @@ from reportlab.platypus import Paragraph,Table,TableStyle,Spacer
 from reportlab.lib import colors
 from docx.shared import Pt
 
+IDENTITY_HEADING="PATIENT IDENTITY NOT VERIFIED - SURGEON CONFIRMATION REQUIRED"
 PDF_BAD=[["Final BAD-D","HC interpretation / action"],["<=1.6","NORMAL"],[">1.6 to <3.0","SUSPICIOUS - REVIEW / NOT CLEARED"],[">=3.0","ABNORMAL CORNEA - DO NOT PROCEED"]]
 ERSS=[
  ["Variable","Finding","Points"],
@@ -31,9 +32,26 @@ HC_NOTE="Published Randleman/ERSS table shown for reference. The HC engine inten
 _orig_pdf=reports.build_pdf
 _orig_docx=reports.build_docx
 
+def _remove_pdf_identity_details(story):
+    """Keep the identity-verification heading but suppress verbose source-by-source bullets."""
+    start=next((i for i,x in enumerate(story) if isinstance(x,Paragraph) and getattr(x,'text','')==IDENTITY_HEADING),None)
+    if start is None:
+        return
+    end=start+1
+    while end < len(story):
+        item=story[end]
+        if isinstance(item,Paragraph):
+            text=getattr(item,'text','')
+            style_name=getattr(getattr(item,'style',None),'name','')
+            if style_name=='Section':
+                break
+        end+=1
+    del story[start+1:end]
+
 def build_pdf(payload):
     orig_build=reports.SimpleDocTemplate.build
     def patched_build(doc,story,*a,**kw):
+        _remove_pdf_identity_details(story)
         idx=next((i for i,x in enumerate(story) if isinstance(x,Paragraph) and getattr(x,'text','')=='Interpretation note'),len(story))
         styles=reports.getSampleStyleSheet()
         sec=reports.ParagraphStyle('HCRefSection',parent=styles['Heading2'],fontName='Helvetica-Bold',fontSize=10.5,leading=13,textColor=reports._rl(reports.NAVY),spaceBefore=10,spaceAfter=5)
@@ -51,7 +69,17 @@ def build_pdf(payload):
 
 def build_docx(payload):
     orig_heading=reports._add_heading
+    orig_bullet=reports._add_bullet
+    state={"suppress_identity":False}
+    def patched_bullet(document,text):
+        if state["suppress_identity"]:
+            return None
+        return orig_bullet(document,text)
     def patched_heading(document,text,level=1):
+        if text==IDENTITY_HEADING:
+            state["suppress_identity"]=True
+            return orig_heading(document,text,level)
+        state["suppress_identity"]=False
         if text=='Interpretation note':
             orig_heading(document,'HC BAD-D reference points',1)
             t=document.add_table(rows=1,cols=2);t.style='Table Grid';t.rows[0].cells[0].text='Final BAD-D';t.rows[0].cells[1].text='HC interpretation / action'
@@ -70,8 +98,11 @@ def build_docx(payload):
                 p=document.add_paragraph(note);p.runs[0].font.size=Pt(8)
         return orig_heading(document,text,level)
     reports._add_heading=patched_heading
+    reports._add_bullet=patched_bullet
     try:return _orig_docx(payload)
-    finally:reports._add_heading=orig_heading
+    finally:
+        reports._add_heading=orig_heading
+        reports._add_bullet=orig_bullet
 
 reports.build_pdf=build_pdf
 reports.build_docx=build_docx
