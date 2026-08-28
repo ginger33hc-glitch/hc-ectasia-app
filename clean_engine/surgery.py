@@ -1,6 +1,6 @@
-"""Pure surgical calculations for the parallel clean engine."""
+"""Pure surgical calculations and LASIK fallback policy for the parallel clean engine."""
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Sequence, Tuple
 
 from .policy import POLICY
 
@@ -11,6 +11,14 @@ class LasikPlan:
     flap_um: float
     optical_zone_mm: float
     transition_zone_mm: float
+
+
+@dataclass(frozen=True)
+class LasikPlanOutcome:
+    plan: LasikPlan
+    status: str
+    pta_percent: Optional[float]
+    independent_hard_stop: bool = False
 
 
 LASIK_PLANS = (
@@ -46,3 +54,36 @@ def final_kmean_within_hc_range(value: float) -> bool:
 
 def lasik_pta_cutoff(pta_percent: Optional[float]) -> bool:
     return isinstance(pta_percent, (int, float)) and not isinstance(pta_percent, bool) and float(pta_percent) >= POLICY.lasik_pta_cutoff_percent
+
+
+def needs_lasik_fallback(outcome: LasikPlanOutcome) -> bool:
+    """Mirror legacy fallback trigger without string-matching clinical reasons."""
+    if outcome.independent_hard_stop:
+        return False
+    return outcome.status == "DO NOT PROCEED" or lasik_pta_cutoff(outcome.pta_percent)
+
+
+def select_lasik_sequence(outcomes: Sequence[LasikPlanOutcome]) -> Tuple[LasikPlanOutcome, ...]:
+    """Return the evaluated A→B→C sequence under the locked fallback contract.
+
+    The caller supplies prospective outcomes in Plan A/B/C order. Evaluation stops
+    on the first plan that neither fails nor reaches PTA >=40%, on an independent
+    hard stop, or after Plan C. Earlier failed plans remain in the returned sequence.
+    """
+    selected = []
+    for expected_plan, outcome in zip(LASIK_PLANS, outcomes):
+        if outcome.plan != expected_plan:
+            raise ValueError("LASIK outcomes must be supplied in Plan A, Plan B, Plan C order")
+        selected.append(outcome)
+        if not needs_lasik_fallback(outcome):
+            break
+    return tuple(selected)
+
+
+def final_lasik_status(sequence: Sequence[LasikPlanOutcome]) -> str:
+    if not sequence:
+        raise ValueError("At least one LASIK plan outcome is required")
+    last = sequence[-1]
+    if lasik_pta_cutoff(last.pta_percent):
+        return "DO NOT PROCEED"
+    return last.status
