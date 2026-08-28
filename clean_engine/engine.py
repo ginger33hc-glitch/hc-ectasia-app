@@ -4,11 +4,11 @@ Pipeline: validate -> calculate -> score -> hard stops -> final decision.
 This module remains isolated from production until full equivalence is proven.
 """
 from .decision import DecisionInput, decide
+from .hard_stops import HardStopInput, evaluate_hard_stops
 from .models import AssessmentResult, CalculatedValues, EyeInput, LasikPlanningStep, PrkScoreValues, ScoreValues
 from .policy import (
     POLICY, age_points, final_bad_d_classification, lasik_mrse_points,
     lasik_pachymetry_points, lasik_rsb_points, randleman_topography_points,
-    score_decision_band,
 )
 from .prk import prk_morphology_points, prk_pachymetry_points, prk_pta_evidence_gap, prk_score_category, prk_score_total
 from .status import combine_status
@@ -110,20 +110,17 @@ def assess(inp: EyeInput) -> AssessmentResult:
         )
 
     bad_status = final_bad_d_classification(inp.bad_d)
-    if inp.pachy_thinnest_um is not None and inp.pachy_thinnest_um <= POLICY.pachymetry_hard_stop_um:
-        hard_stops.append("PACHYMETRY_LE_480")
-    if inp.morphology == "ABNORMAL_ECTATIC": hard_stops.append("ABNORMAL_ECTATIC_TOPOGRAPHY")
-    if bad_status == "ABNORMAL": hard_stops.append("FINAL_BAD_D_ABNORMAL")
-    if inp.intended_sphere_d is not None:
-        if inp.intended_sphere_d < -10.0: hard_stops.append("INTENDED_SPHERE_LT_MINUS_10")
-        if inp.intended_sphere_d > 6.0: hard_stops.append("INTENDED_SPHERE_GT_PLUS_6")
-    if procedure == "LASIK" and calc.lasik_rsb_um is not None and calc.lasik_rsb_um < POLICY.lasik_rsb_hard_stop_um:
-        hard_stops.append("LASIK_RSB_LT_300")
-    if procedure == "PRK" and calc.prk_rst_um is not None and calc.prk_rst_um < POLICY.prk_rst_hard_stop_um:
-        hard_stops.append("PRK_RST_LT_310")
-    if calc.final_kmean_d is not None and not (POLICY.final_kmean_min_d <= calc.final_kmean_d <= POLICY.final_kmean_max_d):
-        hard_stops.append("FINAL_KMEAN_OUTSIDE_36_48")
-    if score_decision_band(erss_total) == "STOP": hard_stops.append("ERSS_GE_4")
+    hard_stops.extend(evaluate_hard_stops(HardStopInput(
+        procedure=procedure,
+        pachy_thinnest_um=inp.pachy_thinnest_um,
+        morphology=inp.morphology,
+        bad_d_status=bad_status,
+        intended_sphere_d=inp.intended_sphere_d,
+        lasik_rsb_um=calc.lasik_rsb_um,
+        prk_rst_um=calc.prk_rst_um,
+        final_kmean_d=calc.final_kmean_d,
+        lasik_erss_total=erss_total,
+    )))
 
     upstream = "DO NOT PROCEED" if hard_stops else ("DATA INSUFFICIENT" if missing else "PASS")
     if procedure == "PRK" and not hard_stops and not missing:
