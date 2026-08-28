@@ -5,7 +5,7 @@ write APP_VERSION, the FastAPI title, or visible software-version strings.
 """
 from pathlib import Path
 import re
-import hc_age_policy, hc_bad_final_policy, bootstrap, extraction_guard, erss_topography_guard
+import hc_age_policy, hc_bad_final_policy, bootstrap, merge_policy_base, extraction_guard, erss_topography_guard
 import report_export_guard
 import reports
 bootstrap.core.build_pdf=reports.build_pdf
