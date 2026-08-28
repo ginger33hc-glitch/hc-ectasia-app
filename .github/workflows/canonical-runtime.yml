@@ -2,7 +2,7 @@ name: Canonical Runtime Safety
 
 on:
   push:
-    branches: [main, clean-engine-phase2]
+    branches: [main]
   pull_request:
     branches: [main]
 
