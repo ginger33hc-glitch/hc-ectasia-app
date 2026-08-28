@@ -79,3 +79,33 @@ def lasik_rsb_points(rsb_um: Optional[float]) -> Optional[int]:
     if rsb_um < 300:
         return 1
     return 0
+
+
+def lasik_mrse_points(mrse_d: Optional[float]) -> Optional[int]:
+    """Locked Randleman MRSE component using minus-diopter thresholds."""
+    if not isinstance(mrse_d, (int, float)) or isinstance(mrse_d, bool):
+        return None
+    value = float(mrse_d)
+    if value < -14:
+        return 4
+    if value < -12:
+        return 3
+    if value < -10:
+        return 2
+    if value < -8:
+        return 1
+    return 0
+
+
+def lasik_erss_total(age_years: Optional[float], pachy_um: Optional[float], morphology: str,
+                     rsb_um: Optional[float], mrse_d: Optional[float]) -> Optional[int]:
+    components = (
+        age_points(age_years),
+        lasik_pachymetry_points(pachy_um),
+        randleman_topography_points(morphology),
+        lasik_rsb_points(rsb_um),
+        lasik_mrse_points(mrse_d),
+    )
+    if any(value is None for value in components):
+        return None
+    return int(sum(components))
