@@ -1,11 +1,15 @@
-"""HC policy: Final BAD-D is the decision-making BAD gate.
+"""HC policy: Final BAD-D interpretation and abnormal hard-stop gate.
 
 Individual Df/Db/Dp/Dt/Da values remain displayed for clinical context, but an
 isolated suspicious/abnormal component does not determine the HC BAD status.
 Final BAD-D:
 - <=1.6: NORMAL
-- >1.6 and <3.0: SUSPICIOUS -> REVIEW / NOT CLEARED
+- >1.6 and <3.0: SUSPICIOUS, contextual under the canonical final-decision hierarchy
 - >=3.0: ABNORMAL CORNEA -> DO NOT PROCEED hard stop
+
+Final PASS WITH CAUTION versus Randleman/ERSS adverse classification belongs only
+to hc_final_decision_policy.py; this module must not independently escalate a
+SUSPICIOUS Final BAD-D to REVIEW/DEFER.
 """
 import bootstrap
 
@@ -50,8 +54,8 @@ def hc_tomography_review(eye):
         "BAD_display": bad,
         "cross_sectional_flags": flags,
         "evidence_note": (
-            "HC BAD policy: Final BAD-D determines the BAD decision gate. Individual Df/Db/Dp/Dt/Da "
-            "remain contextual findings and do not independently determine BAD clearance."
+            "HC BAD policy: Final BAD-D determines the BAD interpretation. Individual Df/Db/Dp/Dt/Da "
+            "remain contextual findings and do not independently determine final clearance."
         ),
     }
 
@@ -73,12 +77,8 @@ def assess_eye_with_final_bad_cutoff(eye, plan, age, patient_modifiers):
             reasons.append(hard_stop)
         result["status"] = "DO NOT PROCEED"
         result["action"] = "DO NOT PROCEED — ABNORMAL CORNEA. Final BAD-D is >=3.0 and meets the HC abnormal cutoff."
-    elif bad_d_status == "SUSPICIOUS" and result.get("status") == "PASS":
-        result["status"] = "REVIEW — NOT CLEARED"
-        result["action"] = "NOT CLEARED. Final BAD-D is suspicious; confirm/review tomography before any surgical decision."
-        reason = "HC BAD gate: Final BAD-D suspicious (>1.6 and <3.0)."
-        if reason not in result.setdefault("reasons", []):
-            result["reasons"].append(reason)
+    # SUSPICIOUS Final BAD-D is intentionally not decision-changing here.
+    # hc_final_decision_policy.py is the sole final hierarchy authority.
     return result
 
 
