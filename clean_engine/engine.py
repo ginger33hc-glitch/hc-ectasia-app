@@ -13,8 +13,8 @@ from .prk import prk_morphology_points, prk_pachymetry_points, prk_pta_evidence_
 from .status import combine_status
 from .surgery import (
     LasikPlanOutcome, evaluate_lasik_fallback, final_kmean_d, final_lasik_status,
-    lasik_pta_percent, lasik_rsb_um, plan_specific_ablation, prk_pta_percent,
-    prk_rst_um,
+    lasik_independent_hard_stop, lasik_pta_percent, lasik_rsb_um,
+    plan_specific_ablation, prk_pta_percent, prk_rst_um,
 )
 
 
@@ -31,12 +31,17 @@ def assess(inp: EyeInput) -> AssessmentResult:
     if procedure not in {"LASIK", "PRK"}:
         missing.append("procedure")
 
+    predicted_final_kmean = None
+    if inp.preop_kmean_d is not None and inp.intended_mrse_d is not None:
+        predicted_final_kmean = final_kmean_d(inp.preop_kmean_d, inp.intended_mrse_d)
+
     calc = CalculatedValues()
     if procedure == "LASIK" and inp.use_lasik_fallback_planning and inp.pachy_thinnest_um is not None:
-        independent = (
-            inp.pachy_thinnest_um <= POLICY.pachymetry_hard_stop_um
-            or inp.morphology == "ABNORMAL_ECTATIC"
-            or (inp.intended_sphere_d is not None and (inp.intended_sphere_d < -10.0 or inp.intended_sphere_d > 6.0))
+        independent = lasik_independent_hard_stop(
+            pachy_thinnest_um=inp.pachy_thinnest_um,
+            morphology=inp.morphology,
+            intended_sphere_d=inp.intended_sphere_d,
+            final_kmean=predicted_final_kmean,
         )
         def evaluate(plan):
             ablation = plan_specific_ablation(
@@ -82,8 +87,8 @@ def assess(inp: EyeInput) -> AssessmentResult:
             prk_pta_percent=prk_pta_percent(inp.pachy_thinnest_um, inp.ablation_um),
         )
 
-    if inp.preop_kmean_d is not None and inp.intended_mrse_d is not None:
-        calc = CalculatedValues(calc.lasik_rsb_um, calc.lasik_pta_percent, calc.prk_rst_um, calc.prk_pta_percent, final_kmean_d(inp.preop_kmean_d, inp.intended_mrse_d))
+    if predicted_final_kmean is not None:
+        calc = CalculatedValues(calc.lasik_rsb_um, calc.lasik_pta_percent, calc.prk_rst_um, calc.prk_pta_percent, predicted_final_kmean)
 
     age, pachy, topo = age_points(inp.age_years), lasik_pachymetry_points(inp.pachy_thinnest_um), randleman_topography_points(inp.morphology)
     rsb = lasik_rsb_points(calc.lasik_rsb_um) if procedure == "LASIK" else None
