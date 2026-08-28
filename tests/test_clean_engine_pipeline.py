@@ -29,10 +29,7 @@ def test_fallback_plan_a_success_stops_after_a():
 
 
 def test_fallback_plan_a_rsb_failure_is_rescued_by_plan_b_recalculation():
-    out = assess(base(
-        use_lasik_fallback_planning=True, pachy_thinnest_um=500,
-        ablation_um=101, intended_sphere_d=-3, intended_cylinder_magnitude_d=1,
-    ))
+    out = assess(base(use_lasik_fallback_planning=True, pachy_thinnest_um=500, ablation_um=101, intended_sphere_d=-3, intended_cylinder_magnitude_d=1))
     assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A", "Plan B"]
     assert out.lasik_planning_sequence[0].rsb_um == 299
     assert out.lasik_planning_sequence[1].ablation_um == 48
@@ -43,27 +40,18 @@ def test_fallback_plan_a_rsb_failure_is_rescued_by_plan_b_recalculation():
 def test_fallback_independent_pachymetry_stop_never_advances_to_plan_b():
     out = assess(base(use_lasik_fallback_planning=True, pachy_thinnest_um=480))
     assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A"]
-    assert out.status == "DO NOT PROCEED"
-    assert "PACHYMETRY_LE_480" in out.hard_stops
+    assert out.status == "DO NOT PROCEED" and "PACHYMETRY_LE_480" in out.hard_stops
 
 
 def test_fallback_plan_c_pta_at_40_is_final_hard_stop():
-    out = assess(base(
-        use_lasik_fallback_planning=True, pachy_thinnest_um=500,
-        ablation_um=120, intended_sphere_d=-5.5, intended_cylinder_magnitude_d=5.5,
-    ))
+    out = assess(base(use_lasik_fallback_planning=True, pachy_thinnest_um=500, ablation_um=120, intended_sphere_d=-5.5, intended_cylinder_magnitude_d=5.5))
     assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A", "Plan B", "Plan C"]
     assert out.lasik_planning_sequence[-1].pta_percent == 44.4
-    assert "LASIK_PTA_GE_40_AFTER_FALLBACK" in out.hard_stops
-    assert out.status == "DO NOT PROCEED"
+    assert "LASIK_PTA_GE_40_AFTER_FALLBACK" in out.hard_stops and out.status == "DO NOT PROCEED"
 
 
 def test_fallback_hyperopic_plan_b_cannot_invent_ablation():
-    out = assess(base(
-        use_lasik_fallback_planning=True, pachy_thinnest_um=500,
-        ablation_um=101, intended_sphere_d=2, intended_mrse_d=1.5,
-        intended_cylinder_magnitude_d=1,
-    ))
+    out = assess(base(use_lasik_fallback_planning=True, pachy_thinnest_um=500, ablation_um=101, intended_sphere_d=2, intended_mrse_d=1.5, intended_cylinder_magnitude_d=1))
     assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A", "Plan B"]
     assert out.lasik_planning_sequence[1].ablation_um is None
     assert out.lasik_planning_sequence[1].ablation_source == "ACTUAL_REQUIRED_HYPEROPIC_OR_MIXED"
@@ -77,6 +65,39 @@ def test_pipeline_exposes_and_sums_all_five_lasik_erss_components():
 def test_prk_does_not_receive_lasik_erss_components_or_total():
     out = assess(base(procedure="PRK", flap_um=None))
     assert out.scores.rsb_points is None and out.scores.mrse_points is None and out.scores.erss_total is None
+
+
+def test_prk_provisional_score_zero_to_one_is_not_escalated():
+    out = assess(base(procedure="PRK", flap_um=None, pachy_thinnest_um=520, morphology="NORMAL_SYMMETRIC", age_years=30, ablation_um=60))
+    assert out.prk_scores.total == 0
+    assert out.prk_scores.category == "LOWER_FLAGGED_BURDEN"
+    assert out.status == "PASS WITH CAUTION"
+
+
+def test_prk_provisional_score_two_to_three_defers():
+    out = assess(base(procedure="PRK", flap_um=None, pachy_thinnest_um=520, morphology="ASYMMETRIC_BOWTIE", age_years=30, ablation_um=60))
+    assert out.prk_scores.total == 2
+    assert out.prk_scores.category == "CAUTION"
+    assert out.status == "CAUTION — STOP/DEFER"
+
+
+def test_prk_provisional_score_four_or_more_stops():
+    out = assess(base(procedure="PRK", flap_um=None, pachy_thinnest_um=520, morphology="INFERIOR_STEEPENING_SRA", age_years=30, ablation_um=60))
+    assert out.prk_scores.total == 5
+    assert out.prk_scores.category == "HIGH_CONCERN"
+    assert "PRK_SCORE_GE_4" in out.hard_stops
+    assert out.status == "DO NOT PROCEED"
+
+
+def test_prk_pta_exact_35_28_is_not_evidence_gap_but_above_is_review():
+    exact_ablation = 0.3528 * 500 - 50
+    exact = assess(base(procedure="PRK", flap_um=None, pachy_thinnest_um=500, ablation_um=exact_ablation, age_years=30))
+    assert exact.calculations.prk_pta_percent == 35.28
+    assert exact.prk_scores.pta_evidence_gap is False
+    above = assess(base(procedure="PRK", flap_um=None, pachy_thinnest_um=500, ablation_um=exact_ablation + 0.001, age_years=30))
+    assert above.prk_scores.pta_evidence_gap is True
+    assert above.status == "REVIEW — NOT CLEARED"
+    assert "PRK_PTA_EVIDENCE_GAP" not in above.hard_stops
 
 
 def test_pachymetry_480_is_independent_hard_stop():
