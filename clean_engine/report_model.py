@@ -1,10 +1,10 @@
 """Presentation-neutral report model for clean assessment results.
 
-This layer translates domain output into a stable report payload without HTML,
-PDF, DOCX, colors, or UI logic. Renderers consume this model later.
+This layer translates domain output into a stable payload without renderer,
+formatting, color, or UI logic. Presentation implementations consume it later.
 """
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Tuple
 
 from .models import AssessmentResult, CalculatedValues, LasikPlanningStep, PrkScoreValues, ScoreValues
 from .status import presentation_class
