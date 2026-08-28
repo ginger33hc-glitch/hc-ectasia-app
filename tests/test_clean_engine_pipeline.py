@@ -5,16 +5,11 @@ from clean_engine.models import EyeInput
 
 def base(**changes):
     values = dict(
-        age_years=30,
-        pachy_thinnest_um=520,
-        bad_d=1.0,
-        morphology="NORMAL_SYMMETRIC",
-        procedure="LASIK",
-        ablation_um=60,
-        flap_um=100,
-        preop_kmean_d=44,
-        intended_mrse_d=-3,
-        intended_sphere_d=-3,
+        age_years=30, pachy_thinnest_um=520, bad_d=1.0,
+        morphology="NORMAL_SYMMETRIC", procedure="LASIK", ablation_um=60,
+        flap_um=100, preop_kmean_d=44, intended_mrse_d=-3,
+        intended_sphere_d=-3, intended_cylinder_magnitude_d=1,
+        laser_platform="Alcon EX500",
     )
     values.update(changes)
     return EyeInput(**values)
@@ -23,39 +18,70 @@ def base(**changes):
 def test_complete_favorable_case_is_pass_with_caution():
     out = assess(base())
     assert out.status == "PASS WITH CAUTION"
-    assert not out.hard_stops
-    assert not out.missing
+    assert not out.hard_stops and not out.missing
+
+
+def test_fallback_plan_a_success_stops_after_a():
+    out = assess(base(use_lasik_fallback_planning=True, ablation_um=60))
+    assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A"]
+    assert out.lasik_planning_sequence[0].ablation_source == "ACTUAL"
+    assert out.calculations.lasik_rsb_um == 360
+
+
+def test_fallback_plan_a_rsb_failure_is_rescued_by_plan_b_recalculation():
+    out = assess(base(
+        use_lasik_fallback_planning=True, pachy_thinnest_um=500,
+        ablation_um=101, intended_sphere_d=-3, intended_cylinder_magnitude_d=1,
+    ))
+    assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A", "Plan B"]
+    assert out.lasik_planning_sequence[0].rsb_um == 299
+    assert out.lasik_planning_sequence[1].ablation_um == 48
+    assert out.lasik_planning_sequence[1].rsb_um == 352
+    assert out.calculations.lasik_rsb_um == 352
+
+
+def test_fallback_independent_pachymetry_stop_never_advances_to_plan_b():
+    out = assess(base(use_lasik_fallback_planning=True, pachy_thinnest_um=480))
+    assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A"]
+    assert out.status == "DO NOT PROCEED"
+    assert "PACHYMETRY_LE_480" in out.hard_stops
+
+
+def test_fallback_plan_c_pta_at_40_is_final_hard_stop():
+    out = assess(base(
+        use_lasik_fallback_planning=True, pachy_thinnest_um=500,
+        ablation_um=120, intended_sphere_d=-5.5, intended_cylinder_magnitude_d=5.5,
+    ))
+    assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A", "Plan B", "Plan C"]
+    assert out.lasik_planning_sequence[-1].pta_percent == 44.4
+    assert "LASIK_PTA_GE_40_AFTER_FALLBACK" in out.hard_stops
+    assert out.status == "DO NOT PROCEED"
+
+
+def test_fallback_hyperopic_plan_b_cannot_invent_ablation():
+    out = assess(base(
+        use_lasik_fallback_planning=True, pachy_thinnest_um=500,
+        ablation_um=101, intended_sphere_d=2, intended_mrse_d=1.5,
+        intended_cylinder_magnitude_d=1,
+    ))
+    assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A", "Plan B"]
+    assert out.lasik_planning_sequence[1].ablation_um is None
+    assert out.lasik_planning_sequence[1].ablation_source == "ACTUAL_REQUIRED_HYPEROPIC_OR_MIXED"
 
 
 def test_pipeline_exposes_and_sums_all_five_lasik_erss_components():
-    out = assess(base(
-        age_years=19,
-        pachy_thinnest_um=505,
-        morphology="ASYMMETRIC_BOWTIE",
-        flap_um=100,
-        ablation_um=145,
-        intended_mrse_d=-9,
-        intended_sphere_d=-9,
-    ))
-    assert out.scores.age_points == 2
-    assert out.scores.pachymetry_points == 1
-    assert out.scores.topography_points == 1
-    assert out.scores.rsb_points == 2
-    assert out.scores.mrse_points == 1
-    assert out.scores.erss_total == 7
+    out = assess(base(age_years=19, pachy_thinnest_um=505, morphology="ASYMMETRIC_BOWTIE", flap_um=100, ablation_um=145, intended_mrse_d=-9, intended_sphere_d=-9))
+    assert (out.scores.age_points, out.scores.pachymetry_points, out.scores.topography_points, out.scores.rsb_points, out.scores.mrse_points, out.scores.erss_total) == (2, 1, 1, 2, 1, 7)
 
 
 def test_prk_does_not_receive_lasik_erss_components_or_total():
     out = assess(base(procedure="PRK", flap_um=None))
-    assert out.scores.rsb_points is None
-    assert out.scores.mrse_points is None
-    assert out.scores.erss_total is None
+    assert out.scores.rsb_points is None and out.scores.mrse_points is None and out.scores.erss_total is None
 
 
 def test_pachymetry_480_is_independent_hard_stop():
     out = assess(base(pachy_thinnest_um=480))
-    assert out.status == "DO NOT PROCEED"
-    assert "PACHYMETRY_LE_480" in out.hard_stops
+    assert out.status == "DO NOT PROCEED" and "PACHYMETRY_LE_480" in out.hard_stops
 
 
 def test_lasik_rsb_just_below_300_is_hard_stop_and_300_is_not():
@@ -69,24 +95,16 @@ def test_prk_rst_just_below_310_is_hard_stop_and_310_is_not():
 
 
 def test_bad_d_3_is_hard_stop():
-    out = assess(base(bad_d=3.0))
-    assert out.status == "DO NOT PROCEED"
-    assert "FINAL_BAD_D_ABNORMAL" in out.hard_stops
+    out = assess(base(bad_d=3.0)); assert out.status == "DO NOT PROCEED" and "FINAL_BAD_D_ABNORMAL" in out.hard_stops
 
 
 def test_erss_3_defers_but_erss_4_stops():
-    score3 = assess(base(age_years=18, pachy_thinnest_um=520))
-    assert score3.scores.erss_total == 3
-    assert score3.status == "CAUTION — DEFER"
-    score4 = assess(base(age_years=18, pachy_thinnest_um=500))
-    assert score4.scores.erss_total == 4
-    assert score4.status == "DO NOT PROCEED"
+    score3 = assess(base(age_years=18, pachy_thinnest_um=520)); assert score3.scores.erss_total == 3 and score3.status == "CAUTION — DEFER"
+    score4 = assess(base(age_years=18, pachy_thinnest_um=500)); assert score4.scores.erss_total == 4 and score4.status == "DO NOT PROCEED"
 
 
 def test_missing_principal_input_never_passes():
-    out = assess(base(bad_d=None))
-    assert out.status == "DATA INSUFFICIENT"
-    assert "bad_d" in out.missing
+    out = assess(base(bad_d=None)); assert out.status == "DATA INSUFFICIENT" and "bad_d" in out.missing
 
 
 def test_final_kmean_boundaries_are_inclusive():
