@@ -3,7 +3,15 @@
 This module does not extract or infer clinical values. It audits the merged extraction payload,
 records provenance/coverage, and flags implausible or internally inconsistent transcriptions before
 the HC engine consumes them.
+
+Multi-image numeric reconciliation policy:
+- When the same numeric parameter is read from multiple valid sources of the same provenance class,
+  a relative spread of <=1% is accepted as normal extraction/measurement variation.
+- The higher reading is retained in that case and the difference is not an unresolved conflict.
+- Differences >1%, nonnumeric disagreements, and disagreements across unequal source-priority
+  classes continue through the existing conflict/safety pathway.
 """
+import re
 from typing import Any, Dict, List
 
 import bootstrap
@@ -23,8 +31,96 @@ PLAUSIBLE = {
     "PPI_avg": (0.01, 10.0), "PPI_max": (0.01, 10.0), "Rmin_mm": (3.0, 15.0),
 }
 
+_CONFLICT_RE = re.compile(
+    r"^(?P<field>[A-Za-z0-9_]+):\s*"
+    r"(?P<a>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s+vs\s+"
+    r"(?P<b>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)$"
+)
+
+
 def _num(value: Any) -> bool:
     return core.is_number(value)
+
+
+def _within_one_percent(values: List[float]) -> bool:
+    """True when the full numeric spread is <=1% of the largest absolute reading."""
+    if len(values) < 2:
+        return False
+    low, high = min(values), max(values)
+    denominator = max(abs(v) for v in values)
+    if denominator == 0:
+        return low == high
+    return abs(high - low) / denominator <= 0.01 + 1e-12
+
+
+def _source_class(raw_eye: Dict[str, Any], field: str) -> str:
+    if field in set(raw_eye.get("table_verified_numeric_fields") or []):
+        return "LABELED_TABLE"
+    if field in set(raw_eye.get("map_fallback_numeric_fields") or []):
+        return "PERMITTED_MAP_FALLBACK"
+    return "UNVERIFIED"
+
+
+def _reconcile_one_percent(merged: Dict[str, Any], results: List[Dict[str, Any]]) -> None:
+    """Apply the HC <=1% duplicate-reading rule after the core merge.
+
+    Only readings with the same accepted provenance class are compared. This preserves the existing
+    labeled-table-over-map-fallback priority. The rule is deliberately not used to reconcile a
+    mixture of labeled-table and fallback values.
+    """
+    observations: Dict[str, Dict[str, Dict[str, List[float]]]] = {}
+    for result in results:
+        for raw_eye in result.get("eyes", []):
+            if not isinstance(raw_eye, dict):
+                continue
+            eye_id = raw_eye.get("eye")
+            if not eye_id:
+                continue
+            for field, value in raw_eye.items():
+                if not _num(value):
+                    continue
+                source_class = _source_class(raw_eye, field)
+                if source_class == "UNVERIFIED":
+                    continue
+                observations.setdefault(eye_id, {}).setdefault(field, {}).setdefault(source_class, []).append(float(value))
+
+    for eye in merged.get("eyes", []):
+        if not isinstance(eye, dict):
+            continue
+        eye_id = eye.get("eye")
+        accepted_fields = set()
+        for field, classes in observations.get(eye_id, {}).items():
+            # Respect source priority: use labeled-table observations when present; otherwise the
+            # permitted fallback class. Never combine the two classes for tolerance adjudication.
+            values = classes.get("LABELED_TABLE") or classes.get("PERMITTED_MAP_FALLBACK") or []
+            if _within_one_percent(values):
+                eye[field] = max(values)
+                accepted_fields.add(field)
+                eye.setdefault("numeric_reconciliation", {})[field] = {
+                    "rule": "RELATIVE_SPREAD_LE_1_PERCENT_USE_HIGHER",
+                    "values": sorted(set(values)),
+                    "retained": max(values),
+                }
+
+        if not accepted_fields:
+            continue
+
+        kept_conflicts = []
+        for item in list(eye.get("data_conflicts") or []):
+            match = _CONFLICT_RE.match(str(item).strip())
+            if match and match.group("field") in accepted_fields:
+                a, b = float(match.group("a")), float(match.group("b"))
+                if _within_one_percent([a, b]):
+                    continue
+            kept_conflicts.append(item)
+        eye["data_conflicts"] = kept_conflicts
+
+        for field in sorted(accepted_fields):
+            details = eye["numeric_reconciliation"][field]
+            merged.setdefault("global_warnings", []).append(
+                f"{eye_id} {field}: duplicate numeric readings within 1% were accepted; "
+                f"higher value {details['retained']:g} retained."
+            )
 
 
 def _audit_eye(eye: Dict[str, Any]) -> Dict[str, Any]:
@@ -79,6 +175,7 @@ def _audit_eye(eye: Dict[str, Any]) -> Dict[str, Any]:
 
 def merge_extractions_guarded(results):
     merged = _original_merge(results)
+    _reconcile_one_percent(merged, results)
     audit = {}
     for eye in merged.get("eyes", []):
         eye_id = eye.get("eye", "UNKNOWN")
@@ -99,5 +196,6 @@ def merge_extractions_guarded(results):
     merged["critical_input_issues"] = sorted(set(merged.get("critical_input_issues", [])))
     merged["global_warnings"] = list(dict.fromkeys(merged.get("global_warnings", [])))
     return merged
+
 
 core.merge_extractions = merge_extractions_guarded
