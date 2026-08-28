@@ -67,21 +67,21 @@ def test_prk_does_not_receive_lasik_erss_components_or_total():
     assert out.scores.rsb_points is None and out.scores.mrse_points is None and out.scores.erss_total is None
 
 
-def test_prk_provisional_score_zero_to_one_is_not_escalated():
-    out = assess(base(procedure="PRK", flap_um=None, pachy_thinnest_um=520, morphology="NORMAL_SYMMETRIC", age_years=30, ablation_um=60))
-    assert out.prk_scores.total == 0
-    assert out.prk_scores.category == "LOWER_FLAGGED_BURDEN"
+def test_prk_score_two_has_no_score_escalation():
+    out = assess(base(procedure="PRK", flap_um=None, pachy_thinnest_um=520, morphology="ASYMMETRIC_BOWTIE", age_years=30, ablation_um=60))
+    assert out.prk_scores.total == 2
+    assert out.prk_scores.category == "NO_SCORE_ESCALATION"
     assert out.status == "PASS WITH CAUTION"
 
 
-def test_prk_provisional_score_two_to_three_defers():
-    out = assess(base(procedure="PRK", flap_um=None, pachy_thinnest_um=520, morphology="ASYMMETRIC_BOWTIE", age_years=30, ablation_um=60))
-    assert out.prk_scores.total == 2
+def test_prk_score_three_defers():
+    out = assess(base(procedure="PRK", flap_um=None, pachy_thinnest_um=520, morphology="NORMAL_SYMMETRIC", age_years=18, ablation_um=60))
+    assert out.prk_scores.total == 3
     assert out.prk_scores.category == "CAUTION"
     assert out.status == "CAUTION — STOP/DEFER"
 
 
-def test_prk_provisional_score_four_or_more_stops():
+def test_prk_score_four_or_more_stops():
     out = assess(base(procedure="PRK", flap_um=None, pachy_thinnest_um=520, morphology="INFERIOR_STEEPENING_SRA", age_years=30, ablation_um=60))
     assert out.prk_scores.total == 5
     assert out.prk_scores.category == "HIGH_CONCERN"
@@ -119,7 +119,13 @@ def test_bad_d_3_is_hard_stop():
     out = assess(base(bad_d=3.0)); assert out.status == "DO NOT PROCEED" and "FINAL_BAD_D_ABNORMAL" in out.hard_stops
 
 
-def test_erss_3_defers_but_erss_4_stops():
+def test_lasik_score_two_has_no_score_escalation():
+    out = assess(base(age_years=19, pachy_thinnest_um=520))
+    assert out.scores.erss_total == 2
+    assert out.status == "PASS WITH CAUTION"
+
+
+def test_lasik_score_three_defers_and_four_stops():
     score3 = assess(base(age_years=18, pachy_thinnest_um=520)); assert score3.scores.erss_total == 3 and score3.status == "CAUTION — DEFER"
     score4 = assess(base(age_years=18, pachy_thinnest_um=500)); assert score4.scores.erss_total == 4 and score4.status == "DO NOT PROCEED"
 
