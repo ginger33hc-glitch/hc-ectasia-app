@@ -5,12 +5,9 @@ This module remains isolated from production until full equivalence is proven.
 """
 from .decision import DecisionInput, decide
 from .hard_stops import HardStopInput, evaluate_hard_stops
-from .models import AssessmentResult, CalculatedValues, EyeInput, LasikPlanningStep, PrkScoreValues, ScoreValues
-from .policy import (
-    POLICY, age_points, final_bad_d_classification, lasik_mrse_points,
-    lasik_pachymetry_points, lasik_rsb_points, randleman_topography_points,
-)
-from .prk import prk_morphology_points, prk_pachymetry_points, prk_pta_evidence_gap, prk_score_category, prk_score_total
+from .models import AssessmentResult, CalculatedValues, EyeInput, LasikPlanningStep
+from .policy import POLICY, final_bad_d_classification
+from .scoring import ScoringInput, calculate_scores
 from .status import combine_status
 from .surgery import (
     LasikPlanOutcome, evaluate_lasik_fallback, final_kmean_d, final_lasik_status,
@@ -91,23 +88,16 @@ def assess(inp: EyeInput) -> AssessmentResult:
     if predicted_final_kmean is not None:
         calc = CalculatedValues(calc.lasik_rsb_um, calc.lasik_pta_percent, calc.prk_rst_um, calc.prk_pta_percent, predicted_final_kmean)
 
-    age, pachy, topo = age_points(inp.age_years), lasik_pachymetry_points(inp.pachy_thinnest_um), randleman_topography_points(inp.morphology)
-    rsb = lasik_rsb_points(calc.lasik_rsb_um) if procedure == "LASIK" else None
-    mrse = lasik_mrse_points(inp.intended_mrse_d) if procedure == "LASIK" else None
-    erss_total = None if procedure != "LASIK" or None in (age, pachy, topo, rsb, mrse) else int(age + pachy + topo + rsb + mrse)
-    scores = ScoreValues(age, pachy, topo, rsb, mrse, erss_total)
-
-    prk_scores = PrkScoreValues()
-    if procedure == "PRK":
-        prk_total = prk_score_total(inp.age_years, inp.pachy_thinnest_um, inp.morphology)
-        prk_scores = PrkScoreValues(
-            age_points=age_points(inp.age_years),
-            pachymetry_points=prk_pachymetry_points(inp.pachy_thinnest_um),
-            morphology_points=prk_morphology_points(inp.morphology),
-            total=prk_total,
-            category=prk_score_category(prk_total),
-            pta_evidence_gap=prk_pta_evidence_gap(calc.prk_pta_percent),
-        )
+    scores, prk_scores = calculate_scores(ScoringInput(
+        procedure=procedure,
+        age_years=inp.age_years,
+        pachy_thinnest_um=inp.pachy_thinnest_um,
+        morphology=inp.morphology,
+        intended_mrse_d=inp.intended_mrse_d,
+        lasik_rsb_um=calc.lasik_rsb_um,
+        prk_pta_percent=calc.prk_pta_percent,
+    ))
+    erss_total = scores.erss_total
 
     bad_status = final_bad_d_classification(inp.bad_d)
     hard_stops.extend(evaluate_hard_stops(HardStopInput(
