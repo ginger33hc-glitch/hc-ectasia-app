@@ -1,4 +1,6 @@
 from dataclasses import FrozenInstanceError
+import ast
+from pathlib import Path
 import pytest
 
 from clean_engine.input_adapter import ReconciledEyeInput
@@ -52,8 +54,7 @@ def test_service_output_is_immutable():
         out.result = out.result
 
 
-def test_service_does_not_import_raw_extraction_or_renderer_modules():
-    from pathlib import Path
-    text = Path("clean_engine/service.py").read_text(encoding="utf-8").lower()
-    for marker in ("app", "openai", "reports", "report_export_guard", "extraction_guard", "merge_policy_base"):
-        assert marker not in text
+def test_service_imports_only_clean_boundary_dependencies():
+    tree = ast.parse(Path("clean_engine/service.py").read_text(encoding="utf-8"))
+    imports = {node.module for node in tree.body if isinstance(node, ast.ImportFrom)}
+    assert imports == {"dataclasses", "engine", "input_adapter", "models", "report_model"}
