@@ -4,11 +4,13 @@ Pipeline: validate -> calculate -> score -> hard stops -> final decision.
 This module remains isolated from production until full equivalence is proven.
 """
 from .decision import DecisionInput, decide
-from .models import AssessmentResult, CalculatedValues, EyeInput, LasikPlanningStep, ScoreValues
+from .models import AssessmentResult, CalculatedValues, EyeInput, LasikPlanningStep, PrkScoreValues, ScoreValues
 from .policy import (
     POLICY, age_points, final_bad_d_classification, lasik_mrse_points,
     lasik_pachymetry_points, lasik_rsb_points, randleman_topography_points,
 )
+from .prk import prk_morphology_points, prk_pachymetry_points, prk_pta_evidence_gap, prk_score_category, prk_score_total
+from .status import combine_status
 from .surgery import (
     LasikPlanOutcome, evaluate_lasik_fallback, final_kmean_d, final_lasik_status,
     lasik_pta_percent, lasik_rsb_um, plan_specific_ablation, prk_pta_percent,
@@ -88,8 +90,20 @@ def assess(inp: EyeInput) -> AssessmentResult:
     mrse = lasik_mrse_points(inp.intended_mrse_d) if procedure == "LASIK" else None
     erss_total = None if procedure != "LASIK" or None in (age, pachy, topo, rsb, mrse) else int(age + pachy + topo + rsb + mrse)
     scores = ScoreValues(age, pachy, topo, rsb, mrse, erss_total)
-    bad_status = final_bad_d_classification(inp.bad_d)
 
+    prk_scores = PrkScoreValues()
+    if procedure == "PRK":
+        prk_total = prk_score_total(inp.age_years, inp.pachy_thinnest_um, inp.morphology)
+        prk_scores = PrkScoreValues(
+            age_points=age_points(inp.age_years),
+            pachymetry_points=prk_pachymetry_points(inp.pachy_thinnest_um),
+            morphology_points=prk_morphology_points(inp.morphology),
+            total=prk_total,
+            category=prk_score_category(prk_total),
+            pta_evidence_gap=prk_pta_evidence_gap(calc.prk_pta_percent),
+        )
+
+    bad_status = final_bad_d_classification(inp.bad_d)
     if inp.pachy_thinnest_um is not None and inp.pachy_thinnest_um <= POLICY.pachymetry_hard_stop_um:
         hard_stops.append("PACHYMETRY_LE_480")
     if inp.morphology == "ABNORMAL_ECTATIC": hard_stops.append("ABNORMAL_ECTATIC_TOPOGRAPHY")
@@ -106,5 +120,16 @@ def assess(inp: EyeInput) -> AssessmentResult:
     if erss_total is not None and erss_total >= 4: hard_stops.append("ERSS_GE_4")
 
     upstream = "DO NOT PROCEED" if hard_stops else ("DATA INSUFFICIENT" if missing else "PASS")
+    if procedure == "PRK" and not hard_stops and not missing:
+        if prk_scores.category == "HIGH_CONCERN":
+            upstream = combine_status(upstream, "DO NOT PROCEED")
+        elif prk_scores.category == "CAUTION":
+            upstream = combine_status(upstream, "CAUTION — STOP/DEFER")
+        if prk_scores.pta_evidence_gap:
+            upstream = combine_status(upstream, "REVIEW — NOT CLEARED")
+
     decision = decide(DecisionInput(upstream, bad_status, erss_total, bool(hard_stops), bool(missing)))
-    return AssessmentResult(decision.status, bad_status, calc, scores, tuple(hard_stops), tuple(missing), tuple(warnings), planning_sequence)
+    return AssessmentResult(
+        decision.status, bad_status, calc, scores, tuple(hard_stops), tuple(missing),
+        tuple(warnings), planning_sequence, prk_scores,
+    )
