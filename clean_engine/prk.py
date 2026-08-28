@@ -1,12 +1,11 @@
 """Pure PRK provisional scoring policy for the parallel clean engine.
 
 PRK keeps its procedure-specific scoring components, while the final score
-decision boundary follows the unified HC rule also used for LASIK:
-0-2 no score escalation, 3 defer/caution, >=4 stop.
+decision boundary is supplied by the shared HC score policy.
 """
 from typing import Optional
 
-from .policy import age_points
+from .policy import age_points, score_decision_band
 
 
 def prk_morphology_points(morphology: str) -> Optional[int]:
@@ -43,13 +42,12 @@ def prk_score_total(age_years: Optional[float], pachy_um: Optional[float], morph
 
 
 def prk_score_category(score: Optional[int]) -> Optional[str]:
-    if not isinstance(score, (int, float)) or isinstance(score, bool):
-        return None
-    if score <= 2:
-        return "NO_SCORE_ESCALATION"
-    if score == 3:
-        return "CAUTION"
-    return "HIGH_CONCERN"
+    band = score_decision_band(score)
+    return {
+        "NO_SCORE_ESCALATION": "NO_SCORE_ESCALATION",
+        "DEFER": "CAUTION",
+        "STOP": "HIGH_CONCERN",
+    }.get(band)
 
 
 def prk_pta_evidence_gap(pta_percent: Optional[float]) -> bool:
