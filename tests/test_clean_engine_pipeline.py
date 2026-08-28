@@ -27,6 +27,31 @@ def test_complete_favorable_case_is_pass_with_caution():
     assert not out.missing
 
 
+def test_pipeline_exposes_and_sums_all_five_lasik_erss_components():
+    out = assess(base(
+        age_years=19,
+        pachy_thinnest_um=505,
+        morphology="ASYMMETRIC_BOWTIE",
+        flap_um=100,
+        ablation_um=145,
+        intended_mrse_d=-9,
+        intended_sphere_d=-9,
+    ))
+    assert out.scores.age_points == 2
+    assert out.scores.pachymetry_points == 1
+    assert out.scores.topography_points == 1
+    assert out.scores.rsb_points == 2
+    assert out.scores.mrse_points == 1
+    assert out.scores.erss_total == 7
+
+
+def test_prk_does_not_receive_lasik_erss_components_or_total():
+    out = assess(base(procedure="PRK", flap_um=None))
+    assert out.scores.rsb_points is None
+    assert out.scores.mrse_points is None
+    assert out.scores.erss_total is None
+
+
 def test_pachymetry_480_is_independent_hard_stop():
     out = assess(base(pachy_thinnest_um=480))
     assert out.status == "DO NOT PROCEED"
