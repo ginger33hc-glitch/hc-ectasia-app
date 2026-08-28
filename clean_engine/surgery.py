@@ -1,6 +1,6 @@
 """Pure surgical calculations and LASIK fallback policy for the parallel clean engine."""
 from dataclasses import dataclass
-from typing import Optional, Sequence, Tuple
+from typing import Callable, Optional, Sequence, Tuple
 
 from .policy import POLICY
 
@@ -64,12 +64,7 @@ def needs_lasik_fallback(outcome: LasikPlanOutcome) -> bool:
 
 
 def select_lasik_sequence(outcomes: Sequence[LasikPlanOutcome]) -> Tuple[LasikPlanOutcome, ...]:
-    """Return the evaluated A→B→C sequence under the locked fallback contract.
-
-    The caller supplies prospective outcomes in Plan A/B/C order. Evaluation stops
-    on the first plan that neither fails nor reaches PTA >=40%, on an independent
-    hard stop, or after Plan C. Earlier failed plans remain in the returned sequence.
-    """
+    """Return the evaluated A→B→C sequence under the locked fallback contract."""
     selected = []
     for expected_plan, outcome in zip(LASIK_PLANS, outcomes):
         if outcome.plan != expected_plan:
@@ -78,6 +73,23 @@ def select_lasik_sequence(outcomes: Sequence[LasikPlanOutcome]) -> Tuple[LasikPl
         if not needs_lasik_fallback(outcome):
             break
     return tuple(selected)
+
+
+def evaluate_lasik_fallback(evaluate_plan: Callable[[LasikPlan], LasikPlanOutcome]) -> Tuple[LasikPlanOutcome, ...]:
+    """Evaluate Plan A→B→C lazily, stopping exactly when fallback is no longer allowed.
+
+    The callback owns plan-specific clinical calculation (including recalculated
+    ablation for the selected optical zone). This function owns only sequencing.
+    """
+    sequence = []
+    for plan in LASIK_PLANS:
+        outcome = evaluate_plan(plan)
+        if outcome.plan != plan:
+            raise ValueError("LASIK evaluator returned an outcome for the wrong plan")
+        sequence.append(outcome)
+        if not needs_lasik_fallback(outcome):
+            break
+    return tuple(sequence)
 
 
 def final_lasik_status(sequence: Sequence[LasikPlanOutcome]) -> str:
