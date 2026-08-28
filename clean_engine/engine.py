@@ -17,20 +17,20 @@ from .surgery import (
     lasik_independent_hard_stop, lasik_pta_percent, lasik_rsb_um,
     plan_specific_ablation, prk_pta_percent, prk_rst_um,
 )
+from .validation import ValidationInput, validate_decision_inputs
 
 
 def assess(inp: EyeInput) -> AssessmentResult:
     procedure = (inp.procedure or "").upper()
-    missing, hard_stops, warnings = [], [], []
+    missing = list(validate_decision_inputs(ValidationInput(
+        age_years=inp.age_years,
+        pachy_thinnest_um=inp.pachy_thinnest_um,
+        bad_d=inp.bad_d,
+        morphology=inp.morphology,
+        procedure=procedure,
+    )))
+    hard_stops, warnings = [], []
     planning_sequence = ()
-
-    for name, value in (("age_years", inp.age_years), ("pachy_thinnest_um", inp.pachy_thinnest_um), ("bad_d", inp.bad_d)):
-        if value is None:
-            missing.append(name)
-    if randleman_topography_points(inp.morphology) is None:
-        missing.append("morphology")
-    if procedure not in {"LASIK", "PRK"}:
-        missing.append("procedure")
 
     predicted_final_kmean = None
     if inp.preop_kmean_d is not None and inp.intended_mrse_d is not None:
