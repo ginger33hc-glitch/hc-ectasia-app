@@ -15,6 +15,9 @@ class EyeInput:
     preop_kmean_d: Optional[float] = None
     intended_mrse_d: Optional[float] = None
     intended_sphere_d: Optional[float] = None
+    intended_cylinder_magnitude_d: Optional[float] = None
+    laser_platform: Optional[str] = None
+    use_lasik_fallback_planning: bool = False
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,19 @@ class ScoreValues:
 
 
 @dataclass(frozen=True)
+class LasikPlanningStep:
+    plan_name: str
+    flap_um: float
+    optical_zone_mm: float
+    transition_zone_mm: float
+    ablation_um: Optional[float]
+    ablation_source: str
+    rsb_um: Optional[float]
+    pta_percent: Optional[float]
+    status: str
+
+
+@dataclass(frozen=True)
 class AssessmentResult:
     status: str
     bad_d_status: str
@@ -45,3 +61,4 @@ class AssessmentResult:
     hard_stops: Tuple[str, ...] = field(default_factory=tuple)
     missing: Tuple[str, ...] = field(default_factory=tuple)
     warnings: Tuple[str, ...] = field(default_factory=tuple)
+    lasik_planning_sequence: Tuple[LasikPlanningStep, ...] = field(default_factory=tuple)
