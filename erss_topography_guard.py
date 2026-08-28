@@ -4,6 +4,7 @@ import extraction_guard
 core=extraction_guard.core
 _original_merge=core.merge_extractions
 _original_extract_one_image=core.extract_one_image
+_original_scoring_morphology=core.scoring_morphology
 
 eye_schema=core.SCHEMA["properties"]["eyes"]["items"]
 eye_props=eye_schema["properties"]
@@ -24,9 +25,6 @@ QUALIFYING={"AXIAL_SAGITTAL_FRONT","AXIAL","SAGITTAL","TANGENTIAL","PLACIDO","OT
 ROLE_FIELDS={"anterior_curvature_map_visible","anterior_curvature_map_type","anterior_curvature_map_location"}
 def _qualifies(e): return e.get("anterior_curvature_map_visible")=="YES" and e.get("anterior_curvature_map_type") in QUALIFYING
 
-# The original all-purpose extraction prompt was doing identity, BAD, pachymetry, treatment-card and
-# morphology work in one call. That made map-role recognition fragile. ERSS now gets its own small,
-# independent vision pass for every Pentacam image; it does not see or ask for BAD values.
 ERSS_SCHEMA={
  "type":"object","additionalProperties":False,
  "properties":{
@@ -49,12 +47,14 @@ by fixed Pentacam layout, Axial/Sagittal Curvature (Front), therefore anterior_c
 Do not require the small panel title to be perfectly legible once the 4 Maps Refractive page is established.
 Upper-right is Elevation Front; lower-left Corneal Thickness; lower-right Elevation Back. They are irrelevant
 to Randleman topography.
-Then inspect ONLY the upper-left anterior curvature map. Classify the visible pattern. Specifically inspect
-superior and inferior steep radial axes for skew/SRA-SRAX. Report srax_deg only if the angle can be measured
-reliably from the image; never invent it. Use INFERIOR_STEEPENING_SRA only when SRAX >=20 degrees can be
-supported, or when >=1.0 D inferior-versus-opposite steepening with printed I-S <1.4 D is supported. If skew
-is visible but the threshold cannot be established, use morphology=UNCERTAIN rather than downgrading it to
-ASYMMETRIC_BOWTIE. This task never needs a BAD map."""
+Then inspect ONLY the upper-left anterior curvature map and classify the Randleman anterior-topography pattern.
+NORMAL_SYMMETRIC = round, oval, or symmetric bow-tie. ASYMMETRIC_BOWTIE requires asymmetric steepening >0.5 D
+but <1.0 D versus the region 180 degrees opposite, without significant SRA/SRAX. INFERIOR_STEEPENING_SRA
+requires support for SRAX >=20 degrees, or >=1.0 D inferior-versus-opposite steepening with printed I-S <1.4 D.
+ABNORMAL_ECTATIC is reserved for an unequivocal abnormal ectatic pattern/keratoconus/PMD/FFKC or I-S >=1.4 D.
+Report srax_deg or inferior_opposite_steepening_D only when reliably supported; never invent a number. If the
+visible pattern is suspicious but the required Randleman category threshold cannot be established, return
+morphology=UNCERTAIN. This task never needs a BAD map."""
 
 def _erss_second_pass(raw,filename):
     response=core.openai_client().responses.create(
@@ -76,13 +76,12 @@ def extract_one_image_with_erss(raw,filename):
     if er.get("display_type")=="PENTACAM_4_MAPS_REFRACTIVE": er["anterior_curvature_map_visible"]="YES"
     target_eye=er.get("eye")
     candidates=[e for e in result.get("eyes",[]) if target_eye=="UNKNOWN" or e.get("eye")==target_eye]
-    if len(candidates)==1:
+    if len(candidates)==1 and er.get("display_type")=="PENTACAM_4_MAPS_REFRACTIVE":
         e=candidates[0]
-        if er.get("anterior_curvature_map_visible")=="YES":
-            e["anterior_curvature_map_visible"]="YES";e["anterior_curvature_map_type"]="AXIAL_SAGITTAL_FRONT";e["anterior_curvature_map_location"]="UPPER_LEFT"
-            for f in ("morphology","asymmetric_bow_tie","srax","srax_deg","inferior_opposite_steepening_D"): e[f]=er.get(f)
-            e["morphology_evidence"]=list(dict.fromkeys((er.get("evidence") or [])+["Dedicated ERSS pass: Pentacam 4 Maps upper-left Axial/Sagittal Curvature (Front) recognized as anterior topography."]))
-            e["erss_source_read"]="DEDICATED_CURVATURE_PASS"
+        e["anterior_curvature_map_visible"]="YES";e["anterior_curvature_map_type"]="AXIAL_SAGITTAL_FRONT";e["anterior_curvature_map_location"]="UPPER_LEFT"
+        for f in ("morphology","asymmetric_bow_tie","srax","srax_deg","inferior_opposite_steepening_D"): e[f]=er.get(f)
+        e["morphology_evidence"]=list(dict.fromkeys((er.get("evidence") or [])+["Dedicated ERSS pass: Pentacam 4 Maps upper-left Axial/Sagittal Curvature (Front) recognized as anterior topography."]))
+        e["erss_source_read"]="DEDICATED_CURVATURE_PASS"
     return result
 core.extract_one_image=extract_one_image_with_erss
 
@@ -114,15 +113,37 @@ def merge_extractions_with_erss_source_guard(results):
                     source_eyes.append(src);sources.append({"file":filename,"map_type":src.get("anterior_curvature_map_type"),"map_location":src.get("anterior_curvature_map_location"),"morphology":src.get("morphology"),"srax_deg":src.get("srax_deg"),"reader":src.get("erss_source_read")})
         eye["erss_topography_sources"]=sources;eye.setdefault("field_provenance",{})["erss_topography"]=sources;eye["erss_bad_dependency"]=False
         if source_eyes:
-            best=next((s for s in source_eyes if s.get("erss_source_read")=="DEDICATED_CURVATURE_PASS" and s.get("morphology") not in (None,"UNCERTAIN")),None) or next((s for s in source_eyes if s.get("erss_source_read")=="DEDICATED_CURVATURE_PASS"),None) or source_eyes[0]
+            dedicated=[s for s in source_eyes if s.get("erss_source_read")=="DEDICATED_CURVATURE_PASS"]
+            categories={s.get("morphology") for s in dedicated if s.get("morphology") not in (None,"UNCERTAIN")}
+            if len(categories)>1:
+                best=dedicated[0]
+                best=dict(best);best.update({"morphology":"UNCERTAIN","asymmetric_bow_tie":"UNCERTAIN","srax":"UNCERTAIN","srax_deg":None,"inferior_opposite_steepening_D":None})
+                best["morphology_evidence"]=["Conflicting dedicated anterior-curvature morphology reads; Randleman topography left UNCERTAIN for surgeon review."]
+            else:
+                best=next((s for s in dedicated if s.get("morphology") not in (None,"UNCERTAIN")),None) or (dedicated[0] if dedicated else source_eyes[0])
             eye["anterior_curvature_map_visible"]="YES";eye["anterior_curvature_map_type"]=best.get("anterior_curvature_map_type");eye["anterior_curvature_map_location"]=best.get("anterior_curvature_map_location")
             for f in ("morphology","asymmetric_bow_tie","srax","srax_deg","inferior_opposite_steepening_D"):eye[f]=best.get(f)
-            eye["morphology_evidence"]=list(dict.fromkeys(best.get("morphology_evidence") or []))
+            eye["morphology_evidence"]=list(dict.fromkeys(best.get("morphology_evidence") or []));eye["erss_source_read"]=best.get("erss_source_read")
         else:
-            eye.update({"anterior_curvature_map_visible":"NO","anterior_curvature_map_type":"NONE","anterior_curvature_map_location":"NONE","morphology":"UNCERTAIN","asymmetric_bow_tie":"UNCERTAIN","srax":"UNCERTAIN","srax_deg":None,"inferior_opposite_steepening_D":None})
+            eye.update({"anterior_curvature_map_visible":"NO","anterior_curvature_map_type":"NONE","anterior_curvature_map_location":"NONE","morphology":"UNCERTAIN","asymmetric_bow_tie":"UNCERTAIN","srax":"UNCERTAIN","srax_deg":None,"inferior_opposite_steepening_D":None,"erss_source_read":None})
         eye["data_conflicts"]=[c for c in eye.get("data_conflicts",[]) if str(c).split(":",1)[0].strip() not in ROLE_FIELDS]
-    # Source-specific 'no curvature on BAD' warnings must not survive as global blockers when a valid source exists.
-    if any(_qualifies(e) for r in guarded for e in r.get("eyes",[])):
-        merged["global_warnings"]=[w for w in merged.get("global_warnings",[]) if not ("NO ANTERIOR" in str(w).upper() and ("BELIN" in str(w).upper() or "BAD" in str(w).upper()))]
+    qualifying_eyes={e.get("eye") for e in merged.get("eyes",[]) if _qualifies(e)}
+    if qualifying_eyes:
+        def keep_warning(w):
+            text=str(w).upper()
+            source_specific=("NO ANTERIOR" in text or "MORPHOLOGY" in text or "SRAX" in text) and ("BELIN" in text or "BAD" in text or "TOPOMETRIC" in text)
+            return not source_specific
+        merged["global_warnings"]=[w for w in merged.get("global_warnings",[]) if keep_warning(w)]
     return merged
 core.merge_extractions=merge_extractions_with_erss_source_guard
+
+def scoring_morphology_with_dedicated_source(eye):
+    """Do not discard a threshold-constrained classification produced by the dedicated ERSS pass."""
+    if eye.get("erss_source_read")=="DEDICATED_CURVATURE_PASS" and _qualifies(eye):
+        category=eye.get("morphology","UNCERTAIN")
+        evidence=list(eye.get("morphology_evidence") or [])
+        if category in {"NORMAL_SYMMETRIC","ASYMMETRIC_BOWTIE","INFERIOR_STEEPENING_SRA","ABNORMAL_ECTATIC"}:
+            evidence.append("Randleman category accepted from the dedicated threshold-constrained anterior-curvature read; BAD/BAD-D was not used.")
+            return {"category":category,"evidence":list(dict.fromkeys(evidence))}
+    return _original_scoring_morphology(eye)
+core.scoring_morphology=scoring_morphology_with_dedicated_source
