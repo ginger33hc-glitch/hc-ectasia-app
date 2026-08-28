@@ -12,7 +12,7 @@ import erss_visual_morphology_policy  # noqa: F401
 
 core = bootstrap.core
 app = _runtime.app
-CANONICAL_VERSION = "0.7.39"
+CANONICAL_VERSION = "0.7.40"
 core.APP_VERSION = CANONICAL_VERSION
 core.app.title = f"HC Ectasia App v{CANONICAL_VERSION}"
 
@@ -86,12 +86,17 @@ def runtime_invariants():
 
 runtime_invariants()
 
-# Keep visible browser version synchronized with the canonical runtime version.
+# Keep visible browser version synchronized with the canonical runtime version and suppress
+# verbose patient-identity details. The clinical identity warnings remain in the decision
+# payload; reports intentionally display only the single surgeon-confirmation line.
 try:
     index_path = Path(__file__).parent / "static" / "index.html"
     html = index_path.read_text(encoding="utf-8")
     html = re.sub(r"HC Ectasia App v\d+\.\d+\.\d+", f"HC Ectasia App v{CANONICAL_VERSION}", html)
     html = re.sub(r"Software v\d+\.\d+\.\d+", f"Software v{CANONICAL_VERSION}", html)
+    identity_css = '<style id="hc-identity-single-line">.identity-alert ul{display:none!important}.identity-alert strong{margin-bottom:0!important}</style>'
+    html = re.sub(r'<style id="hc-identity-single-line">.*?</style>', '', html, flags=re.S)
+    html = html.replace('</head>', identity_css + '\n</head>')
     index_path.write_text(html, encoding="utf-8")
 except OSError:
     pass
