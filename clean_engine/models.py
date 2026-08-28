@@ -40,6 +40,16 @@ class ScoreValues:
 
 
 @dataclass(frozen=True)
+class PrkScoreValues:
+    age_points: Optional[int] = None
+    pachymetry_points: Optional[int] = None
+    morphology_points: Optional[int] = None
+    total: Optional[int] = None
+    category: Optional[str] = None
+    pta_evidence_gap: bool = False
+
+
+@dataclass(frozen=True)
 class LasikPlanningStep:
     plan_name: str
     flap_um: float
@@ -62,3 +72,4 @@ class AssessmentResult:
     missing: Tuple[str, ...] = field(default_factory=tuple)
     warnings: Tuple[str, ...] = field(default_factory=tuple)
     lasik_planning_sequence: Tuple[LasikPlanningStep, ...] = field(default_factory=tuple)
+    prk_scores: PrkScoreValues = field(default_factory=PrkScoreValues)
