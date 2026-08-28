@@ -1,7 +1,8 @@
 """Pure PRK provisional scoring policy for the parallel clean engine.
 
-This mirrors the currently locked PRK-EWSS v1.0 behavior. It is intentionally
-kept separate from validated LASIK ERSS terminology and scoring.
+PRK keeps its procedure-specific scoring components, while the final score
+decision boundary follows the unified HC rule also used for LASIK:
+0-2 no score escalation, 3 defer/caution, >=4 stop.
 """
 from typing import Optional
 
@@ -44,9 +45,9 @@ def prk_score_total(age_years: Optional[float], pachy_um: Optional[float], morph
 def prk_score_category(score: Optional[int]) -> Optional[str]:
     if not isinstance(score, (int, float)) or isinstance(score, bool):
         return None
-    if score <= 1:
-        return "LOWER_FLAGGED_BURDEN"
-    if score <= 3:
+    if score <= 2:
+        return "NO_SCORE_ESCALATION"
+    if score == 3:
         return "CAUTION"
     return "HIGH_CONCERN"
 
