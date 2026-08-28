@@ -66,22 +66,29 @@ def _erss_second_pass(raw,filename):
 
 def extract_one_image_with_erss(raw,filename):
     result=_original_extract_one_image(raw,filename)
-    context=result.get("document_context") or {}
-    if context.get("document_type")!="PENTACAM_TOPOGRAPHY": return result
+    # Run the dedicated source reader for every upload. It independently decides whether
+    # the image is a Pentacam 4 Maps Refractive page, so a generic document-type
+    # misclassification cannot suppress Randleman/ERSS source recognition.
     try:
         er=_erss_second_pass(raw,filename)
     except Exception as exc:
         result.setdefault("global_warnings",[]).append(f"Dedicated ERSS curvature-map read failed for {filename}: {type(exc).__name__}; general extraction retained.")
         return result
-    if er.get("display_type")=="PENTACAM_4_MAPS_REFRACTIVE": er["anterior_curvature_map_visible"]="YES"
+    if er.get("display_type")!="PENTACAM_4_MAPS_REFRACTIVE":
+        return result
+    er["anterior_curvature_map_visible"]="YES"
     target_eye=er.get("eye")
     candidates=[e for e in result.get("eyes",[]) if target_eye=="UNKNOWN" or e.get("eye")==target_eye]
-    if len(candidates)==1 and er.get("display_type")=="PENTACAM_4_MAPS_REFRACTIVE":
+    if len(candidates)==1:
         e=candidates[0]
         e["anterior_curvature_map_visible"]="YES";e["anterior_curvature_map_type"]="AXIAL_SAGITTAL_FRONT";e["anterior_curvature_map_location"]="UPPER_LEFT"
         for f in ("morphology","asymmetric_bow_tie","srax","srax_deg","inferior_opposite_steepening_D"): e[f]=er.get(f)
         e["morphology_evidence"]=list(dict.fromkeys((er.get("evidence") or [])+["Dedicated ERSS pass: Pentacam 4 Maps upper-left Axial/Sagittal Curvature (Front) recognized as anterior topography."]))
         e["erss_source_read"]="DEDICATED_CURVATURE_PASS"
+    else:
+        result.setdefault("global_warnings",[]).append(
+            f"Dedicated ERSS reader recognized Pentacam 4 Maps Refractive in {filename}, but eye laterality could not be mapped unambiguously; no morphology was assigned."
+        )
     return result
 core.extract_one_image=extract_one_image_with_erss
 
