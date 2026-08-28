@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 from typing import Callable, Optional, Sequence, Tuple
 
+from .ablation import select_ablation
 from .policy import POLICY
 
 
@@ -19,6 +20,8 @@ class LasikPlanOutcome:
     status: str
     pta_percent: Optional[float]
     independent_hard_stop: bool = False
+    ablation_um: Optional[float] = None
+    ablation_source: str = "UNAVAILABLE"
 
 
 LASIK_PLANS = (
@@ -57,14 +60,12 @@ def lasik_pta_cutoff(pta_percent: Optional[float]) -> bool:
 
 
 def needs_lasik_fallback(outcome: LasikPlanOutcome) -> bool:
-    """Mirror legacy fallback trigger without string-matching clinical reasons."""
     if outcome.independent_hard_stop:
         return False
     return outcome.status == "DO NOT PROCEED" or lasik_pta_cutoff(outcome.pta_percent)
 
 
 def select_lasik_sequence(outcomes: Sequence[LasikPlanOutcome]) -> Tuple[LasikPlanOutcome, ...]:
-    """Return the evaluated A→B→C sequence under the locked fallback contract."""
     selected = []
     for expected_plan, outcome in zip(LASIK_PLANS, outcomes):
         if outcome.plan != expected_plan:
@@ -76,11 +77,6 @@ def select_lasik_sequence(outcomes: Sequence[LasikPlanOutcome]) -> Tuple[LasikPl
 
 
 def evaluate_lasik_fallback(evaluate_plan: Callable[[LasikPlan], LasikPlanOutcome]) -> Tuple[LasikPlanOutcome, ...]:
-    """Evaluate Plan A→B→C lazily, stopping exactly when fallback is no longer allowed.
-
-    The callback owns plan-specific clinical calculation (including recalculated
-    ablation for the selected optical zone). This function owns only sequencing.
-    """
     sequence = []
     for plan in LASIK_PLANS:
         outcome = evaluate_plan(plan)
@@ -90,6 +86,31 @@ def evaluate_lasik_fallback(evaluate_plan: Callable[[LasikPlan], LasikPlanOutcom
         if not needs_lasik_fallback(outcome):
             break
     return tuple(sequence)
+
+
+def plan_specific_ablation(
+    plan: LasikPlan,
+    *,
+    actual_ablation_um: Optional[float],
+    intended_sphere_d: Optional[float],
+    intended_cylinder_magnitude_d: Optional[float],
+    laser_platform: Optional[str],
+    is_fallback_plan: bool,
+):
+    """Mirror legacy fallback ablation semantics.
+
+    Plan A may use a supplied actual maximum. Legacy Plans B/C deliberately clear
+    the Plan-A ablation so the changed optical zone is recalculated. Therefore a
+    fallback plan never silently reuses the Plan-A actual/estimate.
+    """
+    actual_for_plan = None if is_fallback_plan else actual_ablation_um
+    return select_ablation(
+        actual_ablation_um=actual_for_plan,
+        intended_sphere_d=intended_sphere_d,
+        intended_cylinder_magnitude_d=intended_cylinder_magnitude_d,
+        optical_zone_mm=plan.optical_zone_mm,
+        laser_platform=laser_platform,
+    )
 
 
 def final_lasik_status(sequence: Sequence[LasikPlanOutcome]) -> str:
