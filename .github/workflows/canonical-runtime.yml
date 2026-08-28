@@ -20,7 +20,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt pytest
       - name: Compile decision-critical runtime modules
-        run: python -m py_compile app.py bootstrap.py hc_age_policy.py hc_bad_final_policy.py lasik_planning.py merge_policy_base.py extraction_guard.py erss_topography_guard.py randleman_bad_independence.py erss_visual_morphology_policy.py critical_score_highlight.py pachymetry_policy.py hc_final_decision_policy.py status_rank_policy.py canonical_engine.py reports.py report_export_guard.py clean_engine/policy.py clean_engine/decision.py clean_engine/surgery.py clean_engine/reconciliation.py
+        run: python -m py_compile app.py bootstrap.py hc_age_policy.py hc_bad_final_policy.py lasik_planning.py merge_policy_base.py extraction_guard.py erss_topography_guard.py randleman_bad_independence.py erss_visual_morphology_policy.py critical_score_highlight.py pachymetry_policy.py hc_final_decision_policy.py status_rank_policy.py canonical_engine.py reports.py report_export_guard.py clean_engine/policy.py clean_engine/decision.py clean_engine/surgery.py clean_engine/reconciliation.py clean_engine/models.py clean_engine/engine.py
       - name: Canonical startup invariants
         env:
           OPENAI_API_KEY: test-key-for-import-only
@@ -28,4 +28,4 @@ jobs:
       - name: Behavior-lock, equivalence, and ERSS regression tests
         env:
           OPENAI_API_KEY: test-key-for-import-only
-        run: python -m pytest -q tests/test_behavior_lock_v0743.py tests/test_reconciliation_behavior_lock.py tests/test_surgical_policy_lock.py tests/test_erss_runtime.py tests/test_clean_policy_equivalence.py tests/test_clean_decision_surgery.py tests/test_clean_reconciliation.py
+        run: python -m pytest -q tests/test_behavior_lock_v0743.py tests/test_reconciliation_behavior_lock.py tests/test_surgical_policy_lock.py tests/test_erss_runtime.py tests/test_clean_policy_equivalence.py tests/test_clean_decision_surgery.py tests/test_clean_reconciliation.py tests/test_clean_engine_pipeline.py
