@@ -14,6 +14,7 @@ class EyeInput:
     flap_um: Optional[float] = None
     preop_kmean_d: Optional[float] = None
     intended_mrse_d: Optional[float] = None
+    intended_sphere_d: Optional[float] = None
 
 
 @dataclass(frozen=True)
