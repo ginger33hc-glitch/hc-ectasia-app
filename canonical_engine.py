@@ -15,7 +15,7 @@ import status_rank_policy  # noqa: F401
 
 core = bootstrap.core
 app = _runtime.app
-CANONICAL_VERSION = "0.7.42"
+CANONICAL_VERSION = "0.7.43"
 core.APP_VERSION = CANONICAL_VERSION
 core.app.title = f"HC Ectasia App v{CANONICAL_VERSION}"
 reports.APP_VERSION = CANONICAL_VERSION
@@ -70,6 +70,11 @@ try:
     html = index_path.read_text(encoding="utf-8")
     html = re.sub(r"HC Ectasia App v\d+\.\d+\.\d+", f"HC Ectasia App v{CANONICAL_VERSION}", html)
     html = re.sub(r"Software v\d+\.\d+\.\d+", f"Software v{CANONICAL_VERSION}", html)
+    # Make PASS WITH CAUTION a first-class green status in the primary renderer.
+    html = html.replace(
+        'function statusClass(s){\n  if(s === "PASS") return "pass";',
+        'function statusClass(s){\n  if(s === "PASS" || s === "PASS WITH CAUTION") return "pass";'
+    )
     identity_css = '<style id="hc-identity-single-line">.identity-alert ul{display:none!important}.identity-alert strong{margin-bottom:0!important}</style>'
     html = re.sub(r'<style id="hc-identity-single-line">.*?</style>', '', html, flags=re.S)
     html = html.replace('</head>', identity_css + '\n</head>')
