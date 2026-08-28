@@ -1,5 +1,6 @@
 """Phase 2 tests for pure decision and surgical layers."""
 import pytest
+import lasik_planning as legacy_lasik
 
 from clean_engine.decision import DecisionInput, decide
 from clean_engine import surgery
@@ -16,12 +17,30 @@ def test_clean_final_hierarchy_matrix():
     assert decide(DecisionInput("DATA INSUFFICIENT", "NORMAL", 0, decision_critical_incomplete=True)).status == "DATA INSUFFICIENT"
 
 
-def test_lasik_plan_sequence():
-    assert [(p.name, p.flap_um, p.optical_zone_mm, p.transition_zone_mm) for p in surgery.LASIK_PLANS] == [
-        ("Plan A", 100.0, 6.5, 9.0),
-        ("Plan B", 100.0, 6.0, 8.5),
-        ("Plan C", 90.0, 6.0, 8.5),
-    ]
+def test_lasik_plan_sequence_matches_legacy_runtime_exactly():
+    clean = [(p.name, p.flap_um, p.optical_zone_mm, p.transition_zone_mm) for p in surgery.LASIK_PLANS]
+    legacy = [(p["name"], p["flap_um"], p["optical_zone_mm"], p["transition_zone_mm"]) for p in legacy_lasik.LASIK_PLANS]
+    assert clean == legacy
+
+
+def test_clean_pta_cutoff_matches_legacy_runtime_boundary():
+    for value in (None, 0, 39.999, 40.0, 40.001, 100.0):
+        legacy = legacy_lasik._pta_cutoff({"values": {"LASIK_PTA_percent": value}})
+        assert surgery.lasik_pta_cutoff(value) == legacy
+
+
+def test_legacy_independent_hard_stop_marker_contract_is_characterized():
+    for marker in legacy_lasik._INDEPENDENT_HARD_STOP_MARKERS:
+        assert legacy_lasik._independent_hard_stop({"hard_stops": [f"prefix {marker} suffix"]})
+    assert not legacy_lasik._independent_hard_stop({"hard_stops": ["ordinary LASIK tissue-load failure"]})
+
+
+def test_exact_480_marker_mismatch_is_documented_not_silently_changed():
+    # Current active pachymetry policy emits <=480 while legacy fallback searches for <480.
+    # Preserve this characterization until migration replaces string matching with typed stops.
+    assert not legacy_lasik._independent_hard_stop({
+        "hard_stops": ["HC operational hard stop: thinnest preoperative cornea <=480 µm."]
+    })
 
 
 def outcome(index, status="PASS WITH CAUTION", pta=35.0, hard_stop=False):
