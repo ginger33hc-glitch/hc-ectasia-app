@@ -1,0 +1,29 @@
+name: Canonical Runtime Safety
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  canonical-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+      - name: Compile runtime modules
+        run: python -m py_compile app.py bootstrap.py extraction_guard.py erss_topography_guard.py critical_score_highlight.py pachymetry_policy.py canonical_engine.py reports.py report_export_guard.py
+      - name: Canonical startup invariants
+        env:
+          OPENAI_API_KEY: test-key-for-import-only
+        run: python -c "import canonical_engine; assert canonical_engine.runtime_invariants()"
+      - name: Focused ERSS runtime tests
+        env:
+          OPENAI_API_KEY: test-key-for-import-only
+        run: pytest -q tests/test_erss_runtime.py
