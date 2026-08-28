@@ -11,13 +11,13 @@ import reports
 import randleman_bad_independence  # noqa: F401
 import erss_visual_morphology_policy  # noqa: F401
 import hc_final_decision_policy  # noqa: F401
+import status_rank_policy  # noqa: F401
 
 core = bootstrap.core
 app = _runtime.app
-CANONICAL_VERSION = "0.7.41"
+CANONICAL_VERSION = "0.7.42"
 core.APP_VERSION = CANONICAL_VERSION
 core.app.title = f"HC Ectasia App v{CANONICAL_VERSION}"
-# One version authority for browser, API title, PDF and DOCX exports.
 reports.APP_VERSION = CANONICAL_VERSION
 
 
@@ -49,6 +49,11 @@ def runtime_invariants():
     if not getattr(core,"_erss_visual_morphology_policy_installed",False):errors.append("Improved ERSS visual morphology policy is not active")
     if not getattr(core,"_randleman_bad_independence_installed",False):errors.append("BAD-independent Randleman ERSS pathway is not active")
     if not getattr(core,"_hc_final_decision_hierarchy_installed",False):errors.append("HC final BAD-D/Randleman decision hierarchy is not active")
+    if not getattr(core,"_hc_status_rank_policy_installed",False):errors.append("HC aggregate status ranking is not active")
+    try:
+        if core.combine_status("PASS", "PASS WITH CAUTION") != "PASS WITH CAUTION":errors.append("PASS WITH CAUTION aggregate ranking is invalid")
+        if core.combine_status("PASS WITH CAUTION", "DO NOT PROCEED") != "DO NOT PROCEED":errors.append("Hard-stop aggregate ranking is invalid")
+    except Exception as exc:errors.append(f"Aggregate status ranking failed: {type(exc).__name__}")
     if not getattr(core,"_hc_lasik_fallback_installed",False):errors.append("LASIK fallback planner is not active")
     if getattr(core,"PRK_EPITHELIUM_UM",None) != 50:errors.append("PRK epithelial convention is not 50 µm")
     if getattr(core,"FINAL_KMEAN_MIN_D",None) != 36.0 or getattr(core,"FINAL_KMEAN_MAX_D",None) != 48.0:errors.append("Final keratometry safety bounds are not 36-48 D")
