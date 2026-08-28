@@ -20,12 +20,12 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt pytest
       - name: Compile decision-critical runtime modules
-        run: python -m py_compile app.py bootstrap.py hc_age_policy.py hc_bad_final_policy.py lasik_planning.py merge_policy_base.py extraction_guard.py erss_topography_guard.py randleman_bad_independence.py erss_visual_morphology_policy.py critical_score_highlight.py pachymetry_policy.py hc_final_decision_policy.py status_rank_policy.py canonical_engine.py reports.py report_export_guard.py
+        run: python -m py_compile app.py bootstrap.py hc_age_policy.py hc_bad_final_policy.py lasik_planning.py merge_policy_base.py extraction_guard.py erss_topography_guard.py randleman_bad_independence.py erss_visual_morphology_policy.py critical_score_highlight.py pachymetry_policy.py hc_final_decision_policy.py status_rank_policy.py canonical_engine.py reports.py report_export_guard.py clean_engine/policy.py clean_engine/decision.py clean_engine/surgery.py clean_engine/reconciliation.py clean_engine/input_adapter.py clean_engine/report_model.py clean_engine/service.py clean_engine/migration.py clean_engine/models.py clean_engine/engine.py clean_engine/status.py clean_engine/ablation.py clean_engine/prk.py clean_engine/hard_stops.py clean_engine/validation.py clean_engine/scoring.py clean_engine/calculation.py clean_engine/finalization.py clean_engine/__init__.py
       - name: Canonical startup invariants
         env:
           OPENAI_API_KEY: test-key-for-import-only
         run: python -c "import canonical_engine; assert canonical_engine.runtime_invariants()"
-      - name: Behavior-lock and ERSS regression tests
+      - name: Behavior-lock, equivalence, and clinical regression tests
         env:
           OPENAI_API_KEY: test-key-for-import-only
-        run: python -m pytest -q tests/test_behavior_lock_v0743.py tests/test_reconciliation_behavior_lock.py tests/test_surgical_policy_lock.py tests/test_erss_runtime.py
+        run: python -m pytest -q tests/test_behavior_lock_v0743.py tests/test_reconciliation_behavior_lock.py tests/test_surgical_policy_lock.py tests/test_erss_runtime.py tests/test_clean_policy_equivalence.py tests/test_clean_decision_surgery.py tests/test_clean_reconciliation.py tests/test_clean_engine_pipeline.py tests/test_clean_status_equivalence.py tests/test_clean_ablation_equivalence.py tests/test_clean_prk_characterization.py tests/test_clean_prk_equivalence.py tests/test_clean_hard_stops.py tests/test_clean_validation.py tests/test_clean_scoring.py tests/test_clean_calculation.py tests/test_clean_finalization.py tests/test_clean_architecture.py tests/test_clean_public_api.py tests/test_clean_end_to_end_equivalence.py tests/test_clean_input_adapter.py tests/test_clean_report_model.py tests/test_clean_service.py tests/test_clean_migration_seam.py
