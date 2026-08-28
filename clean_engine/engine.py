@@ -57,6 +57,11 @@ def assess(inp: EyeInput) -> AssessmentResult:
         hard_stops.append("ABNORMAL_ECTATIC_TOPOGRAPHY")
     if bad_status == "ABNORMAL":
         hard_stops.append("FINAL_BAD_D_ABNORMAL")
+    if inp.intended_sphere_d is not None:
+        if inp.intended_sphere_d < -10.0:
+            hard_stops.append("INTENDED_SPHERE_LT_MINUS_10")
+        if inp.intended_sphere_d > 6.0:
+            hard_stops.append("INTENDED_SPHERE_GT_PLUS_6")
     if procedure == "LASIK" and calc.lasik_rsb_um is not None and calc.lasik_rsb_um < POLICY.lasik_rsb_hard_stop_um:
         hard_stops.append("LASIK_RSB_LT_300")
     if procedure == "PRK" and calc.prk_rst_um is not None and calc.prk_rst_um < POLICY.prk_rst_hard_stop_um:
