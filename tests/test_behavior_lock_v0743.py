@@ -1,7 +1,7 @@
-"""Behavior-lock tests for the v0.7.43 production contract.
+"""Behavior-lock tests for the canonical HC production contract.
 
-These tests characterize decision-critical HC behavior before architecture refactor.
-Refactoring must preserve these outputs unless a clinical policy change is explicitly approved.
+These tests characterize decision-critical HC behavior. Refactoring must preserve these
+outputs unless a clinical policy change is explicitly approved.
 """
 import hashlib
 from pathlib import Path
@@ -16,7 +16,7 @@ core = canonical_engine.core
 
 
 def test_canonical_version_lock():
-    assert canonical_engine.CANONICAL_VERSION == "0.7.43"
+    assert canonical_engine.CANONICAL_VERSION == "0.7.45"
 
 
 def test_hc_age_boundaries():
@@ -26,8 +26,8 @@ def test_hc_age_boundaries():
 
 
 def test_hc_pachymetry_boundaries():
-    assert [(p, core.lasik_pachy_points(p)) for p in (479, 480, 499, 500, 510, 511)] == [
-        (479, None), (480, 2), (499, 2), (500, 1), (510, 1), (511, 0)
+    assert [(p, core.lasik_pachy_points(p)) for p in (479, 480, 481, 499, 500, 509, 510, 511)] == [
+        (479, None), (480, 2), (481, 2), (499, 2), (500, 1), (509, 1), (510, 0), (511, 0)
     ]
 
 
