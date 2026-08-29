@@ -1124,8 +1124,19 @@ class TestSignedRefractionInputs(unittest.TestCase):
     def test_empty_sign_button_inserts_only_sign_and_sign_only_is_not_numeric(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
         self.assertIn('input.value=unsigned?`${sign}${unsigned}`:sign;', html)
-        self.assertIn('if(raw===""||raw==="+"||raw==="-")return null;', html)
+        self.assertIn('if(raw===""||raw==="+"||raw==="-")return {state:"blank",value:null};', html)
         self.assertNotIn('parsed||0.25', html)
+
+    def test_mobile_minus_variants_are_normalized_before_numeric_parsing(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn('replace(/[−–—﹣－]/g,"-")', html)
+        self.assertIn('replace(/[＋﹢]/g,"+")', html)
+
+    def test_invalid_or_partial_manifest_input_cannot_silently_become_missing(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn('function validateRefractionInputs()', html)
+        self.assertIn('Complete both ${eye.toUpperCase()} ${role} sphere and cylinder, or leave both blank.', html)
+        self.assertIn('const invalidRefraction=validateRefractionInputs();', html)
 
     def test_autofilled_internal_cylinder_magnitudes_render_as_negative(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()

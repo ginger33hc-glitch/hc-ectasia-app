@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>HC Ectasia App v0.7.47</title>
+  <title>HC Ectasia App v0.7.48</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=5">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=4">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=4">
@@ -35,7 +35,7 @@
   </style>
 </head>
 <body>
-<header><h1>HC Ectasia App v0.7.47</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
+<header><h1>HC Ectasia App v0.7.48</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -98,7 +98,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">HC Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.7.47</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.7.48</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <p class="report-liability-notice">The final surgical decision and all associated responsibility and liability rest with the surgeon. This application is a clinical decision-support aid only.</p>
       <table class="meta-table"><tbody>
@@ -221,12 +221,58 @@ window.addEventListener("beforeunload",()=>selectedFileUrls.forEach(url=>URL.rev
 let lastReport = null;
 let sharedImages = [];
 const value = (id) => document.querySelector(`#${id}`).value;
-const numberOrNull = (id) => {
-  const raw=value(id).trim().replace(",",".");
-  if(raw===""||raw==="+"||raw==="-")return null;
+const normalizeNumericText = (raw) => String(raw??"").trim().replace(/\s+/g,"").replace(/[−–—﹣－]/g,"-").replace(/[＋﹢]/g,"+").replace(",",".");
+const parsedClinicalNumber = (id) => {
+  const raw=normalizeNumericText(value(id));
+  if(raw===""||raw==="+"||raw==="-")return {state:"blank",value:null};
+  if(!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw))return {state:"invalid",value:null};
   const parsed=Number(raw);
-  return Number.isFinite(parsed)?parsed:null;
+  return Number.isFinite(parsed)?{state:"valid",value:parsed}:{state:"invalid",value:null};
 };
+const numberOrNull = (id) => {
+  const {state,value:parsed}=parsedClinicalNumber(id);
+  return state==="valid"?parsed:null;
+};
+function validateRefractionInputs(){
+  const labels={
+    manifest_sphere:"preoperative manifest sphere",manifest_cylinder:"preoperative manifest cylinder",
+    sphere:"intended treatment sphere",cylinder:"intended treatment cylinder"
+  };
+  let firstInvalid=null;
+  for(const eye of ["od","os"]){
+    const parsed={};
+    for(const suffix of Object.keys(labels)){
+      const id=`${eye}_${suffix}`, input=document.getElementById(id), result=parsedClinicalNumber(id);
+      parsed[suffix]=result;
+      input.setCustomValidity("");
+      if(result.state==="invalid"){
+        input.setCustomValidity(`Enter a valid signed number for ${eye.toUpperCase()} ${labels[suffix]}.`);
+        firstInvalid??=input;
+        continue;
+      }
+      if(result.state==="valid"){
+        const low=Number(input.dataset.min), high=Number(input.dataset.max);
+        if(result.value<low||result.value>high){
+          input.setCustomValidity(`${eye.toUpperCase()} ${labels[suffix]} must be between ${low} and ${high} D.`);
+          firstInvalid??=input;
+        }
+      }
+    }
+    for(const [role,sphereSuffix,cylinderSuffix] of [
+      ["manifest","manifest_sphere","manifest_cylinder"],["intended","sphere","cylinder"]
+    ]){
+      const sphere=parsed[sphereSuffix], cylinder=parsed[cylinderSuffix];
+      const oneBlank=(sphere.state==="blank")!== (cylinder.state==="blank");
+      if(oneBlank){
+        const blankSuffix=sphere.state==="blank"?sphereSuffix:cylinderSuffix;
+        const input=document.getElementById(`${eye}_${blankSuffix}`);
+        input.setCustomValidity(`Complete both ${eye.toUpperCase()} ${role} sphere and cylinder, or leave both blank.`);
+        firstInvalid??=input;
+      }
+    }
+  }
+  return firstInvalid;
+}
 document.querySelector("#report_date").value = new Date().toISOString().slice(0,10);
 
 async function loadSharedImages(){
@@ -465,6 +511,14 @@ const allowLoadingStateToPaint=()=>new Promise(resolve=>requestAnimationFrame(()
 
 f.addEventListener("submit", async (e) => {
   e.preventDefault();
+  const invalidRefraction=validateRefractionInputs();
+  if(invalidRefraction){
+    showFormMessage(invalidRefraction.validationMessage);
+    invalidRefraction.scrollIntoView({behavior:"smooth",block:"center"});
+    invalidRefraction.focus();
+    invalidRefraction.reportValidity();
+    return;
+  }
   if(!f.checkValidity()){
     showFormMessage("Please complete the required field highlighted by the browser.");
     f.reportValidity();

@@ -2,7 +2,10 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.47 implements
+## What v0.7.48 implements
+
+- Mobile-safe signed refraction parsing now recognizes common Unicode plus/minus characters.
+- Invalid or partial manifest/intended manual entries block analysis with a field-specific warning instead of silently becoming missing data.
 
 - Sequential original-detail extraction of each uploaded Pentacam/topography or treatment-card image.
 - Pentacam numeric-source priority: explicitly labeled side/summary-table fields are used first.
