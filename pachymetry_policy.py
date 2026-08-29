@@ -1,13 +1,17 @@
 """HC pachymetry policy patch.
 
-Policy:
-- thinnest pachymetry <480 µm: HC hard stop (no pachymetry score used for clearance)
-- 480-510 µm: 2 points
-- >=511 µm: 0 points
+HC policy:
+- thinnest pachymetry <480 µm: hard stop (no pachymetry score used for clearance)
+- 480-499 µm: 2 points
+- 500-509 µm: 1 point
+- >=510 µm: 0 points
 
-The 481-510 µm scoring band follows the published ERSS pachymetry category. Exactly
-480 µm remains the HC hard-stop boundary exception and is scored +2 because the
-independent HC hard stop applies only below 480 µm.
+Evidence note: this is an HC-modified pachymetry component, not the original published
+Randleman ERSS pachymetry table. The published ERSS grouped 481-510 µm together at +2.
+The HC modification deliberately introduces 500 µm as a clinical transition because the
+refractive-surgery literature commonly discusses <500 µm as a thin-cornea risk phenotype,
+while also recognizing that pachymetry alone has no validated binary safe/unsafe cutoff.
+Exactly 480 µm remains scoreable because the independent HC hard stop applies only below 480 µm.
 """
 import critical_score_highlight as runtime
 import bootstrap
@@ -21,8 +25,10 @@ def hc_lasik_pachy_points(pachy):
     value = float(pachy)
     if value < 480:
         return None
-    if value <= 510:
+    if value < 500:
         return 2
+    if value < 510:
+        return 1
     return 0
 
 
@@ -37,12 +43,12 @@ def assess_eye_with_hc_pachymetry(eye, plan, age, patient_modifiers):
     original_pachy = eye.get("pachy_thinnest_um")
     working_eye = eye
 
-    # The legacy engine had an explicit unresolved-boundary branch at exactly
-    # 510 µm. Nudge only the internal legacy boundary check below 510; the HC
-    # scorer assigns 2 points and the reported clinical value is restored.
+    # The legacy engine has an explicit unresolved-boundary branch at exactly 510 µm.
+    # Move only the internal compatibility value just above that boundary; the HC scorer
+    # therefore assigns 0 points and the clinically reported pachymetry is restored to 510.
     if core.is_number(original_pachy) and float(original_pachy) == 510.0:
         working_eye = dict(eye)
-        working_eye["pachy_thinnest_um"] = 509.999999
+        working_eye["pachy_thinnest_um"] = 510.000001
 
     result = _previous_assess_eye(working_eye, plan, age, patient_modifiers)
 
@@ -78,9 +84,9 @@ def assess_eye_with_hc_pachymetry(eye, plan, age, patient_modifiers):
             result["score"] = score
             warnings = list(result.get("warnings") or [])
             warnings.append(
-                "HC LASIK PACHYMETRY POLICY: <480 µm = hard stop; "
-                "480-510 µm = +2; >=511 µm = +0. "
-                "The published ERSS assigns +2 to 481-510 µm; exactly 480 µm is retained at +2 under the HC boundary rule."
+                "HC-MODIFIED LASIK PACHYMETRY POLICY: <480 µm = hard stop; "
+                "480-499 µm = +2; 500-509 µm = +1; >=510 µm = +0. "
+                "This HC banding is not the original published Randleman pachymetry table."
             )
             result["warnings"] = list(dict.fromkeys(warnings))
 
