@@ -200,7 +200,9 @@ def _extracted_eye(extracted: Dict[str, Any], eye_id: str) -> Dict[str, Any]:
 def _tomography_rows(extracted: Dict[str, Any], eye_id: str) -> List[tuple[str, str]]:
     eye = _extracted_eye(extracted, eye_id)
     keys = [
-        ("K1", "K1_D", " D", 2), ("K2", "K2_D", " D", 2),
+        ("K1", "K1_D", " D", 2), ("K1 axis", "K1_axis_deg", " degrees", 0),
+        ("K2", "K2_D", " D", 2), ("K2 axis", "K2_axis_deg", " degrees", 0),
+        ("Corneal diameter / W2W", "corneal_diameter_mm", " mm", 2),
         ("Kmax", "Kmax_D", " D", 2), ("Thinnest pachymetry", "pachy_thinnest_um", " um", 0),
         ("BAD-D final", "BAD_D", "", 2), ("BAD-Df", "Df", "", 2),
         ("BAD-Db", "Db", "", 2), ("BAD-Dp", "Dp", "", 2),
@@ -222,6 +224,32 @@ def _tomography_rows(extracted: Dict[str, Any], eye_id: str) -> List[tuple[str, 
         ("Pentacam QS", "pentacam_qs", "", 0), ("Source files", "source_files", "", 0),
     ]
     return [(label, _fmt(eye.get(key), digits, unit)) for label, key, unit, digits in keys]
+
+
+def _microkeratome_rows(eye: Dict[str, Any]) -> List[tuple[str, str]]:
+    plan = eye.get("microkeratome_planning") or {}
+    if not plan.get("applicable"):
+        return []
+    blades = ", ".join(str(item) for item in plan.get("blade_recommendations") or []) or "Not documented"
+    projected = (
+        f"{_fmt(plan.get('alternative_rsb_um'), 1, ' um')} / "
+        f"{_fmt(plan.get('alternative_pta_percent'), 1, '%')}"
+        if plan.get("alternative_safety") != "NOT_APPLICABLE"
+        else "Not applicable"
+    )
+    return [
+        ("Assessment gate", _text(plan.get("assessment_gate"))),
+        ("Steep-flat K spread", _fmt(plan.get("delta_k_d"), 2, " D")),
+        ("Vacuum ring", _fmt(plan.get("vacuum_ring_mm"), 1, " mm")),
+        ("Vacuum pressure", _text(plan.get("vacuum_pressure_mmhg"), "Not determined") + " mmHg" if plan.get("vacuum_pressure_mmhg") else "Not determined"),
+        ("Blade recommendation(s)", blades),
+        ("Primary hinge", _text(plan.get("primary_hinge"), "No HC K-spread hinge override")),
+        ("Conditional alternative", _text(plan.get("alternative_hinge"), "Not cleared / not applicable")),
+        ("Alternative projected RSB / PTA", projected),
+        ("Alternative safety", _text(plan.get("alternative_safety"))),
+        ("Ring-zone clearance", _fmt(plan.get("ring_tzone_clearance_mm"), 2, " mm")),
+        ("Source", _text(plan.get("source"))),
+    ]
 
 
 def _paired_rows(rows: List[tuple[str, str]]) -> List[List[str]]:
@@ -262,7 +290,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
 
     story: List[Any] = []
     story.append(Paragraph("HC PREOPERATIVE ECTASIA RISK ASSESSMENT", styles["ReportTitle"]))
-    story.append(Paragraph("Corneal refractive surgery clinical decision-support report | Software v0.7.4", styles["ReportSub"]))
+    story.append(Paragraph(f"Corneal refractive surgery clinical decision-support report | Software v{APP_VERSION}", styles["ReportSub"]))
     story.append(Paragraph(LIABILITY_NOTICE, styles["Liability"]))
 
     metadata = [
@@ -339,6 +367,32 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
             story.append(Paragraph(_ascii(title), styles["Section"]))
             for item in items:
                 story.append(Paragraph(f"- {_ascii(item)}", styles["BodySmall"]))
+
+        planning_rows = _microkeratome_rows(eye)
+        if planning_rows:
+            story.append(Paragraph("Post-assessment ML7 microkeratome planning", styles["Section"]))
+            planning_table = Table(
+                [["Parameter", "Surgeon-review recommendation"]]
+                + [[_ascii(key), _ascii(value)] for key, value in planning_rows],
+                colWidths=[2.25 * inch, 3.9 * inch], repeatRows=1,
+            )
+            planning_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), _rl(BLUE)), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"), ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 7.8), ("GRID", (0, 0), (-1, -1), 0.35, _rl(LINE)),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            story.append(planning_table)
+            for title, items in (
+                ("Planning warnings", (eye.get("microkeratome_planning") or {}).get("warnings") or []),
+                ("Planning notes", (eye.get("microkeratome_planning") or {}).get("notes") or []),
+            ):
+                if items:
+                    story.append(Paragraph(title, styles["Section"]))
+                    for item in items:
+                        story.append(Paragraph(f"- {_ascii(item)}", styles["BodySmall"]))
 
         story.append(Paragraph("Extracted tomography", styles["Section"]))
         tomo = [["Parameter", "Value", "Parameter", "Value"]] + [
@@ -505,7 +559,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     run.font.size = Pt(18)
     run.bold = True
     run.font.color.rgb = RGBColor.from_string(NAVY)
-    subtitle = document.add_paragraph("Corneal refractive surgery clinical decision-support report | Software v0.7.4")
+    subtitle = document.add_paragraph(f"Corneal refractive surgery clinical decision-support report | Software v{APP_VERSION}")
     subtitle.paragraph_format.space_after = Pt(10)
     for run in subtitle.runs:
         run.font.name = "Arial"
@@ -601,6 +655,28 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
             _add_heading(document, heading, 2)
             for item in items:
                 _add_bullet(document, item)
+
+        planning_rows = _microkeratome_rows(eye)
+        if planning_rows:
+            _add_heading(document, "Post-assessment ML7 microkeratome planning", 2)
+            planning_table = document.add_table(rows=1, cols=2)
+            planning_table.style = "Table Grid"
+            planning_table.rows[0].cells[0].text = "Parameter"
+            planning_table.rows[0].cells[1].text = "Surgeon-review recommendation"
+            for label, value in planning_rows:
+                cells = planning_table.add_row().cells
+                cells[0].text = label
+                cells[1].text = value.replace(" um", " µm")
+                cells[0].paragraphs[0].runs[0].bold = True
+            _style_doc_table(planning_table, [2.15, 3.7], header=True)
+            for heading, items in (
+                ("Planning warnings", (eye.get("microkeratome_planning") or {}).get("warnings") or []),
+                ("Planning notes", (eye.get("microkeratome_planning") or {}).get("notes") or []),
+            ):
+                if items:
+                    _add_heading(document, heading, 2)
+                    for item in items:
+                        _add_bullet(document, str(item))
 
         _add_heading(document, "Extracted tomography", 2)
         tomo = document.add_table(rows=1, cols=4)

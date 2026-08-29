@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="HC Ectasia App v0.7.4")
+app = FastAPI(title="HC Ectasia App v0.7.47")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -33,7 +33,8 @@ MORPHOLOGY = (
     "UNCERTAIN",
 )
 TABLE_NUMERIC_FIELDS = (
-    "K1_D", "K2_D", "Kmax_D", "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp",
+    "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmax_D", "corneal_diameter_mm",
+    "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp",
     "Dt", "Da", "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI",
     "CKI", "IHD", "I_S", "KISA", "IHA", "Rmin_mm", "anterior_elevation_thinnest_um",
     "posterior_elevation_thinnest_um", "thinnest_x_mm", "thinnest_y_mm",
@@ -109,8 +110,11 @@ SCHEMA = {
                         "items": {"type": "string", "enum": list(MAP_FALLBACK_NUMERIC_FIELDS)},
                     },
                     "K1_D": {"type": ["number", "null"]},
+                    "K1_axis_deg": {"type": ["number", "null"]},
                     "K2_D": {"type": ["number", "null"]},
+                    "K2_axis_deg": {"type": ["number", "null"]},
                     "Kmax_D": {"type": ["number", "null"]},
+                    "corneal_diameter_mm": {"type": ["number", "null"]},
                     "pachy_thinnest_um": {"type": ["number", "null"]},
                     "BAD_D": {"type": ["number", "null"]},
                     "Df": {"type": ["number", "null"]},
@@ -158,8 +162,9 @@ SCHEMA = {
                 },
                 "required": [
                     "eye", "screen_types", "quality", "missing_or_unreadable",
-                    "table_verified_numeric_fields", "map_fallback_numeric_fields", "K1_D", "K2_D",
-                    "Kmax_D", "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp", "Dt", "Da",
+                    "table_verified_numeric_fields", "map_fallback_numeric_fields", "K1_D", "K1_axis_deg",
+                    "K2_D", "K2_axis_deg", "Kmax_D", "corneal_diameter_mm", "pachy_thinnest_um",
+                    "BAD_D", "Df", "Db", "Dp", "Dt", "Da",
                     "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI", "CKI", "IHD",
                     "I_S", "KISA", "IHA", "Rmin_mm", "anterior_elevation_thinnest_um",
                     "posterior_elevation_thinnest_um", "thinnest_x_mm", "thinnest_y_mm",
@@ -262,7 +267,8 @@ at that same marked thinnest point. A generic curvature-map spot is not Kmax or 
 or location is uncertain, return null.
 
 Never substitute a generic map spot value, color-scale value, axis label, neighboring parameter,
-calculated value, average, or visual estimate for K1, K2, Kmax, Rmin, BAD-D/components, PPI, ARTmax, topometric
+calculated value, average, or visual estimate for K1, K2, their axes, corneal diameter/W2W, Kmax,
+Rmin, BAD-D/components, PPI, ARTmax, topometric
 indices, coordinates, corneal volume, HOA, or coma. Those summary/calculated fields must remain null
 when their own labeled table value is unreadable. A labeled BAD-display center/bottom numeric box
 counts as a printed parameter field; an unlabeled number inside the map does not. The table source
@@ -281,7 +287,10 @@ thinnest-point location, pachymetric-progression, topometric, corneal-volume, an
 when they are printed; otherwise return null. Classify both visible anterior and posterior maps as
 REASSURING, BORDERLINE, ABNORMAL, or UNREADABLE. ABNORMAL_ECTATIC is reserved for a clearly visible keratoconus,
 forme-fruste keratoconus, pellucid/ectatic pattern; do not infer it from one isolated index.
-In particular, extract K1_D and K2_D only from explicitly labeled K1 and K2 summary-table fields.
+In particular, extract K1_D/K1_axis_deg and K2_D/K2_axis_deg only from the explicitly labeled K1
+and K2 summary-table fields. The axis must be printed as part of the corresponding K row; never use
+the refractive cylinder axis as a keratometric axis. Extract corneal_diameter_mm only from an
+explicitly labeled corneal diameter, HWTW, WTW, or white-to-white field.
 Kmax_D and Rmin_mm may use the restricted, explicitly labeled local fallback described above only
 when their edge/side boxes are unreadable. Never use an ordinary numeric spot label printed inside a
 curvature map as K1, K2, Kmax, or Rmin. Classify morphology only when an axial,
@@ -743,7 +752,8 @@ def required_tomography_missing(eye: Dict[str, Any]) -> List[str]:
         missing.append("explicit Pentacam QS: OK")
     plausible_ranges = {
         "pachy_thinnest_um": (300, 800), "K1_D": (20, 80), "K2_D": (20, 80),
-        "Kmax_D": (20, 90), "ARTmax_um": (1, 1000), "PPI_min": (0.01, 10),
+        "K1_axis_deg": (0, 180), "K2_axis_deg": (0, 180), "Kmax_D": (20, 90),
+        "corneal_diameter_mm": (8, 16), "ARTmax_um": (1, 1000), "PPI_min": (0.01, 10),
         "PPI_avg": (0.01, 10), "PPI_max": (0.01, 10), "Rmin_mm": (3, 15),
         "thinnest_x_mm": (-10, 10), "thinnest_y_mm": (-10, 10),
         "anterior_elevation_thinnest_um": (-300, 300),
@@ -1447,7 +1457,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.4 / source set 2026-08-25 plus binding HC amendments",
+        "version": "software v0.7.47 / source set 2026-08-25 plus binding HC amendments",
     }
 
 
@@ -1474,11 +1484,13 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     posterior_rank = {"UNREADABLE": 0, "REASSURING": 1, "BORDERLINE": 2, "ABNORMAL": 3}
     numeric_tolerance = {
         "K1_D": 0.25, "K2_D": 0.25, "Kmax_D": 0.25,
+        "K1_axis_deg": 2.0, "K2_axis_deg": 2.0, "corneal_diameter_mm": 0.10,
     }
     # Descriptive values that do not drive an HC decision must never become unresolved conflicts
     # that prohibit PASS. Across overlapping Pentacam screens, preserve source priority
     # (labeled table over permitted map fallback); at equal priority retain the first reading.
     non_decision_conflict_fields = {"thinnest_x_mm", "thinnest_y_mm"}
+    planning_conflict_fields = {"K1_axis_deg", "K2_axis_deg", "corneal_diameter_mm"}
 
     def normalized_eye(raw_eye: Dict[str, Any]) -> Dict[str, Any]:
         eye = dict(raw_eye)
@@ -1619,6 +1631,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     "table_verified_numeric_fields", "map_fallback_numeric_fields",
                     "morphology_evidence", "source_files", "quality_by_source", "_source_filename",
                     "_pentacam_qs", "pentacam_qs", "scoring_morphology", "field_provenance",
+                    "planning_data_issues",
                 ):
                     continue
                 old = target.get(key)
@@ -1667,15 +1680,22 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     if value == "UNCERTAIN":
                         continue
 
-                if key in non_decision_conflict_fields:
-                    continue
-
                 if (
                     key in numeric_tolerance
                     and is_number(old)
                     and is_number(value)
                     and abs(float(old) - float(value)) <= numeric_tolerance[key]
                 ):
+                    continue
+
+                if key in planning_conflict_fields:
+                    target[key] = None
+                    target.setdefault("planning_data_issues", []).append(
+                        f"Conflicting {key} values ({old} vs {value}); microkeratome planning will not use this field."
+                    )
+                    continue
+
+                if key in non_decision_conflict_fields:
                     continue
 
                 target["data_conflicts"].append(f"{key}: {old} vs {value}")
