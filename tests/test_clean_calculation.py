@@ -43,7 +43,7 @@ def test_lasik_fallback_returns_typed_plan_sequence():
 def test_independent_hard_stop_prevents_unnecessary_fallback():
     out = calculate(base(
         use_lasik_fallback_planning=True,
-        pachy_thinnest_um=480.0,
+        pachy_thinnest_um=479.0,
         ablation_um=None,
     ))
     assert tuple(step.plan_name for step in out.planning_sequence) == ("Plan A",)

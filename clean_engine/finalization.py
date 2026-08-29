@@ -36,6 +36,9 @@ def finalize(inp: FinalizationInput) -> FinalizationOutput:
             upstream = combine_status(upstream, "CAUTION — STOP/DEFER")
         if inp.prk_scores.pta_evidence_gap:
             upstream = combine_status(upstream, "REVIEW — NOT CLEARED")
+    elif procedure == "LASIK" and not inp.hard_stops and not inp.missing:
+        if inp.lasik_erss_total == 3:
+            upstream = combine_status(upstream, "CAUTION — STOP/DEFER")
 
     decision: DecisionOutput = decide(DecisionInput(
         upstream_status=upstream,

@@ -10,9 +10,9 @@ from clean_engine.service import CleanAssessment, assess_reconciled
 def case(**changes):
     values = dict(
         age_years=30, pachy_thinnest_um=520, bad_d=1.0,
-        morphology="NORMAL_SYMMETRIC", procedure="LASIK",
+        morphology="NORMAL_SYMMETRIC", procedure="LASIK", prior_refractive_surgery=False,
         ablation_um=60, flap_um=100, preop_kmean_d=43,
-        intended_mrse_d=-3, intended_sphere_d=-3,
+        manifest_mrse_d=-3, intended_mrse_d=-3, intended_sphere_d=-3,
         intended_cylinder_magnitude_d=0, laser_platform="EX500",
     )
     values.update(changes)
@@ -29,9 +29,9 @@ def test_service_composes_reconciled_input_assessment_and_report():
 
 
 def test_service_preserves_hard_stop_and_missing_precedence():
-    stopped = assess_reconciled(case(pachy_thinnest_um=480))
+    stopped = assess_reconciled(case(pachy_thinnest_um=479))
     assert stopped.result.status == "DO NOT PROCEED"
-    assert "PACHYMETRY_LE_480" in stopped.report.hard_stops
+    assert "PACHYMETRY_LT_480" in stopped.report.hard_stops
 
     missing = assess_reconciled(case(bad_d=None))
     assert missing.result.status == "DATA INSUFFICIENT"

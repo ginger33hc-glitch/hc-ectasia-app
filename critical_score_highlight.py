@@ -1,19 +1,17 @@
-"""Runtime UI + export patch: BAD-D/ERSS appendix and morphology-row removal.
+"""Runtime composition for HC score/report presentation policy.
 
-Version ownership belongs exclusively to canonical_engine.py. This module must never
-write APP_VERSION, the FastAPI title, or visible software-version strings.
+Frontend assets are committed under ``static/`` and are never rewritten during
+module import. Version ownership remains exclusively in canonical_engine.py.
 """
-from pathlib import Path
-import re
-import hc_age_policy, hc_bad_final_policy, bootstrap, merge_policy_base, extraction_guard, erss_topography_guard
-import report_export_guard
+import hc_age_policy  # noqa: F401
+import hc_bad_final_policy  # noqa: F401
+import bootstrap
+import merge_policy_base  # noqa: F401
+import extraction_guard  # noqa: F401
+import erss_topography_guard  # noqa: F401
+import report_export_guard  # noqa: F401
 import reports
-bootstrap.core.build_pdf=reports.build_pdf
-bootstrap.core.build_docx=reports.build_docx
-index_path=Path(__file__).parent/"static"/"index.html"
-CSS='''<style id="hc-reference-style">.hc-reference-appendix{margin-top:24px;border-top:2px solid #8aa0b8;padding-top:14px}.hc-reference-appendix h3{color:#173b57;margin:12px 0 6px}.hc-bad-normal{background:#e6f4ea!important;color:#176b3a!important;font-weight:bold}.hc-bad-suspicious{background:#fff0d8!important;color:#9a4d00!important;font-weight:bold}.hc-bad-abnormal{background:#fde5e5!important;color:#a31212!important;font-weight:bold}@media print{.hc-reference-appendix{display:block!important}.hc-bad-normal,.hc-bad-suspicious,.hc-bad-abnormal{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style>'''
-SCRIPT=r'''<script id="hc-reference-script">(function(){const rows=[['Anterior topography','Normal / symmetrical','0'],['Anterior topography','Asymmetric bow-tie','1'],['Anterior topography','Inferior steepening / significant SRA-SRAX','3'],['Anterior topography','Abnormal ectatic pattern','4'],['Residual stromal bed','≥300 µm','0'],['Residual stromal bed','280–299 µm','1'],['Residual stromal bed','260–279 µm','2'],['Residual stromal bed','240–259 µm','3'],['Residual stromal bed','<240 µm','4'],['Age','18–21','3'],['Age','22–25','2'],['Age','26–29','1'],['Age','≥30','0'],['Preop corneal thickness','<450 µm','4'],['Preop corneal thickness','451–480 µm','3'],['Preop corneal thickness','481–510 µm','2'],['Preop corneal thickness','≥510 µm','0'],['MRSE','≤8 D myopia','0'],['MRSE','>8–10 D','1'],['MRSE','>10–12 D','2'],['MRSE','>12–14 D','3'],['MRSE','>14 D','4']];const body=rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('');const html=`<section id="hcReferenceAppendix" class="hc-reference-appendix"><h3>HC BAD-D reference points</h3><table class="clinical-table"><thead><tr><th>Final BAD-D</th><th>HC interpretation / action</th></tr></thead><tbody><tr><td>≤ 1.6</td><td class="hc-bad-normal">NORMAL</td></tr><tr><td>&gt; 1.6 to &lt; 3.0</td><td class="hc-bad-suspicious">SUSPICIOUS — contextual finding; final decision follows the HC hierarchy</td></tr><tr><td>≥ 3.0</td><td class="hc-bad-abnormal">ABNORMAL CORNEA — DO NOT PROCEED</td></tr></tbody></table><h3>Published Randleman / ERSS scoring points</h3><table class="clinical-table"><thead><tr><th>Variable</th><th>Finding</th><th>Points</th></tr></thead><tbody>${body}</tbody></table><p class="note"><strong>Independent pathways:</strong> Randleman anterior-topography points come only from the anterior curvature/topography image; BAD/BAD-D is not used. On Pentacam 4 Maps Refractive the source is the upper-left Axial/Sagittal Curvature (Front) panel. Published ERSS total: 0–2 low, 3 moderate, ≥4 high.</p><p class="note"><strong>HC modification:</strong> the active HC engine intentionally uses HC-modified age and pachymetry rules. The patient score must therefore be read from the HC score breakdown, not reconstructed from this published reference table.</p></section>`;function install(){const eyes=document.getElementById('eye-results'),footer=document.querySelector('#reportSheet .report-footer-note');if(!eyes||!footer||!eyes.children.length)return;if(!document.getElementById('hcReferenceAppendix'))footer.insertAdjacentHTML('beforebegin',html);document.querySelectorAll('.status').forEach(el=>{if((el.textContent||'').trim()==='PASS WITH CAUTION'){el.classList.remove('caution','review','fail','insufficient');el.classList.add('pass')}});document.querySelectorAll('tr').forEach(r=>{const c=r.querySelectorAll('td,th');if(c.length&&['morphology category','morphology'].includes((c[0].textContent||'').trim().toLowerCase()))r.remove()})}let queued=false;function q(){if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;install()})}if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',q);else q();new MutationObserver(ms=>{if(ms.some(m=>m.addedNodes.length))q()}).observe(document.documentElement,{childList:true,subtree:true});})();</script>'''
-try:
- html=index_path.read_text(encoding='utf-8');html=re.sub(r'<style id="hc-reference-style">.*?</style>','',html,flags=re.S);html=re.sub(r'<script id="hc-reference-script">.*?</script>','',html,flags=re.S);html=html.replace('</head>',CSS+'\n</head>').replace('</body>',SCRIPT+'\n</body>');index_path.write_text(html,encoding='utf-8')
-except OSError:pass
-app=bootstrap.app
+
+bootstrap.core.build_pdf = reports.build_pdf
+bootstrap.core.build_docx = reports.build_docx
+app = bootstrap.app

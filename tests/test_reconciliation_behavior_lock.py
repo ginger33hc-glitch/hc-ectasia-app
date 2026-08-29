@@ -34,6 +34,22 @@ def test_exactly_one_percent_full_spread_is_accepted_and_higher_retained():
     assert not any("K1_D" in str(x) for x in od.get("data_conflicts", []))
 
 
+def test_lower_is_retained_for_safety_limiting_fields_within_one_percent():
+    cases = (
+        ("pachy_thinnest_um", 500.0, 504.0, 500.0),
+        ("ARTmax_um", 350.0, 353.0, 350.0),
+        ("Rmin_mm", 7.03, 7.09, 7.03),
+    )
+    for field, first, second, expected in cases:
+        merged = core.merge_extractions([
+            _numeric_result("a.jpg", field, first),
+            _numeric_result("b.jpg", field, second),
+        ])
+        od = merged["eyes"][0]
+        assert od[field] == expected
+        assert not any(field in str(x) for x in od.get("data_conflicts", []))
+
+
 def test_pachymetry_difference_under_10um_but_over_one_percent_remains_conflict():
     merged = core.merge_extractions([
         _numeric_result("a.jpg", "pachy_thinnest_um", 500.0),

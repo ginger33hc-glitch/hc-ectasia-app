@@ -3,7 +3,10 @@
 These tests characterize decision-critical HC behavior before architecture refactor.
 Refactoring must preserve these outputs unless a clinical policy change is explicitly approved.
 """
+import hashlib
 from pathlib import Path
+import subprocess
+import sys
 
 import canonical_engine
 import hc_final_decision_policy as final_policy
@@ -23,8 +26,8 @@ def test_hc_age_boundaries():
 
 
 def test_hc_pachymetry_boundaries():
-    assert [(p, core.lasik_pachy_points(p)) for p in (480, 481, 499, 500, 510, 511)] == [
-        (480, None), (481, 2), (499, 2), (500, 1), (510, 1), (511, 0)
+    assert [(p, core.lasik_pachy_points(p)) for p in (479, 480, 499, 500, 510, 511)] == [
+        (479, None), (480, 2), (499, 2), (500, 1), (510, 1), (511, 0)
     ]
 
 
@@ -121,6 +124,17 @@ def test_safety_constants():
 def test_runtime_html_maps_pass_with_caution_to_green_pass_class():
     html = Path("static/index.html").read_text(encoding="utf-8")
     assert 'if(s === "PASS" || s === "PASS WITH CAUTION") return "pass";' in html
+
+
+def test_canonical_import_does_not_mutate_frontend_assets():
+    path = Path("static/index.html")
+    before = hashlib.sha256(path.read_bytes()).hexdigest()
+    subprocess.run(
+        [sys.executable, "-c", "import canonical_engine; canonical_engine.runtime_invariants()"],
+        check=True,
+    )
+    after = hashlib.sha256(path.read_bytes()).hexdigest()
+    assert after == before
 
 
 def test_required_runtime_layers_are_installed():

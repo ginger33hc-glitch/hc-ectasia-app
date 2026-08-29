@@ -64,6 +64,9 @@ def normal_eye(eye="OD", pachy=560, morphology="NORMAL_SYMMETRIC"):
         "inferior_opposite_steepening_D": 0,
         "anterior_pattern": "REASSURING",
         "posterior_pattern": "REASSURING",
+        "anterior_curvature_map_visible": "YES",
+        "anterior_curvature_map_type": "AXIAL_SAGITTAL_FRONT",
+        "anterior_curvature_map_location": "UPPER_LEFT",
     }
 
 
@@ -385,25 +388,27 @@ class TestBoundaries(unittest.TestCase):
         self.assertEqual(result["status"], "DO NOT PROCEED")
         self.assertTrue(any("RST <310" in item for item in result["hard_stops"]))
 
-    def test_lasik_rsb_300_allowed_and_299_stopped(self):
+    def test_lasik_rsb_failure_triggers_automatic_safe_fallback(self):
         allowed = app.assess_eye(
             normal_eye(pachy=520), plan("LASIK", ablation=120, flap=100), 35, MODIFIERS
         )
         stopped = app.assess_eye(
             normal_eye(pachy=520), plan("LASIK", ablation=121, flap=100), 35, MODIFIERS
         )
-        self.assertEqual(allowed["values"]["LASIK_RSB_um"], 300)
-        self.assertFalse(any("RSB <300" in item for item in allowed["hard_stops"]))
-        self.assertEqual(stopped["values"]["LASIK_RSB_um"], 299)
-        self.assertTrue(any("RSB <300" in item for item in stopped["hard_stops"]))
+        self.assertEqual(allowed["lasik_planning_sequence"][0]["LASIK_RSB_um"], 300)
+        self.assertEqual(stopped["lasik_planning_sequence"][0]["LASIK_RSB_um"], 299)
+        self.assertEqual(stopped["lasik_planning_sequence"][0]["status"], "DO NOT PROCEED")
+        self.assertEqual(allowed["lasik_selected_plan"], "Plan B")
+        self.assertEqual(stopped["lasik_selected_plan"], "Plan B")
+        self.assertGreaterEqual(allowed["values"]["LASIK_RSB_um"], 300)
+        self.assertGreaterEqual(stopped["values"]["LASIK_RSB_um"], 300)
 
-    def test_lasik_exact_510_boundary_is_not_silently_scored(self):
+    def test_lasik_exact_510_boundary_receives_confirmed_score(self):
         result = app.assess_eye(
             normal_eye(pachy=510), plan("LASIK", sphere=-3, ablation=100, flap=100), 35, MODIFIERS
         )
-        self.assertIsNone(result["score"]["rows"]["pachymetry"])
-        self.assertNotEqual(result["status"], "PASS")
-        self.assertTrue(any("510" in item for item in result["missing"]))
+        self.assertEqual(result["score"]["rows"]["pachymetry"], 1)
+        self.assertNotIn("pachymetry boundary at exactly 510 um", result["missing"])
 
     def test_i_s_1_4_uses_published_erss_abnormal_pattern_without_disease_override(self):
         eye = normal_eye()
@@ -580,17 +585,20 @@ class TestScoringAndCompleteness(unittest.TestCase):
         self.assertEqual(result["score"]["total"], 0)
         self.assertEqual(result["status"], "PASS")
 
-    def test_lasik_erss_moderate_means_stop_defer(self):
+    def test_lasik_score_two_has_no_score_escalation(self):
         eye = normal_eye(morphology="ASYMMETRIC_BOWTIE")
         eye["asymmetric_bow_tie"] = "YES"
         eye["inferior_opposite_steepening_D"] = 0.7
         eye["Kmean_D"] = 44.0
+        treatment = plan("LASIK", sphere=-8.5, cylinder=1.0, ablation=100, flap=100)
+        treatment["correction_axis_deg"] = 180
+        treatment["manifest_normalized_axis_deg"] = 180
+        treatment["intended_normalized_axis_deg"] = 180
         result = app.assess_eye(
-            eye, plan("LASIK", sphere=-8.5, cylinder=1.0, ablation=100, flap=100), 28, MODIFIERS
+            eye, treatment, 28, MODIFIERS
         )
-        self.assertEqual(result["score"]["total"], 3)
-        self.assertEqual(result["status"], "CAUTION — STOP/DEFER")
-        self.assertIn("at least 6 months", result["action"])
+        self.assertEqual(result["score"]["total"], 2)
+        self.assertEqual(result["status"], "PASS WITH CAUTION")
 
     def test_missing_critical_tomography_prohibits_pass(self):
         eye = normal_eye()
@@ -773,14 +781,15 @@ class TestScoringAndCompleteness(unittest.TestCase):
         self.assertEqual(eye["K2_D"], 43.0)
         self.assertFalse(any("table_verified" in item for item in eye["data_conflicts"]))
 
-    def test_material_keratometry_difference_remains_a_conflict(self):
+    def test_keratometry_difference_within_one_percent_reconciles(self):
         first = normal_eye()
         second = normal_eye()
         second["K2_D"] = 43.3
         merged = app.merge_extractions(
             [{"eyes": [first], "global_warnings": []}, {"eyes": [second], "global_warnings": []}]
         )
-        self.assertTrue(any("K2_D" in item for item in merged["eyes"][0]["data_conflicts"]))
+        self.assertEqual(merged["eyes"][0]["K2_D"], 43.3)
+        self.assertFalse(any("K2_D" in item for item in merged["eyes"][0]["data_conflicts"]))
 
     def test_uncertain_or_unreadable_page_does_not_conflict_with_readable_page(self):
         readable = normal_eye()
@@ -1276,7 +1285,7 @@ class TestLasikFlapDropdownUi(unittest.TestCase):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
         expected = (
             '<select id="${eye}_flap"><option value="">Select</option>'
-            '<option value="90">90 µm</option><option value="100">100 µm</option>'
+            '<option value="90">90 µm</option><option value="100" selected>100 µm</option>'
             '<option value="110">110 µm</option><option value="120">120 µm</option></select>'
         )
         self.assertIn(expected, html)
@@ -1298,13 +1307,13 @@ class TestZoneDropdownUi(unittest.TestCase):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
         optical = (
             '<select id="${eye}_optical"><option value="">Select</option>'
-            '<option value="6.0">6.0 mm</option><option value="6.5">6.5 mm</option>'
+            '<option value="6.0">6.0 mm</option><option value="6.5" selected>6.5 mm</option>'
             '<option value="7.0">7.0 mm</option></select>'
         )
         transition = (
             '<select id="${eye}_transition"><option value="">Select</option>'
             '<option value="8.0">8.0 mm</option><option value="8.5">8.5 mm</option>'
-            '<option value="9.0">9.0 mm</option></select>'
+            '<option value="9.0" selected>9.0 mm</option></select>'
         )
         self.assertIn(optical, html)
         self.assertIn(transition, html)

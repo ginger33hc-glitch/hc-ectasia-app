@@ -17,14 +17,15 @@ class ReconciledEyeInput:
     bad_d: Optional[float]
     morphology: str
     procedure: str
+    prior_refractive_surgery: Optional[bool] = None
     ablation_um: Optional[float] = None
     flap_um: Optional[float] = None
     preop_kmean_d: Optional[float] = None
+    manifest_mrse_d: Optional[float] = None
     intended_mrse_d: Optional[float] = None
     intended_sphere_d: Optional[float] = None
     intended_cylinder_magnitude_d: Optional[float] = None
     laser_platform: Optional[str] = None
-    use_lasik_fallback_planning: bool = False
 
 
 def to_eye_input(inp: ReconciledEyeInput) -> EyeInput:
@@ -35,12 +36,13 @@ def to_eye_input(inp: ReconciledEyeInput) -> EyeInput:
         bad_d=inp.bad_d,
         morphology=inp.morphology,
         procedure=inp.procedure,
+        prior_refractive_surgery=inp.prior_refractive_surgery,
         ablation_um=inp.ablation_um,
         flap_um=inp.flap_um,
         preop_kmean_d=inp.preop_kmean_d,
+        manifest_mrse_d=inp.manifest_mrse_d,
         intended_mrse_d=inp.intended_mrse_d,
         intended_sphere_d=inp.intended_sphere_d,
         intended_cylinder_magnitude_d=inp.intended_cylinder_magnitude_d,
         laser_platform=inp.laser_platform,
-        use_lasik_fallback_planning=inp.use_lasik_fallback_planning,
     )

@@ -2,7 +2,7 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.4 implements
+## What v0.7.43 implements
 
 - Sequential original-detail extraction of each uploaded Pentacam/topography or treatment-card image.
 - Pentacam numeric-source priority: explicitly labeled side/summary-table fields are used first.
@@ -23,6 +23,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Morphology-first override gate for definite KC/FFKC/PMD or unequivocal ectatic morphology.
 - Published ERSS Placido thresholds are enforced for SRAX/inferior steepening: SRAX requires `≥20°`; the alternative category requires `≥1.0 D` inferior-versus-opposite steepening with `I-S <1.4 D`. Minimal axis deviation is not scored as SRAX, and unsupported visual labels remain unscorable rather than being guessed.
 - HC operational hard stops: preoperative thinnest pachymetry `<480 µm`, LASIK RSB `<300 µm`, PRK RST `<310 µm`, intended sphere `<−10.00 D`, and intended sphere `>+6.00 D`. Exact boundaries do not trigger those rules.
+- HC-modified LASIK pachymetry scoring: `480–499 µm` = +2, `500–510 µm` = +1, and `>=511 µm` = +0.
 - Standard HC PRK calculation: `RST = pachymetry - 50 µm epithelium - maximum stromal ablation`.
 - Zone-specific HC ablation estimates for explicitly documented Alcon EX500 plans: `12 µm/D` at 6.0 mm, `15 µm/D` at 6.5 mm, and `16.33 µm/D` at 7.0 mm; the actual treatment-plan maximum remains preferred.
 - Optical-zone selection is limited to `6.0`, `6.5`, or `7.0 mm`; transition-zone selection is limited to `8.0`, `8.5`, or `9.0 mm`.
@@ -33,7 +34,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Procedure-correct PTA formulas for LASIK and PRK.
 - BAD-D/component display interpretation plus adjunctive ARTmax/TP/Dt/Da evidence flags.
 - Positive tomography concern flags require review and cannot receive automatic PASS.
-- Limited/inadequate decision-source image quality, implausible numeric values, failed PPI/ARTmax consistency checks, and unresolved cross-image value conflicts prohibit PASS.
+- Limited/inadequate decision-source image quality, implausible numeric values, failed PPI/ARTmax consistency checks, and unresolved cross-image value conflicts prohibit PASS. Same-provenance numeric differences `<=1%` retain the parameter-specific safety-limiting value: lower for pachymetry, ARTmax, and Rmin; higher for the remaining supported numeric fields.
 - PRK PTA above the supplied 35.28% direct-cohort envelope requires review and cannot receive automatic PASS.
 - Expanded extraction/reporting of anterior and posterior elevation, pachymetric progression,
   topometric, thinnest-point location, corneal-volume, and HOA/coma fields when visibly available.
@@ -65,7 +66,7 @@ Railway start command: `python start.py`.
 python -m unittest discover -s tests -v
 ```
 
-The 105-test suite covers the exact structural and treatment-range boundaries, signed manifest/intended input and axis requirements, phone-safe sign-only entry, fixed OD-before-OS reporting, prior-surgery routing, identity warnings, date/QS gates, invalid numeric inputs, fellow-eye completeness, ERSS/PRK-EWSS categories, extraction merging, and valid PDF/DOCX generation.
+The test suite covers exact structural and treatment-range boundaries, signed manifest/intended input and axis requirements, phone-safe sign-only entry, fixed OD-before-OS reporting, prior-surgery routing, identity warnings, date/QS gates, invalid numeric inputs, fellow-eye completeness, ERSS/PRK-EWSS categories, extraction merging, runtime isolation, and valid PDF/DOCX generation.
 
 Dependencies are exact-version pinned. The extraction model is restricted to the reviewed configuration; changing it requires explicit non-clinical override and revalidation.
 

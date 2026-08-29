@@ -3,8 +3,6 @@
 Single supported composition point. Production and production-runtime tests must import this
 module rather than assembling policy wrappers independently.
 """
-from pathlib import Path
-import re
 import pachymetry_policy as _runtime
 import bootstrap
 import reports
@@ -27,7 +25,7 @@ def runtime_invariants():
 
     if [core.age_points(x) for x in (18, 19, 20, 21, 30)] != [3, 2, 2, 0, 0]:
         errors.append("HC age policy is not active")
-    if [core.lasik_pachy_points(x) for x in (480, 481, 499, 500, 510, 511)] != [None, 2, 2, 1, 1, 0]:
+    if [core.lasik_pachy_points(x) for x in (479, 480, 499, 500, 510, 511)] != [None, 2, 2, 1, 1, 0]:
         errors.append("HC pachymetry policy is not active")
     if [core.bad_classification(x, final=True) for x in (1.6, 1.61, 2.99, 3.0)] != ["NORMAL", "SUSPICIOUS", "SUSPICIOUS", "ABNORMAL"]:
         errors.append("HC Final BAD-D policy is not active")
@@ -64,20 +62,3 @@ def runtime_invariants():
 
 
 runtime_invariants()
-
-try:
-    index_path = Path(__file__).parent / "static" / "index.html"
-    html = index_path.read_text(encoding="utf-8")
-    html = re.sub(r"HC Ectasia App v\d+\.\d+\.\d+", f"HC Ectasia App v{CANONICAL_VERSION}", html)
-    html = re.sub(r"Software v\d+\.\d+\.\d+", f"Software v{CANONICAL_VERSION}", html)
-    # Make PASS WITH CAUTION a first-class green status in the primary renderer.
-    html = html.replace(
-        'function statusClass(s){\n  if(s === "PASS") return "pass";',
-        'function statusClass(s){\n  if(s === "PASS" || s === "PASS WITH CAUTION") return "pass";'
-    )
-    identity_css = '<style id="hc-identity-single-line">.identity-alert ul{display:none!important}.identity-alert strong{margin-bottom:0!important}</style>'
-    html = re.sub(r'<style id="hc-identity-single-line">.*?</style>', '', html, flags=re.S)
-    html = html.replace('</head>', identity_css + '\n</head>')
-    index_path.write_text(html, encoding="utf-8")
-except OSError:
-    pass

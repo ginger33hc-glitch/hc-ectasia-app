@@ -5,6 +5,8 @@ kept out of this matrix and remain locked by their dedicated clean tests.
 """
 import canonical_engine
 import clean_engine
+import pytest
+from tests.test_hc_engine import MODIFIERS, normal_eye, plan
 
 legacy = canonical_engine.core
 
@@ -12,9 +14,10 @@ legacy = canonical_engine.core
 def clean_case(**changes):
     values = dict(
         age_years=30, pachy_thinnest_um=520, bad_d=1.0,
-        morphology="NORMAL_SYMMETRIC", procedure="LASIK", ablation_um=60,
-        flap_um=100, preop_kmean_d=44, intended_mrse_d=-3,
-        intended_sphere_d=-3, intended_cylinder_magnitude_d=1,
+        morphology="NORMAL_SYMMETRIC", procedure="LASIK", prior_refractive_surgery=False,
+        ablation_um=60, flap_um=100, preop_kmean_d=44,
+        manifest_mrse_d=-3, intended_mrse_d=-3,
+        intended_sphere_d=-3, intended_cylinder_magnitude_d=0,
         laser_platform="Alcon EX500",
     )
     values.update(changes)
@@ -24,7 +27,7 @@ def clean_case(**changes):
 def test_clean_lasik_score_components_match_canonical_primitives_across_matrix():
     cases = (
         (18, 500, "NORMAL_SYMMETRIC", 340, -3),
-        (19, 505, "ASYMMETRIC_BOWTIE", 270, -9),
+        (19, 505, "ASYMMETRIC_BOWTIE", 320, -9),
         (21, 511, "INFERIOR_STEEPENING_SRA", 300, -8),
         (30, 520, "NORMAL_SYMMETRIC", 360, 2),
     )
@@ -33,8 +36,8 @@ def test_clean_lasik_score_components_match_canonical_primitives_across_matrix()
         ablation = pachy - flap - expected_rsb
         out = clean_case(
             age_years=age, pachy_thinnest_um=pachy, morphology=morphology,
-            flap_um=flap, ablation_um=ablation, intended_mrse_d=mrse,
-            intended_sphere_d=max(-10, min(6, mrse)), preop_kmean_d=44,
+            flap_um=flap, ablation_um=ablation, manifest_mrse_d=mrse,
+            preop_kmean_d=44,
         )
         expected = (
             legacy.age_points(age),
@@ -72,9 +75,44 @@ def test_clean_surgical_outputs_match_locked_canonical_formulas():
 def test_clean_final_lasik_status_matches_locked_principal_hierarchy_for_comparable_cases():
     expected = (
         ({}, "PASS WITH CAUTION"),
-        ({"age_years": 18}, "CAUTION — DEFER"),
+        ({"age_years": 18}, "CAUTION — STOP/DEFER"),
         ({"bad_d": 3.0}, "DO NOT PROCEED"),
         ({"bad_d": None}, "DATA INSUFFICIENT"),
     )
     for changes, status in expected:
         assert clean_case(**changes).status == status
+
+
+def test_same_complete_lasik_cases_match_canonical_end_to_end():
+    cases = (
+        {"age": 30, "pachy": 560, "bad_d": 1.0},
+        {"age": 18, "pachy": 560, "bad_d": 1.0},
+        {"age": 30, "pachy": 560, "bad_d": 3.0},
+        {"age": 30, "pachy": 480, "bad_d": 1.0},
+    )
+    for case in cases:
+        eye = normal_eye(pachy=case["pachy"])
+        eye["BAD_D"] = case["bad_d"]
+        if case["pachy"] == 480:
+            eye["ARTmax_um"] = case["pachy"] / eye["PPI_max"]
+        canonical = legacy.assess_eye(
+            eye,
+            plan("LASIK", sphere=-3, cylinder=0, ablation=60, flap=100),
+            case["age"],
+            MODIFIERS,
+        )
+        clean = clean_case(
+            age_years=case["age"],
+            pachy_thinnest_um=case["pachy"],
+            bad_d=case["bad_d"],
+            preop_kmean_d=eye["Kmean_D"],
+            manifest_mrse_d=-3,
+            intended_mrse_d=-3,
+            intended_sphere_d=-3,
+            intended_cylinder_magnitude_d=0,
+        )
+        assert clean.status == canonical["status"]
+        assert bool(clean.hard_stops) == bool(canonical["hard_stops"])
+        assert clean.scores.erss_total == canonical["randleman_erss"]["total"]
+        assert clean.calculations.lasik_rsb_um == canonical["values"]["LASIK_RSB_um"]
+        assert clean.calculations.lasik_pta_percent == pytest.approx(canonical["values"]["LASIK_PTA_percent"])

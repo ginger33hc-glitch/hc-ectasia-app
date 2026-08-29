@@ -10,14 +10,15 @@ class EyeInput:
     bad_d: Optional[float]
     morphology: str
     procedure: str
+    prior_refractive_surgery: Optional[bool] = None
     ablation_um: Optional[float] = None
     flap_um: Optional[float] = None
     preop_kmean_d: Optional[float] = None
+    manifest_mrse_d: Optional[float] = None
     intended_mrse_d: Optional[float] = None
     intended_sphere_d: Optional[float] = None
     intended_cylinder_magnitude_d: Optional[float] = None
     laser_platform: Optional[str] = None
-    use_lasik_fallback_planning: bool = False
 
 
 @dataclass(frozen=True)

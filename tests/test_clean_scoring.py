@@ -4,7 +4,7 @@ from clean_engine.scoring import ScoringInput, calculate_scores
 def test_lasik_scoring_keeps_all_five_erss_components():
     lasik, prk = calculate_scores(ScoringInput(
         procedure="LASIK", age_years=18, pachy_thinnest_um=500,
-        morphology="ASYMMETRIC_BOWTIE", intended_mrse_d=-9,
+        morphology="ASYMMETRIC_BOWTIE", manifest_mrse_d=-9,
         lasik_rsb_um=270, prk_pta_percent=None,
     ))
     assert (lasik.age_points, lasik.pachymetry_points, lasik.topography_points, lasik.rsb_points, lasik.mrse_points) == (3, 1, 1, 2, 1)
@@ -15,7 +15,7 @@ def test_lasik_scoring_keeps_all_five_erss_components():
 def test_prk_scoring_remains_separate_from_lasik_erss():
     lasik, prk = calculate_scores(ScoringInput(
         procedure="PRK", age_years=30, pachy_thinnest_um=520,
-        morphology="ASYMMETRIC_BOWTIE", intended_mrse_d=-3,
+        morphology="ASYMMETRIC_BOWTIE", manifest_mrse_d=-3,
         lasik_rsb_um=350, prk_pta_percent=30,
     ))
     assert lasik.erss_total is None

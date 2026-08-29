@@ -7,7 +7,8 @@ the HC engine consumes them.
 Multi-image numeric reconciliation policy:
 - When the same numeric parameter is read from multiple valid sources of the same provenance class,
   a relative spread of <=1% is accepted as normal extraction/measurement variation.
-- The higher reading is retained in that case and the difference is not an unresolved conflict.
+- The parameter-specific safety-limiting reading is retained in that case and the difference is not
+  an unresolved conflict: lower for pachymetry, ARTmax, and Rmin; higher for other numeric fields.
 - Differences >1%, nonnumeric disagreements, and disagreements across unequal source-priority
   classes continue through the existing conflict/safety pathway.
 """
@@ -30,6 +31,7 @@ PLAUSIBLE = {
     "ARTmax_um": (1.0, 1000.0), "PPI_min": (0.01, 10.0),
     "PPI_avg": (0.01, 10.0), "PPI_max": (0.01, 10.0), "Rmin_mm": (3.0, 15.0),
 }
+LOWER_IS_SAFETY_LIMITING = {"pachy_thinnest_um", "ARTmax_um", "Rmin_mm"}
 
 _CONFLICT_RE = re.compile(
     r"^(?P<field>[A-Za-z0-9_]+):\s*"
@@ -59,6 +61,10 @@ def _source_class(raw_eye: Dict[str, Any], field: str) -> str:
     if field in set(raw_eye.get("map_fallback_numeric_fields") or []):
         return "PERMITTED_MAP_FALLBACK"
     return "UNVERIFIED"
+
+
+def _safety_limiting_value(field: str, values: List[float]) -> float:
+    return min(values) if field in LOWER_IS_SAFETY_LIMITING else max(values)
 
 
 def _reconcile_one_percent(merged: Dict[str, Any], results: List[Dict[str, Any]]) -> None:
@@ -94,12 +100,14 @@ def _reconcile_one_percent(merged: Dict[str, Any], results: List[Dict[str, Any]]
             # permitted fallback class. Never combine the two classes for tolerance adjudication.
             values = classes.get("LABELED_TABLE") or classes.get("PERMITTED_MAP_FALLBACK") or []
             if _within_one_percent(values):
-                eye[field] = max(values)
+                retained = _safety_limiting_value(field, values)
+                eye[field] = retained
                 accepted_fields.add(field)
                 eye.setdefault("numeric_reconciliation", {})[field] = {
-                    "rule": "RELATIVE_SPREAD_LE_1_PERCENT_USE_HIGHER",
+                    "rule": "RELATIVE_SPREAD_LE_1_PERCENT_USE_SAFETY_LIMITING",
+                    "direction": "LOWER" if field in LOWER_IS_SAFETY_LIMITING else "HIGHER",
                     "values": sorted(set(values)),
-                    "retained": max(values),
+                    "retained": retained,
                 }
 
         if not accepted_fields:
@@ -119,7 +127,7 @@ def _reconcile_one_percent(merged: Dict[str, Any], results: List[Dict[str, Any]]
             details = eye["numeric_reconciliation"][field]
             merged.setdefault("global_warnings", []).append(
                 f"{eye_id} {field}: duplicate numeric readings within 1% were accepted; "
-                f"higher value {details['retained']:g} retained."
+                f"safety-limiting {details['direction'].lower()} value {details['retained']:g} retained."
             )
 
 
