@@ -10,10 +10,11 @@ import randleman_bad_independence  # noqa: F401
 import erss_visual_morphology_policy  # noqa: F401
 import hc_final_decision_policy  # noqa: F401
 import status_rank_policy  # noqa: F401
+import inter_eye_tomography_policy  # noqa: F401
 
 core = bootstrap.core
 app = _runtime.app
-CANONICAL_VERSION = "0.7.45"
+CANONICAL_VERSION = "0.7.46"
 core.APP_VERSION = CANONICAL_VERSION
 core.app.title = f"HC Ectasia App v{CANONICAL_VERSION}"
 reports.APP_VERSION = CANONICAL_VERSION
@@ -48,6 +49,7 @@ def runtime_invariants():
     if not getattr(core,"_randleman_bad_independence_installed",False):errors.append("BAD-independent Randleman ERSS pathway is not active")
     if not getattr(core,"_hc_final_decision_hierarchy_installed",False):errors.append("HC final BAD-D/Randleman decision hierarchy is not active")
     if not getattr(core,"_hc_status_rank_policy_installed",False):errors.append("HC aggregate status ranking is not active")
+    if not getattr(core,"_hc_inter_eye_tomography_policy_installed",False):errors.append("Automated inter-eye tomography concern layer is not active")
     try:
         if core.combine_status("PASS", "PASS WITH CAUTION") != "PASS WITH CAUTION":errors.append("PASS WITH CAUTION aggregate ranking is invalid")
         if core.combine_status("PASS WITH CAUTION", "DO NOT PROCEED") != "DO NOT PROCEED":errors.append("Hard-stop aggregate ranking is invalid")
