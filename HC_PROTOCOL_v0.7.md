@@ -68,8 +68,8 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 ## HC operational hard stops
 
 - Thinnest preoperative pachymetry `<480 µm`; exactly 480 is not stopped by this rule alone.
-- HC-modified LASIK pachymetry bands: `480–499 µm` = +2 points, `500–510 µm` = +1 point,
-  and `>=511 µm` = +0 points.
+- HC-modified LASIK pachymetry bands: `480–499 µm` = +2 points, `500–509 µm` = +1 point,
+  and `>=510 µm` = +0 points.
 - LASIK RSB `<300 µm`; exactly 300 is allowed by this rule.
 - PRK RST `<310 µm`; exactly 310 is allowed by this rule.
 - Intended sphere `<−10.00 D`; exactly −10.00 is allowed by this rule.

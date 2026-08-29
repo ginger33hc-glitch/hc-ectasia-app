@@ -2,7 +2,7 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.43 implements
+## What v0.7.47 implements
 
 - Sequential original-detail extraction of each uploaded Pentacam/topography or treatment-card image.
 - Pentacam numeric-source priority: explicitly labeled side/summary-table fields are used first.
@@ -23,7 +23,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Morphology-first override gate for definite KC/FFKC/PMD or unequivocal ectatic morphology.
 - Published ERSS Placido thresholds are enforced for SRAX/inferior steepening: SRAX requires `≥20°`; the alternative category requires `≥1.0 D` inferior-versus-opposite steepening with `I-S <1.4 D`. Minimal axis deviation is not scored as SRAX, and unsupported visual labels remain unscorable rather than being guessed.
 - HC operational hard stops: preoperative thinnest pachymetry `<480 µm`, LASIK RSB `<300 µm`, PRK RST `<310 µm`, intended sphere `<−10.00 D`, and intended sphere `>+6.00 D`. Exact boundaries do not trigger those rules.
-- HC-modified LASIK pachymetry scoring: `480–499 µm` = +2, `500–510 µm` = +1, and `>=511 µm` = +0.
+- HC-modified LASIK pachymetry scoring: `480–499 µm` = +2, `500–509 µm` = +1, and `>=510 µm` = +0.
 - Standard HC PRK calculation: `RST = pachymetry - 50 µm epithelium - maximum stromal ablation`.
 - Zone-specific HC ablation estimates for explicitly documented Alcon EX500 plans: `12 µm/D` at 6.0 mm, `15 µm/D` at 6.5 mm, and `16.33 µm/D` at 7.0 mm; the actual treatment-plan maximum remains preferred.
 - Optical-zone selection is limited to `6.0`, `6.5`, or `7.0 mm`; transition-zone selection is limited to `8.0`, `8.5`, or `9.0 mm`.
@@ -47,6 +47,12 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - The patient name is repeated in large bold uppercase immediately above the overall disposition
   box in the browser, print, PDF, and DOCX reports.
 - Complete machine-readable extraction and decision records remain available for audit.
+- A status-independent post-assessment ML7 planning module runs only after favorable LASIK results
+  (`PASS` or `PASS WITH CAUTION`). It extracts labeled K1/K2 axes and corneal diameter/W2W when
+  available, applies the active Turkish ML7 vacuum-ring/blade reference, and applies the HC
+  `steep K − flat K >4.00 D` hinge rule. The perpendicular-to-steep-axis hinge is primary; a
+  `+10` temporal/nasal alternative is shown only as an anatomy-dependent contingency when projected
+  RSB remains `>=300 µm` and projected PTA remains `<40%`. The module cannot change the ectasia status.
 
 See [HC_PROTOCOL_v0.7.md](HC_PROTOCOL_v0.7.md) for the locked operational rules and
 [PROTOCOL_COMPLIANCE.md](PROTOCOL_COMPLIANCE.md) for the source-to-code audit and evidence limitations.

@@ -28,9 +28,9 @@
   let queued = false;
 
   function installStaticPolicyUI() {
-    document.title = "HC Ectasia App v0.7.46";
+    document.title = "HC Ectasia App v0.7.47";
     const heading = document.querySelector("body > header h1");
-    if (heading) heading.textContent = "HC Ectasia App v0.7.46";
+    if (heading) heading.textContent = "HC Ectasia App v0.7.47";
 
     const manualInterEye = document.querySelector('input[name="patient_modifier"][value="inter_eye_asymmetry"]');
     if (manualInterEye) {

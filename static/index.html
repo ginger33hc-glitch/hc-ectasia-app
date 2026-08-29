@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>HC Ectasia App v0.7.43</title>
+  <title>HC Ectasia App v0.7.47</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=5">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=4">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=4">
@@ -35,7 +35,7 @@
   </style>
 </head>
 <body>
-<header><h1>HC Ectasia App v0.7.43</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
+<header><h1>HC Ectasia App v0.7.47</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -98,7 +98,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">HC Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.7.43</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.7.47</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <p class="report-liability-notice">The final surgical decision and all associated responsibility and liability rest with the surgeon. This application is a clinical decision-support aid only.</p>
       <table class="meta-table"><tbody>
@@ -363,8 +363,23 @@ function applyEffectivePlans(plans){
   cardTransferNote.textContent=transferred.length?`Card values transferred: ${transferred.join("; ")}`:"";
 }
 function listBlock(title, items){if(!items || !items.length)return "";return `<div class="finding-group"><h4>${safe(title)}</h4><ul>${items.map(x=>`<li>${safe(x)}</li>`).join("")}</ul></div>`}
-function lasikPlanHeadline(r){ const v=r.values||{}; if(r.status!=="PASS"||v.procedure!=="LASIK")return ""; const selected=r.lasik_selected_plan||v.LASIK_selected_plan; if(!selected)return ""; const parts=[selected]; if(v.LASIK_flap_um!=null)parts.push(`FLAP ${fmt(v.LASIK_flap_um,0)} µm`); if(v.optical_zone_mm!=null)parts.push(`OPTICAL ZONE ${fmt(v.optical_zone_mm,1)} mm`); if(v.transition_zone_mm!=null)parts.push(`TRANSITION ZONE ${fmt(v.transition_zone_mm,1)} mm`); return parts.join(" • "); }
+function lasikPlanHeadline(r){ const v=r.values||{}; if(!["PASS","PASS WITH CAUTION"].includes(r.status)||v.procedure!=="LASIK")return ""; const selected=r.lasik_selected_plan||v.LASIK_selected_plan; if(!selected)return ""; const parts=[selected]; if(v.LASIK_flap_um!=null)parts.push(`FLAP ${fmt(v.LASIK_flap_um,0)} µm`); if(v.optical_zone_mm!=null)parts.push(`OPTICAL ZONE ${fmt(v.optical_zone_mm,1)} mm`); if(v.transition_zone_mm!=null)parts.push(`TRANSITION ZONE ${fmt(v.transition_zone_mm,1)} mm`); return parts.join(" • "); }
 function statusHeadline(r){ const selected=lasikPlanHeadline(r); return selected?`${r.status} — ${selected}`:r.status; }
+function microkeratomeBlock(r){
+  const p=r.microkeratome_planning;
+  if(!p?.applicable)return "";
+  const rows=[
+    ["Assessment gate",p.assessment_gate??"—"],["Steep − flat K spread",`${fmt(p.delta_k_d,2)} D`],
+    ["Vacuum ring",`${fmt(p.vacuum_ring_mm,1)} mm`],["Vacuum pressure",p.vacuum_pressure_mmhg?`${p.vacuum_pressure_mmhg} mmHg`:"—"],
+    ["Blade recommendation(s)",(p.blade_recommendations||[]).join(", ")||"—"],
+    ["Primary hinge",p.primary_hinge||"No HC K-spread hinge override"],
+    ["Conditional alternative",p.alternative_hinge||"Not cleared / not applicable"],
+    ["Alternative projected RSB / PTA",p.alternative_safety==="NOT_APPLICABLE"?"Not applicable":`${fmt(p.alternative_rsb_um,1)} µm / ${fmt(p.alternative_pta_percent,1)}%`],
+    ["Alternative safety",p.alternative_safety??"—"],["Ring-zone clearance",`${fmt(p.ring_tzone_clearance_mm,2)} mm`],
+    ["Source",p.source??"—"]
+  ];
+  return `<div class="finding-group"><h4>Post-assessment ML7 microkeratome planning</h4><p class="note"><strong>Surgeon-review recommendation only; this module does not alter the ectasia disposition.</strong></p><table class="clinical-table"><thead><tr><th>Parameter</th><th>Recommendation</th></tr></thead><tbody>${rows.map(([a,b])=>`<tr><td>${safe(a)}</td><td>${safe(b)}</td></tr>`).join("")}</tbody></table>${listBlock("Planning warnings",p.warnings)}${listBlock("Planning notes",p.notes)}</div>`;
+}
 function renderEye(r, extracted){
   const v=r.values||{}, s=r.score||{};
   const transition=v.transition_zone_mm===null||v.transition_zone_mm===undefined?(v.transition_zone_not_applicable==="yes"?"Not applicable":"—"):`${fmt(v.transition_zone_mm,1)} mm`;
@@ -387,7 +402,7 @@ function renderEye(r, extracted){
   ];
   const source=(extracted.eyes||[]).find(x=>x.eye===r.eye)||{};
   const tomoRows=[
-    ["K1",fmt(source.K1_D,2)+" D"],["K2",fmt(source.K2_D,2)+" D"],["Kmax",fmt(source.Kmax_D,2)+" D"],
+    ["K1",fmt(source.K1_D,2)+" D"],["K1 axis",fmt(source.K1_axis_deg,0)+"°"],["K2",fmt(source.K2_D,2)+" D"],["K2 axis",fmt(source.K2_axis_deg,0)+"°"],["Kmax",fmt(source.Kmax_D,2)+" D"],["Corneal diameter / W2W",fmt(source.corneal_diameter_mm,2)+" mm"],
     ["Thinnest pachymetry",fmt(source.pachy_thinnest_um,0)+" µm"],["BAD-D final",fmt(source.BAD_D,2)],
     ["BAD-Df",fmt(source.Df,2)],["BAD-Db",fmt(source.Db,2)],["BAD-Dp",fmt(source.Dp,2)],["BAD-Dt",fmt(source.Dt,3)],["BAD-Da",fmt(source.Da,3)],
     ["ARTmax",fmt(source.ARTmax_um,0)+" µm"],["PPI min",fmt(source.PPI_min,2)],["PPI avg",fmt(source.PPI_avg,2)],["PPI max",fmt(source.PPI_max,2)],
@@ -405,7 +420,7 @@ function renderEye(r, extracted){
     <p class="eye-action"><strong>Clinical action:</strong> ${safe(r.action)}</p>
     <p class="note"><strong>Instrument/source:</strong> ${safe(r.instrument||"Not documented")}</p>
     <table class="clinical-table"><thead><tr><th>Parameter</th><th>Result</th></tr></thead><tbody>${rows.map(([a,b])=>`<tr><td>${safe(a)}</td><td>${safe(b)}</td></tr>`).join("")}</tbody></table>
-    ${listBlock("Reasons",r.reasons)}${listBlock("Hard stops",r.hard_stops)}${listBlock("Missing / unresolved",r.missing)}${listBlock("Surgeon attention — hyperopic/mixed pathway",r.surgeon_attention)}${listBlock("Tomography concern flags",r.tomography_review?.cross_sectional_flags)}${listBlock("BAD display interpretation",Object.entries(r.tomography_review?.BAD_display||{}).map(([k,v])=>`${k}: ${v}`))}${listBlock("Surgical-load evidence flags",r.surgical_load_flags)}${listBlock("Clinical modifiers",r.clinical_modifiers)}${listBlock("Warnings",r.warnings)}
+    ${listBlock("Reasons",r.reasons)}${listBlock("Hard stops",r.hard_stops)}${listBlock("Missing / unresolved",r.missing)}${listBlock("Surgeon attention — hyperopic/mixed pathway",r.surgeon_attention)}${listBlock("Tomography concern flags",r.tomography_review?.cross_sectional_flags)}${listBlock("BAD display interpretation",Object.entries(r.tomography_review?.BAD_display||{}).map(([k,v])=>`${k}: ${v}`))}${listBlock("Surgical-load evidence flags",r.surgical_load_flags)}${listBlock("Clinical modifiers",r.clinical_modifiers)}${listBlock("Warnings",r.warnings)}${microkeratomeBlock(r)}
     <div class="finding-group"><h4>Extracted tomography</h4><table class="clinical-table"><thead><tr><th>Parameter</th><th>Value</th></tr></thead><tbody>${tomoRows.map(([a,b])=>`<tr><td>${safe(a)}</td><td>${safe(b)}</td></tr>`).join("")}</tbody></table></div>
   </div></section>`;
 }
