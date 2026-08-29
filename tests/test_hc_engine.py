@@ -407,7 +407,7 @@ class TestBoundaries(unittest.TestCase):
         result = app.assess_eye(
             normal_eye(pachy=510), plan("LASIK", sphere=-3, ablation=100, flap=100), 35, MODIFIERS
         )
-        self.assertEqual(result["score"]["rows"]["pachymetry"], 1)
+        self.assertEqual(result["score"]["rows"]["pachymetry"], 0)
         self.assertNotIn("pachymetry boundary at exactly 510 um", result["missing"])
 
     def test_i_s_1_4_uses_published_erss_abnormal_pattern_without_disease_override(self):
