@@ -16,7 +16,7 @@ core = canonical_engine.core
 
 
 def test_canonical_version_lock():
-    assert canonical_engine.CANONICAL_VERSION == "0.7.45"
+    assert canonical_engine.CANONICAL_VERSION == "0.7.46"
 
 
 def test_hc_age_boundaries():
@@ -142,6 +142,7 @@ def test_required_runtime_layers_are_installed():
     assert core._randleman_bad_independence_installed
     assert core._hc_final_decision_hierarchy_installed
     assert core._hc_status_rank_policy_installed
+    assert core._hc_inter_eye_tomography_policy_installed
     assert core._hc_lasik_fallback_installed
 
 
