@@ -35,16 +35,10 @@ def test_legacy_independent_hard_stop_marker_contract_is_characterized():
     assert not legacy_lasik._independent_hard_stop({"hard_stops": ["ordinary LASIK tissue-load failure"]})
 
 
-def test_exact_480_marker_mismatch_is_documented_not_silently_changed():
-    assert not legacy_lasik._independent_hard_stop({
-        "hard_stops": ["HC operational hard stop: thinnest preoperative cornea <=480 µm."]
-    })
-
-
-def test_clean_independent_hard_stop_uses_active_480_boundary():
+def test_clean_independent_hard_stop_uses_confirmed_480_boundary():
     common = dict(morphology="NORMAL_SYMMETRIC", intended_sphere_d=-3.0, final_kmean=42.0)
-    assert surgery.lasik_independent_hard_stop(pachy_thinnest_um=480.0, **common)
-    assert not surgery.lasik_independent_hard_stop(pachy_thinnest_um=480.001, **common)
+    assert surgery.lasik_independent_hard_stop(pachy_thinnest_um=479.999, **common)
+    assert not surgery.lasik_independent_hard_stop(pachy_thinnest_um=480.0, **common)
 
 
 def test_clean_independent_hard_stop_recognizes_ectatic_morphology():

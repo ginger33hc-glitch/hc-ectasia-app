@@ -10,9 +10,9 @@ from clean_engine.service import CleanAssessment
 def case(**changes):
     values = dict(
         age_years=30, pachy_thinnest_um=520, bad_d=1.0,
-        morphology="NORMAL_SYMMETRIC", procedure="LASIK",
+        morphology="NORMAL_SYMMETRIC", procedure="LASIK", prior_refractive_surgery=False,
         ablation_um=60, flap_um=100, preop_kmean_d=43,
-        intended_mrse_d=-3, intended_sphere_d=-3,
+        manifest_mrse_d=-3, intended_mrse_d=-3, intended_sphere_d=-3,
         intended_cylinder_magnitude_d=0, laser_platform="EX500",
     )
     values.update(changes)
@@ -27,9 +27,9 @@ def test_migration_seam_returns_complete_clean_assessment():
 
 
 def test_migration_seam_preserves_adverse_and_incomplete_states():
-    stopped = run_clean_assessment(case(pachy_thinnest_um=480))
+    stopped = run_clean_assessment(case(pachy_thinnest_um=479))
     assert stopped.result.status == "DO NOT PROCEED"
-    assert "PACHYMETRY_LE_480" in stopped.result.hard_stops
+    assert "PACHYMETRY_LT_480" in stopped.result.hard_stops
 
     incomplete = run_clean_assessment(case(bad_d=None))
     assert incomplete.result.status == "DATA INSUFFICIENT"

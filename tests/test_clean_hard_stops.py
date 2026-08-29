@@ -16,9 +16,9 @@ def test_favorable_input_has_no_hard_stops():
     assert evaluate_hard_stops(base()) == ()
 
 
-def test_pachymetry_boundary_is_inclusive_at_480():
-    assert "PACHYMETRY_LE_480" in evaluate_hard_stops(base(pachy_thinnest_um=480))
-    assert "PACHYMETRY_LE_480" not in evaluate_hard_stops(base(pachy_thinnest_um=480.001))
+def test_pachymetry_480_scores_and_479_fails():
+    assert "PACHYMETRY_LT_480" in evaluate_hard_stops(base(pachy_thinnest_um=479))
+    assert "PACHYMETRY_LT_480" not in evaluate_hard_stops(base(pachy_thinnest_um=480))
 
 
 def test_refractive_magnitude_boundaries_are_strict():
@@ -64,10 +64,10 @@ def test_prk_never_receives_lasik_erss_hard_stop_marker():
 
 def test_marker_order_is_stable_for_reporting():
     stops = evaluate_hard_stops(base(
-        pachy_thinnest_um=480, morphology="ABNORMAL_ECTATIC", bad_d_status="ABNORMAL",
+        pachy_thinnest_um=479, morphology="ABNORMAL_ECTATIC", bad_d_status="ABNORMAL",
         intended_sphere_d=-10.001, lasik_rsb_um=299, final_kmean_d=35.9, lasik_erss_total=4,
     ))
     assert stops == (
-        "PACHYMETRY_LE_480", "ABNORMAL_ECTATIC_TOPOGRAPHY", "FINAL_BAD_D_ABNORMAL",
+        "PACHYMETRY_LT_480", "ABNORMAL_ECTATIC_TOPOGRAPHY", "FINAL_BAD_D_ABNORMAL",
         "INTENDED_SPHERE_LT_MINUS_10", "LASIK_RSB_LT_300", "FINAL_KMEAN_OUTSIDE_36_48", "ERSS_GE_4",
     )

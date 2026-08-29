@@ -18,6 +18,15 @@ def test_locked_examples():
     assert reconcile_numeric([obs(44.50), obs(44.70), obs(44.90)]) == 44.90
 
 
+def test_safety_limiting_lower_fields_use_lower_within_one_percent():
+    for field, values, expected in (
+        ("pachy_thinnest_um", (500.0, 504.0), 500.0),
+        ("ARTmax_um", (350.0, 353.0), 350.0),
+        ("Rmin_mm", (7.03, 7.09), 7.03),
+    ):
+        assert reconcile_numeric([obs(value) for value in values], field=field) == expected
+
+
 def test_full_spread_not_adjacent_pairs_controls_acceptance():
     assert reconcile_numeric([obs(44.0), obs(44.3), obs(44.6)]) is None
 

@@ -55,7 +55,7 @@ def lasik_pachymetry_points(pachy_um: Optional[float]) -> Optional[int]:
     if not isinstance(pachy_um, (int, float)) or isinstance(pachy_um, bool):
         return None
     value = float(pachy_um)
-    if value <= POLICY.pachymetry_hard_stop_um:
+    if value < POLICY.pachymetry_hard_stop_um:
         return None
     if value < 500:
         return 2

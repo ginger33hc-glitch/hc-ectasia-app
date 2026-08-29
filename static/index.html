@@ -3,13 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>HC Ectasia App v0.7.4</title>
+  <title>HC Ectasia App v0.7.43</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=5">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=4">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=4">
   <link rel="shortcut icon" type="image/png" href="/static/icons/favicon-32.png?v=4">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=4">
   <meta name="theme-color" content="#173b57">
+  <link rel="stylesheet" href="/static/hc-reference.css?v=1">
   <style>
     :root{--navy:#173b57;--ink:#17212b;--muted:#66717d;--line:#d9e0e6;--bg:#f4f6f8;--blue:#eaf3fa;--blueInk:#1f5e8c;--green:#e6f4ea;--greenInk:#176b3a;--orange:#fff0d8;--orangeInk:#9a4d00;--red:#fde5e5;--redInk:#a31212;--gray:#eef2f5;--grayInk:#4b5965}
     *{box-sizing:border-box}body{font-family:Arial,sans-serif;background:var(--bg);margin:0;color:var(--ink);line-height:1.42}
@@ -34,7 +35,7 @@
   </style>
 </head>
 <body>
-<header><h1>HC Ectasia App v0.7.4</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
+<header><h1>HC Ectasia App v0.7.43</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -97,7 +98,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">HC Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.7.4</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.7.43</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <p class="report-liability-notice">The final surgical decision and all associated responsibility and liability rest with the surgeon. This application is a clinical decision-support aid only.</p>
       <table class="meta-table"><tbody>
@@ -129,10 +130,10 @@ const eyeTemplate = (eye) => `
   <div class="row"><label>Cylinder axis (degrees)</label><input id="${eye}_axis" type="number" step="1" min="0" max="180"></div>
   <div class="row"><label>Actual maximum ablation (µm)</label><input id="${eye}_ablation" type="number" step=".1" min="0"></div>
   <div class="row"><label>Laser platform</label><input id="${eye}_platform" type="text" value="Alcon EX500" readonly aria-readonly="true"></div>
-  <div class="row"><label>Planned LASIK flap (µm)</label><select id="${eye}_flap"><option value="">Select</option><option value="90">90 µm</option><option value="100">100 µm</option><option value="110">110 µm</option><option value="120">120 µm</option></select></div>
+  <div class="row"><label>Planned LASIK flap (µm)</label><select id="${eye}_flap"><option value="">Select</option><option value="90">90 µm</option><option value="100" selected>100 µm</option><option value="110">110 µm</option><option value="120">120 µm</option></select></div>
   <div class="row"><label>PRK epithelial thickness (µm)</label><input id="${eye}_epithelium" type="text" value="50" readonly aria-readonly="true"></div>
-  <div class="row"><label>Optical zone (mm)</label><select id="${eye}_optical"><option value="">Select</option><option value="6.0">6.0 mm</option><option value="6.5">6.5 mm</option><option value="7.0">7.0 mm</option></select></div>
-  <div class="row"><label>Transition zone (mm)</label><select id="${eye}_transition"><option value="">Select</option><option value="8.0">8.0 mm</option><option value="8.5">8.5 mm</option><option value="9.0">9.0 mm</option></select></div>
+  <div class="row"><label>Optical zone (mm)</label><select id="${eye}_optical"><option value="">Select</option><option value="6.0">6.0 mm</option><option value="6.5" selected>6.5 mm</option><option value="7.0">7.0 mm</option></select></div>
+  <div class="row"><label>Transition zone (mm)</label><select id="${eye}_transition"><option value="">Select</option><option value="8.0">8.0 mm</option><option value="8.5">8.5 mm</option><option value="9.0" selected>9.0 mm</option></select></div>
   <details id="${eye}_clinical" class="clinical-select-group">
     <summary>Clinical eligibility and stability</summary>
     <div class="clinical-select-options">
@@ -323,7 +324,7 @@ function plan(prefix){return {
 }}
 
 function statusClass(s){
-  if(s === "PASS") return "pass";
+  if(s === "PASS" || s === "PASS WITH CAUTION") return "pass";
   if(s === "DO NOT PROCEED") return "fail";
   if(s.startsWith("CAUTION")) return "caution";
   if(s.startsWith("REVIEW")) return "review";
@@ -362,6 +363,8 @@ function applyEffectivePlans(plans){
   cardTransferNote.textContent=transferred.length?`Card values transferred: ${transferred.join("; ")}`:"";
 }
 function listBlock(title, items){if(!items || !items.length)return "";return `<div class="finding-group"><h4>${safe(title)}</h4><ul>${items.map(x=>`<li>${safe(x)}</li>`).join("")}</ul></div>`}
+function lasikPlanHeadline(r){ const v=r.values||{}; if(r.status!=="PASS"||v.procedure!=="LASIK")return ""; const selected=r.lasik_selected_plan||v.LASIK_selected_plan; if(!selected)return ""; const parts=[selected]; if(v.LASIK_flap_um!=null)parts.push(`FLAP ${fmt(v.LASIK_flap_um,0)} µm`); if(v.optical_zone_mm!=null)parts.push(`OPTICAL ZONE ${fmt(v.optical_zone_mm,1)} mm`); if(v.transition_zone_mm!=null)parts.push(`TRANSITION ZONE ${fmt(v.transition_zone_mm,1)} mm`); return parts.join(" • "); }
+function statusHeadline(r){ const selected=lasikPlanHeadline(r); return selected?`${r.status} — ${selected}`:r.status; }
 function renderEye(r, extracted){
   const v=r.values||{}, s=r.score||{};
   const transition=v.transition_zone_mm===null||v.transition_zone_mm===undefined?(v.transition_zone_not_applicable==="yes"?"Not applicable":"—"):`${fmt(v.transition_zone_mm,1)} mm`;
@@ -398,7 +401,7 @@ function renderEye(r, extracted){
     ["Morphology",source.morphology??"—"],["Anterior pattern",source.anterior_pattern??"—"],["Posterior pattern",source.posterior_pattern??"—"],["Image quality",source.quality??"—"],
     ["Pentacam QS",source.pentacam_qs??"—"],["Source files",(source.source_files||[]).join(", ")||"—"]
   ];
-  return `<section class="eye-result"><div class="eye-head"><strong>${safe(r.eye)} ASSESSMENT</strong><span class="status ${statusClass(r.status)}">${safe(r.status)}</span></div><div class="eye-body">
+  return `<section class="eye-result"><div class="eye-head"><strong>${safe(r.eye)} ASSESSMENT</strong><span class="status ${statusClass(r.status)}">${safe(statusHeadline(r))}</span></div><div class="eye-body">
     <p class="eye-action"><strong>Clinical action:</strong> ${safe(r.action)}</p>
     <p class="note"><strong>Instrument/source:</strong> ${safe(r.instrument||"Not documented")}</p>
     <table class="clinical-table"><thead><tr><th>Parameter</th><th>Result</th></tr></thead><tbody>${rows.map(([a,b])=>`<tr><td>${safe(a)}</td><td>${safe(b)}</td></tr>`).join("")}</tbody></table>
@@ -529,5 +532,6 @@ if("serviceWorker" in navigator){
 }
 loadSharedImages();
 </script>
+<script id="hc-reference-script" src="/static/hc-reference.js?v=1"></script>
 </body>
 </html>

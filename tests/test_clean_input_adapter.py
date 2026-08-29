@@ -13,14 +13,15 @@ def test_reconciled_adapter_preserves_every_eye_input_field():
         bad_d=1.4,
         morphology="ASYMMETRIC_BOWTIE",
         procedure="lasik",
+        prior_refractive_surgery=False,
         ablation_um=61,
         flap_um=100,
         preop_kmean_d=43.5,
+        manifest_mrse_d=-3.25,
         intended_mrse_d=-3.25,
         intended_sphere_d=-3,
         intended_cylinder_magnitude_d=0.5,
         laser_platform="Alcon EX500",
-        use_lasik_fallback_planning=True,
     )
     adapted = to_eye_input(source)
     assert isinstance(adapted, EyeInput)

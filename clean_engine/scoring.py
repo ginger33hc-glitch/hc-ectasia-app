@@ -13,7 +13,7 @@ class ScoringInput:
     age_years: Optional[float]
     pachy_thinnest_um: Optional[float]
     morphology: str
-    intended_mrse_d: Optional[float]
+    manifest_mrse_d: Optional[float]
     lasik_rsb_um: Optional[float]
     prk_pta_percent: Optional[float]
 
@@ -25,7 +25,7 @@ def calculate_scores(inp: ScoringInput) -> Tuple[ScoreValues, PrkScoreValues]:
     pachy = lasik_pachymetry_points(inp.pachy_thinnest_um)
     topo = randleman_topography_points(inp.morphology)
     rsb = lasik_rsb_points(inp.lasik_rsb_um) if procedure == "LASIK" else None
-    mrse = lasik_mrse_points(inp.intended_mrse_d) if procedure == "LASIK" else None
+    mrse = lasik_mrse_points(inp.manifest_mrse_d) if procedure == "LASIK" else None
     erss_total = None if procedure != "LASIK" or None in (age, pachy, topo, rsb, mrse) else int(age + pachy + topo + rsb + mrse)
     lasik = ScoreValues(age, pachy, topo, rsb, mrse, erss_total)
 

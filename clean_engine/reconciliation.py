@@ -2,8 +2,8 @@
 
 The clean engine accepts duplicate numeric observations only when all adjudicated
 observations belong to the same accepted provenance class and their full relative
-spread is <=1%. The higher value is retained. Labeled-table evidence has priority
-over permitted map fallback evidence.
+spread is <=1%. The parameter-specific safety-limiting value is retained.
+Labeled-table evidence has priority over permitted map fallback evidence.
 """
 from dataclasses import dataclass
 from typing import Iterable, Optional
@@ -12,6 +12,7 @@ from typing import Iterable, Optional
 LABELED_TABLE = "LABELED_TABLE"
 PERMITTED_MAP_FALLBACK = "PERMITTED_MAP_FALLBACK"
 UNVERIFIED = "UNVERIFIED"
+LOWER_IS_SAFETY_LIMITING = frozenset({"pachy_thinnest_um", "ARTmax_um", "Rmin_mm"})
 
 
 @dataclass(frozen=True)
@@ -31,7 +32,9 @@ def within_one_percent(values: Iterable[float]) -> bool:
     return abs(high - low) / denominator <= 0.01 + 1e-12
 
 
-def reconcile_numeric(observations: Iterable[NumericObservation]) -> Optional[float]:
+def reconcile_numeric(
+    observations: Iterable[NumericObservation], *, field: Optional[str] = None
+) -> Optional[float]:
     observations = list(observations)
     labeled = [o for o in observations if o.source_class == LABELED_TABLE]
     fallback = [o for o in observations if o.source_class == PERMITTED_MAP_FALLBACK]
@@ -43,4 +46,4 @@ def reconcile_numeric(observations: Iterable[NumericObservation]) -> Optional[fl
         return values[0]
     if not within_one_percent(values):
         return None
-    return max(values)
+    return min(values) if field in LOWER_IS_SAFETY_LIMITING else max(values)

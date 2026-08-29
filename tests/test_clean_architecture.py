@@ -14,7 +14,7 @@ def _engine_tree():
 def test_engine_is_orchestrator_not_clinical_policy_container():
     source = ENGINE.read_text(encoding="utf-8")
     forbidden_literals = (
-        "PACHYMETRY_LE_480", "LASIK_RSB_LT_300", "PRK_RST_LT_310",
+        "PACHYMETRY_LT_480", "LASIK_RSB_LT_300", "PRK_RST_LT_310",
         "FINAL_KMEAN_OUTSIDE_36_48", "ERSS_GE_4",
         "LASIK_PTA_GE_40_AFTER_FALLBACK",
     )

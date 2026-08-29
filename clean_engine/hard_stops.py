@@ -28,8 +28,8 @@ def evaluate_hard_stops(inp: HardStopInput) -> Tuple[str, ...]:
     stops = []
     procedure = (inp.procedure or "").upper()
 
-    if inp.pachy_thinnest_um is not None and float(inp.pachy_thinnest_um) <= POLICY.pachymetry_hard_stop_um:
-        stops.append("PACHYMETRY_LE_480")
+    if inp.pachy_thinnest_um is not None and float(inp.pachy_thinnest_um) < POLICY.pachymetry_hard_stop_um:
+        stops.append("PACHYMETRY_LT_480")
     if inp.morphology == "ABNORMAL_ECTATIC":
         stops.append("ABNORMAL_ECTATIC_TOPOGRAPHY")
     if inp.bad_d_status == "ABNORMAL":

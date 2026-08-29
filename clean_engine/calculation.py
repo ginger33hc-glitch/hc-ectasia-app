@@ -36,7 +36,13 @@ class CalculationOutput:
 def calculate(inp: CalculationInput) -> CalculationOutput:
     procedure = (inp.procedure or "").upper()
     predicted_final_kmean = None
-    if inp.preop_kmean_d is not None and inp.intended_mrse_d is not None:
+    mixed_plan = (
+        inp.intended_sphere_d is not None
+        and inp.intended_cylinder_magnitude_d is not None
+        and float(inp.intended_sphere_d) > 0
+        and float(inp.intended_sphere_d) - float(inp.intended_cylinder_magnitude_d) < 0
+    )
+    if inp.preop_kmean_d is not None and inp.intended_mrse_d is not None and not mixed_plan:
         predicted_final_kmean = final_kmean_d(inp.preop_kmean_d, inp.intended_mrse_d)
 
     calc = CalculatedValues()

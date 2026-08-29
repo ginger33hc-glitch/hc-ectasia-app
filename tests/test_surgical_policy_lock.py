@@ -44,9 +44,9 @@ def test_prk_epithelium_and_final_k_safety_constants_are_locked():
     assert core.FINAL_KMEAN_MAX_D == 48.0
 
 
-def test_hc_pachymetry_hard_stop_boundary_remains_inclusive():
-    assert core.lasik_pachy_points(480) is None
-    assert core.lasik_pachy_points(481) == 2
+def test_hc_pachymetry_480_scores_and_479_fails():
+    assert core.lasik_pachy_points(479) is None
+    assert core.lasik_pachy_points(480) == 2
 
 
 def test_final_bad_d_abnormal_boundary_remains_inclusive():

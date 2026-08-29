@@ -1,0 +1,8 @@
+.hc-reference-appendix{margin-top:24px;border-top:2px solid #8aa0b8;padding-top:14px}
+.hc-reference-appendix h3{color:#173b57;margin:12px 0 6px}
+.hc-bad-normal{background:#e6f4ea!important;color:#176b3a!important;font-weight:bold}
+.hc-bad-suspicious{background:#fff0d8!important;color:#9a4d00!important;font-weight:bold}
+.hc-bad-abnormal{background:#fde5e5!important;color:#a31212!important;font-weight:bold}
+.identity-alert ul{display:none!important}
+.identity-alert strong{margin-bottom:0!important}
+@media print{.hc-reference-appendix{display:block!important}.hc-bad-normal,.hc-bad-suspicious,.hc-bad-abnormal{-webkit-print-color-adjust:exact;print-color-adjust:exact}}

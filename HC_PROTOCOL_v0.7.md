@@ -8,15 +8,20 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 
 ## Case and source integrity gate
 
-- Extract and compare patient ID/name, DOB, examination date/time, laterality, filename, and
+- Extract and compare patient ID/name, printed age, examination date/time, laterality, filename, and
   literal Pentacam QS.
-- Conflicting patient ID, DOB, or Pentacam examination date prohibits PASS.
-- A mismatch between entered and source patient ID, DOB, or derived age prohibits PASS.
+- Conflicting patient age or Pentacam examination date prohibits PASS; identity uncertainty remains
+  a visible surgeon-confirmation warning without suppressing the eye analyses.
+- A mismatch between entered and source patient ID or derived age prohibits PASS.
 - Both OD and OS are required for overall PASS; eyes remain separately assessed and are not averaged.
 - An unclassified upload, an upload yielding no usable eye/treatment data, a limited/inadequate
   decision-source image, or an unresolved decision-field conflict prohibits PASS.
 - Pentacam clearance requires a same-exam explicit `QS: OK`; a visible non-OK QS cannot be overridden.
 - Record field-level provenance as labeled table, permitted map fallback, or visual classification.
+- Same-field readings from one accepted provenance class reconcile only when their full relative
+  spread is `<=1%`. Retain the lower value for pachymetry, ARTmax, and Rmin; retain the higher value
+  for BAD-D, Kmax, elevation, PPI, and other supported ectasia indices. Larger differences remain
+  unresolved conflicts.
 
 ## Pathway gate
 
@@ -63,6 +68,8 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 ## HC operational hard stops
 
 - Thinnest preoperative pachymetry `<480 µm`; exactly 480 is not stopped by this rule alone.
+- HC-modified LASIK pachymetry bands: `480–499 µm` = +2 points, `500–510 µm` = +1 point,
+  and `>=511 µm` = +0 points.
 - LASIK RSB `<300 µm`; exactly 300 is allowed by this rule.
 - PRK RST `<310 µm`; exactly 310 is allowed by this rule.
 - Intended sphere `<−10.00 D`; exactly −10.00 is allowed by this rule.
