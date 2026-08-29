@@ -2,7 +2,12 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.48 implements
+## What v0.7.49 implements
+
+- Randleman topography now requires a labeled Pentacam I-S value or surgeon-confirmed I-S value.
+  Visual ABT/SRA labels without their required numeric support are not scored automatically.
+- Topography categories remain mutually exclusive and use the existing single point mapper: abnormal
+  +4, inferior steepening/SRA +3, asymmetric bow-tie +1, and normal/symmetric +0.
 
 - Mobile-safe signed refraction parsing now recognizes common Unicode plus/minus characters.
 - Invalid or partial manifest/intended manual entries block analysis with a field-specific warning instead of silently becoming missing data.

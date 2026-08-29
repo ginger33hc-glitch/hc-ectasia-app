@@ -100,6 +100,7 @@ def _fmt(value: Any, digits: int = 1, unit: str = "") -> str:
 def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
     values = eye.get("values") or {}
     score = eye.get("score") or {}
+    erss_evidence = eye.get("erss_topography_evidence") or {}
     correction = "Not documented"
     if values.get("intended_sphere_D") is not None and values.get("intended_cylinder_magnitude_D") is not None:
         axis = (
@@ -170,6 +171,14 @@ def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
         ("LASIK RSB / PTA", f"{_fmt(values.get('LASIK_RSB_um'), 0, ' um')} / {_fmt(values.get('LASIK_PTA_percent'), 1, '%')}"),
         ("Tomography review", _text((eye.get("tomography_review") or {}).get("status"))),
         ("Morphology category", _text((eye.get("topography_classification") or {}).get("scoring_category"))),
+        ("Randleman I-S / source", (
+            f"{_fmt(erss_evidence.get('I_S_D'), 2, ' D')} / "
+            f"{_text(erss_evidence.get('I_S_source'))}"
+        )),
+        ("Validated Randleman topography", (
+            f"{_text(erss_evidence.get('validated_category'))} / "
+            f"{_text(erss_evidence.get('category_source'))}"
+        )),
         ("Pentacam QS", _text(values.get("pentacam_qs"))),
     ]
 

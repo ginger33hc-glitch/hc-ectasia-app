@@ -7,6 +7,9 @@ import erss_topography_guard as erss
 
 erss.ERSS_PROMPT = r"""You are ONLY the Randleman/ERSS anterior-topography reader. Ignore BAD-D, Belin/Ambrosio values, posterior elevation, pachymetric progression, and every non-anterior-curvature panel.
 
+STEP 0 — READ A PENTACAM TOPOMETRIC/KERATOCONUS INDICES SCREEN WHEN PRESENT.
+If the screen is the Pentacam Topometric/Keratoconus display with the panel labeled "Indices (in 8mm zone)", set display_type=PENTACAM_TOPOMETRIC_KC. Transcribe I_S only from the numeric value directly opposite the label "IS:" in that panel. Do not confuse IS with ISV, IVA, IHD, IHA, KISA, Q-value, or a curvature-map spot. Set I_S_status=CONFIDENT only when the label, sign, digits, eye, and unit/context are unambiguous; otherwise return I_S=null and UNREADABLE or NOT_SHOWN. On this screen do not invent an anterior-map morphology: use anterior_curvature_map_visible=NO and morphology/asymmetric_bow_tie/srax=UNCERTAIN with numeric morphology fields null.
+
 STEP 1 — IDENTIFY THE SOURCE MAP.
 If the page header says OCULUS - PENTACAM 4 Maps Refractive, or the standard Pentacam four-map layout is unmistakable, set display_type=PENTACAM_4_MAPS_REFRACTIVE. On that page the UPPER-LEFT map is the Axial/Sagittal Curvature (Front) map and therefore anterior_curvature_map_visible=YES. Do not require the small upper-left panel title to be perfectly legible once the standard 4 Maps Refractive page is established. Upper-right Elevation Front, lower-left Corneal Thickness, and lower-right Elevation Back are NOT Randleman topography sources.
 
@@ -23,6 +26,6 @@ UNCERTAIN: use only when the anterior curvature map itself is absent, substantia
 STEP 3 — EVIDENCE AND NUMERIC FIELDS.
 In evidence, briefly state the visible morphology used for the classification (for example symmetric bow-tie, asymmetric lobe, inferior displacement, or visibly skewed radial axes). Set srax=YES when a convincing skewed-radial-axis morphology is visually present; set NO only when it is clearly absent; otherwise UNCERTAIN. Report srax_deg and inferior_opposite_steepening_D only when reliably readable or directly supported; otherwise use null. NEVER invent a numeric measurement from color pixels.
 
-This task never needs a BAD map. The output is a Randleman anterior-topography morphology classification, not a diagnosis and not a tomography classification."""
+On a 4 Maps Refractive screen, transcribe I_S only if a clearly labeled I-S/IS index field is actually visible; otherwise use I_S=null and I_S_status=NOT_SHOWN. This task never needs a BAD map. The output is Randleman anterior-topography evidence, not a diagnosis and not a tomography classification."""
 
 erss.core._erss_visual_morphology_policy_installed = True

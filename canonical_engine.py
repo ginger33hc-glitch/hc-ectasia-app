@@ -12,10 +12,11 @@ import hc_final_decision_policy  # noqa: F401
 import status_rank_policy  # noqa: F401
 import inter_eye_tomography_policy  # noqa: F401
 import microkeratome_planning_policy  # noqa: F401
+import erss_topography_evidence_policy  # noqa: F401
 
 core = bootstrap.core
 app = _runtime.app
-CANONICAL_VERSION = "0.7.47"
+CANONICAL_VERSION = "0.7.49"
 core.APP_VERSION = CANONICAL_VERSION
 core.app.title = f"HC Ectasia App v{CANONICAL_VERSION}"
 reports.APP_VERSION = CANONICAL_VERSION
@@ -41,9 +42,11 @@ def runtime_invariants():
 
     try:
         import erss_topography_guard as erss
+        import erss_topography_evidence_policy as erss_evidence
         if core.extract_one_image is not erss.extract_one_image_with_erss:errors.append("Dedicated ERSS anterior-curvature image reader is not active")
         if core.merge_extractions is not erss.merge_extractions_with_erss_source_guard:errors.append("ERSS source-aware multi-image merge is not the active merge layer")
-        if core.scoring_morphology is not erss.scoring_morphology_with_dedicated_source:errors.append("Dedicated ERSS morphology handoff is not active")
+        if core.scoring_morphology is not erss_evidence.scoring_morphology_with_i_s_evidence_gate:errors.append("ERSS I-S evidence gate is not the active morphology handoff")
+        if erss_evidence._previous_scoring_morphology is not erss.scoring_morphology_with_dedicated_source:errors.append("Dedicated ERSS morphology reader is not preserved immediately below the I-S evidence gate")
     except Exception as exc:errors.append(f"ERSS source-isolation module unavailable: {type(exc).__name__}")
 
     if not getattr(core,"_erss_visual_morphology_policy_installed",False):errors.append("Improved ERSS visual morphology policy is not active")
@@ -52,6 +55,8 @@ def runtime_invariants():
     if not getattr(core,"_hc_status_rank_policy_installed",False):errors.append("HC aggregate status ranking is not active")
     if not getattr(core,"_hc_inter_eye_tomography_policy_installed",False):errors.append("Automated inter-eye tomography concern layer is not active")
     if not getattr(core,"_hc_microkeratome_planning_installed",False):errors.append("Post-assessment ML7 microkeratome planning layer is not active")
+    if not getattr(core,"_erss_topography_evidence_policy_installed",False):errors.append("ERSS I-S/topography evidence gate is not active")
+    if getattr(core.lasik_topography_points, "__module__", None) != "app":errors.append("ERSS evidence gate must not replace or duplicate the canonical topography point mapper")
     try:
         if core.combine_status("PASS", "PASS WITH CAUTION") != "PASS WITH CAUTION":errors.append("PASS WITH CAUTION aggregate ranking is invalid")
         if core.combine_status("PASS WITH CAUTION", "DO NOT PROCEED") != "DO NOT PROCEED":errors.append("Hard-stop aggregate ranking is invalid")

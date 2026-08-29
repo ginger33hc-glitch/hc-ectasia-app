@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="HC Ectasia App v0.7.48")
+app = FastAPI(title="HC Ectasia App v0.7.49")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -256,6 +256,11 @@ boxes around the edge of the Pentacam display. Every numeric output in TABLE_NUM
 copied preferentially from its own explicitly labeled printed field. Add the exact output-field name to
 table_verified_numeric_fields only when that labeled field is visible and the value was transcribed
 from it. The list must exactly match the non-null table-derived numeric outputs.
+
+I-S SOURCE LOCK: transcribe I_S only from the explicitly labeled "IS:" or "I-S:" field, preferentially
+from the Pentacam Topometric/Keratoconus panel headed "Indices (in 8 mm zone)". Preserve its printed
+sign. Never substitute ISV, IVA, IHD, IHA, KISA, Q-value, a color, or a curvature-map spot for I_S.
+If the IS label, sign, digits, or eye laterality is uncertain, return I_S=null; never calculate I-S.
 
 If and only if the corresponding side/summary-table field is absent, obscured, or unreadable, a local
 map number may be used as a second-priority fallback when it directly represents the same named
@@ -1457,7 +1462,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.48 / source set 2026-08-25 plus binding HC amendments",
+        "version": "software v0.7.49 / source set 2026-08-25 plus binding HC amendments",
     }
 
 

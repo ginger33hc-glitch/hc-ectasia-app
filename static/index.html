@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>HC Ectasia App v0.7.48</title>
+  <title>HC Ectasia App v0.7.49</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=5">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=4">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=4">
@@ -35,7 +35,7 @@
   </style>
 </head>
 <body>
-<header><h1>HC Ectasia App v0.7.48</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
+<header><h1>HC Ectasia App v0.7.49</h1><p>Source identity verification → eye-specific HC assessment → evidence-labeled clinical report</p></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -98,7 +98,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">HC Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.7.48</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.7.49</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <p class="report-liability-notice">The final surgical decision and all associated responsibility and liability rest with the surgeon. This application is a clinical decision-support aid only.</p>
       <table class="meta-table"><tbody>
@@ -134,6 +134,15 @@ const eyeTemplate = (eye) => `
   <div class="row"><label>PRK epithelial thickness (µm)</label><input id="${eye}_epithelium" type="text" value="50" readonly aria-readonly="true"></div>
   <div class="row"><label>Optical zone (mm)</label><select id="${eye}_optical"><option value="">Select</option><option value="6.0">6.0 mm</option><option value="6.5" selected>6.5 mm</option><option value="7.0">7.0 mm</option></select></div>
   <div class="row"><label>Transition zone (mm)</label><select id="${eye}_transition"><option value="">Select</option><option value="8.0">8.0 mm</option><option value="8.5">8.5 mm</option><option value="9.0" selected>9.0 mm</option></select></div>
+  <details id="${eye}_erss_confirmation" class="clinical-select-group" hidden>
+    <summary>Randleman topography — surgeon confirmation required</summary>
+    <div class="clinical-select-options">
+      <p class="alert">Use the Pentacam Topometric/Keratoconus panel: <strong>Indices (in 8 mm zone) → IS</strong>. Preserve the printed sign. Do not enter ISV, IVA, IHD, IHA, or KISA.</p>
+      <div class="row"><label>Surgeon-confirmed I-S (D)</label><div class="signed-number"><input id="${eye}_surgeon_i_s" type="text" inputmode="decimal" autocomplete="off"><button type="button" class="sign-button" data-positive-target="${eye}_surgeon_i_s" aria-label="Make I-S positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_surgeon_i_s" aria-label="Make I-S negative">−</button></div></div>
+      <div class="row"><label>Surgeon-confirmed Randleman topography category</label><select id="${eye}_surgeon_topography"><option value="">Select only when requested</option><option value="NORMAL_SYMMETRIC">Normal / symmetric bow-tie</option><option value="ASYMMETRIC_BOWTIE">Asymmetric bow-tie</option><option value="INFERIOR_STEEPENING_SRA">Inferior steepening and/or SRA</option><option value="ABNORMAL_ECTATIC">Abnormal / ectatic pattern</option></select></div>
+      <p class="note">Only one mutually exclusive topography category is sent to the existing Randleman scorer. ABT and inferior-steepening/SRA points are never added.</p>
+    </div>
+  </details>
   <details id="${eye}_clinical" class="clinical-select-group">
     <summary>Clinical eligibility and stability</summary>
     <div class="clinical-select-options">
@@ -273,6 +282,17 @@ function validateRefractionInputs(){
   }
   return firstInvalid;
 }
+function validateERSSTopographyInputs(){
+  for(const eye of ["od","os"]){
+    const input=document.getElementById(`${eye}_surgeon_i_s`), result=parsedClinicalNumber(`${eye}_surgeon_i_s`);
+    input.setCustomValidity("");
+    if(result.state==="invalid"){
+      input.setCustomValidity(`Enter a valid signed I-S value for ${eye.toUpperCase()}, or leave it blank.`);
+      return input;
+    }
+  }
+  return null;
+}
 document.querySelector("#report_date").value = new Date().toISOString().slice(0,10);
 
 async function loadSharedImages(){
@@ -365,6 +385,7 @@ function plan(prefix){return {
   epithelium_um:50,
   laser_platform:"Alcon EX500", optical_zone_mm:numberOrNull(`${prefix}_optical`),
   transition_zone_mm:numberOrNull(`${prefix}_transition`), transition_zone_not_applicable:"no",
+  surgeon_I_S_D:numberOrNull(`${prefix}_surgeon_i_s`), surgeon_topography_category:value(`${prefix}_surgeon_topography`)||null,
   stable:value(`${prefix}_stable`), progression:value(`${prefix}_progression`),
   cdva_below_20_20:value(`${prefix}_cdva`), enhancement_anticipated:value(`${prefix}_enhancement`)
 }}
@@ -428,6 +449,7 @@ function microkeratomeBlock(r){
 }
 function renderEye(r, extracted){
   const v=r.values||{}, s=r.score||{};
+  const erssEvidence=r.erss_topography_evidence||{};
   const transition=v.transition_zone_mm===null||v.transition_zone_mm===undefined?(v.transition_zone_not_applicable==="yes"?"Not applicable":"—"):`${fmt(v.transition_zone_mm,1)} mm`;
   const rows=[
     ["Procedure",v.procedure??"—"],["Score / category",`${s.total ?? "—"} / ${s.category ?? "—"}`],
@@ -444,7 +466,9 @@ function renderEye(r, extracted){
     ["Optical / transition zone",`${fmt(v.optical_zone_mm,1)} mm / ${transition}`],["Enhancement anticipated",v.enhancement_anticipated??"—"],
     ["PRK RST / PTA",`${fmt(v.PRK_RST_um,0)} µm / ${fmt(v.PRK_PTA_percent,1)}%`],
     ["LASIK RSB / PTA",`${fmt(v.LASIK_RSB_um,0)} µm / ${fmt(v.LASIK_PTA_percent,1)}%`],
-    ["Tomography review",r.tomography_review?.status??"—"],["Morphology category",r.topography_classification?.scoring_category??"—"]
+    ["Tomography review",r.tomography_review?.status??"—"],["Morphology category",r.topography_classification?.scoring_category??"—"],
+    ["Randleman I-S / source",`${fmt(erssEvidence.I_S_D,2)} D / ${erssEvidence.I_S_source??"—"}`],
+    ["Validated Randleman topography",`${erssEvidence.validated_category??"—"} / ${erssEvidence.category_source??"—"}`]
   ];
   const source=(extracted.eyes||[]).find(x=>x.eye===r.eye)||{};
   const tomoRows=[
@@ -507,6 +531,24 @@ const showFormMessage=(message)=>{
   analysisProgress.textContent=message;
   analysisProgress.hidden=false;
 };
+function applyERSSTopographyPrompts(decision){
+  const requested=[];
+  for(const result of decision?.eyes||[]){
+    const prefix=result.eye==="OD"?"od":result.eye==="OS"?"os":null;
+    if(!prefix)continue;
+    const evidence=result.erss_topography_evidence||{};
+    const details=document.getElementById(`${prefix}_erss_confirmation`);
+    const iSInput=document.getElementById(`${prefix}_surgeon_i_s`);
+    const categoryInput=document.getElementById(`${prefix}_surgeon_topography`);
+    if(evidence.needs_surgeon_I_S||evidence.needs_surgeon_category){
+      details.hidden=false;details.open=true;
+      iSInput.required=Boolean(evidence.needs_surgeon_I_S);
+      categoryInput.required=Boolean(evidence.needs_surgeon_category);
+      requested.push(`${result.eye}${evidence.needs_surgeon_I_S?" I-S":""}${evidence.needs_surgeon_category?" topography category":""}`);
+    }
+  }
+  return requested;
+}
 const allowLoadingStateToPaint=()=>new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
 
 f.addEventListener("submit", async (e) => {
@@ -518,6 +560,12 @@ f.addEventListener("submit", async (e) => {
     invalidRefraction.focus();
     invalidRefraction.reportValidity();
     return;
+  }
+  const invalidERSSTopography=validateERSSTopographyInputs();
+  if(invalidERSSTopography){
+    showFormMessage(invalidERSSTopography.validationMessage);
+    invalidERSSTopography.scrollIntoView({behavior:"smooth",block:"center"});
+    invalidERSSTopography.focus();invalidERSSTopography.reportValidity();return;
   }
   if(!f.checkValidity()){
     showFormMessage("Please complete the required field highlighted by the browser.");
@@ -570,6 +618,7 @@ f.addEventListener("submit", async (e) => {
       manualAgeRow.hidden=false;
     }
     applyEffectivePlans(j.effective_eye_plans);
+    const erssPrompts=applyERSSTopographyPrompts(j.decision);
     statusBox.textContent=j.decision.status; statusBox.className=`status ${statusClass(j.decision.status)}`;
     overallNote.textContent=j.decision.action||"";
     const identityWarnings=j.decision.identity_warnings||[];
@@ -582,6 +631,10 @@ f.addEventListener("submit", async (e) => {
       showFormMessage("Patient age could not be read from the Pentacam image. Enter the age, then run the assessment again.");
       manualAgeRow.scrollIntoView({behavior:"smooth",block:"center"});
       ageInput.focus();
+    }else if(erssPrompts.length){
+      showFormMessage(`Randleman topography requires surgeon confirmation for ${erssPrompts.join("; ")}. Enter the requested Pentacam I-S/category, then run the assessment again.`);
+      const firstPrefix=erssPrompts[0].startsWith("OD")?"od":"os";
+      document.getElementById(`${firstPrefix}_erss_confirmation`).scrollIntoView({behavior:"smooth",block:"center"});
     }else{
       analysisProgress.hidden=true;
       reportCard.scrollIntoView({behavior:"smooth",block:"start"});

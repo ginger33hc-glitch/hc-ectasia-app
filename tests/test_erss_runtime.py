@@ -20,11 +20,17 @@ class TestERSSCanonicalEngine(unittest.TestCase):
         merged=core.merge_extractions([result(eye(False,"UNCERTAIN","bad.jpg"),"bad.jpg"),result(eye(True,"NORMAL_SYMMETRIC","4maps.jpg"),"4maps.jpg")])
         self.assertFalse(any("anterior_curvature_map" in str(x) for x in merged["eyes"][0].get("data_conflicts",[])))
     def test_dedicated_asymmetric_category_reaches_randleman_points(self):
-        maps=eye(True,"ASYMMETRIC_BOWTIE","4maps.jpg");maps["erss_source_read"]="DEDICATED_CURVATURE_PASS";od=core.merge_extractions([result(maps,"4maps.jpg")])["eyes"][0];scored=core.scoring_morphology(od)
+        maps=eye(True,"ASYMMETRIC_BOWTIE","4maps.jpg");maps["erss_source_read"]="DEDICATED_CURVATURE_PASS";maps["I_S"]=0.5;maps["table_verified_numeric_fields"]=["I_S"];maps["inferior_opposite_steepening_D"]=0.75;od=core.merge_extractions([result(maps,"4maps.jpg")])["eyes"][0];od["_erss_i_s_gate_required"]=True;scored=core.scoring_morphology(od)
         self.assertEqual(scored["category"],"ASYMMETRIC_BOWTIE");self.assertEqual(core.lasik_topography_points(scored["category"]),1)
     def test_dedicated_srax_category_reaches_randleman_points(self):
-        maps=eye(True,"INFERIOR_STEEPENING_SRA","4maps.jpg");maps["erss_source_read"]="DEDICATED_CURVATURE_PASS";od=core.merge_extractions([result(maps,"4maps.jpg")])["eyes"][0];scored=core.scoring_morphology(od)
+        maps=eye(True,"INFERIOR_STEEPENING_SRA","4maps.jpg");maps["erss_source_read"]="DEDICATED_CURVATURE_PASS";maps["I_S"]=0.5;maps["table_verified_numeric_fields"]=["I_S"];maps["srax_deg"]=20;od=core.merge_extractions([result(maps,"4maps.jpg")])["eyes"][0];od["_erss_i_s_gate_required"]=True;scored=core.scoring_morphology(od)
         self.assertEqual(scored["category"],"INFERIOR_STEEPENING_SRA");self.assertEqual(core.lasik_topography_points(scored["category"]),3)
+
+    def test_visual_category_without_i_s_is_not_scored(self):
+        maps=eye(True,"ASYMMETRIC_BOWTIE","4maps.jpg");maps["erss_source_read"]="DEDICATED_CURVATURE_PASS";maps["inferior_opposite_steepening_D"]=0.75
+        od=core.merge_extractions([result(maps,"4maps.jpg")])["eyes"][0];od["_erss_i_s_gate_required"]=True
+        self.assertEqual(core.scoring_morphology(od)["category"],"UNCERTAIN")
+        self.assertIsNone(core.lasik_topography_points("UNCERTAIN"))
     def test_conflicting_dedicated_morphologies_become_uncertain(self):
         a=eye(True,"NORMAL_SYMMETRIC","a.jpg");b=eye(True,"ASYMMETRIC_BOWTIE","b.jpg");a["erss_source_read"]=b["erss_source_read"]="DEDICATED_CURVATURE_PASS";od=core.merge_extractions([result(a,"a.jpg"),result(b,"b.jpg")])["eyes"][0]
         self.assertEqual(od["morphology"],"UNCERTAIN")

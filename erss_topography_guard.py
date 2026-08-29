@@ -28,7 +28,7 @@ def _qualifies(e): return e.get("anterior_curvature_map_visible")=="YES" and e.g
 ERSS_SCHEMA={
  "type":"object","additionalProperties":False,
  "properties":{
-  "display_type":{"type":"string","enum":["PENTACAM_4_MAPS_REFRACTIVE","OTHER_PENTACAM","NOT_PENTACAM","UNCERTAIN"]},
+  "display_type":{"type":"string","enum":["PENTACAM_4_MAPS_REFRACTIVE","PENTACAM_TOPOMETRIC_KC","OTHER_PENTACAM","NOT_PENTACAM","UNCERTAIN"]},
   "eye":{"type":"string","enum":["OD","OS","UNKNOWN"]},
   "anterior_curvature_map_visible":{"type":"string","enum":["YES","NO","UNCERTAIN"]},
   "morphology":{"type":"string","enum":["NORMAL_SYMMETRIC","ASYMMETRIC_BOWTIE","INFERIOR_STEEPENING_SRA","ABNORMAL_ECTATIC","UNCERTAIN"]},
@@ -36,9 +36,11 @@ ERSS_SCHEMA={
   "srax":{"type":"string","enum":["YES","NO","UNCERTAIN"]},
   "srax_deg":{"type":["number","null"]},
   "inferior_opposite_steepening_D":{"type":["number","null"]},
+  "I_S":{"type":["number","null"]},
+  "I_S_status":{"type":"string","enum":["CONFIDENT","UNREADABLE","NOT_SHOWN"]},
   "evidence":{"type":"array","items":{"type":"string"}}
  },
- "required":["display_type","eye","anterior_curvature_map_visible","morphology","asymmetric_bow_tie","srax","srax_deg","inferior_opposite_steepening_D","evidence"]
+ "required":["display_type","eye","anterior_curvature_map_visible","morphology","asymmetric_bow_tie","srax","srax_deg","inferior_opposite_steepening_D","I_S","I_S_status","evidence"]
 }
 ERSS_PROMPT=r"""You are ONLY the Randleman/ERSS anterior-topography reader. Ignore BAD-D and all Belin/Ambrosio values.
 First identify the page. If the header says OCULUS - PENTACAM 4 Maps Refractive, or the standard four-map
@@ -74,11 +76,34 @@ def extract_one_image_with_erss(raw,filename):
     except Exception as exc:
         result.setdefault("global_warnings",[]).append(f"Dedicated ERSS curvature-map read failed for {filename}: {type(exc).__name__}; general extraction retained.")
         return result
-    if er.get("display_type")!="PENTACAM_4_MAPS_REFRACTIVE":
+    if er.get("display_type") not in {"PENTACAM_4_MAPS_REFRACTIVE", "PENTACAM_TOPOMETRIC_KC"}:
         return result
-    er["anterior_curvature_map_visible"]="YES"
     target_eye=er.get("eye")
     candidates=[e for e in result.get("eyes",[]) if target_eye=="UNKNOWN" or e.get("eye")==target_eye]
+    if er.get("display_type") == "PENTACAM_TOPOMETRIC_KC":
+        if len(candidates)==1 and er.get("I_S_status")=="CONFIDENT" and core.is_number(er.get("I_S")):
+            e=candidates[0]
+            existing=e.get("I_S")
+            dedicated=float(er["I_S"])
+            if core.is_number(existing) and abs(float(existing)-dedicated)>0.01:
+                e["I_S"]=None
+                verified=set(e.get("table_verified_numeric_fields") or []);verified.discard("I_S")
+                e["table_verified_numeric_fields"]=sorted(verified)
+                e.setdefault("data_conflicts",[]).append(f"I_S: {float(existing):g} vs {dedicated:g}")
+                result.setdefault("global_warnings",[]).append(
+                    f"Dedicated/general I-S conflict in {filename}; neither value was used and surgeon confirmation is required."
+                )
+            else:
+                e["I_S"]=dedicated
+                verified=set(e.get("table_verified_numeric_fields") or []);verified.add("I_S")
+                e["table_verified_numeric_fields"]=sorted(verified)
+                e.setdefault("morphology_evidence",[]).append("Dedicated ERSS pass: I-S transcribed from Pentacam Indices (in 8 mm zone) — IS.")
+        elif er.get("I_S_status")=="CONFIDENT":
+            result.setdefault("global_warnings",[]).append(
+                f"Dedicated ERSS reader found an I-S value in {filename}, but eye laterality could not be mapped unambiguously; the value was not assigned."
+            )
+        return result
+    er["anterior_curvature_map_visible"]="YES"
     if len(candidates)==1:
         e=candidates[0]
         e["anterior_curvature_map_visible"]="YES";e["anterior_curvature_map_type"]="AXIAL_SAGITTAL_FRONT";e["anterior_curvature_map_location"]="UPPER_LEFT"
