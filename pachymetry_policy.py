@@ -2,11 +2,12 @@
 
 Policy:
 - thinnest pachymetry <480 µm: HC hard stop (no pachymetry score used for clearance)
-- 480-499 µm: 2 points
-- 500-510 µm: 1 point
+- 480-510 µm: 2 points
 - >=511 µm: 0 points
 
-This is an HC-modified pachymetry component, not the original published ERSS pachymetry table.
+The 481-510 µm scoring band follows the published ERSS pachymetry category. Exactly
+480 µm remains the HC hard-stop boundary exception and is scored +2 because the
+independent HC hard stop applies only below 480 µm.
 """
 import critical_score_highlight as runtime
 import bootstrap
@@ -20,10 +21,8 @@ def hc_lasik_pachy_points(pachy):
     value = float(pachy)
     if value < 480:
         return None
-    if value < 500:
-        return 2
     if value <= 510:
-        return 1
+        return 2
     return 0
 
 
@@ -40,7 +39,7 @@ def assess_eye_with_hc_pachymetry(eye, plan, age, patient_modifiers):
 
     # The legacy engine had an explicit unresolved-boundary branch at exactly
     # 510 µm. Nudge only the internal legacy boundary check below 510; the HC
-    # scorer still assigns 1 point and the reported clinical value is restored.
+    # scorer assigns 2 points and the reported clinical value is restored.
     if core.is_number(original_pachy) and float(original_pachy) == 510.0:
         working_eye = dict(eye)
         working_eye["pachy_thinnest_um"] = 509.999999
@@ -59,7 +58,6 @@ def assess_eye_with_hc_pachymetry(eye, plan, age, patient_modifiers):
         if value < 480:
             stop = "HC operational hard stop: thinnest preoperative cornea <480 µm."
             hard_stops = list(result.get("hard_stops") or [])
-            # Remove superseded wording if present, then enforce the confirmed cutoff.
             hard_stops = [x for x in hard_stops if "thinnest preoperative cornea <480" not in str(x)]
             if stop not in hard_stops:
                 hard_stops.append(stop)
@@ -73,8 +71,6 @@ def assess_eye_with_hc_pachymetry(eye, plan, age, patient_modifiers):
             result["status"] = "DO NOT PROCEED"
             result["action"] = "DO NOT PROCEED with elective corneal refractive surgery."
 
-        # Make the report explicit that this pachymetry banding is HC-modified,
-        # rather than presenting it as the original Randleman pachymetry table.
         if result.get("values", {}).get("procedure") == "LASIK":
             score = result.get("score") or {}
             if value < 480:
@@ -82,9 +78,9 @@ def assess_eye_with_hc_pachymetry(eye, plan, age, patient_modifiers):
             result["score"] = score
             warnings = list(result.get("warnings") or [])
             warnings.append(
-                "HC-MODIFIED LASIK PACHYMETRY POLICY: <480 µm = hard stop; "
-                "480-499 µm = +2; 500-510 µm = +1; >=511 µm = +0. "
-                "These pachymetry bands are an HC protocol modification and are not the original ERSS pachymetry bins."
+                "HC LASIK PACHYMETRY POLICY: <480 µm = hard stop; "
+                "480-510 µm = +2; >=511 µm = +0. "
+                "The published ERSS assigns +2 to 481-510 µm; exactly 480 µm is retained at +2 under the HC boundary rule."
             )
             result["warnings"] = list(dict.fromkeys(warnings))
 
@@ -93,5 +89,4 @@ def assess_eye_with_hc_pachymetry(eye, plan, age, patient_modifiers):
 
 core.assess_eye = assess_eye_with_hc_pachymetry
 
-# Expose the already patched FastAPI app for Uvicorn.
 app = runtime.app
