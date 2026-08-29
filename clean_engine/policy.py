@@ -1,7 +1,7 @@
 """Pure HC clinical policy definitions for the parallel clean engine.
 
-Phase 2 rule: this module is not wired into production. It mirrors locked
-behavior except where an explicit HC policy amendment is intentionally modeled.
+Phase 2 rule: this module mirrors the active HC clinical policy while remaining
+architecturally separated from extraction, transport, and reporting concerns.
 """
 from dataclasses import dataclass
 from typing import Optional
@@ -52,6 +52,11 @@ def age_points(age: Optional[float]) -> Optional[int]:
 
 
 def lasik_pachymetry_points(pachy_um: Optional[float]) -> Optional[int]:
+    """HC-modified pachymetry component.
+
+    <480 µm hard stop/unscored; 480-499 µm +2; 500-509 µm +1; >=510 µm +0.
+    These are HC operational bands and are not the original published ERSS bins.
+    """
     if not isinstance(pachy_um, (int, float)) or isinstance(pachy_um, bool):
         return None
     value = float(pachy_um)
@@ -59,7 +64,7 @@ def lasik_pachymetry_points(pachy_um: Optional[float]) -> Optional[int]:
         return None
     if value < 500:
         return 2
-    if value <= 510:
+    if value < 510:
         return 1
     return 0
 
