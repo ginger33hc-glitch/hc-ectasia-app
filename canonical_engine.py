@@ -13,7 +13,7 @@ import status_rank_policy  # noqa: F401
 
 core = bootstrap.core
 app = _runtime.app
-CANONICAL_VERSION = "0.7.43"
+CANONICAL_VERSION = "0.7.44"
 core.APP_VERSION = CANONICAL_VERSION
 core.app.title = f"HC Ectasia App v{CANONICAL_VERSION}"
 reports.APP_VERSION = CANONICAL_VERSION
@@ -25,7 +25,7 @@ def runtime_invariants():
 
     if [core.age_points(x) for x in (18, 19, 20, 21, 30)] != [3, 2, 2, 0, 0]:
         errors.append("HC age policy is not active")
-    if [core.lasik_pachy_points(x) for x in (479, 480, 499, 500, 510, 511)] != [None, 2, 2, 1, 1, 0]:
+    if [core.lasik_pachy_points(x) for x in (479, 480, 481, 499, 500, 509, 510, 511)] != [None, 2, 2, 2, 2, 2, 2, 0]:
         errors.append("HC pachymetry policy is not active")
     if [core.bad_classification(x, final=True) for x in (1.6, 1.61, 2.99, 3.0)] != ["NORMAL", "SUSPICIOUS", "SUSPICIOUS", "ABNORMAL"]:
         errors.append("HC Final BAD-D policy is not active")
