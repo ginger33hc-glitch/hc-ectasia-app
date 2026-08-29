@@ -136,6 +136,7 @@ def _reconcile_one_percent(merged: Dict[str, Any], results: List[Dict[str, Any]]
 def _audit_eye(eye: Dict[str, Any]) -> Dict[str, Any]:
     provenance = eye.get("field_provenance") or {}
     verified = set(eye.get("table_verified_numeric_fields") or [])
+    surgeon_verified = set(eye.get("surgeon_verified_numeric_fields") or [])
     fallback = set(eye.get("map_fallback_numeric_fields") or [])
     issues: List[str] = []
     warnings: List[str] = []
@@ -149,7 +150,7 @@ def _audit_eye(eye: Dict[str, Any]) -> Dict[str, Any]:
         value = eye.get(field)
         if value is None:
             continue
-        if field not in verified and field not in fallback:
+        if field not in verified and field not in fallback and field not in surgeon_verified:
             issues.append(f"{field}: decision-critical value has no accepted labeled-field/map-fallback provenance")
         if not provenance.get(field):
             warnings.append(f"{field}: source-file provenance record is unavailable")

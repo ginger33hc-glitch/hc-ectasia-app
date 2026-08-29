@@ -148,6 +148,9 @@ def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
         ("Intended normalized (minus-cylinder)", correction),
         ("Correction source", _text(values.get("correction_source"), "Manual / not documented")),
         ("Score / category", f"{_text(score.get('total'), '-')} / {_text(score.get('category'), '-') }"),
+        ("Randleman ERSS / category", f"{_text((eye.get('randleman_erss') or {}).get('total'))} / {_text((eye.get('randleman_erss') or {}).get('category'))}"),
+        ("Final BAD-D / class", f"{_fmt((eye.get('bad_summary') or {}).get('value'), 2)} / {_text((eye.get('bad_summary') or {}).get('category'))}"),
+        ("HC-adapted NICE / class", f"{_text((eye.get('nice') or {}).get('total'))} / {_text((eye.get('nice') or {}).get('category'))}"),
         ("Thinnest pachymetry", _fmt(values.get("pachy_thinnest_um"), 0, " um")),
         ("Manifest MRSE", _fmt(values.get("MRSE_D"), 2, " D")),
         ("Intended MRSE", _fmt(values.get("intended_MRSE_D"), 2, " D")),
@@ -192,6 +195,11 @@ def _findings(eye: Dict[str, Any]) -> Iterable[tuple[str, List[str]]]:
         ("Surgical-load evidence flags", eye.get("surgical_load_flags") or []),
         ("Clinical modifiers", eye.get("clinical_modifiers") or []),
         ("Warnings", eye.get("warnings") or []),
+        ("NICE component audit", [f"{key}: {value} point(s)" for key, value in (eye.get("nice") or {}).get("rows", {}).items()]
+         + [f"Input {key}: {value}" for key, value in (eye.get("nice") or {}).get("values", {}).items()]
+         + [f"Source {key}: {value}" for key, value in (eye.get("nice") or {}).get("input_sources", {}).items()]
+         + (eye.get("nice") or {}).get("evidence_notes", [])),
+        ("NICE interpretation note", [(eye.get("nice") or {})["note"]] if (eye.get("nice") or {}).get("note") else []),
         ("Surgeon attention - hyperopic/mixed pathway", eye.get("surgeon_attention") or []),
         ("Tomography concern flags", (eye.get("tomography_review") or {}).get("cross_sectional_flags") or []),
         ("BAD display interpretation", [f"{key}: {value}" for key, value in bad_display.items()]),

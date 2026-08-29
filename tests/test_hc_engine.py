@@ -17,6 +17,10 @@ from pypdf import PdfReader
 def normal_eye(eye="OD", pachy=560, morphology="NORMAL_SYMMETRIC"):
     return {
         "eye": eye,
+        "nice_candidates": [{"central_pachy_um": 565, "central_status": "CONFIDENT",
+                             "posterior_pupil_max_um": 8, "posterior_status": "CONFIDENT",
+                             "posterior_reference": "BFS_FLOAT", "bfs_diameter_mm": 8,
+                             "pupil_boundary_visible": True, "evidence": "Synthetic central 565; pupil posterior +8"}],
         "screen_types": ["4 Maps", "BAD Display"],
         "quality": "ADEQUATE",
         "pentacam_qs": "OK",
@@ -978,15 +982,15 @@ class TestApiIntegration(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload["decision"]["status"], "DATA INSUFFICIENT")
-        self.assertTrue(any("Both OD and OS" in item for item in payload["decision"]["critical_input_issues"]))
-        self.assertEqual(payload["decision"]["eyes"][0]["eye"], "OD")
+        self.assertEqual(payload["workflow_status"], "NEEDS_INPUT")
+        self.assertNotIn("decision", payload)
+        self.assertTrue(any("Both OD and OS" in item["message"] for item in payload["missing"]))
         self.assertEqual(payload["effective_eye_plans"]["OD"]["manifest_sphere_D"], -4.5)
         self.assertEqual(payload["effective_eye_plans"]["OD"]["intended_sphere_D"], -4.5)
-        self.assertEqual(payload["decision"]["eyes"][0]["values"]["correction_axis_deg"], 170.0)
+        self.assertEqual(payload["effective_eye_plans"]["OD"]["correction_axis_deg"], 170.0)
 
     def test_professional_pdf_and_word_exports_are_valid(self):
-        extracted = {"eyes": [normal_eye()], "global_warnings": []}
+        extracted = {"eyes": [normal_eye(), normal_eye("OS")], "global_warnings": []}
         decision = app.hc_engine(extracted, 35, {"OD": plan()}, MODIFIERS)
         payload = {
             "patient": {
@@ -997,6 +1001,10 @@ class TestApiIntegration(unittest.TestCase):
             "extracted": extracted,
         }
         client = TestClient(app.app)
+        from assessment_workflow import begin
+        ready = begin(app, extracted, 35, {"OD": plan(), "OS": plan()}, MODIFIERS, payload["patient"])
+        self.assertEqual(ready["workflow_status"], "READY")
+        payload.update({"assessment_token": ready["assessment_token"], "report_token": ready["report_token"]})
         pdf = client.post("/report/pdf", json=payload)
         word = client.post("/report/word", json=payload)
         self.assertEqual(pdf.status_code, 200)
@@ -1140,8 +1148,8 @@ class TestSignedRefractionInputs(unittest.TestCase):
 
     def test_autofilled_internal_cylinder_magnitudes_render_as_negative(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
-        self.assertIn('value=-Math.abs(p.manifest_cylinder_magnitude_D)', html)
-        self.assertIn('value=-Math.abs(p.intended_cylinder_magnitude_D)', html)
+        self.assertIn('cylinder.value=-Math.abs(p[`${role}_cylinder_magnitude_D`])', html)
+        self.assertIn('!sphere.value.trim()&&!cylinder.value.trim()', html)
 
     def test_plus_cylinder_is_transposed_to_equivalent_minus_cylinder(self):
         entered = plan()

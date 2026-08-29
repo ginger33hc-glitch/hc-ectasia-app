@@ -13,13 +13,17 @@ import status_rank_policy  # noqa: F401
 import inter_eye_tomography_policy  # noqa: F401
 import microkeratome_planning_policy  # noqa: F401
 import erss_topography_evidence_policy  # noqa: F401
+import nice_policy
+import assessment_workflow
 
 core = bootstrap.core
 app = _runtime.app
-CANONICAL_VERSION = "0.7.49"
+CANONICAL_VERSION = "0.7.50"
 core.APP_VERSION = CANONICAL_VERSION
 core.app.title = f"HC Ectasia App v{CANONICAL_VERSION}"
 reports.APP_VERSION = CANONICAL_VERSION
+nice_policy.install(core)
+assessment_workflow.install(core)
 
 
 def runtime_invariants():
@@ -55,6 +59,8 @@ def runtime_invariants():
     if not getattr(core,"_hc_status_rank_policy_installed",False):errors.append("HC aggregate status ranking is not active")
     if not getattr(core,"_hc_inter_eye_tomography_policy_installed",False):errors.append("Automated inter-eye tomography concern layer is not active")
     if not getattr(core,"_hc_microkeratome_planning_installed",False):errors.append("Post-assessment ML7 microkeratome planning layer is not active")
+    if not getattr(core,"_hc_nice_installed",False):errors.append("Independent HC NICE policy is not active")
+    if not getattr(core,"_hc_readiness_installed",False):errors.append("Pre-report readiness workflow is not active")
     if not getattr(core,"_erss_topography_evidence_policy_installed",False):errors.append("ERSS I-S/topography evidence gate is not active")
     if getattr(core.lasik_topography_points, "__module__", None) != "app":errors.append("ERSS evidence gate must not replace or duplicate the canonical topography point mapper")
     try:

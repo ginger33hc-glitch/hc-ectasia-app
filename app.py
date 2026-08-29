@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="HC Ectasia App v0.7.49")
+app = FastAPI(title="HC Ectasia App v0.7.50")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -1462,7 +1462,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.49 / source set 2026-08-25 plus binding HC amendments",
+        "version": "software v0.7.50 / source set 2026-08-25 plus binding HC amendments",
     }
 
 
@@ -1863,6 +1863,8 @@ def service_worker() -> FileResponse:
 
 @app.post("/report/pdf")
 def report_pdf(payload: Dict[str, Any] = Body(...)) -> StreamingResponse:
+    from assessment_workflow import export_payload
+    payload = export_payload(payload)
     content = build_pdf(payload)
     return StreamingResponse(
         BytesIO(content), media_type="application/pdf",
@@ -1872,6 +1874,8 @@ def report_pdf(payload: Dict[str, Any] = Body(...)) -> StreamingResponse:
 
 @app.post("/report/word")
 def report_word(payload: Dict[str, Any] = Body(...)) -> StreamingResponse:
+    from assessment_workflow import export_payload
+    payload = export_payload(payload)
     content = build_docx(payload)
     return StreamingResponse(
         BytesIO(content),
@@ -1996,10 +2000,8 @@ async def analyze(
             "Image extraction service failed before the HC assessment. Please retry once.",
         ) from exc
 
-    extracted = merge_extractions(extraction_results)
-    effective_plans = apply_extracted_corrections(extracted, plans)
-    return {
-        "extracted": extracted,
-        "effective_eye_plans": effective_plans,
-        "decision": hc_engine(extracted, age, effective_plans, modifiers, metadata),
-    }
+    from nice_policy import attach_readings
+    from assessment_workflow import begin
+    import sys
+    extracted = attach_readings(merge_extractions(extraction_results), extraction_results)
+    return begin(sys.modules[__name__], extracted, age, plans, modifiers, metadata)

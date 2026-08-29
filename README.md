@@ -77,7 +77,7 @@ Railway start command: `python start.py`.
 ## Test
 
 ```bash
-python -m unittest discover -s tests -v
+python -m pytest -q
 ```
 
 The test suite covers exact structural and treatment-range boundaries, signed manifest/intended input and axis requirements, phone-safe sign-only entry, fixed OD-before-OS reporting, prior-surgery routing, identity warnings, date/QS gates, invalid numeric inputs, fellow-eye completeness, ERSS/PRK-EWSS categories, extraction merging, runtime isolation, and valid PDF/DOCX generation.
@@ -99,3 +99,39 @@ local HTTPS `git push` credential. Use the connected GitHub application:
 5. Reload `https://hc-ectasia-app-production.up.railway.app/` and verify the live application.
 
 Never place GitHub passwords, tokens, API keys, or other credentials in this repository.
+
+## v0.7.50 — HC-adapted NICE and report readiness
+
+`canonical_engine.py` remains the single production composition root. Independent
+`nice_scoring.py` and `nice_policy.py` add a restrictive-only final NICE disposition;
+ERSS/BAD calculations and the isolated `clean_engine` are unchanged. NICE points are
+never added to ERSS. LASIK and PRK use total 4: no NICE escalation, 5–8: CAUTION /
+STOP-DEFER, >=9: HARD STOP. A stronger existing stop always wins.
+
+The report labels this as **HC-adapted NICE**, documents all four components and
+provenance, and cites DOI 10.2147/OPTH.S464217. The approved posterior bands are
+<=15.5 / >15.5 and <18 / >=18 µm, scoring 1/2/3 points (not zero). The automatic
+reader uses the highest printed positive value inside the visible dashed pupil
+on a standard 8-mm BFS Float posterior elevation map. It never substitutes a
+colour estimate, a whole-map maximum, BFTE, BAD difference or thinnest-point
+elevation. Central pachymetry is the labeled Pachy Vertex N. reading, not thinnest.
+The pupil-maximum method and 15.5 boundary are disclosed HC adaptations, not a
+claim that the original study independently validated this implementation.
+
+`assessment_workflow.py` gates reports using all canonical decision-critical missing
+inputs plus missing NICE components. `/analyze` returns NEEDS_INPUT (without a
+clinical decision) and eye-specific completion requests until ready. The browser
+retains manual entries; `/assessment/complete` resumes without another model call.
+Explicit surgeon corrections retain an audit trail and rerun input validation.
+Unreadable source identity/quality may require a clearer source, not a guessed value.
+
+PDF/Word exports require server-issued assessment and current ready-report tokens;
+client-supplied clinical decisions cannot bypass completeness. Tokens reference
+bounded in-memory sessions (64; one-hour idle expiry); server restart or eviction
+requires a new upload. Do not increase worker count without shared session storage.
+Form edits hide the previous report. No clinical model accuracy claim is inferred
+from unit tests; unreadable image values require surgeon confirmation.
+
+Deployment: publish all changed files in one GitHub tree/commit before moving main,
+so a partial multi-file update cannot deploy. Pre-release rollback base:
+`f9f45b8` (restore through a reviewed revert commit, never force-reset main).
