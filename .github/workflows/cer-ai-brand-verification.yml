@@ -1,0 +1,54 @@
+name: CER-AI brand verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-brand:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject legacy product branding
+        shell: python
+        run: |
+          from pathlib import Path
+
+          root = Path('.')
+          text_suffixes = {
+              '.py', '.html', '.js', '.css', '.md', '.txt', '.json',
+              '.yml', '.yaml', '.toml', '.ini', '.cfg', '.webmanifest',
+          }
+          # Construct legacy tokens without embedding the old brand literally,
+          # so this verifier can scan itself as well.
+          legacy_tokens = (
+              'CER' + 'AI',
+              'Cer' + 'ai',
+              'cer' + 'ai',
+          )
+          failures = []
+
+          for path in root.rglob('*'):
+              if '.git' in path.parts:
+                  continue
+              if any(token in path.name for token in legacy_tokens):
+                  failures.append(f'legacy path: {path}')
+              if not path.is_file():
+                  continue
+              if path.suffix.lower() not in text_suffixes and path.name != 'Dockerfile':
+                  continue
+              try:
+                  text = path.read_text(encoding='utf-8')
+              except UnicodeDecodeError:
+                  continue
+              for token in legacy_tokens:
+                  if token in text:
+                      failures.append(f'{path}: legacy product token')
+
+          if failures:
+              raise SystemExit('Legacy product branding found:\n' + '\n'.join(failures))
+          print('CER-AI branding verification passed.')
