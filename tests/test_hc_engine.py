@@ -1111,6 +1111,41 @@ class TestPwaIcons(unittest.TestCase):
         self.assertNotIn('/static/icons/icon-source.svg', html)
 
 
+class TestAuthorshipAndLiabilityFooter(unittest.TestCase):
+    NOTICE = (
+        "Dr Hüseyin Cengiz tarafından geliştirilmiştir. Tüm hakları saklıdır. "
+        "Nihai sorumluluk her zaman ve her şekilde cerraha aittir."
+    )
+
+    def _payload(self):
+        extracted = {"eyes": [normal_eye(), normal_eye("OS")], "global_warnings": []}
+        return {
+            "patient": {"name": "Footer Test", "age": 35},
+            "decision": app.hc_engine(extracted, 35, {"OD": plan(), "OS": plan()}, MODIFIERS),
+            "extracted": extracted,
+        }
+
+    def test_interface_and_print_report_contain_exact_notice(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertEqual(html.count(self.NOTICE), 2)
+        self.assertIn('class="app-legal-footer"', html)
+        self.assertIn('class="report-legal-footer"', html)
+        self.assertIn(".report-legal-footer{position:fixed", html)
+
+    def test_pdf_notice_is_present_on_every_page(self):
+        reader = PdfReader(BytesIO(reports.build_pdf(self._payload())))
+        self.assertGreaterEqual(len(reader.pages), 2)
+        for page in reader.pages:
+            self.assertIn(self.NOTICE, " ".join((page.extract_text() or "").split()))
+
+    def test_word_notice_is_in_every_section_footer(self):
+        document = Document(BytesIO(reports.build_docx(self._payload())))
+        self.assertTrue(document.sections)
+        for section in document.sections:
+            footer_text = " ".join(paragraph.text for paragraph in section.footer.paragraphs)
+            self.assertIn(self.NOTICE, footer_text)
+
+
 class TestSurgeonTopographyReference(unittest.TestCase):
     def test_randleman_confirmation_includes_source_locked_reference(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()

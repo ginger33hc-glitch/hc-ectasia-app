@@ -48,7 +48,16 @@ LIABILITY_NOTICE = (
     "The final surgical decision and all associated responsibility and liability rest with the surgeon. "
     "This application is a clinical decision-support aid only."
 )
+AUTHORSHIP_NOTICE = (
+    "Dr Hüseyin Cengiz tarafından geliştirilmiştir. Tüm hakları saklıdır. "
+    "Nihai sorumluluk her zaman ve her şekilde cerraha aittir."
+)
+PDF_UNICODE_REGULAR = "CERAI-Vera"
 PDF_UNICODE_BOLD = "CERAI-Vera-Bold"
+pdfmetrics.registerFont(TTFont(
+    PDF_UNICODE_REGULAR,
+    str(Path(reportlab.__file__).resolve().parent / "fonts" / "Vera.ttf"),
+))
 pdfmetrics.registerFont(TTFont(
     PDF_UNICODE_BOLD,
     str(Path(reportlab.__file__).resolve().parent / "fonts" / "VeraBd.ttf"),
@@ -292,7 +301,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=letter, rightMargin=0.65 * inch, leftMargin=0.65 * inch,
-        topMargin=0.72 * inch, bottomMargin=0.68 * inch,
+        topMargin=0.72 * inch, bottomMargin=0.82 * inch,
         title="CERAI Preoperative Ectasia Risk Assessment",
         author="CERAI",
     )
@@ -445,11 +454,13 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     def page_footer(canvas, pdf_doc):
         canvas.saveState()
         canvas.setStrokeColor(_rl(LINE))
-        canvas.line(0.65 * inch, 0.48 * inch, 7.85 * inch, 0.48 * inch)
-        canvas.setFont("Helvetica", 7)
+        canvas.line(0.65 * inch, 0.62 * inch, 7.85 * inch, 0.62 * inch)
         canvas.setFillColor(_rl(GRAY))
-        canvas.drawString(0.65 * inch, 0.32 * inch, "CERAI | Clinical decision-support report")
-        canvas.drawRightString(7.85 * inch, 0.32 * inch, f"Page {pdf_doc.page}")
+        canvas.setFont(PDF_UNICODE_REGULAR, 6.1)
+        canvas.drawCentredString(4.25 * inch, 0.43 * inch, AUTHORSHIP_NOTICE)
+        canvas.setFont("Helvetica", 6.5)
+        canvas.drawString(0.65 * inch, 0.23 * inch, "CERAI | Clinical decision-support report")
+        canvas.drawRightString(7.85 * inch, 0.23 * inch, f"Page {pdf_doc.page}")
         canvas.restoreState()
 
     doc.build(story, onFirstPage=page_footer, onLaterPages=page_footer)
@@ -560,13 +571,24 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
 
     footer = section.footer.paragraphs[0]
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer.add_run("CERAI | Clinical decision-support report | ")
-    fld = OxmlElement("w:fldSimple")
-    fld.set(qn("w:instr"), "PAGE")
-    footer._p.append(fld)
+    footer.paragraph_format.space_after = Pt(1)
+    footer.add_run(AUTHORSHIP_NOTICE)
     for run in footer.runs:
         run.font.name = "Arial"
-        run.font.size = Pt(7)
+        run.font.size = Pt(6.5)
+        run.font.color.rgb = RGBColor.from_string(GRAY)
+
+    footer_meta = section.footer.add_paragraph()
+    footer_meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    footer_meta.paragraph_format.space_before = Pt(0)
+    footer_meta.paragraph_format.space_after = Pt(0)
+    footer_meta.add_run("CERAI | Clinical decision-support report | ")
+    fld = OxmlElement("w:fldSimple")
+    fld.set(qn("w:instr"), "PAGE")
+    footer_meta._p.append(fld)
+    for run in footer_meta.runs:
+        run.font.name = "Arial"
+        run.font.size = Pt(6.5)
         run.font.color.rgb = RGBColor.from_string(GRAY)
 
     title = document.add_paragraph()
