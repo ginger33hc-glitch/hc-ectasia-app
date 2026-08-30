@@ -1,38 +1,96 @@
-name: CERAI brand verification
+name: CER-AI brand migration
 
 on:
   push:
-    branches: [main]
-  pull_request:
+    branches: [cer-ai-brand-migration]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  verify-brand:
+  migrate-brand:
+    if: ${{ github.event.head_commit.message != 'Apply CER-AI permanent brand migration' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Reject legacy or incorrect product branding
+        with:
+          fetch-depth: 0
+          ref: cer-ai-brand-migration
+      - name: Replace CERAI branding with CER-AI
         shell: python
         run: |
           from pathlib import Path
 
           root = Path('.')
-          workflow = Path('.github/workflows/cerai-brand-migration.yml')
           text_suffixes = {
               '.py', '.html', '.js', '.css', '.md', '.txt', '.json',
               '.yml', '.yaml', '.toml', '.ini', '.cfg', '.webmanifest',
           }
-          forbidden = (
-              'HC Ectasia App',
-              'HC Ectasia Assessment',
-              'Corneal Refractive Analysis Intelligence',
+          replacements = (
+              ('CERAI', 'CER-AI'),
+              ('Cerai', 'Cer-AI'),
+              ('cerai', 'cer-ai'),
           )
 
+          changed = []
+          for path in root.rglob('*'):
+              if not path.is_file() or '.git' in path.parts:
+                  continue
+              if path.suffix.lower() not in text_suffixes and path.name != 'Dockerfile':
+                  continue
+              try:
+                  original = path.read_text(encoding='utf-8')
+              except UnicodeDecodeError:
+                  continue
+              updated = original
+              for old, new in replacements:
+                  updated = updated.replace(old, new)
+              if updated != original:
+                  path.write_text(updated, encoding='utf-8')
+                  changed.append(str(path))
+
+          # Rename brand-bearing paths, deepest first. Binary asset contents are intentionally
+          # untouched here; only their filenames are migrated. The logo artwork will be replaced
+          # separately with the approved CER-AI artwork.
+          paths = sorted(
+              [p for p in root.rglob('*') if '.git' not in p.parts],
+              key=lambda p: len(p.parts),
+              reverse=True,
+          )
+          renamed = []
+          for path in paths:
+              new_name = path.name
+              for old, new in replacements:
+                  new_name = new_name.replace(old, new)
+              if new_name == path.name:
+                  continue
+              target = path.with_name(new_name)
+              if target.exists():
+                  raise SystemExit(f'Cannot rename {path} -> {target}: target exists')
+              path.rename(target)
+              renamed.append(f'{path} -> {target}')
+
+          print('Updated text files:')
+          print('\n'.join(changed) if changed else '(none)')
+          print('Renamed paths:')
+          print('\n'.join(renamed) if renamed else '(none)')
+      - name: Verify migration
+        shell: python
+        run: |
+          from pathlib import Path
+
+          root = Path('.')
+          text_suffixes = {
+              '.py', '.html', '.js', '.css', '.md', '.txt', '.json',
+              '.yml', '.yaml', '.toml', '.ini', '.cfg', '.webmanifest',
+          }
           failures = []
           for path in root.rglob('*'):
-              if not path.is_file() or '.git' in path.parts or path == workflow:
+              if '.git' in path.parts:
+                  continue
+              if any(token in path.name for token in ('CERAI', 'Cerai', 'cerai')):
+                  failures.append(f'legacy path: {path}')
+              if not path.is_file():
                   continue
               if path.suffix.lower() not in text_suffixes and path.name != 'Dockerfile':
                   continue
@@ -40,10 +98,20 @@ jobs:
                   text = path.read_text(encoding='utf-8')
               except UnicodeDecodeError:
                   continue
-              for phrase in forbidden:
-                  if phrase in text:
-                      failures.append(f'{path}: {phrase}')
-
+              for token in ('CERAI', 'Cerai', 'cerai'):
+                  if token in text:
+                      failures.append(f'{path}: {token}')
           if failures:
-              raise SystemExit('Legacy or incorrect branding found:\n' + '\n'.join(failures))
-          print('CERAI branding verification passed.')
+              raise SystemExit('Legacy CERAI branding remains:\n' + '\n'.join(failures))
+          print('CER-AI textual/path migration verified.')
+      - name: Commit migration
+        run: |
+          if git diff --quiet && git diff --cached --quiet; then
+            echo 'No CERAI branding remained to migrate.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Apply CER-AI permanent brand migration'
+          git push origin HEAD:cer-ai-brand-migration
