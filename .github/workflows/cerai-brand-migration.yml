@@ -3,6 +3,8 @@ name: CER-AI brand migration
 on:
   push:
     branches: [cer-ai-brand-migration]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
