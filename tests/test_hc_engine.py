@@ -1098,15 +1098,15 @@ class TestPwaIcons(unittest.TestCase):
         static_dir = Path(__file__).resolve().parents[1] / "static"
         manifest = json.loads((static_dir / "manifest.webmanifest").read_text())
         self.assertEqual({icon["src"] for icon in manifest["icons"]}, {
-            "/static/icons/icon-192.png?v=7",
-            "/static/icons/icon-512.png?v=7",
-            "/static/icons/icon-maskable-512.png?v=7",
+            "/static/icons/icon-192.png?v=8",
+            "/static/icons/icon-512.png?v=8",
+            "/static/icons/icon-maskable-512.png?v=8",
         })
         html = (static_dir / "index.html").read_text()
-        self.assertIn('/static/manifest.webmanifest?v=7', html)
-        self.assertIn('/static/icons/favicon-32.png?v=7', html)
-        self.assertIn('/static/icons/apple-touch-icon.png?v=7', html)
-        self.assertIn('/static/branding/cerai-logo-final.png?v=2', html)
+        self.assertIn('/static/manifest.webmanifest?v=8', html)
+        self.assertIn('/static/icons/favicon-32.png?v=8', html)
+        self.assertIn('/static/icons/apple-touch-icon.png?v=8', html)
+        self.assertIn('/static/branding/cerai-logo-final.png?v=3', html)
         self.assertIn('alt="CERAI — Corneal Ectasia Risk Analysis Intelligence"', html)
         self.assertNotIn('/static/icons/icon-source.svg', html)
 
