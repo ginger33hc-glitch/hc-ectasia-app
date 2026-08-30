@@ -34,9 +34,12 @@ jobs:
               ('cerai', 'cer-ai'),
           )
 
+          def is_workflow(path: Path) -> bool:
+              return len(path.parts) >= 3 and path.parts[0] == '.github' and path.parts[1] == 'workflows'
+
           changed = []
           for path in root.rglob('*'):
-              if not path.is_file() or '.git' in path.parts:
+              if not path.is_file() or '.git' in path.parts or is_workflow(path):
                   continue
               if path.suffix.lower() not in text_suffixes and path.name != 'Dockerfile':
                   continue
@@ -51,11 +54,11 @@ jobs:
                   path.write_text(updated, encoding='utf-8')
                   changed.append(str(path))
 
-          # Rename brand-bearing paths, deepest first. Binary asset contents are intentionally
-          # untouched here; only their filenames are migrated. The logo artwork will be replaced
-          # separately with the approved CER-AI artwork.
+          # Rename brand-bearing paths, deepest first. Workflow files are handled separately
+          # because GITHUB_TOKEN cannot update workflow definitions without workflows permission.
+          # Binary asset contents are intentionally untouched here; only filenames are migrated.
           paths = sorted(
-              [p for p in root.rglob('*') if '.git' not in p.parts],
+              [p for p in root.rglob('*') if '.git' not in p.parts and not is_workflow(p)],
               key=lambda p: len(p.parts),
               reverse=True,
           )
@@ -76,7 +79,7 @@ jobs:
           print('\n'.join(changed) if changed else '(none)')
           print('Renamed paths:')
           print('\n'.join(renamed) if renamed else '(none)')
-      - name: Verify migration
+      - name: Verify migration outside workflow definitions
         shell: python
         run: |
           from pathlib import Path
@@ -86,9 +89,12 @@ jobs:
               '.py', '.html', '.js', '.css', '.md', '.txt', '.json',
               '.yml', '.yaml', '.toml', '.ini', '.cfg', '.webmanifest',
           }
+          def is_workflow(path: Path) -> bool:
+              return len(path.parts) >= 3 and path.parts[0] == '.github' and path.parts[1] == 'workflows'
+
           failures = []
           for path in root.rglob('*'):
-              if '.git' in path.parts:
+              if '.git' in path.parts or is_workflow(path):
                   continue
               if any(token in path.name for token in ('CERAI', 'Cerai', 'cerai')):
                   failures.append(f'legacy path: {path}')
@@ -104,12 +110,12 @@ jobs:
                   if token in text:
                       failures.append(f'{path}: {token}')
           if failures:
-              raise SystemExit('Legacy CERAI branding remains:\n' + '\n'.join(failures))
-          print('CER-AI textual/path migration verified.')
+              raise SystemExit('Legacy CERAI branding remains outside workflows:\n' + '\n'.join(failures))
+          print('CER-AI textual/path migration verified outside workflows.')
       - name: Commit migration
         run: |
           if git diff --quiet && git diff --cached --quiet; then
-            echo 'No CERAI branding remained to migrate.'
+            echo 'No CERAI branding remained to migrate outside workflows.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
