@@ -1,7 +1,7 @@
-"""HC LASIK automatic planning fallback.
+"""CERAI LASIK automatic planning fallback.
 
 Plan A (default): flap 100 µm, optical zone 6.5 mm, transition zone 9.0 mm.
-If Plan A fails OR LASIK PTA is >=40%, and there is no independent HC hard-stop, re-evaluate with
+If Plan A fails OR LASIK PTA is >=40%, and there is no independent CERAI hard-stop, re-evaluate with
 Plan B: flap 100 µm, optical zone 6.0 mm, transition zone 8.5 mm.
 If Plan B also fails or has PTA >=40%, re-evaluate with Plan C: flap 90 µm, optical zone
 6.0 mm, transition zone 8.5 mm. If Plan C PTA remains >=40%, the final disposition is
@@ -98,7 +98,7 @@ def install(core: Any) -> None:
             final_result["status"] = "DO NOT PROCEED"
             final_result["action"] = "DO NOT PROCEED with elective corneal refractive surgery."
             hard_stops = list(final_result.get("hard_stops") or [])
-            hard_stops.append("HC operational LASIK PTA hard stop: PTA >=40.0%.")
+            hard_stops.append("CERAI operational LASIK PTA hard stop: PTA >=40.0%.")
             final_result["hard_stops"] = list(dict.fromkeys(hard_stops))
             reasons = list(final_result.get("reasons") or [])
             reasons.append("LASIK PTA is >=40.0%; tissue-load cutoff reached. If this persists through Plan C, operation is cancelled.")
@@ -116,7 +116,7 @@ def install(core: Any) -> None:
         values.update({"LASIK_selected_plan": sequence[-1]["plan"], "LASIK_flap_um": sequence[-1]["flap_um"], "optical_zone_mm": sequence[-1]["optical_zone_mm"], "transition_zone_mm": sequence[-1]["transition_zone_mm"]})
         final_result["values"] = values
         warnings = list(final_result.get("warnings") or [])
-        if len(sequence) > 1: warnings.append("Automatic LASIK fallback planning was activated because the preceding plan failed or reached the HC PTA cutoff (>=40.0%). A fallback result does not erase the earlier configuration.")
+        if len(sequence) > 1: warnings.append("Automatic LASIK fallback planning was activated because the preceding plan failed or reached the CERAI PTA cutoff (>=40.0%). A fallback result does not erase the earlier configuration.")
         final_result["warnings"] = list(dict.fromkeys(warnings))
         return final_result
 

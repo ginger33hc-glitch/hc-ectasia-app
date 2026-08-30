@@ -1,6 +1,6 @@
-# HC Ectasia App
+# CERAI
 
-FastAPI application for source-restricted preoperative ectasia risk assessment using the **HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
+FastAPI application for source-restricted preoperative ectasia risk assessment using the **CERAI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
 ## What v0.7.49 implements
 
@@ -18,27 +18,27 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
   for thinnest pachymetry or anterior/posterior elevation at the marked thinnest point. Local spots
   cannot substitute for K, BAD, progression, ARTmax, topometric, volume, or HOA/coma summary values;
   categorical visual inference is reserved for morphology, bow-tie/SRAX, and map patterns.
-- Installable Android PWA with a Web Share Target: one or multiple images shared from Samsung Gallery can open the HC Ectasia App and populate its image intake.
+- Installable Android PWA with a Web Share Target: one or multiple images shared from Samsung Gallery can open CERAI and populate its image intake.
 - Excimer Laser Takip Kartı reading limited to the eye-specific `Düzeltme Miktarı` row; confident minus-cylinder values can fill otherwise empty sphere/cylinder/axis fields, while manual input wins and uncertain/conflicting readings remain warnings.
 - Independent OD and OS assessment; eye values are never averaged, and a missing fellow-eye assessment prohibits overall PASS.
 - Source identity review reads Pentacam patient names only from the labeled `First Name` and `Last Name` demographics fields and records the source filename. An unreadable or unverified name produces a prominent surgeon-confirmation warning without suppressing the eye analyses; acquisition-date conflicts and unclassified/unusable uploads remain clinical/source blockers.
 - Pentacam clearance requires a same-exam explicit `QS: OK`; a visible non-OK QS cannot be masked by another page.
 - Age is read from the explicitly printed Pentacam age; a conflicting manually entered age remains a blocker. Date of birth is not collected.
-- Preoperative manifest refraction is separated from intended treatment correction. LASIK ERSS MRSE uses only the former; ablation and HC treatment-range gates use only the latter.
+- Preoperative manifest refraction is separated from intended treatment correction. LASIK ERSS MRSE uses only the former; ablation and CERAI treatment-range gates use only the latter.
 - Prior PRK/LASIK/SMILE short-circuits virgin-cornea scoring and routes to `POST-REFRACTIVE PATHWAY REQUIRED`.
 - Published five-component LASIK ERSS scoring and categories.
 - PRK-EWSS v1.0 provisional morphology/pachymetry/age triage score, explicitly labeled as unvalidated.
 - Morphology-first override gate for definite KC/FFKC/PMD or unequivocal ectatic morphology.
 - Published ERSS Placido thresholds are enforced for SRAX/inferior steepening: SRAX requires `≥20°`; the alternative category requires `≥1.0 D` inferior-versus-opposite steepening with `I-S <1.4 D`. Minimal axis deviation is not scored as SRAX, and unsupported visual labels remain unscorable rather than being guessed.
-- HC operational hard stops: preoperative thinnest pachymetry `<480 µm`, LASIK RSB `<300 µm`, PRK RST `<310 µm`, intended sphere `<−10.00 D`, and intended sphere `>+6.00 D`. Exact boundaries do not trigger those rules.
-- HC-modified LASIK pachymetry scoring: `480–499 µm` = +2, `500–509 µm` = +1, and `>=510 µm` = +0.
-- Standard HC PRK calculation: `RST = pachymetry - 50 µm epithelium - maximum stromal ablation`.
-- Zone-specific HC ablation estimates for explicitly documented Alcon EX500 plans: `12 µm/D` at 6.0 mm, `15 µm/D` at 6.5 mm, and `16.33 µm/D` at 7.0 mm; the actual treatment-plan maximum remains preferred.
+- CERAI operational hard stops: preoperative thinnest pachymetry `<480 µm`, LASIK RSB `<300 µm`, PRK RST `<310 µm`, intended sphere `<−10.00 D`, and intended sphere `>+6.00 D`. Exact boundaries do not trigger those rules.
+- CERAI-modified LASIK pachymetry scoring: `480–499 µm` = +2, `500–509 µm` = +1, and `>=510 µm` = +0.
+- Standard CERAI PRK calculation: `RST = pachymetry - 50 µm epithelium - maximum stromal ablation`.
+- Zone-specific CERAI ablation estimates for explicitly documented Alcon EX500 plans: `12 µm/D` at 6.0 mm, `15 µm/D` at 6.5 mm, and `16.33 µm/D` at 7.0 mm; the actual treatment-plan maximum remains preferred.
 - Optical-zone selection is limited to `6.0`, `6.5`, or `7.0 mm`; transition-zone selection is limited to `8.0`, `8.5`, or `9.0 mm`.
 - The visible laser-platform field is fixed and read-only as `Alcon EX500` for both eyes; the optical zone remains an explicit eye-specific input.
 - Planned LASIK flap thickness is selected per eye from `90`, `100`, `110`, or `120 µm`; PRK plans leave the flap selection blank.
 - Refraction stability, documented progression, unexplained CDVA loss, and anticipated enhancement remain separate eye-specific values inside one compact clinical-eligibility dropdown box.
-- PRK epithelial thickness is shown per eye as a fixed, read-only `50 µm` HC value and is used in the PRK RST/PTA calculations.
+- PRK epithelial thickness is shown per eye as a fixed, read-only `50 µm` CERAI value and is used in the PRK RST/PTA calculations.
 - Procedure-correct PTA formulas for LASIK and PRK.
 - BAD-D/component display interpretation plus adjunctive ARTmax/TP/Dt/Da evidence flags.
 - Positive tomography concern flags require review and cannot receive automatic PASS.
@@ -57,12 +57,12 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Complete machine-readable extraction and decision records remain available for audit.
 - A status-independent post-assessment ML7 planning module runs only after favorable LASIK results
   (`PASS` or `PASS WITH CAUTION`). It extracts labeled K1/K2 axes and corneal diameter/W2W when
-  available, applies the active Turkish ML7 vacuum-ring/blade reference, and applies the HC
+  available, applies the active Turkish ML7 vacuum-ring/blade reference, and applies the CERAI
   `steep K − flat K >4.00 D` hinge rule. The perpendicular-to-steep-axis hinge is primary; a
   `+10` temporal/nasal alternative is shown only as an anatomy-dependent contingency when projected
   RSB remains `>=300 µm` and projected PTA remains `<40%`. The module cannot change the ectasia status.
 
-See [HC_PROTOCOL_v0.7.md](HC_PROTOCOL_v0.7.md) for the locked operational rules and
+See [CERAI_PROTOCOL_v0.7.md](CERAI_PROTOCOL_v0.7.md) for the locked operational rules and
 [PROTOCOL_COMPLIANCE.md](PROTOCOL_COMPLIANCE.md) for the source-to-code audit and evidence limitations.
 
 ## Run
@@ -100,7 +100,7 @@ local HTTPS `git push` credential. Use the connected GitHub application:
 
 Never place GitHub passwords, tokens, API keys, or other credentials in this repository.
 
-## v0.7.50 — HC-adapted NICE and report readiness
+## v0.7.50 — CERAI-adapted NICE and report readiness
 
 `canonical_engine.py` remains the single production composition root. Independent
 `nice_scoring.py` and `nice_policy.py` add a restrictive-only final NICE disposition;
@@ -108,14 +108,14 @@ ERSS/BAD calculations and the isolated `clean_engine` are unchanged. NICE points
 never added to ERSS. LASIK and PRK use total 4: no NICE escalation, 5–8: CAUTION /
 STOP-DEFER, >=9: HARD STOP. A stronger existing stop always wins.
 
-The report labels this as **HC-adapted NICE**, documents all four components and
+The report labels this as **CERAI-adapted NICE**, documents all four components and
 provenance, and cites DOI 10.2147/OPTH.S464217. The approved posterior bands are
 <=15.5 / >15.5 and <18 / >=18 µm, scoring 1/2/3 points (not zero). The automatic
 reader uses the highest printed positive value inside the visible dashed pupil
 on a standard 8-mm BFS Float posterior elevation map. It never substitutes a
 colour estimate, a whole-map maximum, BFTE, BAD difference or thinnest-point
 elevation. Central pachymetry is the labeled Pachy Vertex N. reading, not thinnest.
-The pupil-maximum method and 15.5 boundary are disclosed HC adaptations, not a
+The pupil-maximum method and 15.5 boundary are disclosed CERAI adaptations, not a
 claim that the original study independently validated this implementation.
 
 `assessment_workflow.py` gates reports using all canonical decision-critical missing

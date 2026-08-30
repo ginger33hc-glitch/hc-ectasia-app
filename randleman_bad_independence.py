@@ -66,7 +66,7 @@ def assess_eye_with_bad_independent_randleman(eye, plan, age, patient_modifiers)
     erss = _independent_lasik_erss(eye, plan, age, result)
     result["randleman_erss"] = erss
 
-    # Publish ERSS whenever its own five inputs exist, even if the separate HC
+    # Publish ERSS whenever its own five inputs exist, even if the separate CERAI
     # tomography pathway is incomplete because BAD data are absent.
     if erss["total"] is not None:
         score = dict(result.get("score") or {})
@@ -93,7 +93,7 @@ def assess_eye_with_bad_independent_randleman(eye, plan, age, patient_modifiers)
 
     warnings = list(result.get("warnings") or [])
     warnings.append(
-        "RANDLEMAN/BAD SEPARATION: Randleman ERSS is calculated only from anterior topography, RSB, age, preoperative corneal thickness, and manifest MRSE. BAD-D/Belin-Ambrosio data are a separate HC tomography pathway and are never required to calculate the Randleman score."
+        "RANDLEMAN/BAD SEPARATION: Randleman ERSS is calculated only from anterior topography, RSB, age, preoperative corneal thickness, and manifest MRSE. BAD-D/Belin-Ambrosio data are a separate CERAI tomography pathway and are never required to calculate the Randleman score."
     )
     if tomography_missing and erss["total"] is not None:
         warnings.append(

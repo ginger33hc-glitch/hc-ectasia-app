@@ -124,13 +124,13 @@ def install(core):
                 result.setdefault("missing", []).extend(f"NICE: {field}" for field in nice["missing"])
                 result["status"] = core.combine_status(result["status"], "DATA INSUFFICIENT")
             elif nice["total"] >= 9:
-                reason = f"HC NICE hard stop: total {nice['total']} >=9 (LASIK and PRK)."
+                reason = f"CERAI NICE hard stop: total {nice['total']} >=9 (LASIK and PRK)."
                 result.setdefault("hard_stops", []).append(reason)
                 result.setdefault("reasons", []).append(reason)
                 result["status"] = core.combine_status(result["status"], "DO NOT PROCEED")
                 result["action"] = "DO NOT PROCEED with corneal refractive surgery. NICE >=9."
             elif nice["total"] >= 5:
-                result.setdefault("reasons", []).append(f"HC NICE caution: total {nice['total']} is in 5-8 inclusive.")
+                result.setdefault("reasons", []).append(f"CERAI NICE caution: total {nice['total']} is in 5-8 inclusive.")
                 old_status = result["status"]
                 result["status"] = core.combine_status(old_status, "CAUTION — STOP/DEFER")
                 if result["status"] != old_status or old_status.startswith("CAUTION"):
@@ -139,7 +139,7 @@ def install(core):
             if result["status"] not in {"PASS", "PASS WITH CAUTION"}:
                 result.pop("microkeratome_planning", None)
             decision["status"] = core.combine_status(decision["status"], result["status"])
-        decision["version"] = f"software v{core.APP_VERSION} / HC NICE and data-readiness policy"
+        decision["version"] = f"software v{core.APP_VERSION} / CERAI NICE and data-readiness policy"
         return decision
 
     core.hc_engine = hc_engine_with_nice

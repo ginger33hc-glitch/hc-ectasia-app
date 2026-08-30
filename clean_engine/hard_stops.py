@@ -24,7 +24,7 @@ class HardStopInput:
 
 
 def evaluate_hard_stops(inp: HardStopInput) -> Tuple[str, ...]:
-    """Return deterministic HC hard-stop markers in stable report order."""
+    """Return deterministic CERAI hard-stop markers in stable report order."""
     stops = []
     procedure = (inp.procedure or "").upper()
 

@@ -1,7 +1,7 @@
-"""HC protocol modification: age scoring for ectasia risk assessment.
+"""CERAI protocol modification: age scoring for ectasia risk assessment.
 
 This intentionally overrides the source-study age bands in the runtime engine.
-HC age bands:
+CERAI age bands:
 - age 18: 3 points
 - age 19-20: 2 points
 - age >=21: 0 points
@@ -34,7 +34,7 @@ if _original_score_audit:
     def _hc_score_audit(result):
         audit = _original_score_audit(result)
         if audit and (result.get("values") or {}).get("procedure") in ("LASIK", "PRK"):
-            audit["source"] = audit.get("source", "") + "; HC-modified age bands"
+            audit["source"] = audit.get("source", "") + "; CERAI-modified age bands"
         return audit
     bootstrap._score_audit = _hc_score_audit
 

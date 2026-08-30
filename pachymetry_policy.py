@@ -1,17 +1,17 @@
-"""HC pachymetry policy patch.
+"""CERAI pachymetry policy patch.
 
-HC policy:
+CERAI policy:
 - thinnest pachymetry <480 µm: hard stop (no pachymetry score used for clearance)
 - 480-499 µm: 2 points
 - 500-509 µm: 1 point
 - >=510 µm: 0 points
 
-Evidence note: this is an HC-modified pachymetry component, not the original published
+Evidence note: this is an CERAI-modified pachymetry component, not the original published
 Randleman ERSS pachymetry table. The published ERSS grouped 481-510 µm together at +2.
-The HC modification deliberately introduces 500 µm as a clinical transition because the
+The CERAI modification deliberately introduces 500 µm as a clinical transition because the
 refractive-surgery literature commonly discusses <500 µm as a thin-cornea risk phenotype,
 while also recognizing that pachymetry alone has no validated binary safe/unsafe cutoff.
-Exactly 480 µm remains scoreable because the independent HC hard stop applies only below 480 µm.
+Exactly 480 µm remains scoreable because the independent CERAI hard stop applies only below 480 µm.
 """
 import critical_score_highlight as runtime
 import bootstrap
@@ -32,7 +32,7 @@ def hc_lasik_pachy_points(pachy):
     return 0
 
 
-# assess_eye resolves this module global at runtime, so the HC scoring function
+# assess_eye resolves this module global at runtime, so the CERAI scoring function
 # replaces only the LASIK pachymetry component while preserving the other ERSS components.
 core.lasik_pachy_points = hc_lasik_pachy_points
 
@@ -44,7 +44,7 @@ def assess_eye_with_hc_pachymetry(eye, plan, age, patient_modifiers):
     working_eye = eye
 
     # The legacy engine has an explicit unresolved-boundary branch at exactly 510 µm.
-    # Move only the internal compatibility value just above that boundary; the HC scorer
+    # Move only the internal compatibility value just above that boundary; the CERAI scorer
     # therefore assigns 0 points and the clinically reported pachymetry is restored to 510.
     if core.is_number(original_pachy) and float(original_pachy) == 510.0:
         working_eye = dict(eye)
@@ -62,7 +62,7 @@ def assess_eye_with_hc_pachymetry(eye, plan, age, patient_modifiers):
         result.setdefault("values", {})["pachy_thinnest_um"] = original_pachy
 
         if value < 480:
-            stop = "HC operational hard stop: thinnest preoperative cornea <480 µm."
+            stop = "CERAI operational hard stop: thinnest preoperative cornea <480 µm."
             hard_stops = list(result.get("hard_stops") or [])
             hard_stops = [x for x in hard_stops if "thinnest preoperative cornea <480" not in str(x)]
             if stop not in hard_stops:
@@ -84,9 +84,9 @@ def assess_eye_with_hc_pachymetry(eye, plan, age, patient_modifiers):
             result["score"] = score
             warnings = list(result.get("warnings") or [])
             warnings.append(
-                "HC-MODIFIED LASIK PACHYMETRY POLICY: <480 µm = hard stop; "
+                "CERAI-MODIFIED LASIK PACHYMETRY POLICY: <480 µm = hard stop; "
                 "480-499 µm = +2; 500-509 µm = +1; >=510 µm = +0. "
-                "This HC banding is not the original published Randleman pachymetry table."
+                "This CERAI banding is not the original published Randleman pachymetry table."
             )
             result["warnings"] = list(dict.fromkeys(warnings))
 

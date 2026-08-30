@@ -1,6 +1,6 @@
-"""Behavior-lock tests for the canonical HC production contract.
+"""Behavior-lock tests for the canonical CERAI production contract.
 
-These tests characterize decision-critical HC behavior. Refactoring must preserve these
+These tests characterize decision-critical CERAI behavior. Refactoring must preserve these
 outputs unless a clinical policy change is explicitly approved.
 """
 import hashlib

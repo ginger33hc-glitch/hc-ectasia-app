@@ -129,7 +129,7 @@ MODIFIERS = {
 
 
 def document_context(
-    patient_id="HC-1", patient_age_years=26, exam_date="2026-08-25", qs="OK",
+    patient_id="CERAI-1", patient_age_years=26, exam_date="2026-08-25", qs="OK",
     patient_name="Test Patient", laterality="BOTH",
 ):
     name_parts = str(patient_name or "").split(maxsplit=1)
@@ -994,7 +994,7 @@ class TestApiIntegration(unittest.TestCase):
         decision = app.hc_engine(extracted, 35, {"OD": plan()}, MODIFIERS)
         payload = {
             "patient": {
-                "name": "Test Patient", "id": "HC-001", "age": 35,
+                "name": "Test Patient", "id": "CERAI-001", "age": 35,
                 "reviewer": "Test Reviewer", "report_date": "2026-08-25",
             },
             "decision": decision,
@@ -1028,7 +1028,7 @@ class TestApiIntegration(unittest.TestCase):
             "\n".join(paragraph.text for paragraph in document.paragraphs),
         )
         text = "\n".join(paragraph.text for paragraph in document.paragraphs)
-        self.assertIn("HC PREOPERATIVE ECTASIA RISK ASSESSMENT", text)
+        self.assertIn("CERAI PREOPERATIVE ECTASIA RISK ASSESSMENT", text)
         self.assertIn("PASS", text)
         patient_paragraph = next(p for p in document.paragraphs if p.text == "TEST PATIENT")
         self.assertTrue(patient_paragraph.runs[0].bold)

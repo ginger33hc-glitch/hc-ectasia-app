@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="HC Ectasia App v0.7.50")
+app = FastAPI(title="CERAI v0.7.50")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -457,11 +457,11 @@ def validate_plan(plan: Dict[str, Any]) -> List[str]:
         if value is not None and (not is_number(value) or not low <= float(value) <= high):
             errors.append(f"invalid {field}: expected {low} to {high}")
     if plan.get("flap_um") is not None and plan.get("flap_um") not in (90, 100, 110, 120):
-        errors.append("invalid flap_um: HC options are 90, 100, 110, or 120 µm")
+        errors.append("invalid flap_um: CERAI options are 90, 100, 110, or 120 µm")
     if plan.get("optical_zone_mm") is not None and plan.get("optical_zone_mm") not in (6.0, 6.5, 7.0):
-        errors.append("invalid optical_zone_mm: HC options are 6.0, 6.5, or 7.0 mm")
+        errors.append("invalid optical_zone_mm: CERAI options are 6.0, 6.5, or 7.0 mm")
     if plan.get("transition_zone_mm") is not None and plan.get("transition_zone_mm") not in (8.0, 8.5, 9.0):
-        errors.append("invalid transition_zone_mm: HC options are 8.0, 8.5, or 9.0 mm")
+        errors.append("invalid transition_zone_mm: CERAI options are 8.0, 8.5, or 9.0 mm")
     return errors
 
 
@@ -692,20 +692,20 @@ def estimate_ablation(plan: Dict[str, Any], warnings: List[str]) -> Optional[flo
     ablation_rate = {6.0: 12.0, 6.5: 15.0, 7.0: 16.33}.get(optical_zone) if is_ex500 else None
     if is_number(sphere) and sphere > 0:
         warnings.append(
-            "The HC linear EX500 ablation estimate is not applied to a hyperopic or mixed-meridian plan; "
+            "The CERAI linear EX500 ablation estimate is not applied to a hyperopic or mixed-meridian plan; "
             "enter the actual laser-plan maximum ablation."
         )
         return None
     if is_number(sphere) and is_number(cylinder) and ablation_rate is not None:
         warnings.append(
-            f"Maximum ablation estimated with the HC Alcon EX500, {optical_zone:.1f}-mm-zone, "
+            f"Maximum ablation estimated with the CERAI Alcon EX500, {optical_zone:.1f}-mm-zone, "
             f"{ablation_rate:g} µm/D convention; "
             "actual laser-plan maximum is preferred."
         )
         return (abs(float(sphere)) + abs(float(cylinder))) * ablation_rate
     if is_number(sphere) and is_number(cylinder):
         warnings.append(
-            "The HC ablation estimate was not applied because an Alcon EX500 with a 6.0-mm, "
+            "The CERAI ablation estimate was not applied because an Alcon EX500 with a 6.0-mm, "
             "6.5-mm, or 7.0-mm optical zone was not explicitly documented."
         )
     return None
@@ -916,7 +916,7 @@ def assess_eye(
         missing.append("preoperative Kmean for final keratometry safety calculation")
     ablation = estimate_ablation(plan, warnings)
     if ablation is None:
-        missing.append("maximum stromal ablation depth or inputs for HC estimate")
+        missing.append("maximum stromal ablation depth or inputs for CERAI estimate")
 
     flap = plan.get("flap_um")
     if procedure == "LASIK" and not is_number(flap):
@@ -984,7 +984,7 @@ def assess_eye(
         surgeon_attention.extend([
             "Confirm manifest-versus-cycloplegic refraction and exclude clinically significant latent hyperopia before finalizing the treatment target.",
             "Confirm refractive stability over at least one year; an apparent change caused by unmasking latent hyperopia must not be treated as stability.",
-            "Review the actual laser treatment plan and maximum stromal ablation; the HC myopic linear µm/D estimate is not valid for this annular/bitoric profile.",
+            "Review the actual laser treatment plan and maximum stromal ablation; the CERAI myopic linear µm/D estimate is not valid for this annular/bitoric profile.",
             "Review full-diameter anterior and posterior tomography, inferior peripheral pachymetry, and PMD/inferior-steepening morphology; a positive refraction does not exclude ectasia susceptibility.",
             "Review optical and transition zones, centration strategy, and the residual stromal calculation against the actual planned ablation profile.",
         ])
@@ -1009,24 +1009,24 @@ def assess_eye(
         )
 
     if pachy is not None and pachy < 480:
-        hard_stops.append("HC operational hard stop: thinnest preoperative cornea <480 µm.")
+        hard_stops.append("CERAI operational hard stop: thinnest preoperative cornea <480 µm.")
     if procedure == "PRK" and rst is not None and rst < 310:
-        hard_stops.append("HC operational PRK RST hard stop: RST <310 µm.")
+        hard_stops.append("CERAI operational PRK RST hard stop: RST <310 µm.")
     if procedure == "LASIK" and rsb is not None and rsb < 300:
-        hard_stops.append("HC operational LASIK RSB hard stop: RSB <300 µm.")
+        hard_stops.append("CERAI operational LASIK RSB hard stop: RSB <300 µm.")
     if visible_morphology == "ABNORMAL_ECTATIC":
         hard_stops.append("Definite KC/FFKC/PMD or unequivocal ectatic morphology override.")
     if is_number(intended_sphere) and intended_sphere < -10.0:
-        hard_stops.append("HC operational treatment-range hard stop: intended sphere <−10.00 D.")
+        hard_stops.append("CERAI operational treatment-range hard stop: intended sphere <−10.00 D.")
     if is_number(intended_sphere) and intended_sphere > 6.0:
-        hard_stops.append("HC operational treatment-range hard stop: intended sphere >+6.00 D.")
+        hard_stops.append("CERAI operational treatment-range hard stop: intended sphere >+6.00 D.")
     if estimated_final_kmean is not None and estimated_final_kmean < FINAL_KMEAN_MIN_D - 1e-9:
         hard_stops.append(
-            "HC operational final-keratometry hard stop: estimated postoperative Kmean <36.00 D."
+            "CERAI operational final-keratometry hard stop: estimated postoperative Kmean <36.00 D."
         )
     if estimated_final_kmean is not None and estimated_final_kmean > FINAL_KMEAN_MAX_D + 1e-9:
         hard_stops.append(
-            "HC operational final-keratometry hard stop: estimated postoperative Kmean >48.00 D."
+            "CERAI operational final-keratometry hard stop: estimated postoperative Kmean >48.00 D."
         )
 
     if hard_stops:
@@ -1173,7 +1173,7 @@ def assess_eye(
             if status == "DO NOT PROCEED"
             else "No surgical clearance; resolve the stated review/data requirement."
             if status != "PASS"
-            else "HC assessment PASS; this is not a guarantee of zero ectasia risk."
+            else "CERAI assessment PASS; this is not a guarantee of zero ectasia risk."
         ),
         "reasons": list(dict.fromkeys(reasons)),
         "hard_stops": hard_stops,
@@ -1248,10 +1248,10 @@ def assess_eye(
         "evidence_boundaries": {
             "HC_policy": [
                 "CCT <480 µm is a hard stop; exactly 480 µm is not stopped by that rule alone.",
-                "LASIK RSB <300 µm and PRK RST <310 µm are HC operational hard stops.",
-                "PRK epithelial thickness is standardized to 50 µm for HC calculations.",
+                "LASIK RSB <300 µm and PRK RST <310 µm are CERAI operational hard stops.",
+                "PRK epithelial thickness is standardized to 50 µm for CERAI calculations.",
                 "For non-mixed plans, estimated postoperative Kmean = preoperative Kmean + "
-                "(0.8 × intended MRSE); values <36.00 D or >48.00 D are HC operational hard stops.",
+                "(0.8 × intended MRSE); values <36.00 D or >48.00 D are CERAI operational hard stops.",
             ],
             "literature_limit": (
                 "The supplied evidence does not validate 310 µm as a universal safe PRK cutoff; "
@@ -1461,8 +1461,8 @@ def hc_engine(
         "identity_warnings": identity_warnings,
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
-        "protocol": "HC Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.50 / source set 2026-08-25 plus binding HC amendments",
+        "protocol": "CERAI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
+        "version": "software v0.7.50 / source set 2026-08-25 plus binding CERAI amendments",
     }
 
 
@@ -1491,7 +1491,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         "K1_D": 0.25, "K2_D": 0.25, "Kmax_D": 0.25,
         "K1_axis_deg": 2.0, "K2_axis_deg": 2.0, "corneal_diameter_mm": 0.10,
     }
-    # Descriptive values that do not drive an HC decision must never become unresolved conflicts
+    # Descriptive values that do not drive a CERAI decision must never become unresolved conflicts
     # that prohibit PASS. Across overlapping Pentacam screens, preserve source priority
     # (labeled table over permitted map fallback); at equal priority retain the first reading.
     non_decision_conflict_fields = {"thinnest_x_mm", "thinnest_y_mm"}
@@ -1868,7 +1868,7 @@ def report_pdf(payload: Dict[str, Any] = Body(...)) -> StreamingResponse:
     content = build_pdf(payload)
     return StreamingResponse(
         BytesIO(content), media_type="application/pdf",
-        headers={"Content-Disposition": 'attachment; filename="HC_Ectasia_Report.pdf"'},
+        headers={"Content-Disposition": 'attachment; filename="CERAI_Report.pdf"'},
     )
 
 
@@ -1880,7 +1880,7 @@ def report_word(payload: Dict[str, Any] = Body(...)) -> StreamingResponse:
     return StreamingResponse(
         BytesIO(content),
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": 'attachment; filename="HC_Ectasia_Report.docx"'},
+        headers={"Content-Disposition": 'attachment; filename="CERAI_Report.docx"'},
     )
 
 
@@ -1997,7 +1997,7 @@ async def analyze(
         print(f"IMAGE EXTRACTION ERROR: {type(exc).__name__}: {exc}", flush=True)
         raise HTTPException(
             502,
-            "Image extraction service failed before the HC assessment. Please retry once.",
+            "Image extraction service failed before the CERAI assessment. Please retry once.",
         ) from exc
 
     from nice_policy import attach_readings

@@ -1,7 +1,7 @@
 """Pure PRK provisional scoring policy for the parallel clean engine.
 
 PRK keeps its procedure-specific scoring components, while the final score
-decision boundary is supplied by the shared HC score policy.
+decision boundary is supplied by the shared CERAI score policy.
 """
 from typing import Optional
 
@@ -51,7 +51,7 @@ def prk_score_category(score: Optional[int]) -> Optional[str]:
 
 
 def prk_pta_evidence_gap(pta_percent: Optional[float]) -> bool:
-    """Legacy review flag; not an HC hard-stop threshold."""
+    """Legacy review flag; not an CERAI hard-stop threshold."""
     return (
         isinstance(pta_percent, (int, float))
         and not isinstance(pta_percent, bool)

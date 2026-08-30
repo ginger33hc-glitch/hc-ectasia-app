@@ -65,7 +65,7 @@ def lasik_independent_hard_stop(
     """Return whether changing LASIK flap/zone parameters cannot cure the stop.
 
     This is explicit typed policy rather than the legacy string-marker search.
-    The clean engine follows the confirmed HC pachymetry rule: values below
+    The clean engine follows the confirmed CERAI pachymetry rule: values below
     480 µm stop, while exactly 480 µm enters the scoring pathway.
     """
     if pachy_thinnest_um is not None and float(pachy_thinnest_um) < POLICY.pachymetry_hard_stop_um:

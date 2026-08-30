@@ -1,6 +1,6 @@
 """Pure non-scored inter-eye tomography discordance assessment.
 
-This module intentionally does not change HC score, status, hard stops, BAD-D,
+This module intentionally does not change CERAI score, status, hard stops, BAD-D,
 or Randleman/ERSS logic. It reports only major bilateral categorical discordance.
 """
 from typing import Any, Dict, Iterable
@@ -116,7 +116,7 @@ def assess_inter_eye_tomography(extracted_eyes: Iterable[Dict[str, Any]]) -> Dic
         "status": "NO MAJOR INTER-EYE DISCORDANCE DETECTED",
         "major_discordances": [],
         "unavailable_domains": [],
-        "note": "No major categorical inter-eye tomography discordance detected. This is not a clearance criterion and does not change the HC score or final disposition.",
+        "note": "No major categorical inter-eye tomography discordance detected. This is not a clearance criterion and does not change the CERAI score or final disposition.",
         "scored": False,
         "decision_effect": "NONE",
     }

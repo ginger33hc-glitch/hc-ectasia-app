@@ -1,7 +1,7 @@
 """Canonical non-scored inter-eye tomography concern layer.
 
 This layer neutralizes the superseded manual inter-eye modifier and appends an
-automated bilateral tomography concern after the established HC engine finishes.
+automated bilateral tomography concern after the established CERAI engine finishes.
 It must not change score, status, hard stops, BAD-D, or Randleman/ERSS decisions.
 """
 import bootstrap
