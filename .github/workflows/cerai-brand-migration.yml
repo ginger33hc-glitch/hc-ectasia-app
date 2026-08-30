@@ -1,0 +1,69 @@
+name: CERAI brand migration
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate-brand:
+    if: ${{ github.event.head_commit.message != 'Apply CERAI permanent brand migration' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Replace legacy HC Ectasia application branding
+        shell: python
+        run: |
+          from pathlib import Path
+
+          root = Path('.')
+          text_suffixes = {'.py','.html','.js','.css','.md','.txt','.json','.yml','.yaml','.toml','.ini','.cfg','.webmanifest'}
+          skip_dirs = {'.git'}
+          replacements = [
+              ('HC PREOPERATIVE ECTASIA RISK ASSESSMENT', 'CERAI — CORNEAL REFRACTIVE ANALYSIS INTELLIGENCE | PREOPERATIVE ECTASIA RISK ASSESSMENT'),
+              ('HC Preoperative Ectasia Risk Assessment', 'CERAI Preoperative Ectasia Risk Assessment'),
+              ('HC Clinical Decision Support', 'CERAI Clinical Decision Support'),
+              ('HC Ectasia Assessment', 'CERAI — Corneal Refractive Analysis Intelligence'),
+              ('HC ECTASIA APP', 'CERAI — CORNEAL REFRACTIVE ANALYSIS INTELLIGENCE'),
+              ('HC Ectasia App', 'CERAI — Corneal Refractive Analysis Intelligence'),
+              ('HC Ectasia', 'CERAI'),
+              ('HC assessment', 'CERAI assessment'),
+              ('HC-adapted NICE', 'CERAI-adapted NICE'),
+              ('HC treatment-range gates', 'CERAI treatment-range gates'),
+              ('HC K-spread hinge override', 'CERAI K-spread hinge override'),
+              ('HC_Ectasia_', 'CERAI_'),
+          ]
+
+          changed=[]
+          for path in root.rglob('*'):
+              if not path.is_file() or any(part in skip_dirs for part in path.parts):
+                  continue
+              if path.suffix.lower() not in text_suffixes and path.name not in {'Dockerfile'}:
+                  continue
+              try:
+                  original=path.read_text(encoding='utf-8')
+              except UnicodeDecodeError:
+                  continue
+              updated=original
+              for old,new in replacements:
+                  updated=updated.replace(old,new)
+              if updated != original:
+                  path.write_text(updated,encoding='utf-8')
+                  changed.append(str(path))
+          print('Changed files:')
+          print('\n'.join(changed) if changed else '(none)')
+      - name: Commit migration
+        run: |
+          if git diff --quiet; then
+            echo 'No legacy branding remains for configured patterns.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Apply CERAI permanent brand migration'
+          git push
