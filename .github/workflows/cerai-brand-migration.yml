@@ -67,3 +67,5 @@ jobs:
           git add -A
           git commit -m 'Apply CERAI permanent brand migration'
           git push
+
+# Triggered after workflow registration; this workflow is idempotent.
