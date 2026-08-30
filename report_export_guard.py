@@ -22,7 +22,7 @@ from docx import Document
 from docx.shared import Pt
 
 IDENTITY_HEADING="PATIENT IDENTITY NOT VERIFIED - SURGEON CONFIRMATION REQUIRED"
-PDF_BAD=[["Final BAD-D","CERAI interpretation / action"],["<=1.6","NORMAL"],[">1.6 to <3.0","SUSPICIOUS - REVIEW / NOT CLEARED"],[">=3.0","ABNORMAL CORNEA - DO NOT PROCEED"]]
+PDF_BAD=[["Final BAD-D","CER-AI interpretation / action"],["<=1.6","NORMAL"],[">1.6 to <3.0","SUSPICIOUS - REVIEW / NOT CLEARED"],[">=3.0","ABNORMAL CORNEA - DO NOT PROCEED"]]
 ERSS=[
  ["Variable","Finding","Points"],
  ["Anterior topography","Normal / symmetrical","0"],["Anterior topography","Asymmetric bow-tie","1"],["Anterior topography","Inferior steepening / significant SRA-SRAX","3"],["Anterior topography","Abnormal ectatic pattern","4"],
@@ -31,7 +31,7 @@ ERSS=[
  ["Preop corneal thickness","<450 um","4"],["Preop corneal thickness","451-480 um","3"],["Preop corneal thickness","481-510 um","2"],["Preop corneal thickness",">=510 um","0"],
  ["MRSE","<=8 D myopia","0"],["MRSE",">8-10 D","1"],["MRSE",">10-12 D","2"],["MRSE",">12-14 D","3"],["MRSE",">14 D","4"]
 ]
-HC_NOTE="Published Randleman/ERSS table shown for reference. The CERAI engine intentionally uses CERAI-modified age and pachymetry rules; the displayed patient score must therefore be read from the CERAI score breakdown, not reconstructed from the published reference table."
+HC_NOTE="Published Randleman/ERSS table shown for reference. The CER-AI engine intentionally uses CER-AI-modified age and pachymetry rules; the displayed patient score must therefore be read from the CER-AI score breakdown, not reconstructed from the published reference table."
 
 _orig_pdf=reports.build_pdf
 _orig_docx=reports.build_docx
@@ -90,7 +90,7 @@ def build_pdf(payload):
             bad.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),reports._rl(reports.NAVY)),('TEXTCOLOR',(0,0),(-1,0),colors.white),('FONTNAME',(0,0),(-1,0),'Helvetica-Bold'),('FONTSIZE',(0,0),(-1,-1),7.5),('GRID',(0,0),(-1,-1),.35,reports._rl(reports.LINE)),('BACKGROUND',(1,1),(1,1),reports._rl(reports.GREEN_FILL)),('BACKGROUND',(1,2),(1,2),reports._rl(reports.AMBER_FILL)),('BACKGROUND',(1,3),(1,3),reports._rl(reports.RED_FILL))]))
             erss=Table(ERSS,colWidths=[1.55*reports.inch,3.85*reports.inch,.75*reports.inch],repeatRows=1)
             erss.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),reports._rl(reports.NAVY)),('TEXTCOLOR',(0,0),(-1,0),colors.white),('FONTNAME',(0,0),(-1,0),'Helvetica-Bold'),('FONTSIZE',(0,0),(-1,-1),7.1),('GRID',(0,0),(-1,-1),.35,reports._rl(reports.LINE))]))
-            appendix=[Paragraph('CERAI BAD-D reference points',sec),bad,Paragraph('BAD-D is read from the Pentacam BAD display and is independent of Randleman/ERSS anterior-topography scoring.',tiny),Paragraph('Published Randleman / ERSS scoring points',sec),erss,Paragraph('Randleman anterior-topography points come only from a qualifying anterior curvature/topography image. On Pentacam 4 Maps Refractive this is the upper-left Axial/Sagittal Curvature (Front) panel. ERSS total: 0-2 low, 3 moderate, >=4 high.',tiny),Paragraph(HC_NOTE,tiny),Spacer(1,8)]
+            appendix=[Paragraph('CER-AI BAD-D reference points',sec),bad,Paragraph('BAD-D is read from the Pentacam BAD display and is independent of Randleman/ERSS anterior-topography scoring.',tiny),Paragraph('Published Randleman / ERSS scoring points',sec),erss,Paragraph('Randleman anterior-topography points come only from a qualifying anterior curvature/topography image. On Pentacam 4 Maps Refractive this is the upper-left Axial/Sagittal Curvature (Front) panel. ERSS total: 0-2 low, 3 moderate, >=4 high.',tiny),Paragraph(HC_NOTE,tiny),Spacer(1,8)]
             story[idx:idx]=appendix
             return orig_build(doc,story,*a,**kw)
         reports.SimpleDocTemplate.build=patched_build
@@ -112,8 +112,8 @@ def build_docx(payload):
                 return orig_heading(document,text,level)
             state["suppress_identity"]=False
             if text=='Interpretation note':
-                orig_heading(document,'CERAI BAD-D reference points',1)
-                t=document.add_table(rows=1,cols=2);t.style='Table Grid';t.rows[0].cells[0].text='Final BAD-D';t.rows[0].cells[1].text='CERAI interpretation / action'
+                orig_heading(document,'CER-AI BAD-D reference points',1)
+                t=document.add_table(rows=1,cols=2);t.style='Table Grid';t.rows[0].cells[0].text='Final BAD-D';t.rows[0].cells[1].text='CER-AI interpretation / action'
                 for row in PDF_BAD[1:]:
                     c=t.add_row().cells;c[0].text=row[0];c[1].text=row[1]
                 reports._style_doc_table(t,[1.6,4.25],header=True)

@@ -1,4 +1,4 @@
-"""Parallel clean architecture for CERAI.
+"""Parallel clean architecture for CER-AI.
 
 Not production-wired until equivalence testing is complete.
 External callers may use the domain EyeInput -> assess -> AssessmentResult API,

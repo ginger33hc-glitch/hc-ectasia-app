@@ -1,9 +1,9 @@
-# CERAI Preoperative Ectasia Risk Assessment — Software Rule Specification v0.7
+# CER-AI Preoperative Ectasia Risk Assessment — Software Rule Specification v0.7
 
 Effective date: 26 August 2026
 
 This file is the code-aligned operational rule specification. Published evidence, provisional
-triage, CERAI operational policy, imaging-quality criteria, and general clinical eligibility are kept
+triage, CER-AI operational policy, imaging-quality criteria, and general clinical eligibility are kept
 as separate layers. No rule in one layer is silently presented as a validated rule from another.
 
 ## Case and source integrity gate
@@ -33,7 +33,7 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 
 - LASIK ERSS MRSE uses preoperative manifest sphere and minus-cylinder magnitude:
   `MRSE = manifest sphere − manifest cylinder magnitude / 2`.
-- Ablation and CERAI treatment-range gates use intended treatment sphere/cylinder only.
+- Ablation and CER-AI treatment-range gates use intended treatment sphere/cylinder only.
 - Treatment-card extraction may auto-fill intended correction only from `Düzeltme Miktarı`.
 - Invalid numeric ranges are not used in any formula.
 - Manifest and intended corrections are normalized to minus-cylinder notation, then classified
@@ -46,13 +46,13 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 
 - The report is generated even when this pathway cannot receive PASS; available tomography,
   structural calculations, missing plan data, and known hard stops remain visible.
-- Actual laser-plan maximum stromal ablation is mandatory. The CERAI linear myopic EX500 µm/D
+- Actual laser-plan maximum stromal ablation is mandatory. The CER-AI linear myopic EX500 µm/D
   convention is not applied to hyperopic annular or mixed bitoric profiles.
 - Hyperopic/mixed cases receive `REVIEW — NOT CLEARED` because the supplied procedure-specific
   ectasia scoring evidence is predominantly myopic. No new weighted ectasia score is invented.
 - Mixed astigmatism is present when the two intended principal meridians have opposite signs.
   Near-zero MRSE is not treated as low surgical load.
-- The CERAI Kmean estimate is not applied to mixed astigmatism. The report instructs the surgeon to
+- The CER-AI Kmean estimate is not applied to mixed astigmatism. The report instructs the surgeon to
   review planned postoperative meridional K values/K1-K2 and the expected steepest and flattest
   corneal powers.
 - The report instructs the surgeon to confirm manifest-versus-cycloplegic refraction, latent
@@ -65,16 +65,16 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 - Hyperopic/mixed PRK is explicitly identified as lacking a validated procedure-specific ectasia
   score; regression and haze remain separate clinical considerations.
 
-## CERAI operational hard stops
+## CER-AI operational hard stops
 
 - Thinnest preoperative pachymetry `<480 µm`; exactly 480 is not stopped by this rule alone.
-- CERAI-modified LASIK pachymetry bands: `480–499 µm` = +2 points, `500–509 µm` = +1 point,
+- CER-AI-modified LASIK pachymetry bands: `480–499 µm` = +2 points, `500–509 µm` = +1 point,
   and `>=510 µm` = +0 points.
 - LASIK RSB `<300 µm`; exactly 300 is allowed by this rule.
 - PRK RST `<310 µm`; exactly 310 is allowed by this rule.
 - Intended sphere `<−10.00 D`; exactly −10.00 is allowed by this rule.
 - Intended sphere `>+6.00 D`; exactly +6.00 is allowed by this rule.
-- PRK epithelium is fixed at 50 µm for CERAI calculations.
+- PRK epithelium is fixed at 50 µm for CER-AI calculations.
 
 ## Tissue formulas
 
@@ -82,14 +82,14 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 - PRK `PTA = (50 + maximum stromal ablation) / CCT × 100`.
 - LASIK `RSB = CCT − flap − maximum stromal ablation`.
 - LASIK `PTA = (flap + maximum stromal ablation) / CCT × 100`.
-- Actual planned maximum ablation is preferred. CERAI EX500 estimation is limited to 12 µm/D at
+- Actual planned maximum ablation is preferred. CER-AI EX500 estimation is limited to 12 µm/D at
   6.0 mm, 15 µm/D at 6.5 mm, and 16.33 µm/D at 7.0 mm.
 
 ## Published/provisional instruments
 
 - LASIK uses the published five-component ERSS: Placido topography, RSB, age, pachymetry, and
   manifest MRSE. Score 0–2 is low, 3 is moderate/STOP-DEFER, and ≥4 is high/DO NOT PROCEED.
-- PRK-EWSS v1.0 is an CERAI provisional triage score and is not validated. It does not produce a risk
+- PRK-EWSS v1.0 is an CER-AI provisional triage score and is not validated. It does not produce a risk
   probability.
 - A single numeric Placido criterion may support the published ERSS topography category but is not
   relabeled as definite keratoconus. A definite visible KC/FFKC/PMD/ectatic morphology remains a

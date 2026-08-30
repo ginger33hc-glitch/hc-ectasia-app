@@ -1,8 +1,8 @@
-"""Post-extraction validation guard for CERAI.
+"""Post-extraction validation guard for CER-AI.
 
 This module does not extract or infer clinical values. It audits the merged extraction payload,
 records provenance/coverage, and flags implausible or internally inconsistent transcriptions before
-the CERAI engine consumes them.
+the CER-AI engine consumes them.
 
 Multi-image numeric reconciliation policy:
 - When the same numeric parameter is read from multiple valid sources of the same provenance class,
@@ -70,7 +70,7 @@ def _safety_limiting_value(field: str, values: List[float]) -> float:
 
 
 def _reconcile_one_percent(merged: Dict[str, Any], results: List[Dict[str, Any]]) -> None:
-    """Apply the CERAI <=1% duplicate-reading rule after the core merge.
+    """Apply the CER-AI <=1% duplicate-reading rule after the core merge.
 
     Only readings with the same accepted provenance class are compared. This preserves the existing
     labeled-table-over-map-fallback priority. The rule is deliberately not used to reconcile a

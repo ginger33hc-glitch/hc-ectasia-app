@@ -31,7 +31,7 @@ def combine_status(current: str, new: str) -> str:
     current_rank = STATUS_RANK.get(current)
     new_rank = STATUS_RANK.get(new)
     if current_rank is None or new_rank is None:
-        raise ValueError(f"Unknown CERAI decision status: current={current!r}, new={new!r}")
+        raise ValueError(f"Unknown CER-AI decision status: current={current!r}, new={new!r}")
     return new if new_rank > current_rank else current
 
 

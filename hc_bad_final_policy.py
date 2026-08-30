@@ -1,7 +1,7 @@
-"""CERAI policy: Final BAD-D interpretation and abnormal hard-stop gate.
+"""CER-AI policy: Final BAD-D interpretation and abnormal hard-stop gate.
 
 Individual Df/Db/Dp/Dt/Da values remain displayed for clinical context, but an
-isolated suspicious/abnormal component does not determine the CERAI BAD status.
+isolated suspicious/abnormal component does not determine the CER-AI BAD status.
 Final BAD-D:
 - <=1.6: NORMAL
 - >1.6 and <3.0: SUSPICIOUS, contextual under the canonical final-decision hierarchy
@@ -54,7 +54,7 @@ def hc_tomography_review(eye):
         "BAD_display": bad,
         "cross_sectional_flags": flags,
         "evidence_note": (
-            "CERAI BAD policy: Final BAD-D determines the BAD interpretation. Individual Df/Db/Dp/Dt/Da "
+            "CER-AI BAD policy: Final BAD-D determines the BAD interpretation. Individual Df/Db/Dp/Dt/Da "
             "remain contextual findings and do not independently determine final clearance."
         ),
     }
@@ -68,7 +68,7 @@ def assess_eye_with_final_bad_cutoff(eye, plan, age, patient_modifiers):
     bad_d_status = final_bad_status(eye)
     result["final_bad_d_interpretation"] = bad_d_status
     if bad_d_status == "ABNORMAL":
-        hard_stop = "CERAI operational hard stop: Final BAD-D abnormal (>=3.0); cornea classified ABNORMAL by the CERAI BAD-D gate."
+        hard_stop = "CER-AI operational hard stop: Final BAD-D abnormal (>=3.0); cornea classified ABNORMAL by the CER-AI BAD-D gate."
         hard_stops = result.setdefault("hard_stops", [])
         reasons = result.setdefault("reasons", [])
         if hard_stop not in hard_stops:
@@ -76,7 +76,7 @@ def assess_eye_with_final_bad_cutoff(eye, plan, age, patient_modifiers):
         if hard_stop not in reasons:
             reasons.append(hard_stop)
         result["status"] = "DO NOT PROCEED"
-        result["action"] = "DO NOT PROCEED — ABNORMAL CORNEA. Final BAD-D is >=3.0 and meets the CERAI abnormal cutoff."
+        result["action"] = "DO NOT PROCEED — ABNORMAL CORNEA. Final BAD-D is >=3.0 and meets the CER-AI abnormal cutoff."
     # SUSPICIOUS Final BAD-D is intentionally not decision-changing here.
     # hc_final_decision_policy.py is the sole final hierarchy authority.
     return result

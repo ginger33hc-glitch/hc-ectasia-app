@@ -1,6 +1,6 @@
-"""Behavior-lock tests for the canonical CERAI production contract.
+"""Behavior-lock tests for the canonical CER-AI production contract.
 
-These tests characterize decision-critical CERAI behavior. Refactoring must preserve these
+These tests characterize decision-critical CER-AI behavior. Refactoring must preserve these
 outputs unless a clinical policy change is explicitly approved.
 """
 import hashlib

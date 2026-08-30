@@ -1,7 +1,7 @@
 """Pure final-decision hierarchy for the parallel clean engine.
 
 No production wiring. This mirrors the locked principal hierarchy while using
-the shared CERAI score disposition policy.
+the shared CER-AI score disposition policy.
 """
 from dataclasses import dataclass
 

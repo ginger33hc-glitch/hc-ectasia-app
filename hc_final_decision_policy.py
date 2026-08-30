@@ -1,6 +1,6 @@
-"""Canonical CERAI final decision hierarchy.
+"""Canonical CER-AI final decision hierarchy.
 
-CERAI policy:
+CER-AI policy:
 - Independent hard stops always prevail.
 - Missing/unresolved decision-critical data can never be promoted to clearance.
 - Final BAD-D ABNORMAL (>=3.0) remains a hard stop.
@@ -48,22 +48,22 @@ def assess_eye_with_hc_final_hierarchy(eye, plan, age, patient_modifiers):
 
     if bad_status == "ABNORMAL":
         # Normally enforced upstream; retain a defensive guard here.
-        stop = "CERAI operational hard stop: Final BAD-D abnormal (>=3.0); cornea classified ABNORMAL by the CERAI BAD-D gate."
+        stop = "CER-AI operational hard stop: Final BAD-D abnormal (>=3.0); cornea classified ABNORMAL by the CER-AI BAD-D gate."
         if stop not in result.setdefault("hard_stops", []):
             result["hard_stops"].append(stop)
         if stop not in result.setdefault("reasons", []):
             result["reasons"].append(stop)
         result["status"] = "DO NOT PROCEED"
-        result["action"] = "DO NOT PROCEED — ABNORMAL CORNEA. Final BAD-D is >=3.0 and meets the CERAI abnormal cutoff."
+        result["action"] = "DO NOT PROCEED — ABNORMAL CORNEA. Final BAD-D is >=3.0 and meets the CER-AI abnormal cutoff."
         return result
 
     if float(erss_total) >= 3:
         # Do not weaken the existing ERSS adverse pathway. If an upstream layer happened
-        # to leave PASS, enforce the CERAI threshold explicitly.
+        # to leave PASS, enforce the CER-AI threshold explicitly.
         if str(result.get("status") or "").upper() in {"PASS", "PASS WITH CAUTION"}:
             result["status"] = "CAUTION — DEFER"
             result["action"] = "DEFER / NOT CLEARED. Randleman/ERSS score is 3 or greater."
-        reason = f"CERAI final hierarchy: Randleman/ERSS total {float(erss_total):g} is >=3."
+        reason = f"CER-AI final hierarchy: Randleman/ERSS total {float(erss_total):g} is >=3."
         if reason not in result.setdefault("reasons", []):
             result["reasons"].append(reason)
         return result
