@@ -1111,6 +1111,31 @@ class TestPwaIcons(unittest.TestCase):
         self.assertNotIn('/static/icons/icon-source.svg', html)
 
 
+class TestSurgeonTopographyReference(unittest.TestCase):
+    def test_randleman_confirmation_includes_source_locked_reference(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn('aria-label="Randleman anterior topography reference guide"', html)
+        self.assertIn("upper-left Axial/Sagittal Curvature (Front)", html)
+        self.assertIn("180° opposite", html)
+        self.assertIn("BAD-D, posterior elevation, pachymetry, ISV and IVA are independent", html)
+        self.assertIn("do not guess", html)
+
+    def test_reference_matches_published_mutually_exclusive_thresholds(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        for threshold in ("&gt;0.5 D and &lt;1.0 D", "SRAX ≥20°", "≥1.0 D", "I-S &lt;1.4 D", "I-S ≥1.4 D"):
+            self.assertIn(threshold, html)
+        for category, points in (
+            ("Normal / symmetric", "0"),
+            ("Asymmetric bow-tie", "1"),
+            ("Inferior steepening / SRA", "3"),
+            ("Abnormal / ectatic", "4"),
+        ):
+            self.assertIn(f"<tr><td>{category}</td>", html)
+            row = html.split(f"<tr><td>{category}</td>", 1)[1].split("</tr>", 1)[0]
+            self.assertTrue(row.endswith(f"<td>{points}</td>"))
+        self.assertIn("single highest applicable", html)
+
+
 class TestSignedRefractionInputs(unittest.TestCase):
     def test_all_refraction_fields_accept_positive_and_negative_values(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
