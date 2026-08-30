@@ -49,8 +49,8 @@ LIABILITY_NOTICE = (
     "This application is a clinical decision-support aid only."
 )
 AUTHORSHIP_NOTICE = (
-    "Dr Hüseyin Cengiz tarafından geliştirilmiştir. Tüm hakları saklıdır. "
-    "Nihai sorumluluk her zaman ve her şekilde cerraha aittir."
+    "Developed by Hüseyin Cengiz, MD. All rights reserved. "
+    "Final responsibility rests with the surgeon at all times and under all circumstances."
 )
 PDF_UNICODE_REGULAR = "CERAI-Vera"
 PDF_UNICODE_BOLD = "CERAI-Vera-Bold"

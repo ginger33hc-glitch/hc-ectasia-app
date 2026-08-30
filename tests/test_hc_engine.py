@@ -1113,8 +1113,8 @@ class TestPwaIcons(unittest.TestCase):
 
 class TestAuthorshipAndLiabilityFooter(unittest.TestCase):
     NOTICE = (
-        "Dr Hüseyin Cengiz tarafından geliştirilmiştir. Tüm hakları saklıdır. "
-        "Nihai sorumluluk her zaman ve her şekilde cerraha aittir."
+        "Developed by Hüseyin Cengiz, MD. All rights reserved. "
+        "Final responsibility rests with the surgeon at all times and under all circumstances."
     )
 
     def _payload(self):
