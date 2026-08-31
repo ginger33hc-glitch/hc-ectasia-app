@@ -2,7 +2,7 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.54 implements
+## What v0.7.55 implements
 
 - The surgeon-confirmation panel and report appendix now use one concise Randleman topography
   reference. The same four mutually exclusive categories feed the existing single point mapper:

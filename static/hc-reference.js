@@ -19,9 +19,9 @@
   let queued = false;
 
   function installStaticPolicyUI() {
-    document.title = "CER-AI v0.7.54";
+    document.title = "CER-AI v0.7.55";
     const heading = document.querySelector("body > header h1");
-    if (heading) heading.textContent = "CER-AI v0.7.54";
+    if (heading) heading.textContent = "CER-AI v0.7.55";
 
     document.querySelectorAll('[data-erss-reference="surgeon"]').forEach(container => {
       if (!container.children.length) container.innerHTML = topographyReferenceHtml();
