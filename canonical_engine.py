@@ -20,6 +20,7 @@ import assessment_workflow
 import user_access
 import operational_security
 import case_archive
+import audit_log
 import case_catalog
 
 core = bootstrap.core
@@ -44,6 +45,7 @@ else:
         core,
         runtime=case_archive.CaseArchiveRuntime(None, required=False),
     )
+audit_log.install(core, _archive_runtime)
 case_catalog.install(core, _archive_runtime)
 
 # ERSS morphology auto-read cleanup must wrap the fully installed assessment workflow.
@@ -89,6 +91,7 @@ def runtime_invariants():
     if not getattr(core,"_cerai_named_user_access_installed",False):errors.append("Named-user access boundary is not active")
     if not getattr(core,"_cerai_operational_security_installed",False):errors.append("Operational security boundary is not active")
     if not getattr(core,"_cerai_case_archive_installed",False):errors.append("Encrypted case archive boundary is not active")
+    if not getattr(core,"_cerai_audit_log_installed",False):errors.append("Encrypted audit-log boundary is not active")
     if not getattr(core,"_cerai_case_catalog_installed",False):errors.append("Encrypted case catalog boundary is not active")
     if not getattr(core,"_erss_topography_evidence_policy_installed",False):errors.append("ERSS I-S/topography evidence gate is not active")
     if not getattr(core,"_erss_auto_read_policy_installed",False):errors.append("ERSS morphology auto-read separation policy is not active")
