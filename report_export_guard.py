@@ -16,22 +16,15 @@ def _tomography_rows_no_morphology(extracted,eye_id,locale="en"):
 reports._eye_metrics=_eye_metrics_no_morphology
 reports._tomography_rows=_tomography_rows_no_morphology
 
-from reportlab.platypus import Paragraph,Table,TableStyle,Spacer
+from reportlab.platypus import KeepTogether,Paragraph,Table,TableStyle,Spacer
 from reportlab.lib import colors
 from docx import Document
 from docx.shared import Pt
 
 IDENTITY_HEADING="PATIENT IDENTITY NOT VERIFIED - SURGEON CONFIRMATION REQUIRED"
 PDF_BAD=[["Final BAD-D","CER-AI interpretation / action"],["<=1.6","NORMAL"],[">1.6 to <2.60","SUSPICIOUS - REVIEW / NOT CLEARED"],[">=2.60","ABNORMAL CORNEA - DO NOT PROCEED"]]
-ERSS=[
- ["Variable","Finding","Points"],
- ["Anterior topography","Normal / symmetrical","0"],["Anterior topography","Asymmetric bow-tie","1"],["Anterior topography","Inferior steepening / significant SRA-SRAX","3"],["Anterior topography","Abnormal ectatic pattern","4"],
- ["Residual stromal bed",">=300 um","0"],["Residual stromal bed","280-299 um","1"],["Residual stromal bed","260-279 um","2"],["Residual stromal bed","240-259 um","3"],["Residual stromal bed","<240 um","4"],
- ["Age","18-21","3"],["Age","22-25","2"],["Age","26-29","1"],["Age",">=30","0"],
- ["Preop corneal thickness","<450 um","4"],["Preop corneal thickness","451-480 um","3"],["Preop corneal thickness","481-510 um","2"],["Preop corneal thickness",">=510 um","0"],
- ["MRSE","<=8 D myopia","0"],["MRSE",">8-10 D","1"],["MRSE",">10-12 D","2"],["MRSE",">12-14 D","3"],["MRSE",">14 D","4"]
-]
-HC_NOTE="Published Randleman/ERSS table shown for reference. The CER-AI engine intentionally uses CER-AI-modified age and pachymetry rules; the displayed patient score must therefore be read from the CER-AI score breakdown, not reconstructed from the published reference table."
+TOPOGRAPHY=[["Category","What to look for","ERSS points"],*[list(row) for row in reports.RANDLEMAN_TOPOGRAPHY_REFERENCE]]
+ACTIVE_ERSS=[list(row) for row in reports.RANDLEMAN_ACTIVE_ERSS_REFERENCE]
 
 _orig_pdf=reports.build_pdf
 _orig_docx=reports.build_docx
@@ -95,10 +88,24 @@ def build_pdf(payload):
             bad_rows=[[Paragraph(tr(cell),ref_head if row_index==0 else ref_cell) for cell in row] for row_index,row in enumerate(PDF_BAD)]
             bad=Table(bad_rows,colWidths=[1.7*reports.inch,4.45*reports.inch],repeatRows=1)
             bad.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),reports._rl(reports.NAVY)),('TEXTCOLOR',(0,0),(-1,0),colors.white),('FONTNAME',(0,0),(-1,0),bold_font),('FONTNAME',(0,1),(-1,-1),regular_font),('FONTSIZE',(0,0),(-1,-1),7.5),('GRID',(0,0),(-1,-1),.35,reports._rl(reports.LINE)),('BACKGROUND',(1,1),(1,1),reports._rl(reports.GREEN_FILL)),('BACKGROUND',(1,2),(1,2),reports._rl(reports.AMBER_FILL)),('BACKGROUND',(1,3),(1,3),reports._rl(reports.RED_FILL))]))
-            erss_rows=[[Paragraph(tr(cell),ref_head if row_index==0 else ref_cell) for cell in row] for row_index,row in enumerate(ERSS)]
-            erss=Table(erss_rows,colWidths=[1.55*reports.inch,3.85*reports.inch,.75*reports.inch],repeatRows=1)
+            topo_rows=[[Paragraph(tr(cell),ref_head if row_index==0 else ref_cell) for cell in row] for row_index,row in enumerate(TOPOGRAPHY)]
+            topo=Table(topo_rows,colWidths=[1.5*reports.inch,3.95*reports.inch,.7*reports.inch],repeatRows=1)
+            topo.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),reports._rl(reports.NAVY)),('TEXTCOLOR',(0,0),(-1,0),colors.white),('FONTNAME',(0,0),(-1,0),bold_font),('FONTNAME',(0,1),(-1,-1),regular_font),('FONTSIZE',(0,0),(-1,-1),7.1),('GRID',(0,0),(-1,-1),.35,reports._rl(reports.LINE)),('ALIGN',(-1,1),(-1,-1),'CENTER')]))
+            erss_rows=[[Paragraph(tr(cell),ref_head if row_index==0 else ref_cell) for cell in row] for row_index,row in enumerate(ACTIVE_ERSS)]
+            erss=Table(erss_rows,colWidths=[1.7*reports.inch,3.7*reports.inch,.75*reports.inch],repeatRows=1)
             erss.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),reports._rl(reports.NAVY)),('TEXTCOLOR',(0,0),(-1,0),colors.white),('FONTNAME',(0,0),(-1,0),bold_font),('FONTNAME',(0,1),(-1,-1),regular_font),('FONTSIZE',(0,0),(-1,-1),7.1),('GRID',(0,0),(-1,-1),.35,reports._rl(reports.LINE))]))
-            appendix=[Paragraph(tr('CER-AI BAD-D reference points'),sec),bad,Paragraph(tr('BAD-D is read from the Pentacam BAD display and is independent of Randleman/ERSS anterior-topography scoring.'),tiny),Paragraph(tr('Published Randleman / ERSS scoring points'),sec),erss,Paragraph(tr('Randleman anterior-topography points come only from a qualifying anterior curvature/topography image. On Pentacam 4 Maps Refractive this is the upper-left Axial/Sagittal Curvature (Front) panel. ERSS total: 0-2 low, 3 moderate, >=4 high.'),tiny),Paragraph(tr(HC_NOTE),tiny),Spacer(1,8)]
+            topography_block=KeepTogether([
+                Paragraph(tr('Randleman topography assessment'),sec),
+                topo,
+                Paragraph(tr(reports.RANDLEMAN_TOPOGRAPHY_SAFETY),tiny),
+                Paragraph(tr(reports.RANDLEMAN_SUPERIOR_NOTE),tiny),
+            ])
+            active_erss_block=KeepTogether([
+                Paragraph(tr('Active CER-AI Randleman / ERSS points'),sec),
+                erss,
+                Paragraph(tr('Randleman/ERSS is calculated from five independent LASIK inputs. BAD-D and NICE remain separate pathways. Overall ERSS: 0-2 low, 3 moderate, >=4 high; CER-AI does not clear totals >=3.'),tiny),
+            ])
+            appendix=[Paragraph(tr('CER-AI BAD-D reference points'),sec),bad,Paragraph(tr('BAD-D is read from the Pentacam BAD display and is independent of Randleman/ERSS anterior-topography scoring.'),tiny),topography_block,active_erss_block,Spacer(1,8)]
             story[idx:idx]=appendix
             return orig_build(doc,story,*a,**kw)
         reports.SimpleDocTemplate.build=patched_build
@@ -128,15 +135,23 @@ def build_docx(payload):
                     c=t.add_row().cells;c[0].text=tr(row[0]);c[1].text=tr(row[1])
                 reports._style_doc_table(t,[1.6,4.25],header=True)
                 p=document.add_paragraph(tr('BAD-D is read from the Pentacam BAD display and is independent of Randleman/ERSS anterior-topography scoring.'));p.runs[0].font.size=Pt(8)
-                orig_heading(document,tr('Published Randleman / ERSS scoring points'),1)
+                orig_heading(document,tr('Randleman topography assessment'),1)
+                topography=document.add_table(rows=1,cols=3);topography.style='Table Grid'
+                for j,x in enumerate(TOPOGRAPHY[0]):topography.rows[0].cells[j].text=tr(x)
+                for row in TOPOGRAPHY[1:]:
+                    c=topography.add_row().cells
+                    for j,x in enumerate(row):c[j].text=tr(x)
+                reports._style_doc_table(topography,[1.45,3.7,.7],header=True)
+                for note_text in (reports.RANDLEMAN_TOPOGRAPHY_SAFETY,reports.RANDLEMAN_SUPERIOR_NOTE):
+                    p=document.add_paragraph(tr(note_text));p.runs[0].font.size=Pt(8)
+                orig_heading(document,tr('Active CER-AI Randleman / ERSS points'),1)
                 e=document.add_table(rows=1,cols=3);e.style='Table Grid'
-                for j,x in enumerate(ERSS[0]):e.rows[0].cells[j].text=tr(x)
-                for row in ERSS[1:]:
+                for j,x in enumerate(ACTIVE_ERSS[0]):e.rows[0].cells[j].text=tr(x)
+                for row in ACTIVE_ERSS[1:]:
                     c=e.add_row().cells
                     for j,x in enumerate(row):c[j].text=tr(x)
-                reports._style_doc_table(e,[1.5,3.65,.7],header=True)
-                for note in ('Randleman anterior-topography points come only from the anterior curvature/topography image; on Pentacam 4 Maps Refractive this is the upper-left Axial/Sagittal Curvature (Front) panel. ERSS total: 0-2 low, 3 moderate, >=4 high.',HC_NOTE):
-                    p=document.add_paragraph(tr(note));p.runs[0].font.size=Pt(8)
+                reports._style_doc_table(e,[1.65,3.5,.7],header=True)
+                p=document.add_paragraph(tr('Randleman/ERSS is calculated from five independent LASIK inputs. BAD-D and NICE remain separate pathways. Overall ERSS: 0-2 low, 3 moderate, >=4 high; CER-AI does not clear totals >=3.'));p.runs[0].font.size=Pt(8)
             return orig_heading(document,text,level)
         reports._add_heading=patched_heading
         reports._add_bullet=patched_bullet

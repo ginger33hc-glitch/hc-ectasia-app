@@ -1149,6 +1149,22 @@ class TestAuthorshipAndLiabilityFooter(unittest.TestCase):
             footer_text = " ".join(paragraph.text for paragraph in section.footer.paragraphs)
             self.assertIn(self.NOTICE, footer_text)
 
+    def test_pdf_and_word_contain_the_same_simplified_topography_reference(self):
+        pdf_text = " ".join(
+            " ".join((page.extract_text() or "").split())
+            for page in PdfReader(BytesIO(reports.build_pdf(self._payload()))).pages
+        )
+        document = Document(BytesIO(reports.build_docx(self._payload())))
+        word_text = " ".join(paragraph.text for paragraph in document.paragraphs)
+        word_text += " " + " ".join(
+            cell.text for table in document.tables for row in table.rows for cell in row.cells
+        )
+        for text in (pdf_text, word_text):
+            self.assertIn("Randleman topography assessment", text)
+            self.assertIn("Mild asymmetric bow-tie", text)
+            self.assertIn("Only the highest applicable single category is scored", text)
+            self.assertIn("Superior steepening alone is not automatically assigned 3 points", text)
+
     def test_turkish_pdf_uses_unicode_labels_and_turkish_footer_on_every_page(self):
         payload = self._payload()
         payload["locale"] = "tr"
@@ -1158,6 +1174,11 @@ class TestAuthorshipAndLiabilityFooter(unittest.TestCase):
         self.assertIn("CER-AI PREOPERATİF EKTAZİ RİSK DEĞERLENDİRMESİ", combined)
         self.assertIn("GENEL KARAR", combined)
         self.assertIn("UYGUN", combined)
+        self.assertIn("Randleman topografi değerlendirmesi", combined)
+        self.assertIn("≥21 yaş", combined)
+        self.assertIn("Kesin durdurma / 2 / 1 / 0", combined)
+        self.assertNotIn(">=21 years", combined)
+        self.assertNotIn("Hard stop / 2 / 1 / 0", combined)
         for page in pages:
             self.assertIn("Hüseyin Cengiz, MD tarafından geliştirilmiştir", page)
 
@@ -1169,6 +1190,10 @@ class TestAuthorshipAndLiabilityFooter(unittest.TestCase):
         table_text = " ".join(cell.text for table in document.tables for row in table.rows for cell in row.cells)
         self.assertIn("CER-AI PREOPERATİF EKTAZİ RİSK DEĞERLENDİRMESİ", body)
         self.assertIn("GENEL KARAR", table_text)
+        self.assertIn("≥21 yaş", table_text)
+        self.assertIn("Kesin durdurma / 2 / 1 / 0", table_text)
+        self.assertNotIn(">=21 years", table_text)
+        self.assertNotIn("Hard stop / 2 / 1 / 0", table_text)
         for section in document.sections:
             footer_text = " ".join(paragraph.text for paragraph in section.footer.paragraphs)
             self.assertIn("Hüseyin Cengiz, MD tarafından geliştirilmiştir", footer_text)
@@ -1179,35 +1204,46 @@ class TestAuthorshipAndLiabilityFooter(unittest.TestCase):
         i18n = (root / "static" / "i18n.js").read_text()
         self.assertIn('data-language="en"', html)
         self.assertIn('data-language="tr"', html)
-        self.assertIn('/static/i18n.js?v=3', html)
+        self.assertIn('/static/i18n.js?v=4', html)
         self.assertIn('locale:i18n.locale', html)
         self.assertIn('localStorage.setItem("cerai-language"', i18n)
         self.assertIn('"Case inputs":"Vaka girdileri"', i18n)
+        self.assertIn('"18 / 19–20 / ≥21 years":"18 / 19–20 / ≥21 yaş"', i18n)
+        self.assertIn('"Hard stop / 2 / 1 / 0":"Kesin durdurma / 2 / 1 / 0"', i18n)
 
 
 class TestSurgeonTopographyReference(unittest.TestCase):
     def test_randleman_confirmation_includes_source_locked_reference(self):
-        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
-        self.assertIn('aria-label="Randleman anterior topography reference guide"', html)
-        self.assertIn("upper-left Axial/Sagittal Curvature (Front)", html)
-        self.assertIn("180° opposite", html)
-        self.assertIn("BAD-D, posterior elevation, pachymetry, ISV and IVA are independent", html)
-        self.assertIn("do not guess", html)
+        root = Path(__file__).resolve().parents[1]
+        html = (root / "static" / "index.html").read_text()
+        reference = (root / "static" / "hc-reference.js").read_text()
+        self.assertEqual(html.count('data-erss-reference="surgeon"'), 1)
+        self.assertIn('aria-label="Randleman anterior topography reference guide"', reference)
+        self.assertIn("upper-left Axial/Sagittal Curvature (Front)", reference)
+        self.assertIn("It never guesses a number", reference)
+        self.assertIn("BAD-D and other tomography indices are not substituted", reference)
 
     def test_reference_matches_published_mutually_exclusive_thresholds(self):
-        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
-        for threshold in ("&gt;0.5 D and &lt;1.0 D", "SRAX ≥20°", "≥1.0 D", "I-S &lt;1.4 D", "I-S ≥1.4 D"):
-            self.assertIn(threshold, html)
+        reference = (Path(__file__).resolve().parents[1] / "static" / "hc-reference.js").read_text()
+        for threshold in (">0.5 D and <1.0 D", "SRAX ≥20°", "≥1.0 D", "I-S <1.4 D", "I-S ≥1.4 D"):
+            self.assertIn(threshold, reference)
         for category, points in (
             ("Normal / symmetric", "0"),
             ("Asymmetric bow-tie", "1"),
             ("Inferior steepening / SRA", "3"),
             ("Abnormal / ectatic", "4"),
         ):
-            self.assertIn(f"<tr><td>{category}</td>", html)
-            row = html.split(f"<tr><td>{category}</td>", 1)[1].split("</tr>", 1)[0]
-            self.assertTrue(row.endswith(f"<td>{points}</td>"))
-        self.assertIn("single highest applicable", html)
+            self.assertRegex(reference, rf'\["{category}",\s*"[^"]+",\s*"{points}"\]')
+        self.assertIn("Only the highest applicable single category is scored; categories are not added", reference)
+        self.assertIn("Superior steepening alone is not automatically assigned 3 points", reference)
+
+    def test_obsolete_fragmented_reference_copy_is_removed(self):
+        root = Path(__file__).resolve().parents[1]
+        html = (root / "static" / "index.html").read_text()
+        reference = (root / "static" / "hc-reference.js").read_text()
+        self.assertNotIn("Surgeon reference — how to choose", html)
+        self.assertNotIn("Published Randleman / ERSS scoring points", reference)
+        self.assertNotIn('["Age", "18–21", "3"]', reference)
 
 
 class TestSignedRefractionInputs(unittest.TestCase):

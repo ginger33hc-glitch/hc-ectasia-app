@@ -46,7 +46,7 @@ GRAY = "52616D"
 GRAY_FILL = "EEF2F5"
 LINE = "D7E0E7"
 INK = "17212B"
-APP_VERSION = "0.7.52"
+APP_VERSION = "0.7.53"
 LIABILITY_NOTICE = (
     "The final surgical decision and all associated responsibility and liability rest with the surgeon. "
     "This application is a clinical decision-support aid only."
@@ -54,6 +54,28 @@ LIABILITY_NOTICE = (
 AUTHORSHIP_NOTICE = (
     "Developed by Hüseyin Cengiz, MD. All rights reserved. "
     "Final responsibility rests with the surgeon at all times and under all circumstances."
+)
+RANDLEMAN_TOPOGRAPHY_REFERENCE = (
+    ("Normal / symmetric", "Normal or symmetric map", "0"),
+    ("Asymmetric bow-tie", "Mild asymmetric bow-tie: >0.5 D and <1.0 D, with no SRA/SRAX", "1"),
+    ("Inferior steepening / SRA", "Inferior point >=1.0 D steeper than the matching superior point with I-S <1.4 D, or SRAX >=20 degrees", "3"),
+    ("Abnormal / ectatic", "Abnormal or ectatic pattern, or I-S >=1.4 D", "4"),
+)
+RANDLEMAN_TOPOGRAPHY_SAFETY = (
+    "If CER-AI cannot read the complete map with HIGH confidence, it asks the surgeon to choose the category. "
+    "It never guesses a number. Only the highest applicable single category is scored; categories are not added."
+)
+RANDLEMAN_SUPERIOR_NOTE = (
+    "Superior steepening alone is not automatically assigned 3 points and requires surgeon review. "
+    "BAD-D and other tomography indices are not substituted for Randleman topography."
+)
+RANDLEMAN_ACTIVE_ERSS_REFERENCE = (
+    ("Variable", "Finding", "Points"),
+    ("Anterior topography", "Use the category table above", "0 / 1 / 3 / 4"),
+    ("Residual stromal bed", "<240 / 240-259 / 260-279 / 280-299 / >=300 um", "4 / 3 / 2 / 1 / 0"),
+    ("Age - active CER-AI policy", "18 / 19-20 / >=21 years", "3 / 2 / 0"),
+    ("Preop corneal thickness - active CER-AI policy", "<480 / 480-499 / 500-509 / >=510 um", "Hard stop / 2 / 1 / 0"),
+    ("Manifest MRSE", "<-14 / -14-<-12 / -12-<-10 / -10-<-8 / >=-8 D", "4 / 3 / 2 / 1 / 0"),
 )
 PDF_UNICODE_REGULAR = "CER-AI-Vera"
 PDF_UNICODE_BOLD = "CER-AI-Vera-Bold"

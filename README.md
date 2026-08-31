@@ -2,16 +2,16 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.52 implements
+## What v0.7.53 implements
 
-- Randleman topography is read only from a qualifying anterior curvature map. A dedicated
-  `HIGH`-confidence complete-map classification may supply the mutually exclusive morphology
-  category without requiring an I-S value. `MODERATE`, `LOW`, or unreadable classifications
-  remain unscorable until surgeon confirmation.
-- Labeled/confirmed I-S remains a separate numeric threshold input and a NICE component; it is
-  not a universal prerequisite for a clearly classifiable Randleman anterior pattern.
-- Topography categories remain mutually exclusive and use the existing single point mapper: abnormal
-  +4, inferior steepening/SRA +3, asymmetric bow-tie +1, and normal/symmetric +0.
+- The surgeon-confirmation panel and report appendix now use one concise Randleman topography
+  reference. The same four mutually exclusive categories feed the existing single point mapper:
+  normal/symmetric 0, asymmetric bow-tie 1, inferior steepening/SRA 3, abnormal/ectatic 4.
+- A `HIGH`-confidence complete-map read may supply the category. Lower-confidence reads require
+  surgeon confirmation; numbers are never inferred, categories are never added, and superior
+  steepening alone is not automatically assigned the inferior-steepening/SRA score.
+- The report appendix now shows active CER-AI age and pachymetry bands instead of the obsolete
+  published reference bands that differ from the running CER-AI policy.
 
 - Mobile-safe signed refraction parsing now recognizes common Unicode plus/minus characters.
 - Invalid or partial manifest/intended manual entries block analysis with a field-specific warning instead of silently becoming missing data.
