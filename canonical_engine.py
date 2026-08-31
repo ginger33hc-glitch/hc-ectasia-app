@@ -17,6 +17,7 @@ import microkeratome_planning_policy  # noqa: F401
 import erss_topography_evidence_policy  # noqa: F401
 import nice_policy
 import assessment_workflow
+import user_access
 import operational_security
 import case_archive
 import case_catalog
@@ -29,6 +30,7 @@ core.app.title = f"CER-AI v{CANONICAL_VERSION}"
 reports.APP_VERSION = CANONICAL_VERSION
 nice_policy.install(core)
 assessment_workflow.install(core)
+user_access.install(core)
 operational_security.install(core)
 
 # Keep archive provisioning inert until every bucket credential and encryption secret has been
@@ -84,6 +86,7 @@ def runtime_invariants():
     if not getattr(core,"_hc_microkeratome_planning_installed",False):errors.append("Post-assessment ML7 microkeratome planning layer is not active")
     if not getattr(core,"_hc_nice_installed",False):errors.append("Independent CER-AI NICE policy is not active")
     if not getattr(core,"_hc_readiness_installed",False):errors.append("Pre-report readiness workflow is not active")
+    if not getattr(core,"_cerai_named_user_access_installed",False):errors.append("Named-user access boundary is not active")
     if not getattr(core,"_cerai_operational_security_installed",False):errors.append("Operational security boundary is not active")
     if not getattr(core,"_cerai_case_archive_installed",False):errors.append("Encrypted case archive boundary is not active")
     if not getattr(core,"_cerai_case_catalog_installed",False):errors.append("Encrypted case catalog boundary is not active")
