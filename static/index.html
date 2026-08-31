@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>CER-AI v0.7.53</title>
+  <title>CER-AI v0.7.54</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=9">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=8">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=8">
@@ -41,7 +41,7 @@
   <style>@media print{.report-card[hidden]{display:none!important}}</style>
 </head>
 <body>
-<header class="app-header"><div class="brand-lockup"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Corneal Ectasia Risk Analysis Intelligence"><span class="brand-version">v0.7.53</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI v0.7.53</h1></header>
+<header class="app-header"><div class="brand-lockup"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Corneal Ectasia Risk Analysis Intelligence"><span class="brand-version">v0.7.54</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI v0.7.54</h1></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -105,7 +105,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">CER-AI Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.7.53</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.7.54</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <p class="report-liability-notice">The final surgical decision and all associated responsibility and liability rest with the surgeon. This application is a clinical decision-support aid only.</p>
       <table class="meta-table"><tbody>
@@ -132,6 +132,23 @@
 <script src="/static/assessment-readiness.js?v=2"></script>
 <script>
 const i18n=window.CERAI_I18N;
+async function ceraiFetch(url,options={}){
+  const requestOptions={...options};
+  const headers=new Headers(options.headers||{});
+  const storedKey=sessionStorage.getItem("cerai_access_key");
+  if(storedKey)headers.set("X-CERAI-Access-Key",storedKey);
+  requestOptions.headers=headers;
+  let response=await fetch(url,requestOptions);
+  if(response.status!==401)return response;
+  const promptText=i18n.locale==="tr"
+    ?"CER-AI erişim anahtarını girin. Anahtar yalnızca bu uygulama oturumunda saklanır."
+    :"Enter the CER-AI access key. It is retained only for this app session.";
+  const supplied=window.prompt(promptText,"");
+  if(!supplied)return response;
+  sessionStorage.setItem("cerai_access_key",supplied);
+  headers.set("X-CERAI-Access-Key",supplied);
+  return fetch(url,{...requestOptions,headers});
+}
 const eyeTemplate = (eye) => `
   <div class="row"><label>Prior corneal refractive surgery?</label><select id="${eye}_prior"><option value="no" selected>No</option><option value="yes">Yes</option><option value="unknown">Unknown</option></select></div>
   <div class="row"><label>Procedure</label><select id="${eye}_procedure"><option value="">Select</option><option value="PRK">PRK</option><option value="LASIK">LASIK</option></select></div>
@@ -552,7 +569,7 @@ async function downloadReport(kind){
   const button=kind==="pdf"?pdfBtn:wordBtn, original=button.textContent;
   button.disabled=true;button.textContent=i18n.translate("Preparing...");
   try{
-    const response=await fetch(`/report/${kind}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(lastReport)});
+    const response=await ceraiFetch(`/report/${kind}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(lastReport)});
     if(!response.ok)throw new Error(`Report export failed (${response.status})`);
     const blob=await response.blob(), url=URL.createObjectURL(blob), a=document.createElement("a");
     const id=(lastReport.patient.id||lastReport.patient.name||"Report").replace(/[^a-z0-9_-]+/gi,"_");
@@ -647,8 +664,8 @@ f.addEventListener("submit", async (e) => {
     fd.set("patient_metadata",JSON.stringify(patientPayload()));
     const clinicalOverrides=readiness.collect();
     const r=readiness.token
-      ?await fetch('/assessment/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assessment_token:readiness.token,age:numberOrNull('age'),eye_plans:{OD:plan('od'),OS:plan('os')},patient_modifiers:modifiers,patient_metadata:patientPayload(),clinical_overrides:clinicalOverrides})})
-      :await fetch("/analyze",{method:"POST",body:fd}); const text=await r.text();
+      ?await ceraiFetch('/assessment/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assessment_token:readiness.token,age:numberOrNull('age'),eye_plans:{OD:plan('od'),OS:plan('os')},patient_modifiers:modifiers,patient_metadata:patientPayload(),clinical_overrides:clinicalOverrides})})
+      :await ceraiFetch("/analyze",{method:"POST",body:fd}); const text=await r.text();
     let j; try{j=JSON.parse(text)}catch{throw new Error("Server returned a non-JSON response: "+text.slice(0,200))}
     if(!r.ok){if(r.status===410)readiness.reset();throw new Error(j.detail||"Request failed");}
     const extractedAge=j.extracted?.derived_age_years;

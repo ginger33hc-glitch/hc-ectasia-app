@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="CER-AI v0.7.53")
+app = FastAPI(title="CER-AI v0.7.54")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -1462,7 +1462,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.53 / source set 2026-08-25 plus binding CER-AI amendments",
+        "version": "software v0.7.54 / source set 2026-08-25 plus binding CER-AI amendments",
     }
 
 
@@ -1971,14 +1971,10 @@ async def analyze(
     if not isinstance(plans, dict) or not isinstance(modifiers, dict) or not isinstance(metadata, dict):
         raise HTTPException(400, "eye_plans, patient_modifiers, and patient_metadata must be JSON objects.")
 
-    image_payloads = []
-    for image in images:
-        raw = await image.read()
-        if raw:
-            image_payloads.append((raw, image.filename or "image.jpg"))
+    from operational_security import admit_analysis, analysis_slot, read_uploads
 
-    if not image_payloads:
-        raise HTTPException(400, "No readable images supplied.")
+    image_payloads = await read_uploads(images)
+    admit_analysis()
 
     # Every image remains an independent extraction. Bounded concurrency prevents the total
     # request time from becoming the sum of all upstream calls and keeps FastAPI responsive.
@@ -1990,9 +1986,12 @@ async def analyze(
             return await asyncio.to_thread(extract_one_image, raw, filename)
 
     try:
-        extraction_results = await asyncio.gather(
-            *(extract_bounded(raw, filename) for raw, filename in image_payloads)
-        )
+        async with analysis_slot():
+            extraction_results = await asyncio.gather(
+                *(extract_bounded(raw, filename) for raw, filename in image_payloads)
+            )
+    except HTTPException:
+        raise
     except Exception as exc:
         print(f"IMAGE EXTRACTION ERROR: {type(exc).__name__}: {exc}", flush=True)
         raise HTTPException(

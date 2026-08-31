@@ -2,7 +2,7 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.53 implements
+## What v0.7.54 implements
 
 - The surgeon-confirmation panel and report appendix now use one concise Randleman topography
   reference. The same four mutually exclusive categories feed the existing single point mapper:
@@ -137,10 +137,33 @@ Unreadable source identity/quality may require a clearer source, not a guessed v
 
 PDF/Word exports require server-issued assessment and current ready-report tokens;
 client-supplied clinical decisions cannot bypass completeness. Tokens reference
-bounded in-memory sessions (64; one-hour idle expiry); server restart or eviction
-requires a new upload. Do not increase worker count without shared session storage.
+bounded in-memory sessions (64; one-hour idle expiry); server restart requires a new
+upload. When capacity is full, existing sessions are preserved and new assessments
+receive a retry response rather than silently evicting an active case. Do not increase
+worker count without shared session storage.
 Form edits hide the previous report. No clinical model accuracy claim is inferred
 from unit tests; unreadable image values require surgeon confirmation.
+
+## Operational security boundary
+
+`operational_security.py` is installed only by `canonical_engine.py`; it contains no
+clinical score or threshold. It incrementally enforces a default maximum of 16 image
+files, 12 MiB per image, and 80 MiB total per assessment before an OpenAI request.
+Whole-case model work is limited to two concurrent assessments and 24 new assessments
+per 15-minute process window by default. These limits are configurable through the
+documented `CERAI_*` environment variables.
+
+Production clinical POST endpoints support a shared access key supplied in the
+`X-CERAI-Access-Key` header. Set both `CERAI_REQUIRE_ACCESS_KEY=1` and a long random
+`CERAI_ACCESS_KEY` in Railway secrets; never commit the key. The browser asks for the
+key only after a protected endpoint returns 401 and retains it only in session storage.
+Production API documentation is closed unless `CERAI_EXPOSE_API_DOCS=1`. Standard
+anti-framing, MIME-sniffing, referrer, permissions, CSP and HSTS headers are added.
+
+Production dependencies and test-only dependencies are separated. CI audits both,
+runs critical Ruff checks, verifies the canonical startup invariants, executes the
+complete suite, and then executes every test file in a fresh Python process so import-
+order coupling cannot be hidden by the complete-suite collection order.
 
 Deployment: publish all changed files in one GitHub tree/commit before moving main,
 so a partial multi-file update cannot deploy. Pre-release rollback base:

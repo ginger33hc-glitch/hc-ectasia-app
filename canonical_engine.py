@@ -15,15 +15,17 @@ import microkeratome_planning_policy  # noqa: F401
 import erss_topography_evidence_policy  # noqa: F401
 import nice_policy
 import assessment_workflow
+import operational_security
 
 core = bootstrap.core
 app = _runtime.app
-CANONICAL_VERSION = "0.7.53"
+CANONICAL_VERSION = "0.7.54"
 core.APP_VERSION = CANONICAL_VERSION
 core.app.title = f"CER-AI v{CANONICAL_VERSION}"
 reports.APP_VERSION = CANONICAL_VERSION
 nice_policy.install(core)
 assessment_workflow.install(core)
+operational_security.install(core)
 
 # ERSS morphology auto-read cleanup must wrap the fully installed assessment workflow.
 # Keep it out of bootstrap so the production composition order remains explicit here.
@@ -65,6 +67,7 @@ def runtime_invariants():
     if not getattr(core,"_hc_microkeratome_planning_installed",False):errors.append("Post-assessment ML7 microkeratome planning layer is not active")
     if not getattr(core,"_hc_nice_installed",False):errors.append("Independent CER-AI NICE policy is not active")
     if not getattr(core,"_hc_readiness_installed",False):errors.append("Pre-report readiness workflow is not active")
+    if not getattr(core,"_cerai_operational_security_installed",False):errors.append("Operational security boundary is not active")
     if not getattr(core,"_erss_topography_evidence_policy_installed",False):errors.append("ERSS I-S/topography evidence gate is not active")
     if not getattr(core,"_erss_auto_read_policy_installed",False):errors.append("ERSS morphology auto-read separation policy is not active")
     if getattr(core.lasik_topography_points, "__module__", None) != "app":errors.append("ERSS evidence gate must not replace or duplicate the canonical topography point mapper")
