@@ -227,6 +227,49 @@ def test_source_media_type_is_preserved_from_filename_extension():
     assert source.media_type == "image/webp"
 
 
+def test_source_inventory_round_trip_preserves_order_and_encrypted_filename():
+    archive = make_archive()
+    case_id = archive.new_case_id()
+    archive.archive_sources(
+        case_id,
+        [(b"second", "Patient OS.png"), (b"first", "Patient OD.jpg")],
+        patient_metadata={"patient_name": "Patient Name"},
+        extracted={},
+    )
+    sources = archive.list_sources(case_id)
+    assert [source.ordinal for source in sources] == [1, 2]
+    assert [source.original_filename for source in sources] == ["Patient OS.png", "Patient OD.jpg"]
+    assert archive.get_bytes(sources[0].artifact) == b"second"
+    assert archive.find_source(case_id, 2) == sources[1]
+    assert archive.find_source(case_id, 99) is None
+
+
+def test_source_inventory_rejects_invalid_case_identifier_without_listing_storage():
+    archive = make_archive()
+    assert archive.list_sources("patient-name") == tuple()
+    assert archive.find_source("patient-name", 1) is None
+
+
+def test_source_inventory_fails_closed_when_encrypted_intake_is_tampered():
+    archive = make_archive()
+    case_id = archive.new_case_id()
+    refs = archive.archive_sources(
+        case_id,
+        [(b"image", "map.jpg")],
+        patient_metadata={},
+        extracted={},
+    )
+    intake = next(ref for ref in refs if ref.kind == "intake-json")
+    stored = archive.store.objects[intake.key]
+    altered = bytearray(stored.data)
+    altered[-1] ^= 1
+    archive.store.objects[intake.key] = case_archive.StoredObject(
+        bytes(altered), stored.metadata, stored.content_type
+    )
+    with pytest.raises(case_archive.ArchiveIntegrityError):
+        archive.list_sources(case_id)
+
+
 def test_ready_archive_generates_canonical_json_and_both_report_languages():
     archive = make_archive()
     revision = archive.archive_ready(

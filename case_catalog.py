@@ -11,9 +11,11 @@ from copy import deepcopy
 from datetime import date, datetime
 from io import BytesIO
 import json
+import mimetypes
 import re
 import unicodedata
 from typing import Any, Dict, Optional
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import Body, HTTPException
 from fastapi.responses import StreamingResponse
@@ -22,6 +24,14 @@ from case_archive import EncryptedArchive, RevisionRef
 
 
 CATALOG_FORMAT = "CER-AI-CASE-CATALOG-v1"
+SAFE_INLINE_SOURCE_TYPES = {
+    "image/bmp",
+    "image/gif",
+    "image/jpeg",
+    "image/png",
+    "image/tiff",
+    "image/webp",
+}
 _CATALOG_KEY_RE = re.compile(
     r"^cases/(?P<case_id>[0-9a-f]{32})/catalog/(?P<revision_id>[0-9a-f]{24})/case-index-[0-9a-f]{64}\.enc$"
 )
@@ -219,6 +229,30 @@ def _principal_can_access(principal: Any, entry: Dict[str, Any]) -> bool:
     return principal.role == "DOCTOR" and creator.get("user_id") == principal.user_id
 
 
+def _authorized_entry(archive: EncryptedArchive, principal: Any, case_id: str, revision_id: str):
+    entry = get_entry(archive, case_id, revision_id)
+    if entry is None:
+        raise HTTPException(404, "Archived CER-AI case revision not found.")
+    if not _principal_can_access(principal, entry):
+        raise HTTPException(403, "You do not have access to this archived case.")
+    return entry
+
+
+def _generic_source_filename(source: Any) -> str:
+    original = str(source.original_filename or "").replace("\\", "/").split("/")[-1]
+    suffix = original.rsplit(".", 1)[-1].lower() if "." in original else ""
+    if not suffix.isalnum() or not 1 <= len(suffix) <= 10:
+        suffix = (mimetypes.guess_extension(source.artifact.media_type) or ".bin").lstrip(".")
+    return f"CER-AI_Pentacam_Source_{source.ordinal:03d}.{suffix}"
+
+
+def _zip_source_filename(source: Any) -> str:
+    original = str(source.original_filename or "").replace("\\", "/").split("/")[-1]
+    cleaned = "".join(ch if ch.isalnum() or ch in {"-", "_", ".", " "} else "_" for ch in original)
+    cleaned = cleaned.strip(" .")[:180] or _generic_source_filename(source)
+    return f"{source.ordinal:03d}_{cleaned}"
+
+
 def install(core: Any, archive_runtime: Any) -> None:
     """Persist encrypted catalog entries and add role-scoped archive routes when named auth is on."""
     if getattr(core, "_cerai_case_catalog_installed", False):
@@ -324,11 +358,7 @@ def install(core: Any, archive_runtime: Any) -> None:
             principal = user_access.require_current_principal()
             if not archive_runtime.enabled:
                 raise HTTPException(503, "CER-AI secure archive is not enabled.")
-            entry = get_entry(archive_runtime.archive, case_id, revision_id)
-            if entry is None:
-                raise HTTPException(404, "Archived CER-AI case revision not found.")
-            if not _principal_can_access(principal, entry):
-                raise HTTPException(403, "You do not have access to this archived case.")
+            _authorized_entry(archive_runtime.archive, principal, case_id, revision_id)
             if kind not in {"pdf", "docx"}:
                 raise HTTPException(404, "Unsupported archived report type.")
             locale = "tr" if str(locale).lower().startswith("tr") else "en"
@@ -353,6 +383,101 @@ def install(core: Any, archive_runtime: Any) -> None:
                 BytesIO(content),
                 media_type=media_type,
                 headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+
+        @core.app.get("/archive/cases/{case_id}/revisions/{revision_id}/sources")
+        def archived_sources(case_id: str, revision_id: str):
+            principal = user_access.require_current_principal()
+            if not archive_runtime.enabled:
+                raise HTTPException(503, "CER-AI secure archive is not enabled.")
+            _authorized_entry(archive_runtime.archive, principal, case_id, revision_id)
+            sources = archive_runtime.archive.list_sources(case_id)
+            audit(
+                "SOURCE_LIST",
+                actor=principal,
+                case_id=case_id,
+                revision_id=revision_id,
+                details={"source_count": len(sources)},
+            )
+            return {
+                "sources": [
+                    {
+                        "ordinal": source.ordinal,
+                        "original_filename": source.original_filename,
+                        "media_type": source.artifact.media_type,
+                        "plaintext_bytes": source.artifact.plaintext_bytes,
+                        "sha256": source.artifact.sha256,
+                    }
+                    for source in sources
+                ],
+                "count": len(sources),
+            }
+
+        def source_response(case_id: str, revision_id: str, ordinal: int, disposition: str):
+            principal = user_access.require_current_principal()
+            if not archive_runtime.enabled:
+                raise HTTPException(503, "CER-AI secure archive is not enabled.")
+            _authorized_entry(archive_runtime.archive, principal, case_id, revision_id)
+            source = archive_runtime.archive.find_source(case_id, ordinal)
+            if source is None:
+                raise HTTPException(404, "Archived Pentacam source image not found.")
+            if disposition == "inline" and source.artifact.media_type not in SAFE_INLINE_SOURCE_TYPES:
+                raise HTTPException(415, "This archived source type is available for download only.")
+            content = archive_runtime.archive.get_bytes(source.artifact)
+            audit(
+                "SOURCE_PREVIEW" if disposition == "inline" else "SOURCE_DOWNLOAD",
+                actor=principal,
+                case_id=case_id,
+                revision_id=revision_id,
+                details={"ordinal": source.ordinal, "sha256": source.artifact.sha256},
+            )
+            return StreamingResponse(
+                BytesIO(content),
+                media_type=source.artifact.media_type,
+                headers={
+                    "Content-Disposition": (
+                        f'{disposition}; filename="{_generic_source_filename(source)}"'
+                    ),
+                    "X-Content-Type-Options": "nosniff",
+                },
+            )
+
+        @core.app.get("/archive/cases/{case_id}/revisions/{revision_id}/sources/{ordinal}/preview")
+        def preview_archived_source(case_id: str, revision_id: str, ordinal: int):
+            return source_response(case_id, revision_id, ordinal, "inline")
+
+        @core.app.get("/archive/cases/{case_id}/revisions/{revision_id}/sources/{ordinal}/download")
+        def download_archived_source(case_id: str, revision_id: str, ordinal: int):
+            return source_response(case_id, revision_id, ordinal, "attachment")
+
+        @core.app.get("/archive/cases/{case_id}/revisions/{revision_id}/sources.zip")
+        def download_archived_sources(case_id: str, revision_id: str):
+            principal = user_access.require_current_principal()
+            if not archive_runtime.enabled:
+                raise HTTPException(503, "CER-AI secure archive is not enabled.")
+            _authorized_entry(archive_runtime.archive, principal, case_id, revision_id)
+            sources = archive_runtime.archive.list_sources(case_id)
+            if not sources:
+                raise HTTPException(404, "No archived Pentacam source images were found.")
+            output = BytesIO()
+            with ZipFile(output, "w", compression=ZIP_DEFLATED, allowZip64=True) as bundle:
+                for source in sources:
+                    bundle.writestr(
+                        _zip_source_filename(source),
+                        archive_runtime.archive.get_bytes(source.artifact),
+                    )
+            output.seek(0)
+            audit(
+                "SOURCE_DOWNLOAD_ALL",
+                actor=principal,
+                case_id=case_id,
+                revision_id=revision_id,
+                details={"source_count": len(sources)},
+            )
+            return StreamingResponse(
+                output,
+                media_type="application/zip",
+                headers={"Content-Disposition": 'attachment; filename="CER-AI_Pentacam_Sources.zip"'},
             )
 
     core._cerai_case_catalog_installed = True

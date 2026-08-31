@@ -117,7 +117,7 @@ Keep:
 
 `CERAI_ARCHIVE_REQUIRED=0`
 
-for the first controlled verification. Use only non-PHI or an explicitly approved test case. Confirm that the Case Archive UI can search the archived revision and retrieve the exact original PDF/DOCX.
+for the first controlled verification. Use only non-PHI or an explicitly approved test case. Confirm that the Case Archive UI can search the archived revision, retrieve the exact original PDF/DOCX, preview every supported raster Pentacam source, download each exact original source payload, and download the complete source ZIP. Verify both OWNER all-case access and DOCTOR own-case-only isolation before enabling patient-data use.
 
 ## 8. Enable fail-closed production behavior
 

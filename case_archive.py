@@ -222,6 +222,13 @@ class RevisionRef:
     artifacts: tuple[ArtifactRef, ...]
 
 
+@dataclass(frozen=True)
+class SourceFileRef:
+    ordinal: int
+    original_filename: str
+    artifact: ArtifactRef
+
+
 class EncryptedArchive:
     """Encrypt and integrity-protect every object before it reaches the storage provider."""
 
@@ -381,6 +388,76 @@ class EncryptedArchive:
             self.put_bytes(case_id, "intake", "intake-json", payload, media_type="application/json")
         )
         return tuple(refs)
+
+    def list_sources(self, case_id: str) -> tuple[SourceFileRef, ...]:
+        """Return the authenticated source inventory without exposing storage object keys."""
+        if not case_id or any(ch not in "0123456789abcdef" for ch in case_id.lower()) or len(case_id) != 32:
+            return tuple()
+        intake_keys = self.store.list(f"cases/{case_id}/intake/")
+        if not intake_keys:
+            return tuple()
+        if len(intake_keys) != 1:
+            raise ArchiveIntegrityError("Archived case has an ambiguous source intake manifest.")
+        try:
+            intake = json.loads(self.get_bytes(intake_keys[0]))
+        except ArchiveIntegrityError:
+            raise
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ArchiveIntegrityError("Archived source intake manifest is unreadable.") from exc
+        if intake.get("archive_format") != ARCHIVE_FORMAT or intake.get("case_id") != case_id:
+            raise ArchiveIntegrityError("Archived source intake manifest identity is invalid.")
+
+        sources: list[SourceFileRef] = []
+        seen_ordinals: set[int] = set()
+        for item in intake.get("source_files") or []:
+            if not isinstance(item, dict) or not isinstance(item.get("artifact"), dict):
+                raise ArchiveIntegrityError("Archived source intake entry is invalid.")
+            artifact = item["artifact"]
+            try:
+                ordinal = int(item.get("ordinal"))
+                plaintext_bytes = int(artifact.get("plaintext_bytes"))
+            except (TypeError, ValueError):
+                raise ArchiveIntegrityError("Archived source intake ordinal or size is invalid.")
+            original_filename = str(item.get("original_filename") or "").strip()
+            key = str(artifact.get("key") or "")
+            sha256 = str(artifact.get("sha256") or "").lower()
+            media_type = str(artifact.get("media_type") or "application/octet-stream")
+            expected_prefix = f"cases/{case_id}/source/{ordinal:03d}/pentacam-source-"
+            if (
+                ordinal < 1
+                or ordinal in seen_ordinals
+                or not original_filename
+                or not key.startswith(expected_prefix)
+                or not key.endswith(".enc")
+                or len(sha256) != 64
+                or any(ch not in "0123456789abcdef" for ch in sha256)
+                or plaintext_bytes < 0
+                or artifact.get("kind") != "pentacam-source"
+                or artifact.get("locale") is not None
+            ):
+                raise ArchiveIntegrityError("Archived source intake artifact reference is invalid.")
+            seen_ordinals.add(ordinal)
+            sources.append(
+                SourceFileRef(
+                    ordinal=ordinal,
+                    original_filename=original_filename,
+                    artifact=ArtifactRef(
+                        key=key,
+                        sha256=sha256,
+                        plaintext_bytes=plaintext_bytes,
+                        media_type=media_type,
+                        kind="pentacam-source",
+                        locale=None,
+                    ),
+                )
+            )
+        return tuple(sorted(sources, key=lambda source: source.ordinal))
+
+    def find_source(self, case_id: str, ordinal: int) -> Optional[SourceFileRef]:
+        for source in self.list_sources(case_id):
+            if source.ordinal == int(ordinal):
+                return source
+        return None
 
     @staticmethod
     def _canonical_ready(ready: Dict[str, Any]) -> Dict[str, Any]:

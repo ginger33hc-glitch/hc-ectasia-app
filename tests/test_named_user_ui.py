@@ -78,6 +78,9 @@ def test_archive_page_requires_session_and_contains_role_aware_tools():
     assert "/archive/audit/search" in allowed.text
     assert "Original PDF EN" in allowed.text
     assert "Regenerate PDF EN" in allowed.text
+    assert "Pentacam sources" in allowed.text
+    assert "View source images" in allowed.text
+    assert "Download all source images (ZIP)" in allowed.text
     assert allowed.headers["cache-control"] == "no-store"
 
 
