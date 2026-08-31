@@ -161,3 +161,11 @@ Existing matching objects are retained. Any conflicting destination object abort
 Do not merge/deploy the archive PR unless all repository safety gates are green and the real Railway preflight + non-PHI canary have both passed.
 
 The archive master key must be backed up outside Railway before real patient data is stored.
+
+### Required activation order
+
+The supported sequence is strictly:
+
+`Bucket created -> variables injected -> preflight PASS -> canary PASS -> named-user sign-in verified -> archive ENABLED -> controlled archive verification -> archive REQUIRED`
+
+Do not skip directly from bucket creation to `CERAI_ARCHIVE_REQUIRED=1`.
