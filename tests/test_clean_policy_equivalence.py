@@ -61,6 +61,7 @@ def test_clean_constants_equal_locked_runtime_constants():
     assert policy.POLICY.corneal_effect_per_intended_mrse_d == legacy.CORNEAL_EFFECT_PER_INTENDED_MRSE_D
     assert policy.POLICY.final_kmean_min_d == legacy.FINAL_KMEAN_MIN_D
     assert policy.POLICY.final_kmean_max_d == legacy.FINAL_KMEAN_MAX_D
+    assert policy.POLICY.bad_d_abnormal_min == 2.6
 
 
 def test_unified_score_policy_has_one_locked_2_3_4_boundary():

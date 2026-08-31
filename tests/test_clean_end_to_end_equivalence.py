@@ -56,7 +56,7 @@ def test_clean_lasik_score_components_match_canonical_primitives_across_matrix()
 
 
 def test_clean_bad_d_classification_matches_canonical_across_final_boundaries():
-    for bad_d in (1.0, 1.6, 1.6001, 2.99, 3.0, 4.0):
+    for bad_d in (1.0, 1.6, 1.6001, 2.5999, 2.6, 3.0, 4.0):
         out = clean_case(bad_d=bad_d)
         assert out.bad_d_status == legacy.bad_classification(bad_d, final=True)
 
@@ -76,7 +76,7 @@ def test_clean_final_lasik_status_matches_locked_principal_hierarchy_for_compara
     expected = (
         ({}, "PASS WITH CAUTION"),
         ({"age_years": 18}, "CAUTION — STOP/DEFER"),
-        ({"bad_d": 3.0}, "DO NOT PROCEED"),
+        ({"bad_d": 2.6}, "DO NOT PROCEED"),
         ({"bad_d": None}, "DATA INSUFFICIENT"),
     )
     for changes, status in expected:
@@ -87,7 +87,7 @@ def test_same_complete_lasik_cases_match_canonical_end_to_end():
     cases = (
         {"age": 30, "pachy": 560, "bad_d": 1.0},
         {"age": 18, "pachy": 560, "bad_d": 1.0},
-        {"age": 30, "pachy": 560, "bad_d": 3.0},
+        {"age": 30, "pachy": 560, "bad_d": 2.6},
         {"age": 30, "pachy": 480, "bad_d": 1.0},
     )
     for case in cases:

@@ -362,7 +362,8 @@ class TestBoundaries(unittest.TestCase):
     def test_bad_display_boundaries(self):
         self.assertEqual(app.bad_classification(1.6, final=True), "NORMAL")
         self.assertEqual(app.bad_classification(1.6001, final=True), "SUSPICIOUS")
-        self.assertEqual(app.bad_classification(3.0, final=True), "ABNORMAL")
+        self.assertEqual(app.bad_classification(2.5999, final=True), "SUSPICIOUS")
+        self.assertEqual(app.bad_classification(2.6, final=True), "ABNORMAL")
         self.assertEqual(app.bad_classification(1.6), "SUSPICIOUS")
         self.assertEqual(app.bad_classification(2.6), "ABNORMAL")
 

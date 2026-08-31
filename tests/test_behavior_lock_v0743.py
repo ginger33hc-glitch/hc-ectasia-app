@@ -16,7 +16,7 @@ core = canonical_engine.core
 
 
 def test_canonical_version_lock():
-    assert canonical_engine.CANONICAL_VERSION == "0.7.50"
+    assert canonical_engine.CANONICAL_VERSION == "0.7.51"
 
 
 def test_hc_age_boundaries():
@@ -32,8 +32,8 @@ def test_hc_pachymetry_boundaries():
 
 
 def test_final_bad_d_boundaries():
-    assert [(x, core.bad_classification(x, final=True)) for x in (1.6, 1.6001, 2.99, 3.0)] == [
-        (1.6, "NORMAL"), (1.6001, "SUSPICIOUS"), (2.99, "SUSPICIOUS"), (3.0, "ABNORMAL")
+    assert [(x, core.bad_classification(x, final=True)) for x in (1.6, 1.6001, 2.5999, 2.6)] == [
+        (1.6, "NORMAL"), (1.6001, "SUSPICIOUS"), (2.5999, "SUSPICIOUS"), (2.6, "ABNORMAL")
     ]
 
 

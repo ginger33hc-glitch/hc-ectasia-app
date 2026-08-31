@@ -4,8 +4,8 @@ Individual Df/Db/Dp/Dt/Da values remain displayed for clinical context, but an
 isolated suspicious/abnormal component does not determine the CER-AI BAD status.
 Final BAD-D:
 - <=1.6: NORMAL
-- >1.6 and <3.0: SUSPICIOUS, contextual under the canonical final-decision hierarchy
-- >=3.0: ABNORMAL CORNEA -> DO NOT PROCEED hard stop
+- >1.6 and <2.6: SUSPICIOUS, contextual under the canonical final-decision hierarchy
+- >=2.6: ABNORMAL CORNEA -> DO NOT PROCEED hard stop
 
 Final PASS WITH CAUTION versus Randleman/ERSS adverse classification belongs only
 to hc_final_decision_policy.py; this module must not independently escalate a
@@ -68,7 +68,7 @@ def assess_eye_with_final_bad_cutoff(eye, plan, age, patient_modifiers):
     bad_d_status = final_bad_status(eye)
     result["final_bad_d_interpretation"] = bad_d_status
     if bad_d_status == "ABNORMAL":
-        hard_stop = "CER-AI operational hard stop: Final BAD-D abnormal (>=3.0); cornea classified ABNORMAL by the CER-AI BAD-D gate."
+        hard_stop = "CER-AI operational hard stop: Final BAD-D abnormal (>=2.60); cornea classified ABNORMAL by the CER-AI BAD-D gate."
         hard_stops = result.setdefault("hard_stops", [])
         reasons = result.setdefault("reasons", [])
         if hard_stop not in hard_stops:
@@ -76,7 +76,7 @@ def assess_eye_with_final_bad_cutoff(eye, plan, age, patient_modifiers):
         if hard_stop not in reasons:
             reasons.append(hard_stop)
         result["status"] = "DO NOT PROCEED"
-        result["action"] = "DO NOT PROCEED — ABNORMAL CORNEA. Final BAD-D is >=3.0 and meets the CER-AI abnormal cutoff."
+        result["action"] = "DO NOT PROCEED — ABNORMAL CORNEA. Final BAD-D is >=2.60 and meets the CER-AI abnormal cutoff."
     # SUSPICIOUS Final BAD-D is intentionally not decision-changing here.
     # hc_final_decision_policy.py is the sole final hierarchy authority.
     return result

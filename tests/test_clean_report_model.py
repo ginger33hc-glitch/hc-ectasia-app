@@ -33,7 +33,7 @@ def test_report_model_preserves_domain_result_without_recalculation():
 
 def test_report_model_uses_central_status_presentation_semantics():
     assert build_report_model(assessment()).presentation_class == "pass"
-    assert build_report_model(assessment(bad_d=3.0)).presentation_class == "fail"
+    assert build_report_model(assessment(bad_d=2.6)).presentation_class == "fail"
     assert build_report_model(assessment(age_years=18)).presentation_class == "caution"
     assert build_report_model(assessment(bad_d=None)).presentation_class == "insufficient"
 

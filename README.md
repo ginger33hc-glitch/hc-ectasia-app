@@ -100,7 +100,13 @@ local HTTPS `git push` credential. Use the connected GitHub application:
 
 Never place GitHub passwords, tokens, API keys, or other credentials in this repository.
 
-## v0.7.50 — CER-AI-adapted NICE and report readiness
+## v0.7.51 — CER-AI-adapted NICE and report readiness
+
+Final BAD-D policy is now boundary-locked to the Pentacam abnormal display threshold:
+`<=1.60` normal, `>1.60 to <2.60` suspicious, and `>=2.60` abnormal. Final
+BAD-D `>=2.60` is an inclusive CER-AI operational hard stop and produces
+`DO NOT PROCEED`. Individual Df/Db/Dp/Dt/Da components remain contextual and
+do not independently determine clearance.
 
 `canonical_engine.py` remains the single production composition root. Independent
 `nice_scoring.py` and `nice_policy.py` add a restrictive-only final NICE disposition;

@@ -18,7 +18,7 @@ class HCPolicy:
     lasik_rsb_hard_stop_um: float = 300.0
     prk_rst_hard_stop_um: float = 310.0
     bad_d_normal_max: float = 1.6
-    bad_d_abnormal_min: float = 3.0
+    bad_d_abnormal_min: float = 2.6
     score_defer: int = 3
     score_stop: int = 4
 

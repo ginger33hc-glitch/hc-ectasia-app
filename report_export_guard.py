@@ -22,7 +22,7 @@ from docx import Document
 from docx.shared import Pt
 
 IDENTITY_HEADING="PATIENT IDENTITY NOT VERIFIED - SURGEON CONFIRMATION REQUIRED"
-PDF_BAD=[["Final BAD-D","CER-AI interpretation / action"],["<=1.6","NORMAL"],[">1.6 to <3.0","SUSPICIOUS - REVIEW / NOT CLEARED"],[">=3.0","ABNORMAL CORNEA - DO NOT PROCEED"]]
+PDF_BAD=[["Final BAD-D","CER-AI interpretation / action"],["<=1.6","NORMAL"],[">1.6 to <2.60","SUSPICIOUS - REVIEW / NOT CLEARED"],[">=2.60","ABNORMAL CORNEA - DO NOT PROCEED"]]
 ERSS=[
  ["Variable","Finding","Points"],
  ["Anterior topography","Normal / symmetrical","0"],["Anterior topography","Asymmetric bow-tie","1"],["Anterior topography","Inferior steepening / significant SRA-SRAX","3"],["Anterior topography","Abnormal ectatic pattern","4"],

@@ -3,7 +3,7 @@
 CER-AI policy:
 - Independent hard stops always prevail.
 - Missing/unresolved decision-critical data can never be promoted to clearance.
-- Final BAD-D ABNORMAL (>=3.0) remains a hard stop.
+- Final BAD-D ABNORMAL (>=2.60) remains a hard stop.
 - Randleman/ERSS total >=3 remains an adverse/defer pathway.
 - Otherwise, when Final BAD-D is available and not ABNORMAL and Randleman is complete
   with total <3, secondary/contextual findings may generate warnings but the final
@@ -48,13 +48,13 @@ def assess_eye_with_hc_final_hierarchy(eye, plan, age, patient_modifiers):
 
     if bad_status == "ABNORMAL":
         # Normally enforced upstream; retain a defensive guard here.
-        stop = "CER-AI operational hard stop: Final BAD-D abnormal (>=3.0); cornea classified ABNORMAL by the CER-AI BAD-D gate."
+        stop = "CER-AI operational hard stop: Final BAD-D abnormal (>=2.60); cornea classified ABNORMAL by the CER-AI BAD-D gate."
         if stop not in result.setdefault("hard_stops", []):
             result["hard_stops"].append(stop)
         if stop not in result.setdefault("reasons", []):
             result["reasons"].append(stop)
         result["status"] = "DO NOT PROCEED"
-        result["action"] = "DO NOT PROCEED — ABNORMAL CORNEA. Final BAD-D is >=3.0 and meets the CER-AI abnormal cutoff."
+        result["action"] = "DO NOT PROCEED — ABNORMAL CORNEA. Final BAD-D is >=2.60 and meets the CER-AI abnormal cutoff."
         return result
 
     if float(erss_total) >= 3:

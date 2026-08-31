@@ -25,6 +25,12 @@ def test_final_bad_category_discordance_is_positive():
     assert any("Final BAD-D" in item for item in out["major_discordances"])
 
 
+def test_final_bad_2_60_boundary_is_abnormal_for_inter_eye_context():
+    out = assess_inter_eye_tomography([eye("OD", bad=2.5999), eye("OS", bad=2.6)])
+    assert out["status"] == "POSITIVE"
+    assert "OD SUSPICIOUS vs OS ABNORMAL" in out["major_discordances"][0]
+
+
 def test_morphology_normal_vs_inferior_steepening_is_positive():
     out = assess_inter_eye_tomography([
         eye("OD"),

@@ -153,8 +153,12 @@ def test_prk_rst_just_below_310_is_hard_stop_and_310_is_not():
     assert "PRK_RST_LT_310" not in assess(base(procedure="PRK", pachy_thinnest_um=500, flap_um=None, ablation_um=140)).hard_stops
 
 
-def test_bad_d_3_is_hard_stop():
-    out = assess(base(bad_d=3.0)); assert out.status == "DO NOT PROCEED" and "FINAL_BAD_D_ABNORMAL" in out.hard_stops
+def test_bad_d_2_60_is_inclusive_hard_stop_and_just_below_is_not():
+    below = assess(base(bad_d=2.5999))
+    boundary = assess(base(bad_d=2.6))
+    assert "FINAL_BAD_D_ABNORMAL" not in below.hard_stops
+    assert boundary.status == "DO NOT PROCEED"
+    assert "FINAL_BAD_D_ABNORMAL" in boundary.hard_stops
 
 
 def test_lasik_score_two_has_no_score_escalation():

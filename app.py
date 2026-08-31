@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="CER-AI v0.7.50")
+app = FastAPI(title="CER-AI v0.7.51")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -471,7 +471,7 @@ def bad_classification(value: Optional[float], final: bool = False) -> str:
     if final:
         if value <= 1.6:
             return "NORMAL"
-        if value < 3.0:
+        if value < 2.6:
             return "SUSPICIOUS"
         return "ABNORMAL"
     if value < 1.6:
@@ -1462,7 +1462,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.50 / source set 2026-08-25 plus binding CER-AI amendments",
+        "version": "software v0.7.51 / source set 2026-08-25 plus binding CER-AI amendments",
     }
 
 

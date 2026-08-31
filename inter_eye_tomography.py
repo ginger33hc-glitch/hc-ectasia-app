@@ -18,7 +18,7 @@ def _bad_category(value: Any) -> str:
     value = float(value)
     if value <= 1.6:
         return "NORMAL"
-    if value < 3.0:
+    if value < 2.6:
         return "SUSPICIOUS"
     return "ABNORMAL"
 

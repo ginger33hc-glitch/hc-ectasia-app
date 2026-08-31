@@ -18,7 +18,7 @@ import assessment_workflow
 
 core = bootstrap.core
 app = _runtime.app
-CANONICAL_VERSION = "0.7.50"
+CANONICAL_VERSION = "0.7.51"
 core.APP_VERSION = CANONICAL_VERSION
 core.app.title = f"CER-AI v{CANONICAL_VERSION}"
 reports.APP_VERSION = CANONICAL_VERSION
@@ -38,7 +38,7 @@ def runtime_invariants():
         errors.append("CER-AI age policy is not active")
     if [core.lasik_pachy_points(x) for x in (479, 480, 481, 499, 500, 509, 510, 511)] != [None, 2, 2, 2, 1, 1, 0, 0]:
         errors.append("CER-AI pachymetry policy is not active")
-    if [core.bad_classification(x, final=True) for x in (1.6, 1.61, 2.99, 3.0)] != ["NORMAL", "SUSPICIOUS", "SUSPICIOUS", "ABNORMAL"]:
+    if [core.bad_classification(x, final=True) for x in (1.6, 1.61, 2.5999, 2.6)] != ["NORMAL", "SUSPICIOUS", "SUSPICIOUS", "ABNORMAL"]:
         errors.append("CER-AI Final BAD-D policy is not active")
 
     expected_topography = {"NORMAL_SYMMETRIC":0,"ASYMMETRIC_BOWTIE":1,"INFERIOR_STEEPENING_SRA":3,"ABNORMAL_ECTATIC":4}

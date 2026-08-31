@@ -50,8 +50,8 @@ def test_hc_pachymetry_480_scores_and_479_fails():
 
 
 def test_final_bad_d_abnormal_boundary_remains_inclusive():
-    assert core.bad_classification(2.999, final=True) == "SUSPICIOUS"
-    assert core.bad_classification(3.0, final=True) == "ABNORMAL"
+    assert core.bad_classification(2.5999, final=True) == "SUSPICIOUS"
+    assert core.bad_classification(2.6, final=True) == "ABNORMAL"
 
 
 def test_hard_stop_status_outranks_every_favorable_status():
