@@ -1,13 +1,13 @@
 """Encrypted, provider-neutral case archive for CER-AI.
 
-The clinical engine never depends on this module.  It wraps the web/workflow boundary and stores
+The clinical engine never depends on this module. It wraps the web/workflow boundary and stores
 source images, canonical assessment snapshots, and generated reports in private S3-compatible object
-storage.  Object keys contain only random case identifiers and content hashes; patient names and IDs
+storage. Object keys contain only random case identifiers and content hashes; patient names and IDs
 are never used in storage paths.
 
 Railway Storage Buckets currently do not provide server-side encryption, object versioning, or object
-locks.  CER-AI therefore encrypts every archived payload before upload and uses content-addressed keys
-so the application never overwrites an existing clinical artifact.
+locks. CER-AI therefore encrypts every archived payload before upload, verifies plaintext SHA-256 on
+read, and refuses application-level overwrites of an existing logical artifact.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
+import mimetypes
 import os
 from pathlib import PurePosixPath
 from threading import RLock
@@ -31,7 +32,7 @@ from fastapi import HTTPException
 
 
 ARCHIVE_FORMAT = "CER-AI-ARCHIVE-v1"
-ENVELOPE_MAGIC = b"CERAIA1"
+ENVELOPE_MAGIC = b"CER-AI1"
 MAX_TOKEN_CASE_MAPPINGS = 256
 
 
@@ -65,7 +66,12 @@ class MemoryObjectStore:
     def put(self, key: str, data: bytes, *, content_type: str, metadata: Dict[str, str]) -> None:
         existing = self.objects.get(key)
         candidate = StoredObject(bytes(data), dict(metadata), content_type)
-        if existing is not None and existing != candidate:
+        if existing is not None:
+            # AES-GCM uses a random nonce, so a retry can produce different ciphertext for the same
+            # plaintext. Matching authenticated plaintext metadata means the logical object already
+            # exists and must be preserved byte-for-byte rather than overwritten.
+            if existing.metadata == candidate.metadata and existing.content_type == candidate.content_type:
+                return
             raise ArchiveIntegrityError(f"Attempted overwrite of immutable archive key: {key}")
         self.objects[key] = candidate
 
@@ -87,18 +93,53 @@ class S3ObjectStore:
 
     @classmethod
     def from_environment(cls) -> "S3ObjectStore":
-        bucket = (os.getenv("CERAI_ARCHIVE_BUCKET") or os.getenv("BUCKET") or os.getenv("AWS_S3_BUCKET_NAME") or "").strip()
-        endpoint = (os.getenv("CERAI_ARCHIVE_ENDPOINT") or os.getenv("ENDPOINT") or os.getenv("AWS_ENDPOINT_URL") or "").strip()
-        access_key = (os.getenv("CERAI_ARCHIVE_ACCESS_KEY_ID") or os.getenv("ACCESS_KEY_ID") or os.getenv("AWS_ACCESS_KEY_ID") or "").strip()
-        secret_key = (os.getenv("CERAI_ARCHIVE_SECRET_ACCESS_KEY") or os.getenv("SECRET_ACCESS_KEY") or os.getenv("AWS_SECRET_ACCESS_KEY") or "").strip()
-        region = (os.getenv("CERAI_ARCHIVE_REGION") or os.getenv("REGION") or os.getenv("AWS_DEFAULT_REGION") or "auto").strip()
-        style = (os.getenv("CERAI_ARCHIVE_URL_STYLE") or os.getenv("AWS_S3_URL_STYLE") or "virtual").strip().lower()
-        required = {"bucket": bucket, "endpoint": endpoint, "access_key": access_key, "secret_key": secret_key}
+        bucket = (
+            os.getenv("CERAI_ARCHIVE_BUCKET")
+            or os.getenv("BUCKET")
+            or os.getenv("AWS_S3_BUCKET_NAME")
+            or ""
+        ).strip()
+        endpoint = (
+            os.getenv("CERAI_ARCHIVE_ENDPOINT")
+            or os.getenv("ENDPOINT")
+            or os.getenv("AWS_ENDPOINT_URL")
+            or ""
+        ).strip()
+        access_key = (
+            os.getenv("CERAI_ARCHIVE_ACCESS_KEY_ID")
+            or os.getenv("ACCESS_KEY_ID")
+            or os.getenv("AWS_ACCESS_KEY_ID")
+            or ""
+        ).strip()
+        secret_key = (
+            os.getenv("CERAI_ARCHIVE_SECRET_ACCESS_KEY")
+            or os.getenv("SECRET_ACCESS_KEY")
+            or os.getenv("AWS_SECRET_ACCESS_KEY")
+            or ""
+        ).strip()
+        region = (
+            os.getenv("CERAI_ARCHIVE_REGION")
+            or os.getenv("REGION")
+            or os.getenv("AWS_DEFAULT_REGION")
+            or "auto"
+        ).strip()
+        style = (
+            os.getenv("CERAI_ARCHIVE_URL_STYLE")
+            or os.getenv("AWS_S3_URL_STYLE")
+            or "virtual"
+        ).strip().lower()
+        required = {
+            "bucket": bucket,
+            "endpoint": endpoint,
+            "access_key": access_key,
+            "secret_key": secret_key,
+        }
         missing = sorted(name for name, value in required.items() if not value)
         if missing:
             raise ArchiveConfigurationError("Missing S3 archive configuration: " + ", ".join(missing))
         if style not in {"virtual", "path"}:
             raise ArchiveConfigurationError("CERAI_ARCHIVE_URL_STYLE must be 'virtual' or 'path'.")
+
         import boto3
         from botocore.config import Config
 
@@ -113,8 +154,23 @@ class S3ObjectStore:
         return cls(client, bucket)
 
     def put(self, key: str, data: bytes, *, content_type: str, metadata: Dict[str, str]) -> None:
-        # Keys are content-addressed by plaintext SHA-256. Re-putting the same logical artifact is
-        # idempotent; CER-AI never exposes an update/delete path for archived clinical objects.
+        """Create once; an existing logical object is never replaced by the application."""
+        from botocore.exceptions import ClientError
+
+        try:
+            existing = self.client.head_object(Bucket=self.bucket, Key=key)
+        except ClientError as exc:
+            code = str((exc.response.get("Error") or {}).get("Code") or "")
+            if code not in {"404", "NoSuchKey", "NotFound"}:
+                raise
+        else:
+            existing_metadata = {str(k): str(v) for k, v in (existing.get("Metadata") or {}).items()}
+            expected_metadata = {str(k): str(v) for k, v in metadata.items()}
+            existing_type = str(existing.get("ContentType") or "application/octet-stream")
+            if existing_metadata == expected_metadata and existing_type == content_type:
+                return
+            raise ArchiveIntegrityError(f"Attempted overwrite of immutable archive key: {key}")
+
         self.client.put_object(
             Bucket=self.bucket,
             Key=key,
@@ -189,7 +245,9 @@ class EncryptedArchive:
     def from_environment(cls) -> "EncryptedArchive":
         key_value = os.getenv("CERAI_ARCHIVE_MASTER_KEY_B64", "").strip()
         if not key_value:
-            raise ArchiveConfigurationError("CERAI_ARCHIVE_MASTER_KEY_B64 is required when archive storage is enabled.")
+            raise ArchiveConfigurationError(
+                "CERAI_ARCHIVE_MASTER_KEY_B64 is required when archive storage is enabled."
+            )
         return cls(S3ObjectStore.from_environment(), cls.decode_master_key(key_value))
 
     @staticmethod
@@ -200,6 +258,13 @@ class EncryptedArchive:
     def _safe_component(value: str) -> str:
         cleaned = "".join(ch for ch in str(value).lower() if ch.isalnum() or ch in {"-", "_"})
         return cleaned[:48] or "artifact"
+
+    @classmethod
+    def _safe_group_parts(cls, group: str) -> list[str]:
+        raw_parts = [part for part in str(group).split("/") if part]
+        if not raw_parts:
+            return ["artifact"]
+        return [cls._safe_component(part) for part in raw_parts]
 
     @staticmethod
     def _digest(data: bytes) -> str:
@@ -235,7 +300,7 @@ class EncryptedArchive:
         if not case_id or any(ch not in "0123456789abcdef" for ch in case_id.lower()) or len(case_id) != 32:
             raise ValueError("case_id must be a 32-character hexadecimal identifier.")
         digest = self._digest(plaintext)
-        components = ["cases", case_id, self._safe_component(group)]
+        components = ["cases", case_id, *self._safe_group_parts(group)]
         if ordinal is not None:
             components.append(f"{int(ordinal):03d}")
         label = self._safe_component(kind)
@@ -245,7 +310,7 @@ class EncryptedArchive:
         aad = f"{ARCHIVE_FORMAT}|{case_id}|{key}|{digest}".encode("utf-8")
         envelope = self._encrypt(plaintext, aad=aad)
         metadata = {
-            "cerai-format": ARCHIVE_FORMAT,
+            "cer-ai-format": ARCHIVE_FORMAT,
             "plaintext-sha256": digest,
             "plaintext-bytes": str(len(plaintext)),
             "media-type": media_type,
@@ -283,8 +348,15 @@ class EncryptedArchive:
         refs: list[ArtifactRef] = []
         source_index: list[Dict[str, Any]] = []
         for index, (raw, filename) in enumerate(image_payloads, 1):
-            media_type = "image/png" if str(filename).lower().endswith(".png") else "image/jpeg"
-            ref = self.put_bytes(case_id, "source", "pentacam-source", raw, media_type=media_type, ordinal=index)
+            media_type = mimetypes.guess_type(str(filename))[0] or "application/octet-stream"
+            ref = self.put_bytes(
+                case_id,
+                "source",
+                "pentacam-source",
+                raw,
+                media_type=media_type,
+                ordinal=index,
+            )
             refs.append(ref)
             source_index.append({
                 "ordinal": index,
@@ -299,8 +371,15 @@ class EncryptedArchive:
             "source_files": source_index,
             "extracted": deepcopy(extracted),
         }
-        payload = json.dumps(intake, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        refs.append(self.put_bytes(case_id, "intake", "intake-json", payload, media_type="application/json"))
+        payload = json.dumps(
+            intake,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        refs.append(
+            self.put_bytes(case_id, "intake", "intake-json", payload, media_type="application/json")
+        )
         return tuple(refs)
 
     @staticmethod
@@ -322,26 +401,48 @@ class EncryptedArchive:
         docx_builder: Callable[[Dict[str, Any]], bytes],
     ) -> RevisionRef:
         canonical = self._canonical_ready(ready)
-        canonical_bytes = json.dumps(canonical, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        canonical_bytes = json.dumps(
+            canonical,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
         revision_id = self._digest(canonical_bytes)[:24]
         group = f"revisions/{revision_id}"
         refs: list[ArtifactRef] = [
-            self.put_bytes(case_id, group, "assessment-json", canonical_bytes, media_type="application/json")
+            self.put_bytes(
+                case_id,
+                group,
+                "assessment-json",
+                canonical_bytes,
+                media_type="application/json",
+            )
         ]
         for locale in ("en", "tr"):
             localized = deepcopy(canonical)
             localized["locale"] = locale
             pdf = pdf_builder(localized)
             docx = docx_builder(localized)
-            refs.append(self.put_bytes(case_id, group, "report-pdf", pdf, media_type="application/pdf", locale=locale))
-            refs.append(self.put_bytes(
-                case_id,
-                group,
-                "report-docx",
-                docx,
-                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                locale=locale,
-            ))
+            refs.append(
+                self.put_bytes(
+                    case_id,
+                    group,
+                    "report-pdf",
+                    pdf,
+                    media_type="application/pdf",
+                    locale=locale,
+                )
+            )
+            refs.append(
+                self.put_bytes(
+                    case_id,
+                    group,
+                    "report-docx",
+                    docx,
+                    media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    locale=locale,
+                )
+            )
         manifest = {
             "archive_format": ARCHIVE_FORMAT,
             "case_id": case_id,
@@ -349,11 +450,30 @@ class EncryptedArchive:
             "archived_at_utc": datetime.now(timezone.utc).isoformat(),
             "artifacts": [asdict(ref) for ref in refs],
         }
-        manifest_bytes = json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        refs.append(self.put_bytes(case_id, group, "manifest-json", manifest_bytes, media_type="application/json"))
+        manifest_bytes = json.dumps(
+            manifest,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        refs.append(
+            self.put_bytes(
+                case_id,
+                group,
+                "manifest-json",
+                manifest_bytes,
+                media_type="application/json",
+            )
+        )
         return RevisionRef(case_id, revision_id, tuple(refs))
 
-    def find_report(self, case_id: str, revision_id: str, locale: str, kind: str) -> Optional[ArtifactRef]:
+    def find_report(
+        self,
+        case_id: str,
+        revision_id: str,
+        locale: str,
+        kind: str,
+    ) -> Optional[ArtifactRef]:
         locale = "tr" if str(locale).lower().startswith("tr") else "en"
         kind = "report-pdf" if kind == "pdf" else "report-docx"
         prefix = f"cases/{case_id}/revisions/{revision_id}/{kind}-{locale}-"
@@ -380,7 +500,10 @@ class CaseArchiveRuntime:
         self._lock = RLock()
         self._token_case: "OrderedDict[str, str]" = OrderedDict()
         self._token_revision: "OrderedDict[str, str]" = OrderedDict()
-        self._pending: ContextVar[Optional[Dict[str, Any]]] = ContextVar("cerai_archive_pending", default=None)
+        self._pending: ContextVar[Optional[Dict[str, Any]]] = ContextVar(
+            "cer_ai_archive_pending",
+            default=None,
+        )
 
     @property
     def enabled(self) -> bool:
@@ -405,25 +528,32 @@ class CaseArchiveRuntime:
         if self.required:
             raise HTTPException(
                 503,
-                "Secure CER-AI case archive is unavailable. The clinical result was not released; retry after archive service recovery.",
+                "Secure CER-AI case archive is unavailable. The clinical result was not released; "
+                "retry after archive service recovery.",
             ) from exc
 
 
 def runtime_from_environment() -> CaseArchiveRuntime:
     required = os.getenv("CERAI_ARCHIVE_REQUIRED", "0").strip() == "1"
-    bucket_markers = any((os.getenv(name) or "").strip() for name in (
-        "CERAI_ARCHIVE_BUCKET", "BUCKET", "AWS_S3_BUCKET_NAME",
-        "CERAI_ARCHIVE_ENDPOINT", "ENDPOINT", "AWS_ENDPOINT_URL",
-        "CERAI_ARCHIVE_MASTER_KEY_B64",
-    ))
+    bucket_markers = any(
+        (os.getenv(name) or "").strip()
+        for name in (
+            "CERAI_ARCHIVE_BUCKET",
+            "BUCKET",
+            "AWS_S3_BUCKET_NAME",
+            "CERAI_ARCHIVE_ENDPOINT",
+            "ENDPOINT",
+            "AWS_ENDPOINT_URL",
+            "CERAI_ARCHIVE_MASTER_KEY_B64",
+        )
+    )
     if not bucket_markers:
         if required:
-            raise ArchiveConfigurationError("CERAI_ARCHIVE_REQUIRED=1 but no archive storage configuration is present.")
+            raise ArchiveConfigurationError(
+                "CERAI_ARCHIVE_REQUIRED=1 but no archive storage configuration is present."
+            )
         return CaseArchiveRuntime(None, required=False)
-    try:
-        return CaseArchiveRuntime(EncryptedArchive.from_environment(), required=required)
-    except ArchiveConfigurationError:
-        raise
+    return CaseArchiveRuntime(EncryptedArchive.from_environment(), required=required)
 
 
 def install(core: Any, *, runtime: Optional[CaseArchiveRuntime] = None) -> CaseArchiveRuntime:
@@ -444,7 +574,10 @@ def install(core: Any, *, runtime: Optional[CaseArchiveRuntime] = None) -> CaseA
 
     async def read_uploads_archived(images):
         payloads = await original_read_uploads(images)
-        runtime._pending.set({"case_id": EncryptedArchive.new_case_id(), "payloads": payloads})
+        runtime._pending.set({
+            "case_id": EncryptedArchive.new_case_id(),
+            "payloads": payloads,
+        })
         return payloads
 
     def finalize_if_ready(response: Dict[str, Any]) -> Dict[str, Any]:
@@ -456,7 +589,11 @@ def install(core: Any, *, runtime: Optional[CaseArchiveRuntime] = None) -> CaseA
         if not (token and report_token and case_id):
             return response
         try:
-            ready = original_export_payload({"assessment_token": token, "report_token": report_token, "locale": "en"})
+            ready = original_export_payload({
+                "assessment_token": token,
+                "report_token": report_token,
+                "locale": "en",
+            })
             revision = runtime.archive.archive_ready(
                 case_id,
                 ready,
@@ -464,7 +601,11 @@ def install(core: Any, *, runtime: Optional[CaseArchiveRuntime] = None) -> CaseA
                 docx_builder=original_build_docx,
             )
             runtime._remember(runtime._token_revision, token, revision.revision_id)
-            response["archive"] = {"status": "ARCHIVED", "case_id": case_id, "revision_id": revision.revision_id}
+            response["archive"] = {
+                "status": "ARCHIVED",
+                "case_id": case_id,
+                "revision_id": revision.revision_id,
+            }
         except Exception as exc:
             runtime.fail_or_continue(exc)
             response["archive"] = {"status": "UNAVAILABLE"}
@@ -519,7 +660,12 @@ def install(core: Any, *, runtime: Optional[CaseArchiveRuntime] = None) -> CaseA
         locale = payload.get("locale", "en")
         if runtime.enabled and case_id and revision_id:
             try:
-                ref = runtime.archive.find_report(str(case_id), str(revision_id), str(locale), "pdf")
+                ref = runtime.archive.find_report(
+                    str(case_id),
+                    str(revision_id),
+                    str(locale),
+                    "pdf",
+                )
                 if ref:
                     return runtime.archive.get_bytes(ref)
             except Exception as exc:
@@ -532,7 +678,12 @@ def install(core: Any, *, runtime: Optional[CaseArchiveRuntime] = None) -> CaseA
         locale = payload.get("locale", "en")
         if runtime.enabled and case_id and revision_id:
             try:
-                ref = runtime.archive.find_report(str(case_id), str(revision_id), str(locale), "docx")
+                ref = runtime.archive.find_report(
+                    str(case_id),
+                    str(revision_id),
+                    str(locale),
+                    "docx",
+                )
                 if ref:
                     return runtime.archive.get_bytes(ref)
             except Exception as exc:
