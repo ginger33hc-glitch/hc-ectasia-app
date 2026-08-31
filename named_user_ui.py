@@ -51,6 +51,7 @@ def install(core: Any) -> None:
 
     if enabled:
         import operational_security
+        import user_access
 
         @core.app.get("/auth/login-page", include_in_schema=False)
         def login_page():
@@ -67,6 +68,22 @@ def install(core: Any) -> None:
                 media_type="text/html",
                 headers={"Cache-Control": "no-store"},
             )
+
+        @core.app.get("/archive/capabilities", include_in_schema=False)
+        def archive_capabilities():
+            principal = user_access.require_current_principal()
+            archive_runtime = getattr(core, "_cerai_case_archive_runtime", None)
+            return {
+                "role": principal.role,
+                "archive_enabled": bool(archive_runtime and archive_runtime.enabled),
+                "audit_enabled": bool(getattr(core, "_cerai_audit_log_installed", False)),
+                "historical_report_enabled": bool(
+                    getattr(core, "_cerai_historical_report_installed", False)
+                ),
+                "research_export_enabled": bool(
+                    getattr(core, "_cerai_research_export_enabled", False)
+                ),
+            }
 
         @core.app.middleware("http")
         async def named_user_page_gate(request, call_next):
