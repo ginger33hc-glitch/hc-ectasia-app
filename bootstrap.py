@@ -1,20 +1,9 @@
-from importlib import import_module
+"""Composition root for the canonical CERAI runtime.
 
-# Canonical runtime module.
-core = import_module("app")
-
-# Install policy modules in the established order.  Each module patches the same
-# canonical app module object; this file is intentionally small so start.py and
-# tests import a single composed runtime.
-for module_name in (
-    "extraction_guard",
-    "erss_topography_guard",
-    "erss_visual_morphology_policy",
-    "randleman_bad_independence",
-    "nice_policy",
-    "erss_auto_read_policy",
-    "assessment_workflow",
-):
-    import_module(module_name)
+Policy modules are imported explicitly by start.py/app runtime; this module only
+exposes the canonical app module object to policy modules without creating a
+second runtime instance.
+"""
+import app as core
 
 __all__ = ["core"]
