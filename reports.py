@@ -1,4 +1,4 @@
-"""Professional PDF and Word exports for CERAI reports."""
+"""Professional PDF and Word exports for CER-AI reports."""
 
 from __future__ import annotations
 
@@ -55,8 +55,8 @@ AUTHORSHIP_NOTICE = (
     "Developed by Hüseyin Cengiz, MD. All rights reserved. "
     "Final responsibility rests with the surgeon at all times and under all circumstances."
 )
-PDF_UNICODE_REGULAR = "CERAI-Vera"
-PDF_UNICODE_BOLD = "CERAI-Vera-Bold"
+PDF_UNICODE_REGULAR = "CER-AI-Vera"
+PDF_UNICODE_BOLD = "CER-AI-Vera-Bold"
 pdfmetrics.registerFont(TTFont(
     PDF_UNICODE_REGULAR,
     str(Path(reportlab.__file__).resolve().parent / "fonts" / "Vera.ttf"),
@@ -162,7 +162,7 @@ def _eye_metrics(eye: Dict[str, Any], locale: str = "en") -> List[tuple[str, str
         ("Score / category", f"{_text(score.get('total'), '-')} / {_text(score.get('category'), '-') }"),
         ("Randleman ERSS / category", f"{_text((eye.get('randleman_erss') or {}).get('total'))} / {_text((eye.get('randleman_erss') or {}).get('category'))}"),
         ("Final BAD-D / class", f"{_fmt((eye.get('bad_summary') or {}).get('value'), 2)} / {_text((eye.get('bad_summary') or {}).get('category'))}"),
-        ("CERAI-adapted NICE / class", f"{_text((eye.get('nice') or {}).get('total'))} / {_text((eye.get('nice') or {}).get('category'))}"),
+        ("CER-AI-adapted NICE / class", f"{_text((eye.get('nice') or {}).get('total'))} / {_text((eye.get('nice') or {}).get('category'))}"),
         ("Thinnest pachymetry", _fmt(values.get("pachy_thinnest_um"), 0, " um")),
         ("Manifest MRSE", _fmt(values.get("MRSE_D"), 2, " D")),
         ("Intended MRSE", _fmt(values.get("intended_MRSE_D"), 2, " D")),
@@ -279,7 +279,7 @@ def _microkeratome_rows(eye: Dict[str, Any], locale: str = "en") -> List[tuple[s
         ("Vacuum ring", _fmt(plan.get("vacuum_ring_mm"), 1, " mm")),
         ("Vacuum pressure", _text(plan.get("vacuum_pressure_mmhg"), "Not determined") + " mmHg" if plan.get("vacuum_pressure_mmhg") else "Not determined"),
         ("Blade recommendation(s)", blades),
-        ("Primary hinge", _text(plan.get("primary_hinge"), "No CERAI K-spread hinge override")),
+        ("Primary hinge", _text(plan.get("primary_hinge"), "No CER-AI K-spread hinge override")),
         ("Conditional alternative", _text(plan.get("alternative_hinge"), "Not cleared / not applicable")),
         ("Alternative projected RSB / PTA", projected),
         ("Alternative safety", _text(plan.get("alternative_safety"))),
@@ -317,8 +317,8 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     doc = SimpleDocTemplate(
         buffer, pagesize=letter, rightMargin=0.65 * inch, leftMargin=0.65 * inch,
         topMargin=0.72 * inch, bottomMargin=0.82 * inch,
-        title=tr("CERAI Preoperative Ectasia Risk Assessment"),
-        author="CERAI",
+        title=tr("CER-AI Preoperative Ectasia Risk Assessment"),
+        author="CER-AI",
     )
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name="ReportTitle", parent=styles["Title"], fontName=bold_font, fontSize=17, leading=20, textColor=_rl(NAVY), alignment=TA_LEFT, spaceAfter=3))
@@ -336,7 +336,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     table_head = lambda value: Paragraph(_ascii(value, ""), styles["TableHead"])
 
     story: List[Any] = []
-    story.append(Paragraph(tr("CERAI PREOPERATIVE ECTASIA RISK ASSESSMENT"), styles["ReportTitle"]))
+    story.append(Paragraph(tr("CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT"), styles["ReportTitle"]))
     story.append(Paragraph(tr("Corneal refractive surgery clinical decision-support report") + f" | {tr('Software')} v{APP_VERSION}", styles["ReportSub"]))
     story.append(Paragraph(liability_notice(locale), styles["Liability"]))
 
@@ -468,7 +468,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     story.append(Spacer(1, 12))
     story.append(Paragraph(tr("Interpretation note"), styles["Section"]))
     story.append(Paragraph(
-        tr("This report is generated under the CERAI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. "
+        tr("This report is generated under the CER-AI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. "
            "CAUTION is a STOP/DEFER decision requiring repeat ectasia/tomographic assessment after at least 6 months. "
            "DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review."),
         styles["Tiny"],
@@ -482,7 +482,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         canvas.setFont(PDF_UNICODE_REGULAR, 6.1)
         canvas.drawCentredString(4.25 * inch, 0.43 * inch, authorship_notice(locale))
         canvas.setFont(regular_font, 6.5)
-        canvas.drawString(0.65 * inch, 0.23 * inch, "CERAI | " + tr("Clinical decision-support report"))
+        canvas.drawString(0.65 * inch, 0.23 * inch, "CER-AI | " + tr("Clinical decision-support report"))
         canvas.drawRightString(7.85 * inch, 0.23 * inch, f"{tr('Page')} {pdf_doc.page}")
         canvas.restoreState()
 
@@ -587,7 +587,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
         style.paragraph_format.space_after = Pt(after)
 
     header = section.header.paragraphs[0]
-    header.text = "CERAI  |  " + tr("PREOPERATIVE RISK ASSESSMENT")
+    header.text = "CER-AI  |  " + tr("PREOPERATIVE RISK ASSESSMENT")
     header.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     for run in header.runs:
         run.font.name = "Arial"
@@ -607,7 +607,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     footer_meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
     footer_meta.paragraph_format.space_before = Pt(0)
     footer_meta.paragraph_format.space_after = Pt(0)
-    footer_meta.add_run("CERAI | " + tr("Clinical decision-support report") + " | ")
+    footer_meta.add_run("CER-AI | " + tr("Clinical decision-support report") + " | ")
     fld = OxmlElement("w:fldSimple")
     fld.set(qn("w:instr"), "PAGE")
     footer_meta._p.append(fld)
@@ -618,7 +618,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
 
     title = document.add_paragraph()
     title.paragraph_format.space_after = Pt(2)
-    run = title.add_run(tr("CERAI PREOPERATIVE ECTASIA RISK ASSESSMENT"))
+    run = title.add_run(tr("CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT"))
     run.font.name = "Arial"
     run.font.size = Pt(18)
     run.bold = True
@@ -766,7 +766,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
 
     _add_heading(document, tr("Interpretation note"), 1)
     note = document.add_paragraph(
-        tr("This report is generated under the CERAI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. "
+        tr("This report is generated under the CER-AI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. "
            "CAUTION is a STOP/DEFER decision requiring repeat ectasia/tomographic assessment after at least 6 months. "
            "DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review.")
     )

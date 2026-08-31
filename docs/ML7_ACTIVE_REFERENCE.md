@@ -7,10 +7,10 @@ The active ML7 reference for this project is the user-supplied Turkish document 
 - Do not substitute an older internet/legacy ML7 nomogram for this active reference.
 - Preserve the information and terminology in the active Turkish reference.
 - The currently effective corneal-diameter bands in the active reference are `10.0–11.4 mm` and `11.5–13.5 mm`; the K=48 row retains `10.0–13.5 mm` as represented in the source.
-- CERAI eligibility/risk assessment remains separate from ML7 surgical-planning reference material.
+- CER-AI eligibility/risk assessment remains separate from ML7 surgical-planning reference material.
 - ML7 material is presented as a post-assessment surgeon-review recommendation, never as an autonomous operative instruction and never as an ectasia-clearance rule.
 - The module runs only after a favorable LASIK result (`PASS` or `PASS WITH CAUTION`) and cannot alter score, status, hard stops, or missing-data gates.
-- Binding CERAI amendment: when `steepest K - flattest K >4.00 D`, the primary hinge recommendation is perpendicular to the steep axis. If that orientation is anatomically impractical, a `+10` temporal or nasal hinge may be shown only as a conditional alternative when projected RSB is `>=300 µm` and projected PTA is `<40%`.
+- Binding CER-AI amendment: when `steepest K - flattest K >4.00 D`, the primary hinge recommendation is perpendicular to the steep axis. If that orientation is anatomically impractical, a `+10` temporal or nasal hinge may be shown only as a conditional alternative when projected RSB is `>=300 µm` and projected PTA is `<40%`.
 - Final surgical planning, device selection, and verification remain with the surgeon.
 
 ## Source-derived notes retained from the Turkish reference

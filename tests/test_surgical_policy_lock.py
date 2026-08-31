@@ -27,7 +27,7 @@ def test_lasik_pta_cutoff_is_inclusive_40_percent():
 
 def test_independent_hard_stop_prevents_fallback():
     for stop in (
-        "CERAI operational hard stop: thinnest preoperative cornea <480 µm.",
+        "CER-AI operational hard stop: thinnest preoperative cornea <480 µm.",
         "Definite KC/FFKC/PMD",
         "intended sphere <−10.00 D",
         "intended sphere >+6.00 D",

@@ -1,20 +1,20 @@
-"""Pure CERAI-adapted NICE score. No ERSS/BAD calculations or framework dependencies."""
+"""Pure CER-AI-adapted NICE score. No ERSS/BAD calculations or framework dependencies."""
 import math
 
 SOURCE = "https://pmc.ncbi.nlm.nih.gov/articles/PMC10960505/"
-POLICY_VERSION = "CERAI-NICE-2026-08-29"
+POLICY_VERSION = "CER-AI-NICE-2026-08-29"
 NOTE = (
     "NICE (Navarro Index for Corneal Ectasia) combines K2, central pachymetry, "
     "posterior elevation and signed I-S. Each component contributes 1-3 points; total 4-12. "
-    "CERAI adaptation: posterior elevation <=15.5 um = 1, >15.5 to <18 um = 2, >=18 um = 3. "
-    "The published table leaves 15 um unspecified. CERAI reads the highest printed positive "
+    "CER-AI adaptation: posterior elevation <=15.5 um = 1, >15.5 to <18 um = 2, >=18 um = 3. "
+    "The published table leaves 15 um unspecified. CER-AI reads the highest printed positive "
     "posterior elevation inside the dashed pupil boundary on the standard 8-mm BFS float map, "
     "not the thinnest-point elevation, BAD difference elevation or BFTE. This pupil-maximum "
     "selection is surgeon-specified, not independently validated as the original NICE method. "
     "Central pachymetry uses the labeled Pachy Vertex N. field (not thinnest pachymetry), "
-    "or a surgeon-confirmed central measurement. CERAI disposition for LASIK and PRK: "
+    "or a surgeon-confirmed central measurement. CER-AI disposition for LASIK and PRK: "
     "4 = no NICE-specific escalation, 5-8 = CAUTION / STOP-DEFER, >=9 = HARD STOP. "
-    "NICE 4 does not establish surgical safety or override ERSS, BAD or other CERAI stops. "
+    "NICE 4 does not establish surgical safety or override ERSS, BAD or other CER-AI stops. "
     "No individual absolute ectasia probability is inferred. Source: Navarro-Naranjo et al., "
     "Clin Ophthalmol 2024;18:881-883. DOI: 10.2147/OPTH.S464217."
 )

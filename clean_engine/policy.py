@@ -1,6 +1,6 @@
-"""Pure CERAI clinical policy definitions for the parallel clean engine.
+"""Pure CER-AI clinical policy definitions for the parallel clean engine.
 
-Phase 2 rule: this module mirrors the active CERAI clinical policy while remaining
+Phase 2 rule: this module mirrors the active CER-AI clinical policy while remaining
 architecturally separated from extraction, transport, and reporting concerns.
 """
 from dataclasses import dataclass
@@ -27,7 +27,7 @@ POLICY = HCPolicy()
 
 
 def score_decision_band(score: Optional[float]) -> Optional[str]:
-    """Unified CERAI score disposition used by LASIK and PRK.
+    """Unified CER-AI score disposition used by LASIK and PRK.
 
     0-2: no score escalation; 3: defer; >=4: stop.
     """
@@ -52,10 +52,10 @@ def age_points(age: Optional[float]) -> Optional[int]:
 
 
 def lasik_pachymetry_points(pachy_um: Optional[float]) -> Optional[int]:
-    """CERAI-modified pachymetry component.
+    """CER-AI-modified pachymetry component.
 
     <480 µm hard stop/unscored; 480-499 µm +2; 500-509 µm +1; >=510 µm +0.
-    These are CERAI operational bands and are not the original published ERSS bins.
+    These are CER-AI operational bands and are not the original published ERSS bins.
     """
     if not isinstance(pachy_um, (int, float)) or isinstance(pachy_um, bool):
         return None

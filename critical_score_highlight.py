@@ -1,4 +1,4 @@
-"""Runtime composition for CERAI score/report presentation policy.
+"""Runtime composition for CER-AI score/report presentation policy.
 
 Frontend assets are committed under ``static/`` and are never rewritten during
 module import. Version ownership remains exclusively in canonical_engine.py.

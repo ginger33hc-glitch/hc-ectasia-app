@@ -129,7 +129,7 @@ MODIFIERS = {
 
 
 def document_context(
-    patient_id="CERAI-1", patient_age_years=26, exam_date="2026-08-25", qs="OK",
+    patient_id="CER-AI-1", patient_age_years=26, exam_date="2026-08-25", qs="OK",
     patient_name="Test Patient", laterality="BOTH",
 ):
     name_parts = str(patient_name or "").split(maxsplit=1)
@@ -994,7 +994,7 @@ class TestApiIntegration(unittest.TestCase):
         decision = app.hc_engine(extracted, 35, {"OD": plan()}, MODIFIERS)
         payload = {
             "patient": {
-                "name": "Test Patient", "id": "CERAI-001", "age": 35,
+                "name": "Test Patient", "id": "CER-AI-001", "age": 35,
                 "reviewer": "Test Reviewer", "report_date": "2026-08-25",
             },
             "decision": decision,
@@ -1028,7 +1028,7 @@ class TestApiIntegration(unittest.TestCase):
             "\n".join(paragraph.text for paragraph in document.paragraphs),
         )
         text = "\n".join(paragraph.text for paragraph in document.paragraphs)
-        self.assertIn("CERAI PREOPERATIVE ECTASIA RISK ASSESSMENT", text)
+        self.assertIn("CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT", text)
         self.assertIn("PASS", text)
         patient_paragraph = next(p for p in document.paragraphs if p.text == "TEST PATIENT")
         self.assertTrue(patient_paragraph.runs[0].bold)
@@ -1103,11 +1103,11 @@ class TestPwaIcons(unittest.TestCase):
             "/static/icons/icon-maskable-512.png?v=8",
         })
         html = (static_dir / "index.html").read_text()
-        self.assertIn('/static/manifest.webmanifest?v=8', html)
+        self.assertIn('/static/manifest.webmanifest?v=9', html)
         self.assertIn('/static/icons/favicon-32.png?v=8', html)
         self.assertIn('/static/icons/apple-touch-icon.png?v=8', html)
         self.assertIn('/static/branding/cerai-logo-final.png?v=3', html)
-        self.assertIn('alt="CERAI — Corneal Ectasia Risk Analysis Intelligence"', html)
+        self.assertIn('alt="CER-AI — Corneal Ectasia Risk Analysis Intelligence"', html)
         self.assertNotIn('/static/icons/icon-source.svg', html)
 
 
@@ -1151,7 +1151,7 @@ class TestAuthorshipAndLiabilityFooter(unittest.TestCase):
         reader = PdfReader(BytesIO(reports.build_pdf(payload)))
         pages = [" ".join((page.extract_text() or "").split()) for page in reader.pages]
         combined = " ".join(pages)
-        self.assertIn("CERAI PREOPERATİF EKTAZİ RİSK DEĞERLENDİRMESİ", combined)
+        self.assertIn("CER-AI PREOPERATİF EKTAZİ RİSK DEĞERLENDİRMESİ", combined)
         self.assertIn("GENEL KARAR", combined)
         self.assertIn("UYGUN", combined)
         for page in pages:
@@ -1163,7 +1163,7 @@ class TestAuthorshipAndLiabilityFooter(unittest.TestCase):
         document = Document(BytesIO(reports.build_docx(payload)))
         body = " ".join(paragraph.text for paragraph in document.paragraphs)
         table_text = " ".join(cell.text for table in document.tables for row in table.rows for cell in row.cells)
-        self.assertIn("CERAI PREOPERATİF EKTAZİ RİSK DEĞERLENDİRMESİ", body)
+        self.assertIn("CER-AI PREOPERATİF EKTAZİ RİSK DEĞERLENDİRMESİ", body)
         self.assertIn("GENEL KARAR", table_text)
         for section in document.sections:
             footer_text = " ".join(paragraph.text for paragraph in section.footer.paragraphs)
@@ -1175,7 +1175,7 @@ class TestAuthorshipAndLiabilityFooter(unittest.TestCase):
         i18n = (root / "static" / "i18n.js").read_text()
         self.assertIn('data-language="en"', html)
         self.assertIn('data-language="tr"', html)
-        self.assertIn('/static/i18n.js?v=1', html)
+        self.assertIn('/static/i18n.js?v=2', html)
         self.assertIn('locale:i18n.locale', html)
         self.assertIn('localStorage.setItem("cerai-language"', i18n)
         self.assertIn('"Case inputs":"Vaka girdileri"', i18n)

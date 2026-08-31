@@ -1,4 +1,4 @@
-"""Old-vs-clean PRK component equivalence plus explicit CERAI decision override."""
+"""Old-vs-clean PRK component equivalence plus explicit CER-AI decision override."""
 import canonical_engine
 
 from clean_engine import prk

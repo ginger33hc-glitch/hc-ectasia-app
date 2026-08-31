@@ -1,6 +1,6 @@
 """Canonical post-assessment integration for ML7 microkeratome planning.
 
-This wrapper runs after the complete CERAI decision and only appends a
+This wrapper runs after the complete CER-AI decision and only appends a
 surgeon-review planning record.  It never changes status, score, hard stops,
 missing data, or the ectasia action.
 """

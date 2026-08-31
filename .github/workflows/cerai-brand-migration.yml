@@ -1,4 +1,4 @@
-name: CERAI brand verification
+name: CER-AI brand verification
 
 on:
   push:
@@ -16,6 +16,7 @@ jobs:
       - name: Reject legacy or incorrect product branding
         shell: python
         run: |
+          import re
           from pathlib import Path
 
           root = Path('.')
@@ -43,7 +44,9 @@ jobs:
               for phrase in forbidden:
                   if phrase in text:
                       failures.append(f'{path}: {phrase}')
+              if re.search(r'CERAI(?!_)', text):
+                  failures.append(f'{path}: legacy CERAI spelling')
 
           if failures:
               raise SystemExit('Legacy or incorrect branding found:\n' + '\n'.join(failures))
-          print('CERAI branding verification passed.')
+          print('CER-AI branding verification passed.')

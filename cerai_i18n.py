@@ -1,4 +1,4 @@
-"""Presentation-only localization for CERAI.
+"""Presentation-only localization for CER-AI.
 
 The clinical engine remains language-neutral and continues to emit its locked
 English decision record.  This module translates only user-facing reports.
@@ -19,8 +19,8 @@ def normalize_locale(value: Any) -> str:
 
 
 TR = {
-    "CERAI Preoperative Ectasia Risk Assessment": "CERAI Preoperatif Ektazi Risk Değerlendirmesi",
-    "CERAI PREOPERATIVE ECTASIA RISK ASSESSMENT": "CERAI PREOPERATİF EKTAZİ RİSK DEĞERLENDİRMESİ",
+    "CER-AI Preoperative Ectasia Risk Assessment": "CER-AI Preoperatif Ektazi Risk Değerlendirmesi",
+    "CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT": "CER-AI PREOPERATİF EKTAZİ RİSK DEĞERLENDİRMESİ",
     "PREOPERATIVE RISK ASSESSMENT": "PREOPERATİF RİSK DEĞERLENDİRMESİ",
     "Corneal refractive surgery clinical decision-support report": "Korneal refraktif cerrahi klinik karar destek raporu",
     "Clinical decision-support report": "Klinik karar destek raporu",
@@ -56,7 +56,7 @@ TR = {
     "Score / category": "Puan / kategori",
     "Randleman ERSS / category": "Randleman ERSS / kategori",
     "Final BAD-D / class": "Final BAD-D / sınıf",
-    "CERAI-adapted NICE / class": "CERAI uyarlanmış NICE / sınıf",
+    "CER-AI-adapted NICE / class": "CER-AI uyarlanmış NICE / sınıf",
     "Thinnest pachymetry": "En ince pakimetri",
     "Manifest MRSE": "Manifest MRSE",
     "Intended MRSE": "Hedef MRSE",
@@ -166,13 +166,13 @@ TR = {
     "Synthetic central 565; pupil posterior +8": "Sentetik santral 565; pupil posterior +8",
     "Randleman anterior-topography points come only from the anterior curvature/topography image; on Pentacam 4 Maps Refractive this is the upper-left Axial/Sagittal Curvature (Front) panel. ERSS total: 0-2 low, 3 moderate, >=4 high.": "Randleman ön topografi puanları yalnızca ön eğrilik/topografi görüntüsünden elde edilir; Pentacam 4 Maps Refractive sayfasında bu, sol üst Axial/Sagittal Curvature (Front) panelidir. ERSS toplamı: 0-2 düşük, 3 orta, ≥4 yüksek.",
     "NO MAJOR INTER-EYE DISCORDANCE DETECTED": "BELİRGİN GÖZLER ARASI UYUMSUZLUK SAPTANMADI",
-    "No CERAI K-spread hinge override": "CERAI K-farkı menteşe değişikliği yok",
+    "No CER-AI K-spread hinge override": "CER-AI K-farkı menteşe değişikliği yok",
     "Not cleared / not applicable": "Onaylanmadı / uygulanamaz",
     "PATIENT NAME NOT DOCUMENTED": "HASTA ADI BELGELENMEDİ",
     "PATIENT IDENTITY NOT VERIFIED - SURGEON CONFIRMATION REQUIRED": "HASTA KİMLİĞİ DOĞRULANMADI — CERRAH ONAYI GEREKLİ",
     "OVERALL DISPOSITION": "GENEL KARAR",
-    "CERAI BAD-D reference points": "CERAI BAD-D referans değerleri",
-    "CERAI interpretation / action": "CERAI yorumu / eylemi",
+    "CER-AI BAD-D reference points": "CER-AI BAD-D referans değerleri",
+    "CER-AI interpretation / action": "CER-AI yorumu / eylemi",
     "SUSPICIOUS - REVIEW / NOT CLEARED": "ŞÜPHELİ — DEĞERLENDİR / ONAYLANMADI",
     "ABNORMAL CORNEA - DO NOT PROCEED": "ANORMAL KORNEA — İŞLEME DEVAM ETMEYİN",
     "Published Randleman / ERSS scoring points": "Yayımlanmış Randleman / ERSS puanları",
@@ -189,26 +189,26 @@ TR = {
     "<=8 D myopia": "≤8 D miyopi",
     "BAD-D is read from the Pentacam BAD display and is independent of Randleman/ERSS anterior-topography scoring.": "BAD-D, Pentacam BAD ekranından okunur ve Randleman/ERSS ön topografi puanlamasından bağımsızdır.",
     "Randleman anterior-topography points come only from a qualifying anterior curvature/topography image. On Pentacam 4 Maps Refractive this is the upper-left Axial/Sagittal Curvature (Front) panel. ERSS total: 0-2 low, 3 moderate, >=4 high.": "Randleman ön topografi puanları yalnızca uygun bir ön eğrilik/topografi görüntüsünden elde edilir. Pentacam 4 Maps Refractive sayfasında kaynak sol üst Axial/Sagittal Curvature (Front) panelidir. ERSS toplamı: 0-2 düşük, 3 orta, ≥4 yüksek.",
-    "Published Randleman/ERSS table shown for reference. The CERAI engine intentionally uses CERAI-modified age and pachymetry rules; the displayed patient score must therefore be read from the CERAI score breakdown, not reconstructed from the published reference table.": "Yayımlanmış Randleman/ERSS tablosu referans amacıyla gösterilmiştir. CERAI motoru bilerek CERAI'ye uyarlanmış yaş ve pakimetri kurallarını kullanır; bu nedenle hasta puanı yayımlanmış referans tablodan yeniden hesaplanmamalı, CERAI puan dökümünden okunmalıdır.",
-    "This report is generated under the CERAI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. CAUTION is a STOP/DEFER decision requiring repeat ectasia/tomographic assessment after at least 6 months. DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review.": "Bu rapor, korneal refraktif cerrahi için CERAI Preoperatif Ektazi Risk Değerlendirme Protokolü kapsamında oluşturulmuştur. DİKKAT kararı DURDURMA/ERTELEME anlamına gelir ve en az 6 ay sonra ektazi/tomografi değerlendirmesinin tekrarlanmasını gerektirir. VERİ YETERSİZ / DEĞERLENDİRİLMEDİ sonucu UYGUN kararına izin vermez. Bu klinik karar destek raporu cerrahın bağımsız değerlendirmesinin yerini almaz.",
+    "Published Randleman/ERSS table shown for reference. The CER-AI engine intentionally uses CER-AI-modified age and pachymetry rules; the displayed patient score must therefore be read from the CER-AI score breakdown, not reconstructed from the published reference table.": "Yayımlanmış Randleman/ERSS tablosu referans amacıyla gösterilmiştir. CER-AI motoru bilerek CER-AI'ye uyarlanmış yaş ve pakimetri kurallarını kullanır; bu nedenle hasta puanı yayımlanmış referans tablodan yeniden hesaplanmamalı, CER-AI puan dökümünden okunmalıdır.",
+    "This report is generated under the CER-AI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. CAUTION is a STOP/DEFER decision requiring repeat ectasia/tomographic assessment after at least 6 months. DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review.": "Bu rapor, korneal refraktif cerrahi için CER-AI Preoperatif Ektazi Risk Değerlendirme Protokolü kapsamında oluşturulmuştur. DİKKAT kararı DURDURMA/ERTELEME anlamına gelir ve en az 6 ay sonra ektazi/tomografi değerlendirmesinin tekrarlanmasını gerektirir. VERİ YETERSİZ / DEĞERLENDİRİLMEDİ sonucu UYGUN kararına izin vermez. Bu klinik karar destek raporu cerrahın bağımsız değerlendirmesinin yerini almaz.",
 }
 
 
 TR_CLINICAL = {
     "DO NOT PROCEED with elective corneal refractive surgery.": "Elektif korneal refraktif cerrahiye DEVAM ETMEYİN.",
     "STOP/DEFER; repeat relevant ectasia screening and reassess after at least 6 months.": "DURDURUN/ERTELEYİN; ilgili ektazi taramasını tekrarlayın ve en az 6 ay sonra yeniden değerlendirin.",
-    "CERAI assessment PASS; this is not a guarantee of zero ectasia risk.": "CERAI değerlendirmesi UYGUN; bu sonuç ektazi riskinin sıfır olduğunu garanti etmez.",
+    "CER-AI assessment PASS; this is not a guarantee of zero ectasia risk.": "CER-AI değerlendirmesi UYGUN; bu sonuç ektazi riskinin sıfır olduğunu garanti etmez.",
     "Decision-critical or required clinical data are missing/unresolved; PASS is prohibited.": "Karar için kritik veya zorunlu klinik veriler eksik/çözümlenmemiştir; UYGUN kararı verilemez.",
     "No surgical clearance; resolve the stated review/data requirement.": "Cerrahi onay yoktur; belirtilen değerlendirme/veri gereksinimini giderin.",
     "Overall result reflects the least favorable eye. Each eye remains independently scored; values are never averaged.": "Genel sonuç daha olumsuz olan gözü yansıtır. Her göz bağımsız puanlanır; değerlerin ortalaması alınmaz.",
-    "CERAI operational hard stop: thinnest preoperative cornea <480 µm.": "CERAI kesin durdurma kuralı: preoperatif en ince kornea <480 µm.",
-    "CERAI operational LASIK RSB hard stop: RSB <300 µm.": "CERAI LASIK kesin durdurma kuralı: RSB <300 µm.",
-    "CERAI operational PRK RST hard stop: RST <310 µm.": "CERAI PRK kesin durdurma kuralı: RST <310 µm.",
-    "CERAI operational final-keratometry hard stop: estimated postoperative Kmean <36.00 D.": "CERAI final keratometri kesin durdurma kuralı: tahmini postoperatif Kort <36,00 D.",
-    "CERAI operational final-keratometry hard stop: estimated postoperative Kmean >48.00 D.": "CERAI final keratometri kesin durdurma kuralı: tahmini postoperatif Kort >48,00 D.",
-    "CERAI operational treatment-range hard stop: intended sphere <−10.00 D.": "CERAI tedavi aralığı kesin durdurma kuralı: hedef sfer <−10,00 D.",
-    "CERAI operational treatment-range hard stop: intended sphere >+6.00 D.": "CERAI tedavi aralığı kesin durdurma kuralı: hedef sfer >+6,00 D.",
-    "CERAI operational LASIK PTA hard stop: PTA >=40.0%.": "CERAI LASIK kesin durdurma kuralı: PTA ≥%40,0.",
+    "CER-AI operational hard stop: thinnest preoperative cornea <480 µm.": "CER-AI kesin durdurma kuralı: preoperatif en ince kornea <480 µm.",
+    "CER-AI operational LASIK RSB hard stop: RSB <300 µm.": "CER-AI LASIK kesin durdurma kuralı: RSB <300 µm.",
+    "CER-AI operational PRK RST hard stop: RST <310 µm.": "CER-AI PRK kesin durdurma kuralı: RST <310 µm.",
+    "CER-AI operational final-keratometry hard stop: estimated postoperative Kmean <36.00 D.": "CER-AI final keratometri kesin durdurma kuralı: tahmini postoperatif Kort <36,00 D.",
+    "CER-AI operational final-keratometry hard stop: estimated postoperative Kmean >48.00 D.": "CER-AI final keratometri kesin durdurma kuralı: tahmini postoperatif Kort >48,00 D.",
+    "CER-AI operational treatment-range hard stop: intended sphere <−10.00 D.": "CER-AI tedavi aralığı kesin durdurma kuralı: hedef sfer <−10,00 D.",
+    "CER-AI operational treatment-range hard stop: intended sphere >+6.00 D.": "CER-AI tedavi aralığı kesin durdurma kuralı: hedef sfer >+6,00 D.",
+    "CER-AI operational LASIK PTA hard stop: PTA >=40.0%.": "CER-AI LASIK kesin durdurma kuralı: PTA ≥%40,0.",
     "Refractive instability or documented progression: defer and re-evaluate after >=6 months.": "Refraktif instabilite veya belgelenmiş progresyon: erteleyin ve ≥6 ay sonra yeniden değerlendirin.",
     "Unexplained preoperative CDVA <20/20 requires investigation.": "Açıklanamayan preoperatif EİDGK <20/20 araştırılmalıdır.",
     "Prior PRK/LASIK/SMILE or other corneal refractive surgery requires a separate pathway.": "Önceki PRK/LASIK/SMILE veya başka korneal refraktif cerrahi ayrı bir değerlendirme yolu gerektirir.",
@@ -228,19 +228,19 @@ TR_CLINICAL = {
     "No classifiable OD/OS tomography was extracted.": "Sınıflandırılabilir OD/OS tomografisi çıkarılamadı.",
     "No eye-specific assessment could be completed.": "Göze özgü değerlendirme tamamlanamadı.",
     "Numeric ERSS category support does not, by itself, constitute a keratoconus diagnosis.": "Sayısal ERSS kategori desteği tek başına keratokonus tanısı oluşturmaz.",
-    "PRK epithelial thickness is standardized to 50 µm for CERAI calculations.": "CERAI hesaplamalarında PRK epitel kalınlığı 50 µm olarak standardize edilmiştir.",
+    "PRK epithelial thickness is standardized to 50 µm for CER-AI calculations.": "CER-AI hesaplamalarında PRK epitel kalınlığı 50 µm olarak standardize edilmiştir.",
     "Override gate negative; procedure-specific score and required tomography/clinical review are reassuring.": "Öncelikli dışlama ölçütü yoktur; prosedüre özgü puan ile zorunlu tomografi/klinik değerlendirme rahatlatıcıdır.",
-    "CERAI SCORE — SOURCE & BREAKDOWN: PRK-EWSS v1.0 provisional evidence-weighted triage score (not validated); CERAI-modified age bands. morphology: +0 (morphology NORMAL_SYMMETRIC); pachymetry: +0 (thinnest pachymetry 560 µm); age: +0 (age 35 years). TOTAL: 0 (LOWER_FLAGGED_BURDEN). Hard stops are independent of this numeric score and are not counted as score points.": "CERAI PUANI — KAYNAK VE DÖKÜM: PRK-EWSS v1.0 geçici kanıt ağırlıklı triyaj puanı (doğrulanmamıştır); CERAI'ye uyarlanmış yaş aralıkları. morfoloji: +0 (NORMAL_SİMETRİK); pakimetri: +0 (en ince pakimetri 560 µm); yaş: +0 (35 yaş). TOPLAM: 0 (DÜŞÜK UYARI YÜKÜ). Kesin durdurma kuralları bu sayısal puandan bağımsızdır ve puana eklenmez.",
+    "CER-AI SCORE — SOURCE & BREAKDOWN: PRK-EWSS v1.0 provisional evidence-weighted triage score (not validated); CER-AI-modified age bands. morphology: +0 (morphology NORMAL_SYMMETRIC); pachymetry: +0 (thinnest pachymetry 560 µm); age: +0 (age 35 years). TOTAL: 0 (LOWER_FLAGGED_BURDEN). Hard stops are independent of this numeric score and are not counted as score points.": "CER-AI PUANI — KAYNAK VE DÖKÜM: PRK-EWSS v1.0 geçici kanıt ağırlıklı triyaj puanı (doğrulanmamıştır); CER-AI'ye uyarlanmış yaş aralıkları. morfoloji: +0 (NORMAL_SİMETRİK); pakimetri: +0 (en ince pakimetri 560 µm); yaş: +0 (35 yaş). TOPLAM: 0 (DÜŞÜK UYARI YÜKÜ). Kesin durdurma kuralları bu sayısal puandan bağımsızdır ve puana eklenmez.",
     "ECTASIA RISK INTERPRETATION: In the cited post-PRK ectasia series with complete ERSS data, 77% of ectasia eyes had cumulative ERSS >=4, 9% had score 3, and 14% had score <=2. The surgical cohort incidence reported in that study was 9/31,045 eyes (0.029%). ABSOLUTE PROBABILITY: Not established for an individual PRK score. LIMITATION: These are distributions among ectasia cases and an overall cohort incidence, not score-specific patient probabilities. The LASIK ERSS is not validated as an absolute-risk calculator for PRK; the 0.029% cohort incidence must not be assigned to an individual score. SOURCE: Risk Assessment for Corneal Ectasia following Photorefractive Keratectomy.": "EKTAZİ RİSK YORUMU: Tam ERSS verisi bulunan atıf yapılan PRK sonrası ektazi serisinde ektazili gözlerin %77'sinde toplam ERSS ≥4, %9'unda puan 3 ve %14'ünde puan ≤2 idi. Çalışmadaki cerrahi kohort insidansı 9/31.045 göz (%0,029) olarak bildirildi. MUTLAK OLASILIK: Tek bir PRK puanı için belirlenmemiştir. SINIRLAMA: Bunlar ektazi vakaları arasındaki dağılımlar ve genel kohort insidansıdır; puana özgü hasta olasılıkları değildir. LASIK ERSS, PRK için mutlak risk hesaplayıcısı olarak doğrulanmamıştır; %0,029 kohort insidansı bireysel bir puana atanamaz. KAYNAK: Fotorefraktif keratektomi sonrası korneal ektazi risk değerlendirmesi.",
-    "NICE (Navarro Index for Corneal Ectasia) combines K2, central pachymetry, posterior elevation and signed I-S. Each component contributes 1-3 points; total 4-12. CERAI adaptation: posterior elevation <=15.5 um = 1, >15.5 to <18 um = 2, >=18 um = 3. The published table leaves 15 um unspecified. CERAI reads the highest printed positive posterior elevation inside the dashed pupil boundary on the standard 8-mm BFS float map, not the thinnest-point elevation, BAD difference elevation or BFTE. This pupil-maximum selection is surgeon-specified, not independently validated as the original NICE method. Central pachymetry uses the labeled Pachy Vertex N. field (not thinnest pachymetry), or a surgeon-confirmed central measurement. CERAI disposition for LASIK and PRK: 4 = no NICE-specific escalation, 5-8 = CAUTION / STOP-DEFER, >=9 = HARD STOP. NICE 4 does not establish surgical safety or override ERSS, BAD or other CERAI stops. No individual absolute ectasia probability is inferred. Source: Navarro-Naranjo et al., Clin Ophthalmol 2024;18:881-883. DOI: 10.2147/OPTH.S464217.": "NICE (Navarro Korneal Ektazi İndeksi), K2, santral pakimetri, posterior elevasyon ve işaretli I-S değerini birleştirir. Her bileşen 1-3 puan verir; toplam 4-12'dir. CERAI uyarlaması: posterior elevasyon ≤15,5 µm = 1, >15,5 ile <18 µm = 2, ≥18 µm = 3. Yayımlanmış tabloda 15 µm belirtilmemiştir. CERAI, en ince nokta elevasyonu, BAD fark elevasyonu veya BFTE yerine standart 8 mm BFS float haritasında kesikli pupil sınırı içindeki yazılı en yüksek pozitif posterior elevasyonu okur. Bu pupil-maksimum seçimi cerrah tarafından belirlenmiştir ve özgün NICE yöntemi olarak bağımsız biçimde doğrulanmamıştır. Santral pakimetri, etiketli Pachy Vertex N. alanından (en ince pakimetri değil) veya cerrahın doğruladığı santral ölçümden alınır. LASIK ve PRK için CERAI kararı: 4 = NICE'a özgü artırım yok, 5-8 = DİKKAT / DURDUR-ERTELE, ≥9 = KESİN DURDURMA. NICE 4 cerrahi güvenliği kanıtlamaz ve ERSS, BAD veya diğer CERAI durdurma kurallarını geçersiz kılmaz. Bireysel mutlak ektazi olasılığı çıkarımı yapılmaz. Kaynak: Navarro-Naranjo ve ark., Clin Ophthalmol 2024;18:881-883. DOI: 10.2147/OPTH.S464217.",
-    "Inter-eye tomography concern: NO MAJOR INTER-EYE DISCORDANCE DETECTED. No major categorical inter-eye tomography discordance detected. This is not a clearance criterion and does not change the CERAI score or final disposition.": "Gözler arası tomografi değerlendirmesi: BELİRGİN GÖZLER ARASI UYUMSUZLUK SAPTANMADI. Belirgin kategorik gözler arası tomografi uyumsuzluğu saptanmadı. Bu bir cerrahi onay ölçütü değildir ve CERAI puanını veya nihai kararı değiştirmez.",
+    "NICE (Navarro Index for Corneal Ectasia) combines K2, central pachymetry, posterior elevation and signed I-S. Each component contributes 1-3 points; total 4-12. CER-AI adaptation: posterior elevation <=15.5 um = 1, >15.5 to <18 um = 2, >=18 um = 3. The published table leaves 15 um unspecified. CER-AI reads the highest printed positive posterior elevation inside the dashed pupil boundary on the standard 8-mm BFS float map, not the thinnest-point elevation, BAD difference elevation or BFTE. This pupil-maximum selection is surgeon-specified, not independently validated as the original NICE method. Central pachymetry uses the labeled Pachy Vertex N. field (not thinnest pachymetry), or a surgeon-confirmed central measurement. CER-AI disposition for LASIK and PRK: 4 = no NICE-specific escalation, 5-8 = CAUTION / STOP-DEFER, >=9 = HARD STOP. NICE 4 does not establish surgical safety or override ERSS, BAD or other CER-AI stops. No individual absolute ectasia probability is inferred. Source: Navarro-Naranjo et al., Clin Ophthalmol 2024;18:881-883. DOI: 10.2147/OPTH.S464217.": "NICE (Navarro Korneal Ektazi İndeksi), K2, santral pakimetri, posterior elevasyon ve işaretli I-S değerini birleştirir. Her bileşen 1-3 puan verir; toplam 4-12'dir. CER-AI uyarlaması: posterior elevasyon ≤15,5 µm = 1, >15,5 ile <18 µm = 2, ≥18 µm = 3. Yayımlanmış tabloda 15 µm belirtilmemiştir. CER-AI, en ince nokta elevasyonu, BAD fark elevasyonu veya BFTE yerine standart 8 mm BFS float haritasında kesikli pupil sınırı içindeki yazılı en yüksek pozitif posterior elevasyonu okur. Bu pupil-maksimum seçimi cerrah tarafından belirlenmiştir ve özgün NICE yöntemi olarak bağımsız biçimde doğrulanmamıştır. Santral pakimetri, etiketli Pachy Vertex N. alanından (en ince pakimetri değil) veya cerrahın doğruladığı santral ölçümden alınır. LASIK ve PRK için CER-AI kararı: 4 = NICE'a özgü artırım yok, 5-8 = DİKKAT / DURDUR-ERTELE, ≥9 = KESİN DURDURMA. NICE 4 cerrahi güvenliği kanıtlamaz ve ERSS, BAD veya diğer CER-AI durdurma kurallarını geçersiz kılmaz. Bireysel mutlak ektazi olasılığı çıkarımı yapılmaz. Kaynak: Navarro-Naranjo ve ark., Clin Ophthalmol 2024;18:881-883. DOI: 10.2147/OPTH.S464217.",
+    "Inter-eye tomography concern: NO MAJOR INTER-EYE DISCORDANCE DETECTED. No major categorical inter-eye tomography discordance detected. This is not a clearance criterion and does not change the CER-AI score or final disposition.": "Gözler arası tomografi değerlendirmesi: BELİRGİN GÖZLER ARASI UYUMSUZLUK SAPTANMADI. Belirgin kategorik gözler arası tomografi uyumsuzluğu saptanmadı. Bu bir cerrahi onay ölçütü değildir ve CER-AI puanını veya nihai kararı değiştirmez.",
 }
 
 
 REPLACEMENTS = (
-    (r"CERAI SCORE — SOURCE & BREAKDOWN:", "CERAI PUANI — KAYNAK VE DÖKÜM:"),
+    (r"CER-AI SCORE — SOURCE & BREAKDOWN:", "CER-AI PUANI — KAYNAK VE DÖKÜM:"),
     (r"provisional evidence-weighted triage score \(not validated\)", "geçici kanıt ağırlıklı triyaj puanı (doğrulanmamıştır)"),
-    (r"CERAI-modified age bands", "CERAI'ye uyarlanmış yaş aralıkları"),
+    (r"CER-AI-modified age bands", "CER-AI'ye uyarlanmış yaş aralıkları"),
     (r"\bmorphology:", "morfoloji:"),
     (r"\bmorphology\b", "morfoloji"),
     (r"\bpachymetry:", "pakimetri:"),

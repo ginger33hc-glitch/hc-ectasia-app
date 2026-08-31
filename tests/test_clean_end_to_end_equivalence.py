@@ -1,6 +1,6 @@
 """End-to-end equivalence matrix for behavior that can be compared safely.
 
-This complements primitive equivalence tests. Intentional CERAI policy overrides are
+This complements primitive equivalence tests. Intentional CER-AI policy overrides are
 kept out of this matrix and remain locked by their dedicated clean tests.
 """
 import canonical_engine
