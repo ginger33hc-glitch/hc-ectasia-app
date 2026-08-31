@@ -1,6 +1,6 @@
 """Operational safeguards for the CER-AI web boundary.
 
-This module intentionally contains no clinical rules.  It limits untrusted input,
+This module intentionally contains no clinical rules. It limits untrusted input,
 upstream extraction load, and browser exposure around the canonical engine.
 """
 
@@ -53,6 +53,7 @@ PROTECTED_PATHS = frozenset({
     "/report/pdf",
     "/report/word",
 })
+PROTECTED_PREFIXES = ("/archive/",)
 
 _rate_lock = RLock()
 _analysis_starts: deque[float] = deque()
@@ -145,6 +146,10 @@ def _access_key_valid(request: Request) -> bool:
     return bool(ACCESS_KEY) and secrets.compare_digest(supplied, ACCESS_KEY)
 
 
+def _is_protected_path(path: str) -> bool:
+    return path in PROTECTED_PATHS or any(path.startswith(prefix) for prefix in PROTECTED_PREFIXES)
+
+
 def _request_limit(path: str) -> int:
     return MAX_REQUEST_BYTES if path == "/analyze" else MAX_JSON_REQUEST_BYTES
 
@@ -164,7 +169,7 @@ def _secure_response(response, path: str):
         "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
     )
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    if path in PROTECTED_PATHS:
+    if _is_protected_path(path):
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -182,7 +187,9 @@ def install(core) -> None:
     """Install once around the fully assembled FastAPI application."""
     if getattr(core, "_cerai_operational_security_installed", False):
         return
-    if REQUIRE_ACCESS_KEY and not ACCESS_KEY:
+
+    named_users_enabled = bool(getattr(core, "_cerai_named_users_enabled", False))
+    if not named_users_enabled and REQUIRE_ACCESS_KEY and not ACCESS_KEY:
         raise RuntimeError(
             "CERAI_REQUIRE_ACCESS_KEY=1 but CERAI_ACCESS_KEY is not configured."
         )
@@ -194,7 +201,8 @@ def install(core) -> None:
     @core.app.middleware("http")
     async def cerai_web_boundary(request: Request, call_next):
         path = request.url.path
-        if path in PROTECTED_PATHS:
+        principal_context_token = None
+        if _is_protected_path(path):
             request_limit = _request_limit(path)
             content_length = request.headers.get("content-length")
             if content_length:
@@ -209,14 +217,28 @@ def install(core) -> None:
                         status_code=400,
                         content={"detail": "Invalid Content-Length header."},
                     ), path)
-            if ACCESS_KEY and not _access_key_valid(request):
+
+            if named_users_enabled:
+                principal = core._cerai_authenticate_request(request)
+                if principal is None:
+                    return _secure_response(JSONResponse(
+                        status_code=401,
+                        content={"detail": "CER-AI sign-in required."},
+                        headers={"WWW-Authenticate": "CER-AI-Session"},
+                    ), path)
+                principal_context_token = core._cerai_bind_principal(principal)
+            elif ACCESS_KEY and not _access_key_valid(request):
                 return _secure_response(JSONResponse(
                     status_code=401,
                     content={"detail": "CER-AI access key required."},
                     headers={"WWW-Authenticate": "CER-AI-Key"},
                 ), path)
 
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        finally:
+            if principal_context_token is not None:
+                core._cerai_reset_principal(principal_context_token)
         return _secure_response(response, path)
 
     core._cerai_operational_security_installed = True
