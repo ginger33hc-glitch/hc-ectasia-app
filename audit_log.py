@@ -113,14 +113,18 @@ def list_events(
 
 
 def install(core: Any, archive_runtime: Any) -> None:
-    """Expose an audit callback; callers decide whether an event is required for their operation."""
+    """Expose a fail-aware audit callback that uses the same encrypted archive backend."""
     if getattr(core, "_cerai_audit_log_installed", False):
         return
 
     def audit_event(event_type: str, **kwargs):
         if not archive_runtime.enabled:
             return None
-        return write_event(archive_runtime.archive, event_type, **kwargs)
+        try:
+            return write_event(archive_runtime.archive, event_type, **kwargs)
+        except Exception as exc:
+            archive_runtime.fail_or_continue(exc)
+            return None
 
     core._cerai_audit_event = audit_event
     core._cerai_audit_log_runtime = archive_runtime
