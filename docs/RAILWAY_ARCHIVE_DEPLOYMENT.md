@@ -59,6 +59,7 @@ The preflight checks configuration only and does not contact the bucket or uploa
 - required Railway S3 variables are present,
 - `BUCKET` was not confused with `RAILWAY_BUCKET_NAME`,
 - the Railway endpoint is HTTPS,
+- the endpoint uses a Railway Storage hostname from the Bucket Credentials tab,
 - URL style is valid,
 - archive key decodes to exactly 32 bytes,
 - research and archive keys are different,

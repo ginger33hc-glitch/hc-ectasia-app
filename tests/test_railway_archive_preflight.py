@@ -17,7 +17,7 @@ def env():
         "ACCESS_KEY_ID": "access-key-id",
         "SECRET_ACCESS_KEY": "secret-access-key",
         "REGION": "auto",
-        "ENDPOINT": "https://storage.railway.app",
+        "ENDPOINT": "https://t3.storageapi.dev",
         "AWS_S3_URL_STYLE": "virtual",
         "CERAI_ARCHIVE_MASTER_KEY_B64": ARCHIVE_KEY,
         "CERAI_ARCHIVE_ENABLED": "0",
@@ -30,7 +30,7 @@ def env():
 def test_valid_railway_configuration_passes_without_exposing_secrets():
     result = preflight.validate_environment(env())
     assert result["bucket_configured"] is True
-    assert result["endpoint"] == "https://storage.railway.app"
+    assert result["endpoint"] == "https://t3.storageapi.dev"
     assert result["url_style"] == "virtual"
     assert "ACCESS_KEY_ID" not in result
     assert "SECRET_ACCESS_KEY" not in result
@@ -45,12 +45,21 @@ def test_display_bucket_name_cannot_replace_s3_bucket_name():
 
 def test_endpoint_must_be_https_railway_storage():
     values = env()
-    values["ENDPOINT"] = "http://storage.railway.app"
+    values["ENDPOINT"] = "http://t3.storageapi.dev"
     with pytest.raises(preflight.PreflightError):
         preflight.validate_environment(values)
     values["ENDPOINT"] = "https://example.invalid"
     with pytest.raises(preflight.PreflightError):
         preflight.validate_environment(values)
+    values["ENDPOINT"] = "https://t3.storageapi.dev.example.invalid"
+    with pytest.raises(preflight.PreflightError):
+        preflight.validate_environment(values)
+
+
+def test_legacy_railway_storage_endpoint_remains_supported():
+    values = env()
+    values["ENDPOINT"] = "https://storage.railway.app"
+    assert preflight.validate_environment(values)["endpoint"] == values["ENDPOINT"]
 
 
 def test_path_style_is_allowed_for_legacy_bucket_credentials():

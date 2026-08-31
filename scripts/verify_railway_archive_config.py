@@ -14,6 +14,8 @@ from urllib.parse import urlparse
 
 REQUIRED_BUCKET_VARS = ("BUCKET", "ACCESS_KEY_ID", "SECRET_ACCESS_KEY", "ENDPOINT")
 ALLOWED_URL_STYLES = {"virtual", "path"}
+RAILWAY_STORAGE_HOSTS = {"storage.railway.app"}
+RAILWAY_STORAGE_HOST_SUFFIXES = (".storageapi.dev",)
 
 
 class PreflightError(RuntimeError):
@@ -51,9 +53,13 @@ def validate_environment(env: dict[str, str] | None = None) -> dict[str, object]
     parsed = urlparse(endpoint)
     if parsed.scheme != "https" or not parsed.netloc:
         raise PreflightError("ENDPOINT must be a valid https URL.")
-    if parsed.hostname != "storage.railway.app":
+    hostname = (parsed.hostname or "").lower()
+    if hostname not in RAILWAY_STORAGE_HOSTS and not any(
+        hostname.endswith(suffix) for suffix in RAILWAY_STORAGE_HOST_SUFFIXES
+    ):
         raise PreflightError(
-            "This Railway-specific preflight expects ENDPOINT=https://storage.railway.app."
+            "ENDPOINT must use the HTTPS Railway Storage hostname shown in the "
+            "Bucket Credentials tab."
         )
 
     style = (_value(env, "AWS_S3_URL_STYLE") or "virtual").lower()
