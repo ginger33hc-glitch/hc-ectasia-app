@@ -46,7 +46,7 @@ GRAY = "52616D"
 GRAY_FILL = "EEF2F5"
 LINE = "D7E0E7"
 INK = "17212B"
-APP_VERSION = "0.7.51"
+APP_VERSION = "0.7.52"
 LIABILITY_NOTICE = (
     "The final surgical decision and all associated responsibility and liability rest with the surgeon. "
     "This application is a clinical decision-support aid only."
@@ -194,6 +194,7 @@ def _eye_metrics(eye: Dict[str, Any], locale: str = "en") -> List[tuple[str, str
             f"{_text(erss_evidence.get('validated_category'))} / "
             f"{_text(erss_evidence.get('category_source'))}"
         )),
+        ("Anterior-map read confidence", _text(erss_evidence.get("image_category_confidence"))),
         ("Pentacam QS", _text(values.get("pentacam_qs"))),
     ]
     return [(translate_text(label, locale), translate_text(value, locale)) for label, value in rows]

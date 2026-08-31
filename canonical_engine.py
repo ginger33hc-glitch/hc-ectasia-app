@@ -18,7 +18,7 @@ import assessment_workflow
 
 core = bootstrap.core
 app = _runtime.app
-CANONICAL_VERSION = "0.7.51"
+CANONICAL_VERSION = "0.7.52"
 core.APP_VERSION = CANONICAL_VERSION
 core.app.title = f"CER-AI v{CANONICAL_VERSION}"
 reports.APP_VERSION = CANONICAL_VERSION

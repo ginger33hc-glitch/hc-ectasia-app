@@ -92,6 +92,8 @@ def test_same_complete_lasik_cases_match_canonical_end_to_end():
     )
     for case in cases:
         eye = normal_eye(pachy=case["pachy"])
+        eye["morphology_confidence"] = "HIGH"
+        eye["erss_source_read"] = "DEDICATED_CURVATURE_PASS"
         eye["BAD_D"] = case["bad_d"]
         if case["pachy"] == 480:
             eye["ARTmax_um"] = case["pachy"] / eye["PPI_max"]

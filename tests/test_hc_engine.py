@@ -484,6 +484,9 @@ class TestBoundaries(unittest.TestCase):
 
     def test_definite_ectatic_morphology_is_not_downgraded_by_srax_fields(self):
         eye = normal_eye(morphology="ABNORMAL_ECTATIC")
+        eye["anterior_curvature_map_visible"] = "YES"
+        eye["morphology_confidence"] = "HIGH"
+        eye["erss_source_read"] = "DEDICATED_CURVATURE_PASS"
         eye["srax"] = "YES"
         eye["srax_deg"] = 5
         result = app.assess_eye(
@@ -1176,7 +1179,7 @@ class TestAuthorshipAndLiabilityFooter(unittest.TestCase):
         i18n = (root / "static" / "i18n.js").read_text()
         self.assertIn('data-language="en"', html)
         self.assertIn('data-language="tr"', html)
-        self.assertIn('/static/i18n.js?v=2', html)
+        self.assertIn('/static/i18n.js?v=3', html)
         self.assertIn('locale:i18n.locale', html)
         self.assertIn('localStorage.setItem("cerai-language"', i18n)
         self.assertIn('"Case inputs":"Vaka girdileri"', i18n)

@@ -2,10 +2,14 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.49 implements
+## What v0.7.52 implements
 
-- Randleman topography now requires a labeled Pentacam I-S value or surgeon-confirmed I-S value.
-  Visual ABT/SRA labels without their required numeric support are not scored automatically.
+- Randleman topography is read only from a qualifying anterior curvature map. A dedicated
+  `HIGH`-confidence complete-map classification may supply the mutually exclusive morphology
+  category without requiring an I-S value. `MODERATE`, `LOW`, or unreadable classifications
+  remain unscorable until surgeon confirmation.
+- Labeled/confirmed I-S remains a separate numeric threshold input and a NICE component; it is
+  not a universal prerequisite for a clearly classifiable Randleman anterior pattern.
 - Topography categories remain mutually exclusive and use the existing single point mapper: abnormal
   +4, inferior steepening/SRA +3, asymmetric bow-tie +1, and normal/symmetric +0.
 
@@ -29,7 +33,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Published five-component LASIK ERSS scoring and categories.
 - PRK-EWSS v1.0 provisional morphology/pachymetry/age triage score, explicitly labeled as unvalidated.
 - Morphology-first override gate for definite KC/FFKC/PMD or unequivocal ectatic morphology.
-- Published ERSS Placido thresholds are enforced for SRAX/inferior steepening: SRAX requires `≥20°`; the alternative category requires `≥1.0 D` inferior-versus-opposite steepening with `I-S <1.4 D`. Minimal axis deviation is not scored as SRAX, and unsupported visual labels remain unscorable rather than being guessed.
+- Published ERSS Placido thresholds are enforced when numeric evidence is available: SRAX `≥20°`; the alternative category requires `≥1.0 D` inferior-versus-opposite steepening with `I-S <1.4 D`. A clearly visible `HIGH`-confidence SRA/inferior-steepening map pattern may also supply the category without inventing an angle; lower-confidence visual labels remain unscorable.
 - CER-AI operational hard stops: preoperative thinnest pachymetry `<480 µm`, LASIK RSB `<300 µm`, PRK RST `<310 µm`, intended sphere `<−10.00 D`, and intended sphere `>+6.00 D`. Exact boundaries do not trigger those rules.
 - CER-AI-modified LASIK pachymetry scoring: `480–499 µm` = +2, `500–509 µm` = +1, and `>=510 µm` = +0.
 - Standard CER-AI PRK calculation: `RST = pachymetry - 50 µm epithelium - maximum stromal ablation`.

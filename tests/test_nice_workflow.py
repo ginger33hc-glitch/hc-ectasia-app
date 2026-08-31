@@ -19,6 +19,9 @@ core = runtime.core
 
 def scenario(procedure="LASIK"):
     extracted = {"eyes": [normal_eye("OD"), normal_eye("OS")], "critical_input_issues": []}
+    for eye in extracted["eyes"]:
+        eye["morphology_confidence"] = "HIGH"
+        eye["erss_source_read"] = "DEDICATED_CURVATURE_PASS"
     plans = {eye: plan(procedure, flap=100 if procedure == "LASIK" else None) for eye in ("OD", "OS")}
     return extracted, plans
 

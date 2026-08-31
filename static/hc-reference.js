@@ -28,9 +28,9 @@
   let queued = false;
 
   function installStaticPolicyUI() {
-    document.title = "CER-AI v0.7.51";
+    document.title = "CER-AI v0.7.52";
     const heading = document.querySelector("body > header h1");
-    if (heading) heading.textContent = "CER-AI v0.7.51";
+    if (heading) heading.textContent = "CER-AI v0.7.52";
 
     const manualInterEye = document.querySelector('input[name="patient_modifier"][value="inter_eye_asymmetry"]');
     if (manualInterEye) {

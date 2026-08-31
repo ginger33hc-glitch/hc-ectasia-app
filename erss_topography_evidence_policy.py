@@ -72,21 +72,57 @@ def _prepared_eye(eye, plan):
     return prepared
 
 
-def _automatic_numeric_support(eye, category):
+_CATEGORY_RANK = {
+    "NORMAL_SYMMETRIC": 0,
+    "ASYMMETRIC_BOWTIE": 1,
+    "INFERIOR_STEEPENING_SRA": 3,
+    "ABNORMAL_ECTATIC": 4,
+}
+
+
+def _numeric_category(eye):
+    """Return a category only when a published numeric pattern criterion is usable."""
+    i_s = eye.get("I_S")
+    i_s_usable = core.is_number(i_s) and _i_s_status(eye) in VALID_I_S_STATUSES
     srax = eye.get("srax_deg")
     opposite = eye.get("inferior_opposite_steepening_D")
-    if category == "INFERIOR_STEEPENING_SRA":
+
+    if i_s_usable and float(i_s) >= 1.4:
+        return "ABNORMAL_ECTATIC", "Labeled/confirmed I-S is >=1.4 D."
+    if core.is_number(srax) and float(srax) >= 20.0:
+        return "INFERIOR_STEEPENING_SRA", "Documented SRA/SRAX is >=20 degrees."
+    if (
+        core.is_number(opposite)
+        and float(opposite) >= 1.0
+        and i_s_usable
+        and float(i_s) < 1.4
+    ):
         return (
-            (core.is_number(srax) and float(srax) >= 20.0)
-            or (core.is_number(opposite) and float(opposite) >= 1.0)
+            "INFERIOR_STEEPENING_SRA",
+            "Documented inferior-versus-opposite steepening is >=1.0 D with I-S <1.4 D.",
         )
-    if category == "ASYMMETRIC_BOWTIE":
+    if (
+        core.is_number(opposite)
+        and 0.5 < float(opposite) < 1.0
+        and not (core.is_number(srax) and float(srax) >= 20.0)
+    ):
         return (
-            core.is_number(opposite)
-            and 0.5 < float(opposite) < 1.0
-            and not (core.is_number(srax) and float(srax) >= 20.0)
+            "ASYMMETRIC_BOWTIE",
+            "Documented opposite-region asymmetry is >0.5 D and <1.0 D without qualifying SRA/SRAX.",
         )
-    return True
+    return None, None
+
+
+def _high_confidence_map_category(eye):
+    category = eye.get("morphology")
+    if (
+        eye.get("erss_source_read") == "DEDICATED_CURVATURE_PASS"
+        and eye.get("anterior_curvature_map_visible") == "YES"
+        and eye.get("morphology_confidence") == "HIGH"
+        and category in VALID_CATEGORIES
+    ):
+        return category
+    return None
 
 
 def scoring_morphology_with_i_s_evidence_gate(eye):
@@ -98,85 +134,46 @@ def scoring_morphology_with_i_s_evidence_gate(eye):
         return _previous_scoring_morphology(eye)
 
     evidence = list(eye.get("morphology_evidence") or [])
-    i_s = eye.get("I_S")
-    status = _i_s_status(eye)
-    if not core.is_number(i_s) or status not in VALID_I_S_STATUSES:
-        evidence.append(
-            "Randleman topography not scored: a labeled Pentacam I-S value or surgeon-confirmed I-S value is required."
-        )
-        if status == "CONFLICT":
-            evidence.append("Conflicting same-eye I-S readings require surgeon resolution; no conservative maximum was scored.")
-        return {"category": "UNCERTAIN", "evidence": list(dict.fromkeys(evidence))}
-
-    i_s = float(i_s)
+    numeric_category, numeric_evidence = _numeric_category(eye)
+    map_category = _high_confidence_map_category(eye)
     surgeon_category = eye.get("surgeon_topography_category")
-    automatic = _previous_scoring_morphology(eye)
-    automatic_category = automatic.get("category", "UNCERTAIN")
-    evidence.extend(automatic.get("evidence") or [])
 
-    # Highest applicable category wins; topography categories are never added together.
-    if i_s >= 1.4 or automatic_category == "ABNORMAL_ECTATIC" or surgeon_category == "ABNORMAL_ECTATIC":
+    candidates = []
+    if numeric_category:
+        candidates.append((numeric_category, "AUTOMATIC_NUMERIC_EVIDENCE"))
+        evidence.append(numeric_evidence)
+    if map_category:
+        candidates.append((map_category, "AUTOMATIC_HIGH_CONFIDENCE_MAP_EVIDENCE"))
         evidence.append(
-            "The I-S threshold or a confirmed abnormal/ectatic anterior pattern supports ABNORMAL_ECTATIC; this is the single highest applicable ERSS topography category."
+            "Dedicated reader found a HIGH-confidence category on the complete anterior curvature map; no BAD/BAD-D field was used."
         )
-        return {"category": "ABNORMAL_ECTATIC", "evidence": list(dict.fromkeys(evidence))}
+    if surgeon_category in VALID_CATEGORIES:
+        candidates.append((surgeon_category, "SURGEON_CONFIRMED"))
+        evidence.append("Randleman anterior-topography category was explicitly confirmed by the surgeon.")
 
-    srax = eye.get("srax_deg")
-    opposite = eye.get("inferior_opposite_steepening_D")
-    if (
-        (core.is_number(srax) and float(srax) >= 20.0)
-        or (core.is_number(opposite) and float(opposite) >= 1.0)
-    ):
+    if not candidates:
+        confidence = eye.get("morphology_confidence") or "UNSPECIFIED"
         evidence.append(
-            "Inferior-steepening/SRA numeric support is present; this single category takes precedence over asymmetric bow-tie."
+            f"Randleman topography remains unscored: no qualifying numeric criterion, HIGH-confidence dedicated map category, or surgeon-confirmed category is available (map confidence: {confidence})."
         )
-        return {"category": "INFERIOR_STEEPENING_SRA", "evidence": list(dict.fromkeys(evidence))}
+        if _i_s_status(eye) == "CONFLICT":
+            evidence.append("Conflicting same-eye I-S readings were not used.")
+        return {"category": "UNCERTAIN", "category_source": "UNRESOLVED", "evidence": list(dict.fromkeys(evidence))}
 
-    if surgeon_category == "INFERIOR_STEEPENING_SRA":
-        evidence.append("Inferior-steepening/SRA category confirmed by the surgeon; it takes precedence over ABT.")
-        return {"category": "INFERIOR_STEEPENING_SRA", "evidence": list(dict.fromkeys(evidence))}
-
-    if (
-        (automatic_category == "ASYMMETRIC_BOWTIE" and _automatic_numeric_support(eye, automatic_category))
-        or surgeon_category == "ASYMMETRIC_BOWTIE"
-    ):
-        evidence.append(
-            "Validated asymmetric bow-tie evidence supplies the single ABT category; it is not added to another topography category."
-        )
-        return {"category": "ASYMMETRIC_BOWTIE", "evidence": list(dict.fromkeys(evidence))}
-
-    if automatic_category == "NORMAL_SYMMETRIC" or surgeon_category == "NORMAL_SYMMETRIC":
-        evidence.append("Normal/symmetric anterior topography is the single validated category.")
-        return {"category": "NORMAL_SYMMETRIC", "evidence": list(dict.fromkeys(evidence))}
-
-    category = automatic_category
-    if category not in VALID_CATEGORIES:
-        return {"category": "UNCERTAIN", "evidence": list(dict.fromkeys(evidence))}
-
-    if category in {"ASYMMETRIC_BOWTIE", "INFERIOR_STEEPENING_SRA"} and not _automatic_numeric_support(eye, category):
-        evidence.append(
-            "Visual asymmetry alone was not scored: the published numeric support is unreadable, so surgeon category confirmation is required."
-        )
-        return {"category": "UNCERTAIN", "evidence": list(dict.fromkeys(evidence))}
-
+    category, source = max(candidates, key=lambda item: _CATEGORY_RANK[item[0]])
     evidence.append(
-        "I-S and anterior-curvature evidence passed the ERSS evidence gate; the category is forwarded to the existing point mapper."
+        "Highest applicable single Randleman topography category selected; ABT and inferior-steepening/SRA points are never added."
     )
-    return {"category": category, "evidence": list(dict.fromkeys(evidence))}
+    return {"category": category, "category_source": source, "evidence": list(dict.fromkeys(evidence))}
 
 
 def required_tomography_missing_with_i_s(eye):
     missing = list(_previous_required_tomography_missing(eye))
     if not eye.get("_erss_i_s_gate_required"):
         return missing
-    status = _i_s_status(eye)
-    if not core.is_number(eye.get("I_S")) or status not in VALID_I_S_STATUSES:
-        missing.append("labeled Pentacam I-S value or surgeon-confirmed I-S value for Randleman topography")
-
-    raw_category = eye.get("morphology")
     validated = scoring_morphology_with_i_s_evidence_gate(eye).get("category")
-    if raw_category in {"ASYMMETRIC_BOWTIE", "INFERIOR_STEEPENING_SRA"} and validated == "UNCERTAIN":
-        missing.append("surgeon-confirmed Randleman topography category when numeric ABT/SRA support is unreadable")
+    if validated == "UNCERTAIN":
+        missing.append("surgeon-confirmed Randleman topography category when the dedicated anterior-map read is not HIGH confidence")
     return list(dict.fromkeys(missing))
 
 
@@ -192,20 +189,12 @@ def assess_eye_with_i_s_evidence(eye, plan, age, patient_modifiers):
         "I_S_status": status,
         "I_S_source": _i_s_source(working_eye),
         "image_category": working_eye.get("morphology", "UNCERTAIN"),
+        "image_category_confidence": working_eye.get("morphology_confidence", "UNSPECIFIED"),
         "validated_category": validated.get("category", "UNCERTAIN"),
-        "category_source": (
-            "SURGEON_CONFIRMED"
-            if working_eye.get("surgeon_topography_category") == validated.get("category")
-            else "AUTOMATIC_NUMERIC_AND_MAP_EVIDENCE"
-            if validated.get("category") in VALID_CATEGORIES
-            else "UNRESOLVED"
-        ),
+        "category_source": validated.get("category_source", "UNRESOLVED"),
         "single_category_rule": "Highest applicable category only; ABT and inferior-steepening/SRA points are never added.",
-        "needs_surgeon_I_S": status not in VALID_I_S_STATUSES,
-        "needs_surgeon_category": (
-            working_eye.get("morphology") in {"ASYMMETRIC_BOWTIE", "INFERIOR_STEEPENING_SRA"}
-            and validated.get("category") == "UNCERTAIN"
-        ),
+        "needs_surgeon_I_S": False,
+        "needs_surgeon_category": validated.get("category") == "UNCERTAIN",
     }
     result["erss_topography_evidence"] = evidence_record
     result.setdefault("values", {}).update({

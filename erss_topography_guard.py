@@ -32,6 +32,7 @@ ERSS_SCHEMA={
   "eye":{"type":"string","enum":["OD","OS","UNKNOWN"]},
   "anterior_curvature_map_visible":{"type":"string","enum":["YES","NO","UNCERTAIN"]},
   "morphology":{"type":"string","enum":["NORMAL_SYMMETRIC","ASYMMETRIC_BOWTIE","INFERIOR_STEEPENING_SRA","ABNORMAL_ECTATIC","UNCERTAIN"]},
+  "morphology_confidence":{"type":"string","enum":["HIGH","MODERATE","LOW","UNREADABLE"]},
   "asymmetric_bow_tie":{"type":"string","enum":["YES","NO","UNCERTAIN"]},
   "srax":{"type":"string","enum":["YES","NO","UNCERTAIN"]},
   "srax_deg":{"type":["number","null"]},
@@ -40,7 +41,7 @@ ERSS_SCHEMA={
   "I_S_status":{"type":"string","enum":["CONFIDENT","UNREADABLE","NOT_SHOWN"]},
   "evidence":{"type":"array","items":{"type":"string"}}
  },
- "required":["display_type","eye","anterior_curvature_map_visible","morphology","asymmetric_bow_tie","srax","srax_deg","inferior_opposite_steepening_D","I_S","I_S_status","evidence"]
+ "required":["display_type","eye","anterior_curvature_map_visible","morphology","morphology_confidence","asymmetric_bow_tie","srax","srax_deg","inferior_opposite_steepening_D","I_S","I_S_status","evidence"]
 }
 ERSS_PROMPT=r"""You are ONLY the Randleman/ERSS anterior-topography reader. Ignore BAD-D and all Belin/Ambrosio values.
 First identify the page. If the header says OCULUS - PENTACAM 4 Maps Refractive, or the standard four-map
@@ -54,9 +55,12 @@ NORMAL_SYMMETRIC = round, oval, or symmetric bow-tie. ASYMMETRIC_BOWTIE requires
 but <1.0 D versus the region 180 degrees opposite, without significant SRA/SRAX. INFERIOR_STEEPENING_SRA
 requires support for SRAX >=20 degrees, or >=1.0 D inferior-versus-opposite steepening with printed I-S <1.4 D.
 ABNORMAL_ECTATIC is reserved for an unequivocal abnormal ectatic pattern/keratoconus/PMD/FFKC or I-S >=1.4 D.
-Report srax_deg or inferior_opposite_steepening_D only when reliably supported; never invent a number. If the
-visible pattern is suspicious but the required Randleman category threshold cannot be established, return
-morphology=UNCERTAIN. This task never needs a BAD map."""
+Report srax_deg or inferior_opposite_steepening_D only when reliably supported; never invent a number.
+Set morphology_confidence=HIGH only when the complete anterior map is visible at adequate resolution and the
+pattern clearly belongs to one category without relying on an unreadable numeric threshold. Use MODERATE or LOW
+when the pattern is suggestive but not definitive, and UNREADABLE when the map cannot be classified. Superior-only
+steepening is not automatically the ERSS inferior-steepening category: classify it from the complete pattern as
+asymmetric bow-tie, abnormal ectatic, or uncertain as appropriate. This task never needs a BAD map."""
 
 def _erss_second_pass(raw,filename):
     response=core.openai_client().responses.create(
@@ -107,7 +111,7 @@ def extract_one_image_with_erss(raw,filename):
     if len(candidates)==1:
         e=candidates[0]
         e["anterior_curvature_map_visible"]="YES";e["anterior_curvature_map_type"]="AXIAL_SAGITTAL_FRONT";e["anterior_curvature_map_location"]="UPPER_LEFT"
-        for f in ("morphology","asymmetric_bow_tie","srax","srax_deg","inferior_opposite_steepening_D"): e[f]=er.get(f)
+        for f in ("morphology","morphology_confidence","asymmetric_bow_tie","srax","srax_deg","inferior_opposite_steepening_D"): e[f]=er.get(f)
         e["morphology_evidence"]=list(dict.fromkeys((er.get("evidence") or [])+["Dedicated ERSS pass: Pentacam 4 Maps upper-left Axial/Sagittal Curvature (Front) recognized as anterior topography."]))
         e["erss_source_read"]="DEDICATED_CURVATURE_PASS"
     else:
@@ -124,7 +128,7 @@ def merge_extractions_with_erss_source_guard(results):
         for raw in result.get("eyes",[]):
             e=dict(raw)
             if not _qualifies(e):
-                e.update({"morphology":"UNCERTAIN","asymmetric_bow_tie":"UNCERTAIN","srax":"UNCERTAIN","srax_deg":None,"inferior_opposite_steepening_D":None})
+                e.update({"morphology":"UNCERTAIN","morphology_confidence":"UNREADABLE","asymmetric_bow_tie":"UNCERTAIN","srax":"UNCERTAIN","srax_deg":None,"inferior_opposite_steepening_D":None})
             eyes.append(e)
         copied["eyes"]=eyes;guarded.append(copied)
     merge_input=[]
@@ -142,22 +146,22 @@ def merge_extractions_with_erss_source_guard(results):
             filename=(result.get("document_context") or {}).get("source_filename")
             for src in result.get("eyes",[]):
                 if src.get("eye")==eye_id and _qualifies(src):
-                    source_eyes.append(src);sources.append({"file":filename,"map_type":src.get("anterior_curvature_map_type"),"map_location":src.get("anterior_curvature_map_location"),"morphology":src.get("morphology"),"srax_deg":src.get("srax_deg"),"reader":src.get("erss_source_read")})
+                    source_eyes.append(src);sources.append({"file":filename,"map_type":src.get("anterior_curvature_map_type"),"map_location":src.get("anterior_curvature_map_location"),"morphology":src.get("morphology"),"morphology_confidence":src.get("morphology_confidence"),"srax_deg":src.get("srax_deg"),"reader":src.get("erss_source_read")})
         eye["erss_topography_sources"]=sources;eye.setdefault("field_provenance",{})["erss_topography"]=sources;eye["erss_bad_dependency"]=False
         if source_eyes:
             dedicated=[s for s in source_eyes if s.get("erss_source_read")=="DEDICATED_CURVATURE_PASS"]
             categories={s.get("morphology") for s in dedicated if s.get("morphology") not in (None,"UNCERTAIN")}
             if len(categories)>1:
                 best=dedicated[0]
-                best=dict(best);best.update({"morphology":"UNCERTAIN","asymmetric_bow_tie":"UNCERTAIN","srax":"UNCERTAIN","srax_deg":None,"inferior_opposite_steepening_D":None})
+                best=dict(best);best.update({"morphology":"UNCERTAIN","morphology_confidence":"LOW","asymmetric_bow_tie":"UNCERTAIN","srax":"UNCERTAIN","srax_deg":None,"inferior_opposite_steepening_D":None})
                 best["morphology_evidence"]=["Conflicting dedicated anterior-curvature morphology reads; Randleman topography left UNCERTAIN for surgeon review."]
             else:
                 best=next((s for s in dedicated if s.get("morphology") not in (None,"UNCERTAIN")),None) or (dedicated[0] if dedicated else source_eyes[0])
             eye["anterior_curvature_map_visible"]="YES";eye["anterior_curvature_map_type"]=best.get("anterior_curvature_map_type");eye["anterior_curvature_map_location"]=best.get("anterior_curvature_map_location")
-            for f in ("morphology","asymmetric_bow_tie","srax","srax_deg","inferior_opposite_steepening_D"):eye[f]=best.get(f)
+            for f in ("morphology","morphology_confidence","asymmetric_bow_tie","srax","srax_deg","inferior_opposite_steepening_D"):eye[f]=best.get(f)
             eye["morphology_evidence"]=list(dict.fromkeys(best.get("morphology_evidence") or []));eye["erss_source_read"]=best.get("erss_source_read")
         else:
-            eye.update({"anterior_curvature_map_visible":"NO","anterior_curvature_map_type":"NONE","anterior_curvature_map_location":"NONE","morphology":"UNCERTAIN","asymmetric_bow_tie":"UNCERTAIN","srax":"UNCERTAIN","srax_deg":None,"inferior_opposite_steepening_D":None,"erss_source_read":None})
+            eye.update({"anterior_curvature_map_visible":"NO","anterior_curvature_map_type":"NONE","anterior_curvature_map_location":"NONE","morphology":"UNCERTAIN","morphology_confidence":"UNREADABLE","asymmetric_bow_tie":"UNCERTAIN","srax":"UNCERTAIN","srax_deg":None,"inferior_opposite_steepening_D":None,"erss_source_read":None})
         eye["data_conflicts"]=[c for c in eye.get("data_conflicts",[]) if str(c).split(":",1)[0].strip() not in ROLE_FIELDS]
     qualifying_eyes={e.get("eye") for e in merged.get("eyes",[]) if _qualifies(e)}
     if qualifying_eyes:

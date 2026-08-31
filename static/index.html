@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>CER-AI v0.7.51</title>
+  <title>CER-AI v0.7.52</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=9">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=8">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=8">
@@ -41,7 +41,7 @@
   <style>@media print{.report-card[hidden]{display:none!important}}</style>
 </head>
 <body>
-<header class="app-header"><div class="brand-lockup"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Corneal Ectasia Risk Analysis Intelligence"><span class="brand-version">v0.7.51</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI v0.7.51</h1></header>
+<header class="app-header"><div class="brand-lockup"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Corneal Ectasia Risk Analysis Intelligence"><span class="brand-version">v0.7.52</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI v0.7.52</h1></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -105,7 +105,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">CER-AI Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.7.51</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.7.52</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <p class="report-liability-notice">The final surgical decision and all associated responsibility and liability rest with the surgeon. This application is a clinical decision-support aid only.</p>
       <table class="meta-table"><tbody>
@@ -128,7 +128,7 @@
 </main>
 <footer class="app-legal-footer">Developed by Hüseyin Cengiz, MD. All rights reserved. Final responsibility rests with the surgeon at all times and under all circumstances.</footer>
 
-<script src="/static/i18n.js?v=2"></script>
+<script src="/static/i18n.js?v=3"></script>
 <script src="/static/assessment-readiness.js?v=2"></script>
 <script>
 const i18n=window.CERAI_I18N;
@@ -149,13 +149,13 @@ const eyeTemplate = (eye) => `
   <details id="${eye}_erss_confirmation" class="clinical-select-group" hidden>
     <summary>Randleman topography — surgeon confirmation required</summary>
     <div class="clinical-select-options">
-      <p class="alert">Use the Pentacam Topometric/Keratoconus panel: <strong>Indices (in 8 mm zone) → IS</strong>. Preserve the printed sign. Do not enter ISV, IVA, IHD, IHA, or KISA.</p>
+      <p class="alert">Confirm the category from the anterior curvature map. If I-S is separately requested for NICE or the abnormal-pattern threshold, use Pentacam Topometric/Keratoconus: <strong>Indices (in 8 mm zone) → IS</strong>. Preserve the sign; do not enter ISV, IVA, IHD, IHA, or KISA.</p>
       <section class="erss-reference" aria-label="Randleman anterior topography reference guide">
         <h4>Surgeon reference — how to choose the Randleman category</h4>
         <ol>
           <li>On a standard Pentacam <strong>4 Maps Refractive</strong> page, assess only the <strong>upper-left Axial/Sagittal Curvature (Front)</strong> map for this category.</li>
           <li>Compare the steepest region with the region <strong>180° opposite</strong>. For SRA, assess whether the two bow-tie axes are radially aligned or skewed.</li>
-          <li>Use the separately printed <strong>IS / I-S</strong> value only. BAD-D, posterior elevation, pachymetry, ISV and IVA are independent data and must not be substituted here.</li>
+          <li>If available, use only the separately printed <strong>IS / I-S</strong> value for its numeric threshold. I-S is not mandatory for a clearly classifiable anterior pattern. BAD-D, posterior elevation, pachymetry, ISV and IVA are independent from Randleman topography and must not be substituted.</li>
           <li>Select the <strong>single highest applicable</strong> category below.</li>
         </ol>
         <table>
@@ -167,7 +167,7 @@ const eyeTemplate = (eye) => `
             <tr><td>Abnormal / ectatic</td><td>Unequivocal keratoconus, pellucid marginal degeneration, or forme-fruste keratoconus pattern; or <strong>I-S ≥1.4 D</strong>.</td><td>4</td></tr>
           </tbody>
         </table>
-        <p class="reference-warning">If the correct map, opposite-region comparison, axis relationship, or printed I-S cannot be assessed reliably, do not guess. Leave the category unresolved and upload a clearer source image.</p>
+        <p class="reference-warning">If the complete map cannot be classified confidently, do not guess. Leave the category unresolved and upload a clearer source image or confirm the category as the surgeon.</p>
         <p class="note">This is the published Placido-era Randleman/ERSS pattern classification adapted to CER-AI's locked anterior-curvature source rule. It is a risk-score input, not a stand-alone diagnosis. Source: <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3748728/" target="_blank" rel="noopener">Randleman et al., 2008 validation study</a>.</p>
       </section>
       <div class="row"><label>Surgeon-confirmed I-S (D)</label><div class="signed-number"><input id="${eye}_surgeon_i_s" type="text" inputmode="decimal" autocomplete="off"><button type="button" class="sign-button" data-positive-target="${eye}_surgeon_i_s" aria-label="Make I-S positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_surgeon_i_s" aria-label="Make I-S negative">−</button></div></div>
@@ -521,7 +521,8 @@ function renderEye(r, extracted){
     ["LASIK RSB / PTA",`${fmt(v.LASIK_RSB_um,0)} µm / ${fmt(v.LASIK_PTA_percent,1)}%`],
     ["Tomography review",r.tomography_review?.status??"—"],["Morphology category",r.topography_classification?.scoring_category??"—"],
     ["Randleman I-S / source",`${fmt(erssEvidence.I_S_D,2)} D / ${erssEvidence.I_S_source??"—"}`],
-    ["Validated Randleman topography",`${erssEvidence.validated_category??"—"} / ${erssEvidence.category_source??"—"}`]
+    ["Validated Randleman topography",`${erssEvidence.validated_category??"—"} / ${erssEvidence.category_source??"—"}`],
+    ["Anterior-map read confidence",erssEvidence.image_category_confidence??"—"]
   ];
   const source=(extracted.eyes||[]).find(x=>x.eye===r.eye)||{};
   const tomoRows=[
@@ -726,6 +727,6 @@ if("serviceWorker" in navigator){
 }
 loadSharedImages();
 </script>
-<script id="hc-reference-script" src="/static/hc-reference.js?v=3"></script>
+<script id="hc-reference-script" src="/static/hc-reference.js?v=4"></script>
 </body>
 </html>

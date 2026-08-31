@@ -74,6 +74,7 @@ TR = {
     "Morphology category": "Morfoloji kategorisi",
     "Randleman I-S / source": "Randleman I-S / kaynak",
     "Validated Randleman topography": "Doğrulanmış Randleman topografisi",
+    "Anterior-map read confidence": "Anterior harita okuma güveni",
     "Pentacam QS": "Pentacam QS",
     "Hard stops": "Kesin durdurma nedenleri",
     "Decision reasons": "Karar nedenleri",
