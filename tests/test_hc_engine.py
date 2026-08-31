@@ -1106,7 +1106,7 @@ class TestPwaIcons(unittest.TestCase):
         self.assertIn('/static/manifest.webmanifest?v=9', html)
         self.assertIn('/static/icons/favicon-32.png?v=8', html)
         self.assertIn('/static/icons/apple-touch-icon.png?v=8', html)
-        self.assertIn('/static/branding/cerai-logo-final.png?v=3', html)
+        self.assertIn('/static/branding/cer-ai-logo-final.png?v=4', html)
         self.assertIn('alt="CER-AI — Corneal Ectasia Risk Analysis Intelligence"', html)
         self.assertNotIn('/static/icons/icon-source.svg', html)
 
