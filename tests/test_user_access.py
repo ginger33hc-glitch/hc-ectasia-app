@@ -99,6 +99,22 @@ def test_disabled_account_cannot_authenticate():
         user_access._reset_for_tests()
 
 
+def test_failed_login_rate_limit(monkeypatch):
+    registry = user_access.parse_registry(json.dumps([account_payload()]))
+    user_access._configure_for_tests(registry)
+    monkeypatch.setattr(user_access, "LOGIN_FAILURE_LIMIT", 3)
+    try:
+        for _ in range(3):
+            with pytest.raises(Exception) as exc:
+                user_access.authenticate_credentials("owner", "definitely-wrong-password")
+            assert getattr(exc.value, "status_code", None) == 401
+        with pytest.raises(Exception) as exc:
+            user_access.authenticate_credentials("owner", "long-owner-password")
+        assert getattr(exc.value, "status_code", None) == 429
+    finally:
+        user_access._reset_for_tests()
+
+
 def test_current_principal_context_is_explicitly_reset():
     principal = user_access.Principal("doctor-1", "doctor", "Doctor One", "DOCTOR")
     token = user_access.bind_current_principal(principal)
@@ -107,16 +123,19 @@ def test_current_principal_context_is_explicitly_reset():
     assert user_access.current_principal() is None
 
 
-def test_named_session_can_replace_shared_access_key_for_protected_route(monkeypatch):
+def test_named_session_can_replace_shared_access_key_and_login_logout_are_audited(monkeypatch):
     owner = account_payload()
     registry_json = json.dumps([owner])
     monkeypatch.setenv("CERAI_USERS_JSON", registry_json)
-    monkeypatch.setattr(user_access, "NAMED_USERS_ENABLED", True)
     user_access._reset_for_tests()
     monkeypatch.setattr(user_access, "NAMED_USERS_ENABLED", True)
 
     app = FastAPI()
-    core = SimpleNamespace(app=app)
+    events = []
+    core = SimpleNamespace(
+        app=app,
+        _cerai_audit_event=lambda event_type, **kwargs: events.append((event_type, kwargs)),
+    )
     try:
         user_access.install(core)
         operational_security.install(core)
@@ -141,10 +160,18 @@ def test_named_session_can_replace_shared_access_key_for_protected_route(monkeyp
         assert "HttpOnly" in cookie
         assert "Secure" in cookie
         assert "SameSite=strict" in cookie
+        assert events[0][0] == "LOGIN_SUCCESS"
+        assert events[0][1]["actor"].user_id == "owner-1"
 
         admitted = client.post("/assessment/complete", json={})
         assert admitted.status_code == 200
         assert admitted.json()["user_id"] == "owner-1"
         assert user_access.current_principal() is None
+
+        logout = client.post("/auth/logout")
+        assert logout.status_code == 200
+        assert events[-1][0] == "LOGOUT"
+        assert events[-1][1]["actor"].user_id == "owner-1"
+        assert client.post("/assessment/complete", json={}).status_code == 401
     finally:
         user_access._reset_for_tests()
