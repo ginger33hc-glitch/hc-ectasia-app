@@ -1,4 +1,4 @@
-"""Runtime bootstrap for the CERAI."""
+"""Runtime bootstrap for the CER-AI."""
 
 import app as core
 from lasik_planning import install
@@ -93,8 +93,8 @@ def apply_extracted_corrections_with_ex500(extracted,eye_plans):
             actual=distinct[0]; previous=plan.get("ablation_um")
             if core.is_number(previous) and abs(float(previous)-actual)>0.5: warnings.append(f"{eye} entered/calculated ablation {float(previous):g} µm was replaced by the directly displayed EX500 Maximal Ablation {actual:g} µm.")
             plan["ablation_um"]=actual; plan["ablation_source"]="ALCON_WAVELIGHT_EX500_DISPLAYED_MAXIMAL_ABLATION"; plan["laser_platform"]="Alcon WaveLight EX500"
-            warnings.append(f"{eye} maximum ablation uses the directly displayed Alcon WaveLight EX500 Maximal Ablation value ({actual:g} µm); CERAI calculated estimate was not used.")
-        elif candidates: warnings.append(f"{eye} EX500 planning image did not provide one conflict-free confident Maximal Ablation value; the CERAI calculation fallback will be used when its required inputs are available.")
+            warnings.append(f"{eye} maximum ablation uses the directly displayed Alcon WaveLight EX500 Maximal Ablation value ({actual:g} µm); CER-AI calculated estimate was not used.")
+        elif candidates: warnings.append(f"{eye} EX500 planning image did not provide one conflict-free confident Maximal Ablation value; the CER-AI calculation fallback will be used when its required inputs are available.")
         plan["correction_warnings"]=list(dict.fromkeys(warnings))
     return effective
 core.apply_extracted_corrections=apply_extracted_corrections_with_ex500
@@ -142,7 +142,7 @@ def assess_eye_with_ablation_source(eye,plan,age,patient_modifiers):
         result["score"]["source"]=audit["source"]; result["score"]["breakdown"]=audit["breakdown"]
         if audit.get("risk"): result["score"]["risk_interpretation"]=audit["risk"]
         warnings=list(result.get("warnings") or [])
-        warnings.append("CERAI SCORE — SOURCE & BREAKDOWN: "+audit["source"]+". "+"; ".join(audit["breakdown"])+f". TOTAL: {audit['total']} ({audit['category']}). Hard stops are independent of this numeric score and are not counted as score points.")
+        warnings.append("CER-AI SCORE — SOURCE & BREAKDOWN: "+audit["source"]+". "+"; ".join(audit["breakdown"])+f". TOTAL: {audit['total']} ({audit['category']}). Hard stops are independent of this numeric score and are not counted as score points.")
         risk=audit.get("risk")
         if risk:
             warnings.append("ECTASIA RISK INTERPRETATION: "+risk["published_evidence"]+" ABSOLUTE PROBABILITY: "+risk["absolute_probability"]+" LIMITATION: "+risk["interpretation_limit"]+" SOURCE: "+risk["source"])

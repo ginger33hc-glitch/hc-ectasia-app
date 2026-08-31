@@ -1,4 +1,4 @@
-"""CERAI-approved boundaries and fail-closed API/report completion behavior."""
+"""CER-AI-approved boundaries and fail-closed API/report completion behavior."""
 from copy import deepcopy
 from io import BytesIO
 import itertools

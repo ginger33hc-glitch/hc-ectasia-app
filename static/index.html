@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>CERAI v0.7.50</title>
+  <title>CER-AI v0.7.50</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=8">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=8">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=8">
@@ -40,7 +40,7 @@
   <style>@media print{.report-card[hidden]{display:none!important}}</style>
 </head>
 <body>
-<header class="app-header"><div class="brand-lockup"><img class="brand-logo" src="/static/branding/cerai-logo-final.png?v=3" alt="CERAI — Corneal Ectasia Risk Analysis Intelligence"><span class="brand-version">v0.7.50</span></div><h1 class="sr-only">CERAI v0.7.50</h1></header>
+<header class="app-header"><div class="brand-lockup"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=3" alt="CER-AI — Corneal Ectasia Risk Analysis Intelligence"><span class="brand-version">v0.7.50</span></div><h1 class="sr-only">CER-AI v0.7.50</h1></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -87,10 +87,10 @@
         <fieldset><legend>OD</legend><div id="od-fields"></div></fieldset>
         <fieldset><legend>OS</legend><div id="os-fields"></div></fieldset>
       </div>
-      <p class="note">Preoperative manifest refraction is used only for LASIK ERSS MRSE. Intended treatment correction is used for ablation and CERAI treatment-range gates. Unless a different role-specific value is entered, the treatment card’s Düzeltme Miktarı auto-fills both manifest and intended correction. Every refraction field accepts positive or negative values; use the +/− buttons when a phone keyboard has no sign key. Equivalent plus-cylinder entries are safely transposed to minus-cylinder notation for calculation and disclosed in the report.</p>
+      <p class="note">Preoperative manifest refraction is used only for LASIK ERSS MRSE. Intended treatment correction is used for ablation and CER-AI treatment-range gates. Unless a different role-specific value is entered, the treatment card’s Düzeltme Miktarı auto-fills both manifest and intended correction. Every refraction field accepts positive or negative values; use the +/− buttons when a phone keyboard has no sign key. Equivalent plus-cylinder entries are safely transposed to minus-cylinder notation for calculation and disclosed in the report.</p>
       <p id="cardTransferNote" class="note"></p>
       <section id="readinessPanel" class="card" aria-live="polite" hidden></section>
-      <button id="analyzeBtn" type="submit">Analyze images and run CERAI assessment</button>
+      <button id="analyzeBtn" type="submit">Analyze images and run CER-AI assessment</button>
       <p id="analysisProgress" class="alert" role="status" aria-live="polite" hidden></p>
     </form>
   </div>
@@ -103,7 +103,7 @@
     </div>
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
-        <div><div class="report-kicker">CERAI Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
+        <div><div class="report-kicker">CER-AI Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
         <div class="report-version"><strong>Software v0.7.50</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <p class="report-liability-notice">The final surgical decision and all associated responsibility and liability rest with the surgeon. This application is a clinical decision-support aid only.</p>
@@ -118,7 +118,7 @@
       <p id="overall-note" class="eye-action"></p>
       <div id="identityWarning" class="identity-alert" hidden></div>
       <div id="eye-results"></div>
-      <p class="report-footer-note">Generated under the CERAI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. CAUTION is a STOP/DEFER decision requiring repeat ectasia/tomographic assessment after at least 6 months. DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review.</p>
+      <p class="report-footer-note">Generated under the CER-AI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. CAUTION is a STOP/DEFER decision requiring repeat ectasia/tomographic assessment after at least 6 months. DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review.</p>
       <p class="report-legal-footer">Developed by Hüseyin Cengiz, MD. All rights reserved. Final responsibility rests with the surgeon at all times and under all circumstances.</p>
     </article>
     <details class="no-print"><summary>Automatically extracted source data</summary><pre id="extract">—</pre></details>
@@ -165,7 +165,7 @@ const eyeTemplate = (eye) => `
           </tbody>
         </table>
         <p class="reference-warning">If the correct map, opposite-region comparison, axis relationship, or printed I-S cannot be assessed reliably, do not guess. Leave the category unresolved and upload a clearer source image.</p>
-        <p class="note">This is the published Placido-era Randleman/ERSS pattern classification adapted to CERAI's locked anterior-curvature source rule. It is a risk-score input, not a stand-alone diagnosis. Source: <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3748728/" target="_blank" rel="noopener">Randleman et al., 2008 validation study</a>.</p>
+        <p class="note">This is the published Placido-era Randleman/ERSS pattern classification adapted to CER-AI's locked anterior-curvature source rule. It is a risk-score input, not a stand-alone diagnosis. Source: <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC3748728/" target="_blank" rel="noopener">Randleman et al., 2008 validation study</a>.</p>
       </section>
       <div class="row"><label>Surgeon-confirmed I-S (D)</label><div class="signed-number"><input id="${eye}_surgeon_i_s" type="text" inputmode="decimal" autocomplete="off"><button type="button" class="sign-button" data-positive-target="${eye}_surgeon_i_s" aria-label="Make I-S positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_surgeon_i_s" aria-label="Make I-S negative">−</button></div></div>
       <div class="row"><label>Surgeon-confirmed Randleman topography category</label><select id="${eye}_surgeon_topography"><option value="">Select only when requested</option><option value="NORMAL_SYMMETRIC">Normal / symmetric bow-tie</option><option value="ASYMMETRIC_BOWTIE">Asymmetric bow-tie</option><option value="INFERIOR_STEEPENING_SRA">Inferior steepening and/or SRA</option><option value="ABNORMAL_ECTATIC">Abnormal / ectatic pattern</option></select></div>
@@ -360,7 +360,7 @@ async function loadSharedImages(){
       imageInput.files=transfer.files;
     }catch(_error){/* FormData fallback below handles browsers that block assignment. */}
     sharedImageNotice.hidden=false;
-    sharedImageNotice.innerHTML=`<strong>${loaded.length} shared image${loaded.length===1?"":"s"} received.</strong> Complete the clinical fields, then run the CERAI assessment.`;
+    sharedImageNotice.innerHTML=`<strong>${loaded.length} shared image${loaded.length===1?"":"s"} received.</strong> Complete the clinical fields, then run the CER-AI assessment.`;
   }catch(error){
     sharedImageNotice.hidden=false;
     sharedImageNotice.innerHTML=`<strong>Shared images were not loaded.</strong> ${safe(error.message||error)}`;
@@ -480,7 +480,7 @@ function microkeratomeBlock(r){
     ["Assessment gate",p.assessment_gate??"—"],["Steep − flat K spread",`${fmt(p.delta_k_d,2)} D`],
     ["Vacuum ring",`${fmt(p.vacuum_ring_mm,1)} mm`],["Vacuum pressure",p.vacuum_pressure_mmhg?`${p.vacuum_pressure_mmhg} mmHg`:"—"],
     ["Blade recommendation(s)",(p.blade_recommendations||[]).join(", ")||"—"],
-    ["Primary hinge",p.primary_hinge||"No CERAI K-spread hinge override"],
+    ["Primary hinge",p.primary_hinge||"No CER-AI K-spread hinge override"],
     ["Conditional alternative",p.alternative_hinge||"Not cleared / not applicable"],
     ["Alternative projected RSB / PTA",p.alternative_safety==="NOT_APPLICABLE"?"Not applicable":`${fmt(p.alternative_rsb_um,1)} µm / ${fmt(p.alternative_pta_percent,1)}%`],
     ["Alternative safety",p.alternative_safety??"—"],["Ring-zone clearance",`${fmt(p.ring_tzone_clearance_mm,2)} mm`],
@@ -496,7 +496,7 @@ function renderEye(r, extracted){
     ["Procedure",v.procedure??"—"],["Score / category",`${s.total ?? "—"} / ${s.category ?? "—"}`],
     ["Randleman ERSS / category",`${r.randleman_erss?.total??"Not applicable"} / ${r.randleman_erss?.category??"—"}`],
     ["Final BAD-D / class",`${fmt(r.bad_summary?.value,2)} / ${r.bad_summary?.category??"—"}`],
-    ["CERAI-adapted NICE / class",`${r.nice?.total??"Not applicable"} / ${r.nice?.category??"—"}`],
+    ["CER-AI-adapted NICE / class",`${r.nice?.total??"Not applicable"} / ${r.nice?.category??"—"}`],
     ["Prior refractive surgery",v.prior_refractive_surgery??"—"],["Stability / progression / CDVA flag",`${v.refractive_stability??"—"} / ${v.documented_progression??"—"} / ${v.unexplained_CDVA_below_20_20??"—"}`],
     ["Manifest entered notation",enteredRefractionText(v,"manifest")],["Manifest normalized (minus-cylinder)",manifestText(v)],
     ["Intended entered notation",enteredRefractionText(v,"intended")],["Intended normalized (minus-cylinder)",correctionText(v)],["Correction source",v.correction_source??"Manual / not documented"],
@@ -566,7 +566,7 @@ async function downloadReport(kind){
     if(!response.ok)throw new Error(`Report export failed (${response.status})`);
     const blob=await response.blob(), url=URL.createObjectURL(blob), a=document.createElement("a");
     const id=(lastReport.patient.id||lastReport.patient.name||"Report").replace(/[^a-z0-9_-]+/gi,"_");
-    a.href=url;a.download=`CERAI_${id}.${kind==="pdf"?"pdf":"docx"}`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+    a.href=url;a.download=`CER-AI_${id}.${kind==="pdf"?"pdf":"docx"}`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
   }catch(err){alert(String(err))}finally{button.disabled=false;button.textContent=original}
 }
 pdfBtn.addEventListener("click",()=>downloadReport("pdf"));

@@ -2,10 +2,10 @@
 
 The vacuum-ring/blade rules are kept outside the ectasia engine.  They can only
 produce a surgeon-review recommendation after a favorable LASIK assessment and
-can never change the CERAI disposition.
+can never change the CER-AI disposition.
 
 Source rules: the user-supplied Turkish ML7 reference (MED-LOGICS document
-200-0386, Rev. 22) plus the binding CERAI hinge rule for a K spread >4.00 D.
+200-0386, Rev. 22) plus the binding CER-AI hinge rule for a K spread >4.00 D.
 """
 from dataclasses import asdict, dataclass, field
 from typing import Optional, Tuple
@@ -51,7 +51,7 @@ class MicrokeratomePlan:
     alternative_safety: str = "NOT_APPLICABLE"
     warnings: Tuple[str, ...] = field(default_factory=tuple)
     notes: Tuple[str, ...] = field(default_factory=tuple)
-    source: str = "MED-LOGICS ML7 Rev. 22 active Turkish reference + CERAI hinge amendment"
+    source: str = "MED-LOGICS ML7 Rev. 22 active Turkish reference + CER-AI hinge amendment"
 
     def as_dict(self):
         return asdict(self)
@@ -102,7 +102,7 @@ def _alternative_tissue_safety(
 
     The +10 blade is modeled as a 10-µm increase in flap thickness.  The
     contingency is allowed only when projected RSB remains >=300 µm and PTA
-    remains <40.0%, matching the active CERAI tissue gates.
+    remains <40.0%, matching the active CER-AI tissue gates.
     """
     pachy = _finite(pachy_um)
     flap = _finite(planned_flap_um)
@@ -167,7 +167,7 @@ def plan_microkeratome(inp: MicrokeratomePlanningInput) -> MicrokeratomePlan:
     alternative_rsb = alternative_pta = None
     alternative_safety = "NOT_APPLICABLE"
 
-    # Binding CERAI rule: strict >4.00 D, not >=4.00 D.
+    # Binding CER-AI rule: strict >4.00 D, not >=4.00 D.
     if delta is not None and delta > 4.00:
         primary_hinge = "Perpendicular to steep axis"
         if steep_axis is not None and 0 <= steep_axis <= 180:
@@ -189,9 +189,9 @@ def plan_microkeratome(inp: MicrokeratomePlanningInput) -> MicrokeratomePlan:
                     if anatomy is False
                     else "only if the surgeon determines that the perpendicular hinge is anatomically impractical"
                 )
-                notes.append(f"CERAI contingency: {alternative_hinge} may be considered {qualifier}; projected RSB/PTA remain within CERAI limits.")
+                notes.append(f"CER-AI contingency: {alternative_hinge} may be considered {qualifier}; projected RSB/PTA remain within CER-AI limits.")
             elif alternative_safety == "NOT_ALLOWED":
-                warnings.append("The +10 temporal/nasal contingency is not permitted: projected RSB and/or PTA reaches an CERAI tissue cutoff.")
+                warnings.append("The +10 temporal/nasal contingency is not permitted: projected RSB and/or PTA reaches an CER-AI tissue cutoff.")
             else:
                 warnings.append("RSB/PTA inputs are incomplete; the +10 temporal/nasal contingency cannot be cleared.")
 

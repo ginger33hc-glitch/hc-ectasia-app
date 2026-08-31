@@ -1,4 +1,4 @@
-"""Canonical aggregate-status ranking for CERAI decisions.
+"""Canonical aggregate-status ranking for CER-AI decisions.
 
 Adds PASS WITH CAUTION as a valid engine status so bilateral/overall aggregation cannot
 raise KeyError after the final-decision hierarchy returns the new classification.
@@ -21,11 +21,11 @@ _STATUS_RANK = {
 
 
 def combine_status_hc(current: str, new: str) -> str:
-    """Return the more restrictive known CERAI status without crashing on a valid status."""
+    """Return the more restrictive known CER-AI status without crashing on a valid status."""
     current_rank = _STATUS_RANK.get(current)
     new_rank = _STATUS_RANK.get(new)
     if current_rank is None or new_rank is None:
-        raise ValueError(f"Unknown CERAI decision status: current={current!r}, new={new!r}")
+        raise ValueError(f"Unknown CER-AI decision status: current={current!r}, new={new!r}")
     return new if new_rank > current_rank else current
 
 
