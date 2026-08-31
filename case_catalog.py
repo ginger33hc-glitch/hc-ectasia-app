@@ -1,7 +1,7 @@
 """Encrypted case-catalog foundation for CER-AI.
 
-Catalog entries live inside the same encrypted S3-compatible case archive.  Searchable PHI is never
-placed in object keys or S3 metadata.  This intentionally provides a durable storage/index seam only;
+Catalog entries live inside the same encrypted S3-compatible case archive. Searchable PHI is never
+placed in object keys or S3 metadata. This intentionally provides a durable storage/index seam only;
 authenticated owner/doctor UI routes are added separately once named-user authentication is restored.
 """
 
@@ -12,7 +12,7 @@ from datetime import date, datetime
 import json
 import re
 import unicodedata
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Optional
 
 from case_archive import EncryptedArchive, RevisionRef
 
@@ -32,11 +32,13 @@ def _clean_text(value: Any) -> Optional[str]:
 
 def _search_text(value: Any) -> str:
     text = _clean_text(value) or ""
-    # Diacritic-insensitive matching is useful for Turkish names entered on different keyboards.
+    # Turkish/Latin diacritics, punctuation and spacing are presentation details rather than
+    # identifiers. Removing them makes common searches such as "Şule Işık"/"sule isik",
+    # "Dr. Example"/"dr example" and "P-123"/"p123" equivalent without exposing PHI in keys.
     text = text.replace("ı", "i").replace("İ", "I")
     decomposed = unicodedata.normalize("NFKD", text)
     ascii_like = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
-    return ascii_like.casefold()
+    return "".join(ch for ch in ascii_like.casefold() if ch.isalnum())
 
 
 def _date_text(value: Any) -> Optional[str]:
@@ -212,4 +214,10 @@ def install(core: Any, archive_runtime: Any) -> None:
 
     assessment_workflow.begin = begin_cataloged
     assessment_workflow.complete = complete_cataloged
+    core._cerai_case_catalog_runtime = archive_runtime
+    core._cerai_case_catalog_search = (
+        (lambda **filters: search_entries(archive_runtime.archive, **filters))
+        if archive_runtime.enabled
+        else (lambda **filters: [])
+    )
     core._cerai_case_catalog_installed = True
