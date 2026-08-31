@@ -30,6 +30,11 @@ jobs:
               'HC Ectasia Assessment',
               'Corneal Refractive Analysis Intelligence',
           )
+          # Preserve this pre-existing wire-protocol header until all deployed clients have moved
+          # to named-user sessions. It is a technical compatibility identifier, not product branding.
+          technical_compatibility_identifiers = (
+              'X-CERAI-Access-Key',
+          )
 
           failures = []
           for path in root.rglob('*'):
@@ -44,7 +49,10 @@ jobs:
               for phrase in forbidden:
                   if phrase in text:
                       failures.append(f'{path}: {phrase}')
-              if re.search(r'CERAI(?!_)', text):
+              brand_text = text
+              for identifier in technical_compatibility_identifiers:
+                  brand_text = brand_text.replace(identifier, '')
+              if re.search(r'CERAI(?!_)', brand_text):
                   failures.append(f'{path}: legacy CERAI spelling')
 
           if failures:
