@@ -92,6 +92,17 @@ def test_named_users_require_hashed_owner_registry_and_reject_raw_password_field
         preflight.validate_environment(values)
 
     values["CERAI_USERS_JSON"] = json.dumps([
+        {
+            "user_id": "owner-1",
+            "role": "OWNER",
+            "password": "do-not-store-this",
+            "password_hash": "scrypt$placeholder",
+        }
+    ])
+    with pytest.raises(preflight.PreflightError):
+        preflight.validate_environment(values)
+
+    values["CERAI_USERS_JSON"] = json.dumps([
         {"user_id": "owner-1", "role": "OWNER", "password_hash": "scrypt$placeholder"}
     ])
     assert preflight.validate_environment(values)["named_users_enabled"] is True

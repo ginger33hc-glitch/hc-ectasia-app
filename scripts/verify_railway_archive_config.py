@@ -100,7 +100,7 @@ def validate_environment(env: dict[str, str] | None = None) -> dict[str, object]
             for item in users
         ):
             raise PreflightError("CERAI_USERS_JSON must contain at least one enabled OWNER.")
-        if any("password" in item and "password_hash" not in item for item in users if isinstance(item, dict)):
+        if any("password" in item for item in users if isinstance(item, dict)):
             raise PreflightError("Raw password fields are not allowed in CERAI_USERS_JSON.")
 
     archive_enabled = _value(env, "CERAI_ARCHIVE_ENABLED") == "1"
