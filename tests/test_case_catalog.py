@@ -1,4 +1,5 @@
 from copy import deepcopy
+import json
 
 import case_archive
 import case_catalog
@@ -74,12 +75,12 @@ def test_catalog_round_trip_is_encrypted_and_integrity_checked():
     archive = make_archive()
     case_id = "3" * 32
     ref = case_catalog.write_entry(archive, revision(case_id, "4" * 24), ready_payload())
-    decoded = case_archive.json.loads(archive.get_bytes(ref))
+    decoded = json.loads(archive.get_bytes(ref))
     assert decoded["patient"]["name"] == "Şule Işık"
     assert decoded["case_id"] == case_id
 
 
-def test_search_is_turkish_diacritic_insensitive_for_name_and_reviewer():
+def test_search_is_turkish_diacritic_and_punctuation_insensitive():
     archive = make_archive()
     case_catalog.write_entry(archive, revision("5" * 32), ready_payload())
     by_name = case_catalog.search_entries(archive, patient_name="sule isik")
@@ -93,8 +94,8 @@ def test_search_supports_patient_id_date_and_decision_filters_together():
     case_catalog.write_entry(archive, revision("6" * 32), ready_payload())
     matches = case_catalog.search_entries(
         archive,
-        patient_id="p-123",
-        report_date="2026-08-31",
+        patient_id="p123",
+        report_date="2026/08/31",
         decision="caution",
     )
     assert len(matches) == 1
