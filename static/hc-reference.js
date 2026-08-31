@@ -45,15 +45,16 @@
     const footer = document.querySelector("#reportSheet .report-footer-note");
     if (!eyes || !footer || !eyes.children.length) return;
     if (!document.getElementById("hcReferenceAppendix")) footer.insertAdjacentHTML("beforebegin", html);
+    window.CERAI_I18N?.translateDOM(document.getElementById("hcReferenceAppendix"));
     document.querySelectorAll(".status").forEach(element => {
-      if ((element.textContent || "").trim() === "PASS WITH CAUTION") {
+      if (["PASS WITH CAUTION", "DİKKATLE UYGUN"].includes((element.textContent || "").trim())) {
         element.classList.remove("caution", "review", "fail", "insufficient");
         element.classList.add("pass");
       }
     });
     document.querySelectorAll("tr").forEach(row => {
       const cells = row.querySelectorAll("td,th");
-      if (cells.length && ["morphology category", "morphology"].includes((cells[0].textContent || "").trim().toLowerCase())) row.remove();
+      if (cells.length && ["morphology category", "morphology", "morfoloji kategorisi", "morfoloji"].includes((cells[0].textContent || "").trim().toLowerCase())) row.remove();
     });
   }
 

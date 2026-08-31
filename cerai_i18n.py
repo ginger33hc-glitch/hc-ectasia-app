@@ -1,0 +1,323 @@
+"""Presentation-only localization for CERAI.
+
+The clinical engine remains language-neutral and continues to emit its locked
+English decision record.  This module translates only user-facing reports.
+"""
+
+from __future__ import annotations
+
+import re
+from typing import Any
+
+
+SUPPORTED_LOCALES = {"en", "tr"}
+
+
+def normalize_locale(value: Any) -> str:
+    locale = str(value or "en").strip().lower().replace("_", "-").split("-", 1)[0]
+    return locale if locale in SUPPORTED_LOCALES else "en"
+
+
+TR = {
+    "CERAI Preoperative Ectasia Risk Assessment": "CERAI Preoperatif Ektazi Risk Değerlendirmesi",
+    "CERAI PREOPERATIVE ECTASIA RISK ASSESSMENT": "CERAI PREOPERATİF EKTAZİ RİSK DEĞERLENDİRMESİ",
+    "PREOPERATIVE RISK ASSESSMENT": "PREOPERATİF RİSK DEĞERLENDİRMESİ",
+    "Corneal refractive surgery clinical decision-support report": "Korneal refraktif cerrahi klinik karar destek raporu",
+    "Clinical decision-support report": "Klinik karar destek raporu",
+    "Software": "Yazılım",
+    "Page": "Sayfa",
+    "ASSESSMENT": "DEĞERLENDİRMESİ",
+    "assessment": "değerlendirmesi",
+    "Not documented": "Belgelenmedi",
+    "Not available": "Mevcut değil",
+    "Not applicable": "Uygulanamaz",
+    "Not determined": "Belirlenmedi",
+    "None": "Yok",
+    "Manual / not documented": "Manuel / belgelenmedi",
+    "axis unavailable": "aks mevcut değil",
+    "Patient": "Hasta",
+    "Patient ID": "Hasta kimliği",
+    "Age": "Yaş",
+    "Assessment date": "Değerlendirme tarihi",
+    "Reviewer": "Değerlendiren",
+    "Eyes assessed": "Değerlendirilen gözler",
+    "Parameter": "Parametre",
+    "Result": "Sonuç",
+    "Value": "Değer",
+    "Source": "Kaynak",
+    "Procedure": "Prosedür",
+    "Prior refractive surgery": "Önceki refraktif cerrahi",
+    "Stability / progression / CDVA flag": "Stabilite / progresyon / EİDGK uyarısı",
+    "Manifest entered notation": "Girilen manifest gösterim",
+    "Manifest normalized (minus-cylinder)": "Normalize manifest (eksi silindir)",
+    "Intended entered notation": "Girilen hedef düzeltme gösterimi",
+    "Intended normalized (minus-cylinder)": "Normalize hedef düzeltme (eksi silindir)",
+    "Correction source": "Düzeltme kaynağı",
+    "Score / category": "Puan / kategori",
+    "Randleman ERSS / category": "Randleman ERSS / kategori",
+    "Final BAD-D / class": "Final BAD-D / sınıf",
+    "CERAI-adapted NICE / class": "CERAI uyarlanmış NICE / sınıf",
+    "Thinnest pachymetry": "En ince pakimetri",
+    "Manifest MRSE": "Manifest MRSE",
+    "Intended MRSE": "Hedef MRSE",
+    "Manifest / intended pattern": "Manifest / hedef patern",
+    "Intended principal meridians": "Hedef ana meridyenler",
+    "Preoperative / estimated final Kmean": "Preoperatif / tahmini final Kort",
+    "Maximum ablation": "Maksimum ablasyon",
+    "Laser platform": "Lazer platformu",
+    "PRK epithelium": "PRK epiteli",
+    "Optical / transition zone": "Optik / geçiş zonu",
+    "Enhancement anticipated": "Ek düzeltme öngörülüyor",
+    "PRK RST / PTA": "PRK RST / PTA",
+    "LASIK RSB / PTA": "LASIK RSB / PTA",
+    "Tomography review": "Tomografi değerlendirmesi",
+    "Morphology category": "Morfoloji kategorisi",
+    "Randleman I-S / source": "Randleman I-S / kaynak",
+    "Validated Randleman topography": "Doğrulanmış Randleman topografisi",
+    "Pentacam QS": "Pentacam QS",
+    "Hard stops": "Kesin durdurma nedenleri",
+    "Decision reasons": "Karar nedenleri",
+    "Reasons": "Nedenler",
+    "Missing or unresolved data": "Eksik veya çözümlenmemiş veriler",
+    "Missing / unresolved": "Eksik / çözümlenmemiş",
+    "Surgical-load evidence flags": "Cerrahi yük kanıt uyarıları",
+    "Clinical modifiers": "Klinik değiştiriciler",
+    "Warnings": "Uyarılar",
+    "NICE component audit": "NICE bileşen denetimi",
+    "NICE interpretation note": "NICE yorum notu",
+    "Surgeon attention - hyperopic/mixed pathway": "Cerrahın dikkatine — hipermetropik/karma yol",
+    "Surgeon attention — hyperopic/mixed pathway": "Cerrahın dikkatine — hipermetropik/karma yol",
+    "Tomography concern flags": "Tomografi endişe uyarıları",
+    "BAD display interpretation": "BAD ekran yorumu",
+    "Post-assessment ML7 microkeratome planning": "Değerlendirme sonrası ML7 mikrokeratom planlaması",
+    "Surgeon-review recommendation": "Cerrah değerlendirme önerisi",
+    "Planning warnings": "Planlama uyarıları",
+    "Planning notes": "Planlama notları",
+    "Extracted tomography": "Çıkarılan tomografi verileri",
+    "Extraction warnings": "Veri çıkarma uyarıları",
+    "Interpretation note": "Yorum notu",
+    "Global clinical / source blockers": "Genel klinik / kaynak engelleri",
+    "Assessment gate": "Değerlendirme geçidi",
+    "Steep-flat K spread": "Dik-düz K farkı",
+    "Steep − flat K spread": "Dik − düz K farkı",
+    "Vacuum ring": "Vakum halkası",
+    "Vacuum pressure": "Vakum basıncı",
+    "Blade recommendation(s)": "Bıçak önerisi/önerileri",
+    "Primary hinge": "Birincil menteşe",
+    "Conditional alternative": "Koşullu alternatif",
+    "Alternative projected RSB / PTA": "Alternatif tahmini RSB / PTA",
+    "Alternative safety": "Alternatif güvenliği",
+    "Ring-zone clearance": "Halka-zon açıklığı",
+    "K1 axis": "K1 aksı",
+    "K2 axis": "K2 aksı",
+    "Corneal diameter / W2W": "Kornea çapı / W2W",
+    "Anterior elevation at TP": "En ince noktada ön elevasyon",
+    "Posterior elevation at TP": "En ince noktada arka elevasyon",
+    "Thinnest X": "En ince X",
+    "Thinnest Y": "En ince Y",
+    "Corneal volume": "Kornea hacmi",
+    "Vertical coma": "Dikey koma",
+    "Anterior pattern": "Ön yüz paterni",
+    "Posterior pattern": "Arka yüz paterni",
+    "Image quality": "Görüntü kalitesi",
+    "Source files": "Kaynak dosyalar",
+    "PASS": "UYGUN",
+    "PASS WITH CAUTION": "DİKKATLE UYGUN",
+    "CAUTION — STOP/DEFER": "DİKKAT — DURDUR/ERTELE",
+    "CAUTION - STOP/DEFER": "DİKKAT — DURDUR/ERTELE",
+    "DO NOT PROCEED": "İŞLEME DEVAM ETMEYİN",
+    "REVIEW — NOT CLEARED": "DEĞERLENDİR — ONAYLANMADI",
+    "REVIEW - NOT CLEARED": "DEĞERLENDİR — ONAYLANMADI",
+    "DATA INSUFFICIENT": "VERİ YETERSİZ",
+    "NOT ASSESSED": "DEĞERLENDİRİLMEDİ",
+    "REQUIRED INFORMATION": "GEREKLİ BİLGİ",
+    "NORMAL": "NORMAL",
+    "SUSPICIOUS": "ŞÜPHELİ",
+    "ABNORMAL": "ANORMAL",
+    "HIGH": "YÜKSEK",
+    "MODERATE": "ORTA",
+    "LOW": "DÜŞÜK",
+    "YES": "EVET",
+    "NO": "HAYIR",
+    "UNKNOWN": "BİLİNMİYOR",
+    "yes": "evet",
+    "no": "hayır",
+    "unknown": "bilinmiyor",
+    "REASSURING": "RAHATLATICI",
+    "ADEQUATE": "YETERLİ",
+    "CONFIDENT": "GÜVENİLİR",
+    "NORMAL_SYMMETRIC": "NORMAL_SİMETRİK",
+    "LOWER_FLAGGED_BURDEN": "DÜŞÜK UYARI YÜKÜ",
+    "MYOPIC": "MİYOPİK",
+    "HYPEROPIC": "HİPERMETROPİK",
+    "MIXED": "KARMA",
+    "NO_NICE_ESCALATION": "NICE ARTIRIMI YOK",
+    "PENTACAM_PRINTED": "PENTACAM YAZILI DEĞER",
+    "PENTACAM_LABELED_K2": "PENTACAM ETİKETLİ K2",
+    "PENTACAM_LABELED_IS": "PENTACAM ETİKETLİ I-S",
+    "central_pachymetry": "santral pakimetri",
+    "posterior_elevation": "posterior elevasyon",
+    "central_pachy": "santral pakimetri",
+    "posterior_pupil_max_um": "pupil içi maksimum posterior elevasyon (µm)",
+    "central_pachy_um": "santral pakimetri (µm)",
+    "I_S": "I-S",
+    "K2_D": "K2 (D)",
+    "I_S_D": "I-S (D)",
+    "Synthetic central 565; pupil posterior +8": "Sentetik santral 565; pupil posterior +8",
+    "Randleman anterior-topography points come only from the anterior curvature/topography image; on Pentacam 4 Maps Refractive this is the upper-left Axial/Sagittal Curvature (Front) panel. ERSS total: 0-2 low, 3 moderate, >=4 high.": "Randleman ön topografi puanları yalnızca ön eğrilik/topografi görüntüsünden elde edilir; Pentacam 4 Maps Refractive sayfasında bu, sol üst Axial/Sagittal Curvature (Front) panelidir. ERSS toplamı: 0-2 düşük, 3 orta, ≥4 yüksek.",
+    "NO MAJOR INTER-EYE DISCORDANCE DETECTED": "BELİRGİN GÖZLER ARASI UYUMSUZLUK SAPTANMADI",
+    "No CERAI K-spread hinge override": "CERAI K-farkı menteşe değişikliği yok",
+    "Not cleared / not applicable": "Onaylanmadı / uygulanamaz",
+    "PATIENT NAME NOT DOCUMENTED": "HASTA ADI BELGELENMEDİ",
+    "PATIENT IDENTITY NOT VERIFIED - SURGEON CONFIRMATION REQUIRED": "HASTA KİMLİĞİ DOĞRULANMADI — CERRAH ONAYI GEREKLİ",
+    "OVERALL DISPOSITION": "GENEL KARAR",
+    "CERAI BAD-D reference points": "CERAI BAD-D referans değerleri",
+    "CERAI interpretation / action": "CERAI yorumu / eylemi",
+    "SUSPICIOUS - REVIEW / NOT CLEARED": "ŞÜPHELİ — DEĞERLENDİR / ONAYLANMADI",
+    "ABNORMAL CORNEA - DO NOT PROCEED": "ANORMAL KORNEA — İŞLEME DEVAM ETMEYİN",
+    "Published Randleman / ERSS scoring points": "Yayımlanmış Randleman / ERSS puanları",
+    "Variable": "Değişken",
+    "Finding": "Bulgu",
+    "Points": "Puan",
+    "Anterior topography": "Ön topografi",
+    "Normal / symmetrical": "Normal / simetrik",
+    "Asymmetric bow-tie": "Asimetrik bow-tie",
+    "Inferior steepening / significant SRA-SRAX": "İnferior dikleşme / belirgin SRA-SRAX",
+    "Abnormal ectatic pattern": "Anormal ektatik patern",
+    "Residual stromal bed": "Rezidüel stromal yatak",
+    "Preop corneal thickness": "Preoperatif kornea kalınlığı",
+    "<=8 D myopia": "≤8 D miyopi",
+    "BAD-D is read from the Pentacam BAD display and is independent of Randleman/ERSS anterior-topography scoring.": "BAD-D, Pentacam BAD ekranından okunur ve Randleman/ERSS ön topografi puanlamasından bağımsızdır.",
+    "Randleman anterior-topography points come only from a qualifying anterior curvature/topography image. On Pentacam 4 Maps Refractive this is the upper-left Axial/Sagittal Curvature (Front) panel. ERSS total: 0-2 low, 3 moderate, >=4 high.": "Randleman ön topografi puanları yalnızca uygun bir ön eğrilik/topografi görüntüsünden elde edilir. Pentacam 4 Maps Refractive sayfasında kaynak sol üst Axial/Sagittal Curvature (Front) panelidir. ERSS toplamı: 0-2 düşük, 3 orta, ≥4 yüksek.",
+    "Published Randleman/ERSS table shown for reference. The CERAI engine intentionally uses CERAI-modified age and pachymetry rules; the displayed patient score must therefore be read from the CERAI score breakdown, not reconstructed from the published reference table.": "Yayımlanmış Randleman/ERSS tablosu referans amacıyla gösterilmiştir. CERAI motoru bilerek CERAI'ye uyarlanmış yaş ve pakimetri kurallarını kullanır; bu nedenle hasta puanı yayımlanmış referans tablodan yeniden hesaplanmamalı, CERAI puan dökümünden okunmalıdır.",
+    "This report is generated under the CERAI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. CAUTION is a STOP/DEFER decision requiring repeat ectasia/tomographic assessment after at least 6 months. DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review.": "Bu rapor, korneal refraktif cerrahi için CERAI Preoperatif Ektazi Risk Değerlendirme Protokolü kapsamında oluşturulmuştur. DİKKAT kararı DURDURMA/ERTELEME anlamına gelir ve en az 6 ay sonra ektazi/tomografi değerlendirmesinin tekrarlanmasını gerektirir. VERİ YETERSİZ / DEĞERLENDİRİLMEDİ sonucu UYGUN kararına izin vermez. Bu klinik karar destek raporu cerrahın bağımsız değerlendirmesinin yerini almaz.",
+}
+
+
+TR_CLINICAL = {
+    "DO NOT PROCEED with elective corneal refractive surgery.": "Elektif korneal refraktif cerrahiye DEVAM ETMEYİN.",
+    "STOP/DEFER; repeat relevant ectasia screening and reassess after at least 6 months.": "DURDURUN/ERTELEYİN; ilgili ektazi taramasını tekrarlayın ve en az 6 ay sonra yeniden değerlendirin.",
+    "CERAI assessment PASS; this is not a guarantee of zero ectasia risk.": "CERAI değerlendirmesi UYGUN; bu sonuç ektazi riskinin sıfır olduğunu garanti etmez.",
+    "Decision-critical or required clinical data are missing/unresolved; PASS is prohibited.": "Karar için kritik veya zorunlu klinik veriler eksik/çözümlenmemiştir; UYGUN kararı verilemez.",
+    "No surgical clearance; resolve the stated review/data requirement.": "Cerrahi onay yoktur; belirtilen değerlendirme/veri gereksinimini giderin.",
+    "Overall result reflects the least favorable eye. Each eye remains independently scored; values are never averaged.": "Genel sonuç daha olumsuz olan gözü yansıtır. Her göz bağımsız puanlanır; değerlerin ortalaması alınmaz.",
+    "CERAI operational hard stop: thinnest preoperative cornea <480 µm.": "CERAI kesin durdurma kuralı: preoperatif en ince kornea <480 µm.",
+    "CERAI operational LASIK RSB hard stop: RSB <300 µm.": "CERAI LASIK kesin durdurma kuralı: RSB <300 µm.",
+    "CERAI operational PRK RST hard stop: RST <310 µm.": "CERAI PRK kesin durdurma kuralı: RST <310 µm.",
+    "CERAI operational final-keratometry hard stop: estimated postoperative Kmean <36.00 D.": "CERAI final keratometri kesin durdurma kuralı: tahmini postoperatif Kort <36,00 D.",
+    "CERAI operational final-keratometry hard stop: estimated postoperative Kmean >48.00 D.": "CERAI final keratometri kesin durdurma kuralı: tahmini postoperatif Kort >48,00 D.",
+    "CERAI operational treatment-range hard stop: intended sphere <−10.00 D.": "CERAI tedavi aralığı kesin durdurma kuralı: hedef sfer <−10,00 D.",
+    "CERAI operational treatment-range hard stop: intended sphere >+6.00 D.": "CERAI tedavi aralığı kesin durdurma kuralı: hedef sfer >+6,00 D.",
+    "CERAI operational LASIK PTA hard stop: PTA >=40.0%.": "CERAI LASIK kesin durdurma kuralı: PTA ≥%40,0.",
+    "Refractive instability or documented progression: defer and re-evaluate after >=6 months.": "Refraktif instabilite veya belgelenmiş progresyon: erteleyin ve ≥6 ay sonra yeniden değerlendirin.",
+    "Unexplained preoperative CDVA <20/20 requires investigation.": "Açıklanamayan preoperatif EİDGK <20/20 araştırılmalıdır.",
+    "Prior PRK/LASIK/SMILE or other corneal refractive surgery requires a separate pathway.": "Önceki PRK/LASIK/SMILE veya başka korneal refraktif cerrahi ayrı bir değerlendirme yolu gerektirir.",
+    "Do not run the virgin-cornea engine; complete the separate post-refractive pathway.": "Daha önce cerrahi geçirmemiş kornea motorunu kullanmayın; ayrı post-refraktif yolu tamamlayın.",
+    "Pregnancy or nursing reported; separate refractive-surgery eligibility review required.": "Gebelik veya emzirme bildirildi; ayrı refraktif cerrahi uygunluk değerlendirmesi gerekir.",
+    "Collagen/connective-tissue disease reported; separate clinical eligibility review required.": "Kollajen/bağ dokusu hastalığı bildirildi; ayrı klinik uygunluk değerlendirmesi gerekir.",
+    "Relevant medication/drug usage reported; medication-specific clinical review required.": "İlgili ilaç kullanımı bildirildi; ilaca özgü klinik değerlendirme gerekir.",
+    "Dry-eye disease reported; ocular-surface optimization and eligibility review required.": "Kuru göz hastalığı bildirildi; oküler yüzey optimizasyonu ve uygunluk değerlendirmesi gerekir.",
+    "Systemic disease reported; disease-specific refractive-surgery eligibility review required.": "Sistemik hastalık bildirildi; hastalığa özgü refraktif cerrahi uygunluk değerlendirmesi gerekir.",
+    "Chronic eye rubbing/repetitive ocular trauma present.": "Kronik göz ovalama/tekrarlayan oküler travma mevcut.",
+    "Family history of keratoconus present.": "Ailede keratokonus öyküsü mevcut.",
+    "Marked inter-eye asymmetry requires escalated review.": "Belirgin gözler arası asimetri ileri değerlendirme gerektirir.",
+    "Definite KC/FFKC/PMD or unequivocal ectatic morphology override.": "Kesin KC/FFKC/PMD veya belirgin ektatik morfoloji önceliklidir.",
+    "Suspicious adjunctive tomography display: repeat/confirm and review concordance.": "Şüpheli yardımcı tomografi bulgusu: tekrarlayın/doğrulayın ve uyumu değerlendirin.",
+    "Abnormal adjunctive tomography display: morphology/clinical concordance review required.": "Anormal yardımcı tomografi bulgusu: morfoloji/klinik uyum değerlendirmesi gerekir.",
+    "Both OD and OS tomography assessments are required; fellow-eye assessment is missing.": "Hem OD hem OS tomografi değerlendirmesi gereklidir; diğer göz değerlendirmesi eksiktir.",
+    "No classifiable OD/OS tomography was extracted.": "Sınıflandırılabilir OD/OS tomografisi çıkarılamadı.",
+    "No eye-specific assessment could be completed.": "Göze özgü değerlendirme tamamlanamadı.",
+    "Numeric ERSS category support does not, by itself, constitute a keratoconus diagnosis.": "Sayısal ERSS kategori desteği tek başına keratokonus tanısı oluşturmaz.",
+    "PRK epithelial thickness is standardized to 50 µm for CERAI calculations.": "CERAI hesaplamalarında PRK epitel kalınlığı 50 µm olarak standardize edilmiştir.",
+    "Override gate negative; procedure-specific score and required tomography/clinical review are reassuring.": "Öncelikli dışlama ölçütü yoktur; prosedüre özgü puan ile zorunlu tomografi/klinik değerlendirme rahatlatıcıdır.",
+    "CERAI SCORE — SOURCE & BREAKDOWN: PRK-EWSS v1.0 provisional evidence-weighted triage score (not validated); CERAI-modified age bands. morphology: +0 (morphology NORMAL_SYMMETRIC); pachymetry: +0 (thinnest pachymetry 560 µm); age: +0 (age 35 years). TOTAL: 0 (LOWER_FLAGGED_BURDEN). Hard stops are independent of this numeric score and are not counted as score points.": "CERAI PUANI — KAYNAK VE DÖKÜM: PRK-EWSS v1.0 geçici kanıt ağırlıklı triyaj puanı (doğrulanmamıştır); CERAI'ye uyarlanmış yaş aralıkları. morfoloji: +0 (NORMAL_SİMETRİK); pakimetri: +0 (en ince pakimetri 560 µm); yaş: +0 (35 yaş). TOPLAM: 0 (DÜŞÜK UYARI YÜKÜ). Kesin durdurma kuralları bu sayısal puandan bağımsızdır ve puana eklenmez.",
+    "ECTASIA RISK INTERPRETATION: In the cited post-PRK ectasia series with complete ERSS data, 77% of ectasia eyes had cumulative ERSS >=4, 9% had score 3, and 14% had score <=2. The surgical cohort incidence reported in that study was 9/31,045 eyes (0.029%). ABSOLUTE PROBABILITY: Not established for an individual PRK score. LIMITATION: These are distributions among ectasia cases and an overall cohort incidence, not score-specific patient probabilities. The LASIK ERSS is not validated as an absolute-risk calculator for PRK; the 0.029% cohort incidence must not be assigned to an individual score. SOURCE: Risk Assessment for Corneal Ectasia following Photorefractive Keratectomy.": "EKTAZİ RİSK YORUMU: Tam ERSS verisi bulunan atıf yapılan PRK sonrası ektazi serisinde ektazili gözlerin %77'sinde toplam ERSS ≥4, %9'unda puan 3 ve %14'ünde puan ≤2 idi. Çalışmadaki cerrahi kohort insidansı 9/31.045 göz (%0,029) olarak bildirildi. MUTLAK OLASILIK: Tek bir PRK puanı için belirlenmemiştir. SINIRLAMA: Bunlar ektazi vakaları arasındaki dağılımlar ve genel kohort insidansıdır; puana özgü hasta olasılıkları değildir. LASIK ERSS, PRK için mutlak risk hesaplayıcısı olarak doğrulanmamıştır; %0,029 kohort insidansı bireysel bir puana atanamaz. KAYNAK: Fotorefraktif keratektomi sonrası korneal ektazi risk değerlendirmesi.",
+    "NICE (Navarro Index for Corneal Ectasia) combines K2, central pachymetry, posterior elevation and signed I-S. Each component contributes 1-3 points; total 4-12. CERAI adaptation: posterior elevation <=15.5 um = 1, >15.5 to <18 um = 2, >=18 um = 3. The published table leaves 15 um unspecified. CERAI reads the highest printed positive posterior elevation inside the dashed pupil boundary on the standard 8-mm BFS float map, not the thinnest-point elevation, BAD difference elevation or BFTE. This pupil-maximum selection is surgeon-specified, not independently validated as the original NICE method. Central pachymetry uses the labeled Pachy Vertex N. field (not thinnest pachymetry), or a surgeon-confirmed central measurement. CERAI disposition for LASIK and PRK: 4 = no NICE-specific escalation, 5-8 = CAUTION / STOP-DEFER, >=9 = HARD STOP. NICE 4 does not establish surgical safety or override ERSS, BAD or other CERAI stops. No individual absolute ectasia probability is inferred. Source: Navarro-Naranjo et al., Clin Ophthalmol 2024;18:881-883. DOI: 10.2147/OPTH.S464217.": "NICE (Navarro Korneal Ektazi İndeksi), K2, santral pakimetri, posterior elevasyon ve işaretli I-S değerini birleştirir. Her bileşen 1-3 puan verir; toplam 4-12'dir. CERAI uyarlaması: posterior elevasyon ≤15,5 µm = 1, >15,5 ile <18 µm = 2, ≥18 µm = 3. Yayımlanmış tabloda 15 µm belirtilmemiştir. CERAI, en ince nokta elevasyonu, BAD fark elevasyonu veya BFTE yerine standart 8 mm BFS float haritasında kesikli pupil sınırı içindeki yazılı en yüksek pozitif posterior elevasyonu okur. Bu pupil-maksimum seçimi cerrah tarafından belirlenmiştir ve özgün NICE yöntemi olarak bağımsız biçimde doğrulanmamıştır. Santral pakimetri, etiketli Pachy Vertex N. alanından (en ince pakimetri değil) veya cerrahın doğruladığı santral ölçümden alınır. LASIK ve PRK için CERAI kararı: 4 = NICE'a özgü artırım yok, 5-8 = DİKKAT / DURDUR-ERTELE, ≥9 = KESİN DURDURMA. NICE 4 cerrahi güvenliği kanıtlamaz ve ERSS, BAD veya diğer CERAI durdurma kurallarını geçersiz kılmaz. Bireysel mutlak ektazi olasılığı çıkarımı yapılmaz. Kaynak: Navarro-Naranjo ve ark., Clin Ophthalmol 2024;18:881-883. DOI: 10.2147/OPTH.S464217.",
+    "Inter-eye tomography concern: NO MAJOR INTER-EYE DISCORDANCE DETECTED. No major categorical inter-eye tomography discordance detected. This is not a clearance criterion and does not change the CERAI score or final disposition.": "Gözler arası tomografi değerlendirmesi: BELİRGİN GÖZLER ARASI UYUMSUZLUK SAPTANMADI. Belirgin kategorik gözler arası tomografi uyumsuzluğu saptanmadı. Bu bir cerrahi onay ölçütü değildir ve CERAI puanını veya nihai kararı değiştirmez.",
+}
+
+
+REPLACEMENTS = (
+    (r"CERAI SCORE — SOURCE & BREAKDOWN:", "CERAI PUANI — KAYNAK VE DÖKÜM:"),
+    (r"provisional evidence-weighted triage score \(not validated\)", "geçici kanıt ağırlıklı triyaj puanı (doğrulanmamıştır)"),
+    (r"CERAI-modified age bands", "CERAI'ye uyarlanmış yaş aralıkları"),
+    (r"\bmorphology:", "morfoloji:"),
+    (r"\bmorphology\b", "morfoloji"),
+    (r"\bpachymetry:", "pakimetri:"),
+    (r"\bthinnest pachymetry\b", "en ince pakimetri"),
+    (r"\bage:", "yaş:"),
+    (r"\bage (\d+) years\b", r"\1 yaş"),
+    (r"\bTOTAL:", "TOPLAM:"),
+    (r"Hard stops are independent of this numeric score and are not counted as score points\.", "Kesin durdurma kuralları bu sayısal puandan bağımsızdır ve puana eklenmez."),
+    (r"\bInput\b", "Girdi"),
+    (r"point\(s\)", "puan"),
+    (r"\bpoints\b", "puan"),
+    (r"\bsource\b", "kaynak"),
+    (r"\bNot documented\b", "Belgelenmedi"),
+    (r"\bNot available\b", "Mevcut değil"),
+    (r"\bNot applicable\b", "Uygulanamaz"),
+    (r"\baxis unavailable\b", "aks mevcut değil"),
+    (r"\bLOWER_FLAGGED_BURDEN\b", "DÜŞÜK UYARI YÜKÜ"),
+    (r"\bNO_NICE_ESCALATION\b", "NICE ARTIRIMI YOK"),
+    (r"\bPENTACAM_PRINTED\b", "PENTACAM YAZILI DEĞER"),
+    (r"\bPENTACAM_LABELED_K2\b", "PENTACAM ETİKETLİ K2"),
+    (r"\bPENTACAM_LABELED_IS\b", "PENTACAM ETİKETLİ I-S"),
+    (r"\bcentral_pachymetry\b", "santral pakimetri"),
+    (r"\bposterior_elevation\b", "posterior elevasyon"),
+    (r"\bcentral_pachy\b", "santral pakimetri"),
+    (r"\bposterior_pupil_max_um\b", "pupil içi maksimum posterior elevasyon (µm)"),
+    (r"\bcentral_pachy_um\b", "santral pakimetri (µm)"),
+    (r"\bI_S\b", "I-S"),
+    (r"\bK2_D\b", "K2 (D)"),
+    (r"\bI_S_D\b", "I-S (D)"),
+    (r"\bNORMAL_SYMMETRIC\b", "NORMAL_SİMETRİK"),
+    (r"\bREASSURING\b", "RAHATLATICI"),
+    (r"\bADEQUATE\b", "YETERLİ"),
+    (r"\bMYOPIC\b", "MİYOPİK"),
+    (r"\bHYPEROPIC\b", "HİPERMETROPİK"),
+    (r"\bMIXED\b", "KARMA"),
+    (r"\byes\b", "evet"),
+    (r"\bno\b", "hayır"),
+    (r"\bunknown\b", "bilinmiyor"),
+    (r"\bdegrees\b", "derece"),
+    (r"Synthetic central", "Sentetik santral"),
+    (r"pupil posterior", "pupil posterior elevasyonu"),
+)
+
+
+def translate_text(value: Any, locale: str = "en") -> str:
+    text = "" if value is None else str(value)
+    if normalize_locale(locale) != "tr" or not text:
+        return text
+    if text in TR_CLINICAL:
+        return TR_CLINICAL[text]
+    if text in TR:
+        return TR[text]
+    translated = text
+    for pattern, replacement in REPLACEMENTS:
+        translated = re.sub(pattern, replacement, translated, flags=re.IGNORECASE)
+    return translated
+
+
+def liability_notice(locale: str) -> str:
+    if normalize_locale(locale) == "tr":
+        return (
+            "Nihai cerrahi karar ile buna bağlı tüm sorumluluk ve yükümlülük cerraha aittir. "
+            "Bu uygulama yalnızca klinik karar destek aracıdır."
+        )
+    return (
+        "The final surgical decision and all associated responsibility and liability rest with the surgeon. "
+        "This application is a clinical decision-support aid only."
+    )
+
+
+def authorship_notice(locale: str) -> str:
+    if normalize_locale(locale) == "tr":
+        return (
+            "Hüseyin Cengiz, MD tarafından geliştirilmiştir. Tüm hakları saklıdır. "
+            "Nihai sorumluluk her zaman ve her koşulda cerraha aittir."
+        )
+    return (
+        "Developed by Hüseyin Cengiz, MD. All rights reserved. "
+        "Final responsibility rests with the surgeon at all times and under all circumstances."
+    )

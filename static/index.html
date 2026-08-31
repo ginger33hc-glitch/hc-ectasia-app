@@ -16,6 +16,7 @@
     *{box-sizing:border-box}body{font-family:Arial,sans-serif;background:var(--bg);margin:0;color:var(--ink);line-height:1.42}
     .app-header{background:#05090d;border-bottom:1px solid #1f2a33;padding:8px 22px;box-shadow:0 2px 8px rgba(0,0,0,.28)}
     .brand-lockup{position:relative;width:min(100%,900px);margin:0 auto}.brand-logo{display:block;width:100%;height:auto}.brand-version{position:absolute;right:1.5%;top:4%;font-size:11px;font-weight:700;color:#9aa6b5;letter-spacing:.4px}
+    .language-switch{display:flex;justify-content:flex-end;align-items:center;gap:6px;max-width:900px;margin:2px auto 0;color:#b8c7d5;font-size:12px}.language-switch button{padding:5px 10px;border:1px solid #56728a;border-radius:6px;background:#101a22;color:#d8e4ed;font-size:12px}.language-switch button.active{background:#2f668d;border-color:#8ab6d3;color:#fff}.language-switch button:focus-visible{outline:2px solid #ef7f2d;outline-offset:2px}
     .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
     main{max-width:1100px;margin:20px auto;padding:0 14px 40px}.card{background:white;border:1px solid var(--line);border-radius:11px;padding:18px;margin:14px 0;box-shadow:0 1px 2px rgba(0,0,0,.03)}
     .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.row{display:grid;grid-template-columns:1.25fr 1fr;gap:10px;margin:10px 0;align-items:center}
@@ -40,7 +41,7 @@
   <style>@media print{.report-card[hidden]{display:none!important}}</style>
 </head>
 <body>
-<header class="app-header"><div class="brand-lockup"><img class="brand-logo" src="/static/branding/cerai-logo-final.png?v=3" alt="CERAI — Corneal Ectasia Risk Analysis Intelligence"><span class="brand-version">v0.7.50</span></div><h1 class="sr-only">CERAI v0.7.50</h1></header>
+<header class="app-header"><div class="brand-lockup"><img class="brand-logo" src="/static/branding/cerai-logo-final.png?v=3" alt="CERAI — Corneal Ectasia Risk Analysis Intelligence"><span class="brand-version">v0.7.50</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CERAI v0.7.50</h1></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -127,8 +128,10 @@
 </main>
 <footer class="app-legal-footer">Developed by Hüseyin Cengiz, MD. All rights reserved. Final responsibility rests with the surgeon at all times and under all circumstances.</footer>
 
+<script src="/static/i18n.js?v=1"></script>
 <script src="/static/assessment-readiness.js?v=0.7.50"></script>
 <script>
+const i18n=window.CERAI_I18N;
 const eyeTemplate = (eye) => `
   <div class="row"><label>Prior corneal refractive surgery?</label><select id="${eye}_prior"><option value="no" selected>No</option><option value="yes">Yes</option><option value="unknown">Unknown</option></select></div>
   <div class="row"><label>Procedure</label><select id="${eye}_procedure"><option value="">Select</option><option value="PRK">PRK</option><option value="LASIK">LASIK</option></select></div>
@@ -189,6 +192,12 @@ const eyeTemplate = (eye) => `
   </details>`;
 document.querySelector("#od-fields").innerHTML = eyeTemplate("od");
 document.querySelector("#os-fields").innerHTML = eyeTemplate("os");
+document.querySelectorAll("[data-language]").forEach(button=>{
+  button.classList.toggle("active",button.dataset.language===i18n.locale);
+  button.setAttribute("aria-pressed",String(button.dataset.language===i18n.locale));
+  button.addEventListener("click",()=>i18n.setLocale(button.dataset.language));
+});
+i18n.translateDOM(document.body);
 function applySign(input,sign){
   const raw=input.value.trim();
   const unsigned=raw.replace(/^[+-]/,"");
@@ -214,7 +223,7 @@ for(const eye of ["od","os"]){
     clinicalReviewState[eye]=true;
     details.classList.remove("review-required");
     details.classList.add("reviewed");
-    details.querySelector("summary").textContent="Clinical eligibility and stability — reviewed";
+    details.querySelector("summary").textContent=i18n.translate("Clinical eligibility and stability — reviewed");
   });
 }
 
@@ -470,9 +479,9 @@ function applyEffectivePlans(plans){
   }
   cardTransferNote.textContent=transferred.length?`Card values transferred: ${transferred.join("; ")}`:"";
 }
-function listBlock(title, items){if(!items || !items.length)return "";return `<div class="finding-group"><h4>${safe(title)}</h4><ul>${items.map(x=>`<li>${safe(x)}</li>`).join("")}</ul></div>`}
+function listBlock(title, items){if(!items || !items.length)return "";return `<div class="finding-group"><h4>${safe(i18n.translate(title))}</h4><ul>${items.map(x=>`<li>${safe(i18n.clinical(x))}</li>`).join("")}</ul></div>`}
 function lasikPlanHeadline(r){ const v=r.values||{}; if(!["PASS","PASS WITH CAUTION"].includes(r.status)||v.procedure!=="LASIK")return ""; const selected=r.lasik_selected_plan||v.LASIK_selected_plan; if(!selected)return ""; const parts=[selected]; if(v.LASIK_flap_um!=null)parts.push(`FLAP ${fmt(v.LASIK_flap_um,0)} µm`); if(v.optical_zone_mm!=null)parts.push(`OPTICAL ZONE ${fmt(v.optical_zone_mm,1)} mm`); if(v.transition_zone_mm!=null)parts.push(`TRANSITION ZONE ${fmt(v.transition_zone_mm,1)} mm`); return parts.join(" • "); }
-function statusHeadline(r){ const selected=lasikPlanHeadline(r); return selected?`${r.status} — ${selected}`:r.status; }
+function statusHeadline(r){ const selected=lasikPlanHeadline(r); return selected?`${i18n.clinical(r.status)} — ${selected}`:i18n.clinical(r.status); }
 function microkeratomeBlock(r){
   const p=r.microkeratome_planning;
   if(!p?.applicable)return "";
@@ -531,8 +540,8 @@ function renderEye(r, extracted){
     ["Pentacam QS",source.pentacam_qs??"—"],["Source files",(source.source_files||[]).join(", ")||"—"]
   ];
   return `<section class="eye-result"><div class="eye-head"><strong>${safe(r.eye)} ASSESSMENT</strong><span class="status ${statusClass(r.status)}">${safe(statusHeadline(r))}</span></div><div class="eye-body">
-    <p class="eye-action"><strong>Clinical action:</strong> ${safe(r.action)}</p>
-    <p class="note"><strong>Instrument/source:</strong> ${safe(r.instrument||"Not documented")}</p>
+    <p class="eye-action"><strong>Clinical action:</strong> ${safe(i18n.clinical(r.action))}</p>
+    <p class="note"><strong>Instrument/source:</strong> ${safe(i18n.clinical(r.instrument||"Not documented"))}</p>
     <table class="clinical-table"><thead><tr><th>Parameter</th><th>Result</th></tr></thead><tbody>${rows.map(([a,b])=>`<tr><td>${safe(a)}</td><td>${safe(b)}</td></tr>`).join("")}</tbody></table>
     ${listBlock("NICE component audit",Object.entries(r.nice?.rows||{}).map(([k,v])=>`${k}: ${v} point(s)`).concat(Object.entries(r.nice?.values||{}).map(([k,v])=>`${k}: ${v}`),Object.entries(r.nice?.input_sources||{}).map(([k,v])=>`${k} source: ${v}`)))}
     ${listBlock("NICE interpretation note",r.nice?.note?[r.nice.note]:[])}
@@ -548,19 +557,20 @@ function patientPayload(){return {
 const orderedEyes=(eyes)=>[...(eyes||[])].sort((a,b)=>({OD:0,OS:1}[a.eye]??2)-({OD:0,OS:1}[b.eye]??2));
 function setReportMetadata(decision){
   const p=patientPayload();
-  document.querySelector("#reportPatient").textContent=p.name||"Not documented";
-  document.querySelector("#reportPatientBanner").textContent=p.name||"PATIENT NAME NOT DOCUMENTED";
-  document.querySelector("#reportPatientId").textContent=p.id||"Not documented";
-  document.querySelector("#reportAge").textContent=p.age??"Not documented";
-  document.querySelector("#reportDate").textContent=p.report_date||"Not documented";
-  document.querySelector("#reportReviewer").textContent=p.reviewer||"Not documented";
-  document.querySelector("#reportEyes").textContent=orderedEyes(decision.eyes).map(x=>x.eye).join(", ")||"None";
-  document.querySelector("#generatedAt").textContent=`Generated ${new Date().toLocaleString()}`;
+  document.querySelector("#reportPatient").textContent=p.name||i18n.translate("Not documented");
+  document.querySelector("#reportPatientBanner").textContent=p.name||i18n.translate("PATIENT NAME NOT DOCUMENTED");
+  document.querySelector("#reportPatientId").textContent=p.id||i18n.translate("Not documented");
+  document.querySelector("#reportAge").textContent=p.age??i18n.translate("Not documented");
+  document.querySelector("#reportDate").textContent=p.report_date||i18n.translate("Not documented");
+  document.querySelector("#reportReviewer").textContent=p.reviewer||i18n.translate("Not documented");
+  document.querySelector("#reportEyes").textContent=orderedEyes(decision.eyes).map(x=>x.eye).join(", ")||i18n.translate("None");
+  const generated=i18n.locale==="tr"?"Oluşturulma":"Generated";
+  document.querySelector("#generatedAt").textContent=`${generated} ${new Date().toLocaleString(i18n.locale==="tr"?"tr-TR":"en-US")}`;
 }
 async function downloadReport(kind){
   if(!lastReport)return;
   const button=kind==="pdf"?pdfBtn:wordBtn, original=button.textContent;
-  button.disabled=true;button.textContent="Preparing...";
+  button.disabled=true;button.textContent=i18n.translate("Preparing...");
   try{
     const response=await fetch(`/report/${kind}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(lastReport)});
     if(!response.ok)throw new Error(`Report export failed (${response.status})`);
@@ -681,14 +691,14 @@ f.addEventListener("submit", async (e) => {
     }
     if(j.workflow_status!=='READY'||!j.report_token||!j.decision)throw new Error('Server did not return a complete report-ready assessment.');
     const erssPrompts=applyERSSTopographyPrompts(j.decision);
-    statusBox.textContent=j.decision.status; statusBox.className=`status ${statusClass(j.decision.status)}`;
-    overallNote.textContent=j.decision.action||"";
+    statusBox.textContent=i18n.clinical(j.decision.status); statusBox.className=`status ${statusClass(j.decision.status)}`;
+    overallNote.textContent=i18n.clinical(j.decision.action||"");
     const identityWarnings=j.decision.identity_warnings||[];
     identityWarning.hidden=!identityWarnings.length;
-    identityWarning.innerHTML=identityWarnings.length?`<strong>PATIENT IDENTITY NOT VERIFIED — SURGEON CONFIRMATION REQUIRED</strong><ul>${identityWarnings.map(item=>`<li>${safe(item)}</li>`).join("")}</ul>`:"";
+    identityWarning.innerHTML=identityWarnings.length?`<strong>${safe(i18n.translate("PATIENT IDENTITY NOT VERIFIED — SURGEON CONFIRMATION REQUIRED"))}</strong><ul>${identityWarnings.map(item=>`<li>${safe(i18n.clinical(item))}</li>`).join("")}</ul>`:"";
     eyeResults.innerHTML=listBlock("Global clinical / source blockers",j.decision.critical_input_issues)+orderedEyes(j.decision.eyes).map(x=>renderEye(x,j.extracted)).join("");
     decisionBox.textContent=JSON.stringify(j.decision,null,2); extractBox.textContent=JSON.stringify(j.extracted,null,2);
-    lastReport={patient:patientPayload(),decision:j.decision,extracted:j.extracted,assessment_token:j.assessment_token,report_token:j.report_token};setReportMetadata(j.decision);reportCard.hidden=false;
+    lastReport={locale:i18n.locale,patient:patientPayload(),decision:j.decision,extracted:j.extracted,assessment_token:j.assessment_token,report_token:j.report_token};setReportMetadata(j.decision);i18n.translateDOM(reportCard);reportCard.hidden=false;
     if(agePromptNeeded){
       showFormMessage("Patient age could not be read from the Pentacam image. Enter the age, then run the assessment again.");
       manualAgeRow.scrollIntoView({behavior:"smooth",block:"center"});

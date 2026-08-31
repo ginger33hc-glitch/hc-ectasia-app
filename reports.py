@@ -30,6 +30,8 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from cerai_i18n import authorship_notice, liability_notice, normalize_locale, translate_text
+
 
 NAVY = "173B57"
 BLUE = "1F5E8C"
@@ -44,6 +46,7 @@ GRAY = "52616D"
 GRAY_FILL = "EEF2F5"
 LINE = "D7E0E7"
 INK = "17212B"
+APP_VERSION = "0.7.50"
 LIABILITY_NOTICE = (
     "The final surgical decision and all associated responsibility and liability rest with the surgeon. "
     "This application is a clinical decision-support aid only."
@@ -106,7 +109,7 @@ def _fmt(value: Any, digits: int = 1, unit: str = "") -> str:
     return f"{rendered}{unit}"
 
 
-def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
+def _eye_metrics(eye: Dict[str, Any], locale: str = "en") -> List[tuple[str, str]]:
     values = eye.get("values") or {}
     score = eye.get("score") or {}
     erss_evidence = eye.get("erss_topography_evidence") or {}
@@ -143,7 +146,7 @@ def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
         if values.get("transition_zone_mm") is None and values.get("transition_zone_not_applicable") == "yes"
         else _fmt(values.get("transition_zone_mm"), 1, " mm")
     )
-    return [
+    rows = [
         ("Procedure", _text(values.get("procedure"))),
         ("Prior refractive surgery", _text(values.get("prior_refractive_surgery"))),
         ("Stability / progression / CDVA flag", (
@@ -193,9 +196,10 @@ def _eye_metrics(eye: Dict[str, Any]) -> List[tuple[str, str]]:
         )),
         ("Pentacam QS", _text(values.get("pentacam_qs"))),
     ]
+    return [(translate_text(label, locale), translate_text(value, locale)) for label, value in rows]
 
 
-def _findings(eye: Dict[str, Any]) -> Iterable[tuple[str, List[str]]]:
+def _findings(eye: Dict[str, Any], locale: str = "en") -> Iterable[tuple[str, List[str]]]:
     bad_display = (eye.get("tomography_review") or {}).get("BAD_display") or {}
     groups = [
         ("Hard stops", eye.get("hard_stops") or []),
@@ -213,7 +217,10 @@ def _findings(eye: Dict[str, Any]) -> Iterable[tuple[str, List[str]]]:
         ("Tomography concern flags", (eye.get("tomography_review") or {}).get("cross_sectional_flags") or []),
         ("BAD display interpretation", [f"{key}: {value}" for key, value in bad_display.items()]),
     ]
-    return ((title, [str(item) for item in items]) for title, items in groups if items)
+    return (
+        (translate_text(title, locale), [translate_text(item, locale) for item in items])
+        for title, items in groups if items
+    )
 
 
 def _extracted_eye(extracted: Dict[str, Any], eye_id: str) -> Dict[str, Any]:
@@ -223,7 +230,7 @@ def _extracted_eye(extracted: Dict[str, Any], eye_id: str) -> Dict[str, Any]:
     return {}
 
 
-def _tomography_rows(extracted: Dict[str, Any], eye_id: str) -> List[tuple[str, str]]:
+def _tomography_rows(extracted: Dict[str, Any], eye_id: str, locale: str = "en") -> List[tuple[str, str]]:
     eye = _extracted_eye(extracted, eye_id)
     keys = [
         ("K1", "K1_D", " D", 2), ("K1 axis", "K1_axis_deg", " degrees", 0),
@@ -249,10 +256,13 @@ def _tomography_rows(extracted: Dict[str, Any], eye_id: str) -> List[tuple[str, 
         ("Posterior pattern", "posterior_pattern", "", 0), ("Image quality", "quality", "", 0),
         ("Pentacam QS", "pentacam_qs", "", 0), ("Source files", "source_files", "", 0),
     ]
-    return [(label, _fmt(eye.get(key), digits, unit)) for label, key, unit, digits in keys]
+    return [
+        (translate_text(label, locale), translate_text(_fmt(eye.get(key), digits, unit), locale))
+        for label, key, unit, digits in keys
+    ]
 
 
-def _microkeratome_rows(eye: Dict[str, Any]) -> List[tuple[str, str]]:
+def _microkeratome_rows(eye: Dict[str, Any], locale: str = "en") -> List[tuple[str, str]]:
     plan = eye.get("microkeratome_planning") or {}
     if not plan.get("applicable"):
         return []
@@ -263,7 +273,7 @@ def _microkeratome_rows(eye: Dict[str, Any]) -> List[tuple[str, str]]:
         if plan.get("alternative_safety") != "NOT_APPLICABLE"
         else "Not applicable"
     )
-    return [
+    rows = [
         ("Assessment gate", _text(plan.get("assessment_gate"))),
         ("Steep-flat K spread", _fmt(plan.get("delta_k_d"), 2, " D")),
         ("Vacuum ring", _fmt(plan.get("vacuum_ring_mm"), 1, " mm")),
@@ -276,6 +286,7 @@ def _microkeratome_rows(eye: Dict[str, Any]) -> List[tuple[str, str]]:
         ("Ring-zone clearance", _fmt(plan.get("ring_tzone_clearance_mm"), 2, " mm")),
         ("Source", _text(plan.get("source"))),
     ]
+    return [(translate_text(label, locale), translate_text(value, locale)) for label, value in rows]
 
 
 def _paired_rows(rows: List[tuple[str, str]]) -> List[List[str]]:
@@ -294,6 +305,10 @@ def _ordered_eyes(decision: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def build_pdf(payload: Dict[str, Any]) -> bytes:
+    locale = normalize_locale(payload.get("locale"))
+    tr = lambda value: translate_text(value, locale)
+    regular_font = PDF_UNICODE_REGULAR if locale == "tr" else "Helvetica"
+    bold_font = PDF_UNICODE_BOLD if locale == "tr" else "Helvetica-Bold"
     patient = payload.get("patient") or {}
     decision = payload.get("decision") or {}
     extracted = payload.get("extracted") or {}
@@ -302,32 +317,38 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     doc = SimpleDocTemplate(
         buffer, pagesize=letter, rightMargin=0.65 * inch, leftMargin=0.65 * inch,
         topMargin=0.72 * inch, bottomMargin=0.82 * inch,
-        title="CERAI Preoperative Ectasia Risk Assessment",
+        title=tr("CERAI Preoperative Ectasia Risk Assessment"),
         author="CERAI",
     )
     styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name="ReportTitle", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=17, leading=20, textColor=_rl(NAVY), alignment=TA_LEFT, spaceAfter=3))
-    styles.add(ParagraphStyle(name="ReportSub", parent=styles["Normal"], fontName="Helvetica", fontSize=8.5, leading=11, textColor=_rl(GRAY), spaceAfter=12))
-    styles.add(ParagraphStyle(name="Section", parent=styles["Heading2"], fontName="Helvetica-Bold", fontSize=10.5, leading=13, textColor=_rl(NAVY), spaceBefore=10, spaceAfter=5))
-    styles.add(ParagraphStyle(name="BodySmall", parent=styles["BodyText"], fontName="Helvetica", fontSize=8.5, leading=11, textColor=_rl(INK), spaceAfter=3))
-    styles.add(ParagraphStyle(name="Tiny", parent=styles["BodyText"], fontName="Helvetica", fontSize=7.2, leading=9, textColor=_rl(GRAY)))
-    styles.add(ParagraphStyle(name="Liability", parent=styles["BodyText"], fontName="Helvetica-Bold", fontSize=9, leading=12, textColor=_rl(RED), backColor=_rl(RED_FILL), borderColor=_rl(RED), borderWidth=0.8, borderPadding=7, spaceAfter=11))
+    styles.add(ParagraphStyle(name="ReportTitle", parent=styles["Title"], fontName=bold_font, fontSize=17, leading=20, textColor=_rl(NAVY), alignment=TA_LEFT, spaceAfter=3))
+    styles.add(ParagraphStyle(name="ReportSub", parent=styles["Normal"], fontName=regular_font, fontSize=8.5, leading=11, textColor=_rl(GRAY), spaceAfter=12))
+    styles.add(ParagraphStyle(name="Section", parent=styles["Heading2"], fontName=bold_font, fontSize=10.5, leading=13, textColor=_rl(NAVY), spaceBefore=10, spaceAfter=5))
+    styles.add(ParagraphStyle(name="BodySmall", parent=styles["BodyText"], fontName=regular_font, fontSize=8.5, leading=11, textColor=_rl(INK), spaceAfter=3))
+    styles.add(ParagraphStyle(name="Tiny", parent=styles["BodyText"], fontName=regular_font, fontSize=7.2, leading=9, textColor=_rl(GRAY)))
+    styles.add(ParagraphStyle(name="Liability", parent=styles["BodyText"], fontName=bold_font, fontSize=9, leading=12, textColor=_rl(RED), backColor=_rl(RED_FILL), borderColor=_rl(RED), borderWidth=0.8, borderPadding=7, spaceAfter=11))
     styles.add(ParagraphStyle(name="PatientName", parent=styles["BodyText"], fontName=PDF_UNICODE_BOLD, fontSize=15, leading=18, textColor=_rl(NAVY), spaceBefore=2, spaceAfter=6))
+    styles.add(ParagraphStyle(name="TableText", parent=styles["BodyText"], fontName=regular_font, fontSize=7.5, leading=9, textColor=_rl(INK), spaceAfter=0))
+    styles.add(ParagraphStyle(name="TableLabel", parent=styles["BodyText"], fontName=bold_font, fontSize=7.3, leading=8.7, textColor=_rl(INK), spaceAfter=0))
+    styles.add(ParagraphStyle(name="TableHead", parent=styles["BodyText"], fontName=bold_font, fontSize=7.5, leading=9, textColor=colors.white, spaceAfter=0))
+    table_text = lambda value: Paragraph(_ascii(value, ""), styles["TableText"])
+    table_label = lambda value: Paragraph(_ascii(value, ""), styles["TableLabel"])
+    table_head = lambda value: Paragraph(_ascii(value, ""), styles["TableHead"])
 
     story: List[Any] = []
-    story.append(Paragraph("CERAI PREOPERATIVE ECTASIA RISK ASSESSMENT", styles["ReportTitle"]))
-    story.append(Paragraph(f"Corneal refractive surgery clinical decision-support report | Software v{APP_VERSION}", styles["ReportSub"]))
-    story.append(Paragraph(LIABILITY_NOTICE, styles["Liability"]))
+    story.append(Paragraph(tr("CERAI PREOPERATIVE ECTASIA RISK ASSESSMENT"), styles["ReportTitle"]))
+    story.append(Paragraph(tr("Corneal refractive surgery clinical decision-support report") + f" | {tr('Software')} v{APP_VERSION}", styles["ReportSub"]))
+    story.append(Paragraph(liability_notice(locale), styles["Liability"]))
 
     metadata = [
-        ["Patient", _ascii(patient.get("name")), "Patient ID", _ascii(patient.get("id"))],
-        ["Age", _ascii(patient.get("age")), "Assessment date", _ascii(patient.get("report_date"))],
-        ["Reviewer", _ascii(patient.get("reviewer")), "Eyes assessed", ", ".join(_ascii(e.get("eye")) for e in report_eyes) or "None"],
+        [table_label(tr("Patient")), table_text(_text(patient.get("name"), tr("Not documented"))), table_label(tr("Patient ID")), table_text(_text(patient.get("id"), tr("Not documented")))],
+        [table_label(tr("Age")), table_text(_text(patient.get("age"), tr("Not documented"))), table_label(tr("Assessment date")), table_text(_text(patient.get("report_date"), tr("Not documented")))],
+        [table_label(tr("Reviewer")), table_text(_text(patient.get("reviewer"), tr("Not documented"))), table_label(tr("Eyes assessed")), table_text(", ".join(_ascii(e.get("eye")) for e in report_eyes) or tr("None"))],
     ]
     meta_table = Table(metadata, colWidths=[0.85 * inch, 2.2 * inch, 1.0 * inch, 2.1 * inch], hAlign="LEFT")
     meta_table.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (-1, -1), "Helvetica"), ("FONTSIZE", (0, 0), (-1, -1), 8.3),
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"), ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
+        ("FONTNAME", (0, 0), (-1, -1), regular_font), ("FONTSIZE", (0, 0), (-1, -1), 8.3),
+        ("FONTNAME", (0, 0), (0, -1), bold_font), ("FONTNAME", (2, 0), (2, -1), bold_font),
         ("TEXTCOLOR", (0, 0), (-1, -1), _rl(INK)),
         ("BACKGROUND", (0, 0), (0, -1), _rl(GRAY_FILL)), ("BACKGROUND", (2, 0), (2, -1), _rl(GRAY_FILL)),
         ("GRID", (0, 0), (-1, -1), 0.45, _rl(LINE)),
@@ -336,12 +357,12 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     ]))
     story.append(meta_table)
     story.append(Spacer(1, 10))
-    patient_banner = _ascii(patient.get("name"), "PATIENT NAME NOT DOCUMENTED").upper()
+    patient_banner = _ascii(patient.get("name"), tr("PATIENT NAME NOT DOCUMENTED")).upper()
     story.append(Paragraph(patient_banner, styles["PatientName"]))
 
-    overall = _ascii(decision.get("status") or "NOT ASSESSED")
+    overall = _ascii(tr(decision.get("status") or "NOT ASSESSED"))
     accent, fill = _status_palette(decision.get("status") or "")
-    status_table = Table([[Paragraph(f"<b>OVERALL DISPOSITION</b><br/><font size='13'><b>{overall}</b></font><br/>{_ascii(decision.get('action'), '')}", styles["BodySmall"])]], colWidths=[6.15 * inch])
+    status_table = Table([[Paragraph(f"<b>{tr('OVERALL DISPOSITION')}</b><br/><font size='13'><b>{overall}</b></font><br/>{_ascii(tr(decision.get('action')), '')}", styles["BodySmall"])]], colWidths=[6.15 * inch])
     status_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), _rl(fill)),
         ("BOX", (0, 0), (-1, -1), 1.2, _rl(accent)),
@@ -353,58 +374,59 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     story.append(status_table)
     identity_warnings = decision.get("identity_warnings") or []
     if identity_warnings:
-        story.append(Paragraph("PATIENT IDENTITY NOT VERIFIED - SURGEON CONFIRMATION REQUIRED", styles["Section"]))
+        story.append(Paragraph(tr("PATIENT IDENTITY NOT VERIFIED - SURGEON CONFIRMATION REQUIRED"), styles["Section"]))
         for item in identity_warnings:
-            story.append(Paragraph(f"- {_ascii(item)}", styles["BodySmall"]))
+            story.append(Paragraph(f"- {_ascii(tr(item))}", styles["BodySmall"]))
     blockers = decision.get("critical_input_issues") or []
     if blockers:
-        story.append(Paragraph("Global clinical / source blockers", styles["Section"]))
+        story.append(Paragraph(tr("Global clinical / source blockers"), styles["Section"]))
         for item in blockers:
-            story.append(Paragraph(f"- {_ascii(item)}", styles["BodySmall"]))
+            story.append(Paragraph(f"- {_ascii(tr(item))}", styles["BodySmall"]))
 
     for eye in report_eyes:
         eye_status = eye.get("status") or "NOT ASSESSED"
         eye_accent, eye_fill = _status_palette(eye_status)
-        story.append(Paragraph(f"{_ascii(eye.get('eye'))} ASSESSMENT", styles["Section"]))
-        banner = Table([[_ascii(eye_status), _ascii(eye.get("action"), "")]], colWidths=[1.7 * inch, 4.45 * inch])
+        story.append(Paragraph(f"{_ascii(eye.get('eye'))} {tr('ASSESSMENT')}", styles["Section"]))
+        banner = Table([[table_label(tr(eye_status)), table_text(tr(eye.get("action"))) ]], colWidths=[1.7 * inch, 4.45 * inch])
         banner.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, -1), _rl(eye_fill)),
             ("TEXTCOLOR", (0, 0), (0, 0), _rl(eye_accent)),
-            ("FONTNAME", (0, 0), (0, 0), "Helvetica-Bold"), ("FONTNAME", (1, 0), (1, 0), "Helvetica"),
+            ("FONTNAME", (0, 0), (0, 0), bold_font), ("FONTNAME", (1, 0), (1, 0), regular_font),
             ("FONTSIZE", (0, 0), (-1, -1), 8), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("BOX", (0, 0), (-1, -1), 0.6, _rl(eye_accent)),
             ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
             ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
         ]))
         story.append(banner)
-        metric_rows = [["Parameter", "Result"]] + [[_ascii(k), _ascii(v)] for k, v in _eye_metrics(eye)]
+        metric_rows = [[table_head(tr("Parameter")), table_head(tr("Result"))]] + [[table_label(k), table_text(v)] for k, v in _eye_metrics(eye, locale)]
         metric_table = Table(metric_rows, colWidths=[2.25 * inch, 3.9 * inch], repeatRows=1)
         metric_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), _rl(NAVY)), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"), ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
-            ("FONTNAME", (1, 1), (1, -1), "Helvetica"), ("FONTSIZE", (0, 0), (-1, -1), 7.8),
+            ("FONTNAME", (0, 0), (-1, 0), bold_font), ("FONTNAME", (0, 1), (0, -1), bold_font),
+            ("FONTNAME", (1, 1), (1, -1), regular_font), ("FONTSIZE", (0, 0), (-1, -1), 7.8),
             ("GRID", (0, 0), (-1, -1), 0.35, _rl(LINE)), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, _rl("F7F9FB")]),
             ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
             ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
         ]))
         story.append(metric_table)
-        for title, items in _findings(eye):
+        for title, items in _findings(eye, locale):
             story.append(Paragraph(_ascii(title), styles["Section"]))
             for item in items:
                 story.append(Paragraph(f"- {_ascii(item)}", styles["BodySmall"]))
 
-        planning_rows = _microkeratome_rows(eye)
+        planning_rows = _microkeratome_rows(eye, locale)
         if planning_rows:
-            story.append(Paragraph("Post-assessment ML7 microkeratome planning", styles["Section"]))
+            story.append(Paragraph(tr("Post-assessment ML7 microkeratome planning"), styles["Section"]))
             planning_table = Table(
-                [["Parameter", "Surgeon-review recommendation"]]
-                + [[_ascii(key), _ascii(value)] for key, value in planning_rows],
+                [[table_head(tr("Parameter")), table_head(tr("Surgeon-review recommendation"))]]
+                + [[table_label(key), table_text(value)] for key, value in planning_rows],
                 colWidths=[2.25 * inch, 3.9 * inch], repeatRows=1,
             )
             planning_table.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), _rl(BLUE)), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"), ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
+                ("FONTNAME", (0, 0), (-1, 0), bold_font), ("FONTNAME", (0, 1), (0, -1), bold_font),
+                ("FONTNAME", (1, 1), (1, -1), regular_font),
                 ("FONTSIZE", (0, 0), (-1, -1), 7.8), ("GRID", (0, 0), (-1, -1), 0.35, _rl(LINE)),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
@@ -416,19 +438,20 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
                 ("Planning notes", (eye.get("microkeratome_planning") or {}).get("notes") or []),
             ):
                 if items:
-                    story.append(Paragraph(title, styles["Section"]))
+                    story.append(Paragraph(tr(title), styles["Section"]))
                     for item in items:
-                        story.append(Paragraph(f"- {_ascii(item)}", styles["BodySmall"]))
+                        story.append(Paragraph(f"- {_ascii(tr(item))}", styles["BodySmall"]))
 
-        story.append(Paragraph("Extracted tomography", styles["Section"]))
-        tomo = [["Parameter", "Value", "Parameter", "Value"]] + [
-            [_ascii(value, "") for value in row]
-            for row in _paired_rows(_tomography_rows(extracted, eye.get("eye")))
+        story.append(Paragraph(tr("Extracted tomography"), styles["Section"]))
+        tomo = [[table_label(tr("Parameter")), table_label(tr("Value")), table_label(tr("Parameter")), table_label(tr("Value"))]] + [
+            [table_label(value) if index in (0, 2) else table_text(value) for index, value in enumerate(row)]
+            for row in _paired_rows(_tomography_rows(extracted, eye.get("eye"), locale))
         ]
         tomo_table = Table(tomo, colWidths=[1.45 * inch, 1.55 * inch, 1.45 * inch, 1.7 * inch], repeatRows=1)
         tomo_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), _rl(GRAY_FILL)), ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"), ("FONTNAME", (2, 1), (2, -1), "Helvetica-Bold"),
+            ("BACKGROUND", (0, 0), (-1, 0), _rl(GRAY_FILL)), ("FONTNAME", (0, 0), (-1, 0), bold_font),
+            ("FONTNAME", (0, 1), (0, -1), bold_font), ("FONTNAME", (2, 1), (2, -1), bold_font),
+            ("FONTNAME", (1, 1), (1, -1), regular_font), ("FONTNAME", (3, 1), (3, -1), regular_font),
             ("FONTSIZE", (0, 0), (-1, -1), 7.2),
             ("GRID", (0, 0), (-1, -1), 0.35, _rl(LINE)), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
@@ -438,16 +461,16 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
 
     warnings = extracted.get("global_warnings") or []
     if warnings:
-        story.append(Paragraph("Extraction warnings", styles["Section"]))
+        story.append(Paragraph(tr("Extraction warnings"), styles["Section"]))
         for item in warnings:
-            story.append(Paragraph(f"- {_ascii(item)}", styles["BodySmall"]))
+            story.append(Paragraph(f"- {_ascii(tr(item))}", styles["BodySmall"]))
 
     story.append(Spacer(1, 12))
-    story.append(Paragraph("Interpretation note", styles["Section"]))
+    story.append(Paragraph(tr("Interpretation note"), styles["Section"]))
     story.append(Paragraph(
-        "This report is generated under the CERAI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. "
-        "CAUTION is a STOP/DEFER decision requiring repeat ectasia/tomographic assessment after at least 6 months. "
-        "DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review.",
+        tr("This report is generated under the CERAI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. "
+           "CAUTION is a STOP/DEFER decision requiring repeat ectasia/tomographic assessment after at least 6 months. "
+           "DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review."),
         styles["Tiny"],
     ))
 
@@ -457,10 +480,10 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         canvas.line(0.65 * inch, 0.62 * inch, 7.85 * inch, 0.62 * inch)
         canvas.setFillColor(_rl(GRAY))
         canvas.setFont(PDF_UNICODE_REGULAR, 6.1)
-        canvas.drawCentredString(4.25 * inch, 0.43 * inch, AUTHORSHIP_NOTICE)
-        canvas.setFont("Helvetica", 6.5)
-        canvas.drawString(0.65 * inch, 0.23 * inch, "CERAI | Clinical decision-support report")
-        canvas.drawRightString(7.85 * inch, 0.23 * inch, f"Page {pdf_doc.page}")
+        canvas.drawCentredString(4.25 * inch, 0.43 * inch, authorship_notice(locale))
+        canvas.setFont(regular_font, 6.5)
+        canvas.drawString(0.65 * inch, 0.23 * inch, "CERAI | " + tr("Clinical decision-support report"))
+        canvas.drawRightString(7.85 * inch, 0.23 * inch, f"{tr('Page')} {pdf_doc.page}")
         canvas.restoreState()
 
     doc.build(story, onFirstPage=page_footer, onLaterPages=page_footer)
@@ -530,6 +553,8 @@ def _add_bullet(document: Document, text: str) -> None:
 
 
 def build_docx(payload: Dict[str, Any]) -> bytes:
+    locale = normalize_locale(payload.get("locale"))
+    tr = lambda value: translate_text(value, locale)
     patient = payload.get("patient") or {}
     decision = payload.get("decision") or {}
     extracted = payload.get("extracted") or {}
@@ -562,7 +587,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
         style.paragraph_format.space_after = Pt(after)
 
     header = section.header.paragraphs[0]
-    header.text = "CERAI  |  PREOPERATIVE RISK ASSESSMENT"
+    header.text = "CERAI  |  " + tr("PREOPERATIVE RISK ASSESSMENT")
     header.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     for run in header.runs:
         run.font.name = "Arial"
@@ -572,7 +597,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     footer = section.footer.paragraphs[0]
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
     footer.paragraph_format.space_after = Pt(1)
-    footer.add_run(AUTHORSHIP_NOTICE)
+    footer.add_run(authorship_notice(locale))
     for run in footer.runs:
         run.font.name = "Arial"
         run.font.size = Pt(6.5)
@@ -582,7 +607,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     footer_meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
     footer_meta.paragraph_format.space_before = Pt(0)
     footer_meta.paragraph_format.space_after = Pt(0)
-    footer_meta.add_run("CERAI | Clinical decision-support report | ")
+    footer_meta.add_run("CERAI | " + tr("Clinical decision-support report") + " | ")
     fld = OxmlElement("w:fldSimple")
     fld.set(qn("w:instr"), "PAGE")
     footer_meta._p.append(fld)
@@ -593,12 +618,12 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
 
     title = document.add_paragraph()
     title.paragraph_format.space_after = Pt(2)
-    run = title.add_run("CERAI PREOPERATIVE ECTASIA RISK ASSESSMENT")
+    run = title.add_run(tr("CERAI PREOPERATIVE ECTASIA RISK ASSESSMENT"))
     run.font.name = "Arial"
     run.font.size = Pt(18)
     run.bold = True
     run.font.color.rgb = RGBColor.from_string(NAVY)
-    subtitle = document.add_paragraph(f"Corneal refractive surgery clinical decision-support report | Software v{APP_VERSION}")
+    subtitle = document.add_paragraph(tr("Corneal refractive surgery clinical decision-support report") + f" | {tr('Software')} v{APP_VERSION}")
     subtitle.paragraph_format.space_after = Pt(10)
     for run in subtitle.runs:
         run.font.name = "Arial"
@@ -608,7 +633,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     liability = document.add_paragraph()
     liability.paragraph_format.space_after = Pt(10)
     liability.paragraph_format.left_indent = Inches(0.08)
-    liability_run = liability.add_run(LIABILITY_NOTICE)
+    liability_run = liability.add_run(liability_notice(locale))
     liability_run.font.name = "Arial"
     liability_run.font.size = Pt(9)
     liability_run.font.bold = True
@@ -617,9 +642,9 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     meta = document.add_table(rows=3, cols=4)
     meta.style = "Table Grid"
     rows = [
-        ("Patient", _text(patient.get("name")), "Patient ID", _text(patient.get("id"))),
-        ("Age", _text(patient.get("age")), "Assessment date", _text(patient.get("report_date"))),
-        ("Reviewer", _text(patient.get("reviewer")), "Eyes assessed", ", ".join(_text(e.get("eye")) for e in report_eyes) or "None"),
+        (tr("Patient"), _text(patient.get("name"), tr("Not documented")), tr("Patient ID"), _text(patient.get("id"), tr("Not documented"))),
+        (tr("Age"), _text(patient.get("age"), tr("Not documented")), tr("Assessment date"), _text(patient.get("report_date"), tr("Not documented"))),
+        (tr("Reviewer"), _text(patient.get("reviewer"), tr("Not documented")), tr("Eyes assessed"), ", ".join(_text(e.get("eye")) for e in report_eyes) or tr("None")),
     ]
     for r_idx, values in enumerate(rows):
         for c_idx, value in enumerate(values):
@@ -633,7 +658,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     patient_banner.paragraph_format.space_before = Pt(10)
     patient_banner.paragraph_format.space_after = Pt(6)
     patient_banner_run = patient_banner.add_run(
-        _text(patient.get("name"), "PATIENT NAME NOT DOCUMENTED").upper()
+        _text(patient.get("name"), tr("PATIENT NAME NOT DOCUMENTED")).upper()
     )
     patient_banner_run.font.name = "Arial"
     patient_banner_run.font.size = Pt(15)
@@ -644,7 +669,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     accent, fill = _status_palette(status)
     box = document.add_table(rows=1, cols=1)
     box.style = "Table Grid"
-    box.cell(0, 0).text = f"OVERALL DISPOSITION\n{status}\n{_text(decision.get('action'), '')}"
+    box.cell(0, 0).text = f"{tr('OVERALL DISPOSITION')}\n{tr(status)}\n{tr(_text(decision.get('action'), ''))}"
     _set_cell_shading(box.cell(0, 0), fill)
     _set_cell_margins(box.cell(0, 0), top=150, bottom=150, start=180, end=180)
     for idx, run in enumerate(box.cell(0, 0).paragraphs[0].runs):
@@ -654,24 +679,24 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
 
     identity_warnings = decision.get("identity_warnings") or []
     if identity_warnings:
-        _add_heading(document, "PATIENT IDENTITY NOT VERIFIED - SURGEON CONFIRMATION REQUIRED", 1)
+        _add_heading(document, tr("PATIENT IDENTITY NOT VERIFIED - SURGEON CONFIRMATION REQUIRED"), 1)
         for item in identity_warnings:
-            _add_bullet(document, str(item))
+            _add_bullet(document, tr(item))
 
     blockers = decision.get("critical_input_issues") or []
     if blockers:
-        _add_heading(document, "Global clinical / source blockers", 1)
+        _add_heading(document, tr("Global clinical / source blockers"), 1)
         for item in blockers:
-            _add_bullet(document, item)
+            _add_bullet(document, tr(item))
 
     for eye in report_eyes:
-        _add_heading(document, f"{_text(eye.get('eye'))} assessment", 1)
+        _add_heading(document, f"{_text(eye.get('eye'))} {tr('assessment')}", 1)
         eye_status = eye.get("status") or "NOT ASSESSED"
         eye_accent, eye_fill = _status_palette(eye_status)
         banner = document.add_table(rows=1, cols=2)
         banner.style = "Table Grid"
-        banner.cell(0, 0).text = eye_status
-        banner.cell(0, 1).text = _text(eye.get("action"), "")
+        banner.cell(0, 0).text = tr(eye_status)
+        banner.cell(0, 1).text = tr(_text(eye.get("action"), ""))
         for cell in banner.rows[0].cells:
             _set_cell_shading(cell, eye_fill)
             _set_cell_margins(cell, top=110, bottom=110)
@@ -681,27 +706,27 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
 
         table = document.add_table(rows=1, cols=2)
         table.style = "Table Grid"
-        table.rows[0].cells[0].text = "Parameter"
-        table.rows[0].cells[1].text = "Result"
-        for label, value in _eye_metrics(eye):
+        table.rows[0].cells[0].text = tr("Parameter")
+        table.rows[0].cells[1].text = tr("Result")
+        for label, value in _eye_metrics(eye, locale):
             cells = table.add_row().cells
             cells[0].text = label
             cells[1].text = value.replace(" um", " µm")
             cells[0].paragraphs[0].runs[0].bold = True
         _style_doc_table(table, [2.15, 3.7], header=True)
 
-        for heading, items in _findings(eye):
+        for heading, items in _findings(eye, locale):
             _add_heading(document, heading, 2)
             for item in items:
                 _add_bullet(document, item)
 
-        planning_rows = _microkeratome_rows(eye)
+        planning_rows = _microkeratome_rows(eye, locale)
         if planning_rows:
-            _add_heading(document, "Post-assessment ML7 microkeratome planning", 2)
+            _add_heading(document, tr("Post-assessment ML7 microkeratome planning"), 2)
             planning_table = document.add_table(rows=1, cols=2)
             planning_table.style = "Table Grid"
-            planning_table.rows[0].cells[0].text = "Parameter"
-            planning_table.rows[0].cells[1].text = "Surgeon-review recommendation"
+            planning_table.rows[0].cells[0].text = tr("Parameter")
+            planning_table.rows[0].cells[1].text = tr("Surgeon-review recommendation")
             for label, value in planning_rows:
                 cells = planning_table.add_row().cells
                 cells[0].text = label
@@ -713,18 +738,18 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
                 ("Planning notes", (eye.get("microkeratome_planning") or {}).get("notes") or []),
             ):
                 if items:
-                    _add_heading(document, heading, 2)
+                    _add_heading(document, tr(heading), 2)
                     for item in items:
-                        _add_bullet(document, str(item))
+                        _add_bullet(document, tr(item))
 
-        _add_heading(document, "Extracted tomography", 2)
+        _add_heading(document, tr("Extracted tomography"), 2)
         tomo = document.add_table(rows=1, cols=4)
         tomo.style = "Table Grid"
-        tomo.rows[0].cells[0].text = "Parameter"
-        tomo.rows[0].cells[1].text = "Value"
-        tomo.rows[0].cells[2].text = "Parameter"
-        tomo.rows[0].cells[3].text = "Value"
-        for row in _paired_rows(_tomography_rows(extracted, eye.get("eye"))):
+        tomo.rows[0].cells[0].text = tr("Parameter")
+        tomo.rows[0].cells[1].text = tr("Value")
+        tomo.rows[0].cells[2].text = tr("Parameter")
+        tomo.rows[0].cells[3].text = tr("Value")
+        for row in _paired_rows(_tomography_rows(extracted, eye.get("eye"), locale)):
             cells = tomo.add_row().cells
             for index, value in enumerate(row):
                 cells[index].text = value.replace(" um", " µm")
@@ -735,15 +760,15 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
 
     warnings = extracted.get("global_warnings") or []
     if warnings:
-        _add_heading(document, "Extraction warnings", 1)
+        _add_heading(document, tr("Extraction warnings"), 1)
         for item in warnings:
-            _add_bullet(document, str(item))
+            _add_bullet(document, tr(item))
 
-    _add_heading(document, "Interpretation note", 1)
+    _add_heading(document, tr("Interpretation note"), 1)
     note = document.add_paragraph(
-        "This report is generated under the CERAI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. "
-        "CAUTION is a STOP/DEFER decision requiring repeat ectasia/tomographic assessment after at least 6 months. "
-        "DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review."
+        tr("This report is generated under the CERAI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. "
+           "CAUTION is a STOP/DEFER decision requiring repeat ectasia/tomographic assessment after at least 6 months. "
+           "DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review.")
     )
     note.style = document.styles["Normal"]
     for run in note.runs:

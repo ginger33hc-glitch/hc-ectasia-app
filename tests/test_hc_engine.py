@@ -1145,6 +1145,41 @@ class TestAuthorshipAndLiabilityFooter(unittest.TestCase):
             footer_text = " ".join(paragraph.text for paragraph in section.footer.paragraphs)
             self.assertIn(self.NOTICE, footer_text)
 
+    def test_turkish_pdf_uses_unicode_labels_and_turkish_footer_on_every_page(self):
+        payload = self._payload()
+        payload["locale"] = "tr"
+        reader = PdfReader(BytesIO(reports.build_pdf(payload)))
+        pages = [" ".join((page.extract_text() or "").split()) for page in reader.pages]
+        combined = " ".join(pages)
+        self.assertIn("CERAI PREOPERATİF EKTAZİ RİSK DEĞERLENDİRMESİ", combined)
+        self.assertIn("GENEL KARAR", combined)
+        self.assertIn("UYGUN", combined)
+        for page in pages:
+            self.assertIn("Hüseyin Cengiz, MD tarafından geliştirilmiştir", page)
+
+    def test_turkish_word_uses_turkish_labels_and_footer(self):
+        payload = self._payload()
+        payload["locale"] = "tr"
+        document = Document(BytesIO(reports.build_docx(payload)))
+        body = " ".join(paragraph.text for paragraph in document.paragraphs)
+        table_text = " ".join(cell.text for table in document.tables for row in table.rows for cell in row.cells)
+        self.assertIn("CERAI PREOPERATİF EKTAZİ RİSK DEĞERLENDİRMESİ", body)
+        self.assertIn("GENEL KARAR", table_text)
+        for section in document.sections:
+            footer_text = " ".join(paragraph.text for paragraph in section.footer.paragraphs)
+            self.assertIn("Hüseyin Cengiz, MD tarafından geliştirilmiştir", footer_text)
+
+    def test_interface_has_persistent_english_turkish_selector_and_localized_exports(self):
+        root = Path(__file__).resolve().parents[1]
+        html = (root / "static" / "index.html").read_text()
+        i18n = (root / "static" / "i18n.js").read_text()
+        self.assertIn('data-language="en"', html)
+        self.assertIn('data-language="tr"', html)
+        self.assertIn('/static/i18n.js?v=1', html)
+        self.assertIn('locale:i18n.locale', html)
+        self.assertIn('localStorage.setItem("cerai-language"', i18n)
+        self.assertIn('"Case inputs":"Vaka girdileri"', i18n)
+
 
 class TestSurgeonTopographyReference(unittest.TestCase):
     def test_randleman_confirmation_includes_source_locked_reference(self):

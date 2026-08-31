@@ -211,7 +211,11 @@ def export_payload(payload):
         ready = session.get("ready")
         if not ready or not secrets.compare_digest(str(payload.get("report_token") or ""), ready["report_token"]):
             raise HTTPException(409, "Complete all required inputs and obtain a current ready assessment before exporting.")
-        return deepcopy(ready)
+        exported = deepcopy(ready)
+        # Locale is presentation-only and may be selected after the locked
+        # clinical assessment. Never copy decision data from the export request.
+        exported["locale"] = "tr" if str(payload.get("locale") or "").lower().startswith("tr") else "en"
+        return exported
 
 
 def install(core):
