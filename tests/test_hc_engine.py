@@ -6,12 +6,14 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import app
+import canonical_engine
 import reports
 from docx import Document
 from docx.shared import Pt
 from fastapi.testclient import TestClient
 from pypdf import PdfReader
+
+app = canonical_engine.core
 
 
 def normal_eye(eye="OD", pachy=560, morphology="NORMAL_SYMMETRIC"):
@@ -1399,7 +1401,7 @@ class TestAnalyzeLoadingStateUi(unittest.TestCase):
         self.assertIn('analyzeBtn.textContent="Analyzing images... Please wait"', html)
         self.assertIn('showFormMessage("Analyzing images... Please wait.")', html)
         self.assertIn("await allowLoadingStateToPaint()", html)
-        self.assertLess(html.index("await allowLoadingStateToPaint()"), html.index('fetch("/analyze"'))
+        self.assertLess(html.index("await allowLoadingStateToPaint()"), html.index('ceraiFetch("/analyze"'))
         self.assertIn("f.reportValidity()", html)
         self.assertIn('showFormMessage(`Analysis failed:', html)
 

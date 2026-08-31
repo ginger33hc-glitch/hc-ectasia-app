@@ -15,12 +15,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.13'
           cache: pip
       - name: Install dependencies
-        run: pip install -r requirements.txt pytest
+        run: pip install -r requirements-dev.txt
+      - name: Audit production dependencies
+        run: pip-audit -r requirements.txt
+      - name: Critical static checks
+        run: ruff check --select E9,F63,F7,F82 .
       - name: Compile decision-critical runtime modules
-        run: python -m py_compile app.py bootstrap.py hc_age_policy.py hc_bad_final_policy.py lasik_planning.py merge_policy_base.py extraction_guard.py erss_topography_guard.py randleman_bad_independence.py erss_visual_morphology_policy.py critical_score_highlight.py pachymetry_policy.py hc_final_decision_policy.py status_rank_policy.py inter_eye_tomography.py inter_eye_tomography_policy.py planning/microkeratome.py microkeratome_planning_policy.py canonical_engine.py reports.py report_export_guard.py clean_engine/policy.py clean_engine/decision.py clean_engine/surgery.py clean_engine/reconciliation.py clean_engine/input_adapter.py clean_engine/report_model.py clean_engine/service.py clean_engine/migration.py clean_engine/models.py clean_engine/engine.py clean_engine/status.py clean_engine/ablation.py clean_engine/prk.py clean_engine/hard_stops.py clean_engine/validation.py clean_engine/scoring.py clean_engine/calculation.py clean_engine/finalization.py clean_engine/microkeratome_planning.py clean_engine/__init__.py
+        run: python -m py_compile app.py bootstrap.py operational_security.py assessment_workflow.py hc_age_policy.py hc_bad_final_policy.py lasik_planning.py merge_policy_base.py extraction_guard.py erss_topography_guard.py randleman_bad_independence.py erss_visual_morphology_policy.py critical_score_highlight.py pachymetry_policy.py hc_final_decision_policy.py status_rank_policy.py inter_eye_tomography.py inter_eye_tomography_policy.py planning/microkeratome.py microkeratome_planning_policy.py canonical_engine.py reports.py report_export_guard.py clean_engine/policy.py clean_engine/decision.py clean_engine/surgery.py clean_engine/reconciliation.py clean_engine/input_adapter.py clean_engine/report_model.py clean_engine/service.py clean_engine/migration.py clean_engine/models.py clean_engine/engine.py clean_engine/status.py clean_engine/ablation.py clean_engine/prk.py clean_engine/hard_stops.py clean_engine/validation.py clean_engine/scoring.py clean_engine/calculation.py clean_engine/finalization.py clean_engine/microkeratome_planning.py clean_engine/__init__.py
       - name: Canonical startup invariants
         env:
           OPENAI_API_KEY: test-key-for-import-only
@@ -33,3 +37,11 @@ jobs:
         env:
           OPENAI_API_KEY: test-key-for-import-only
         run: python -m pytest -q
+      - name: Test files are independent of import order
+        env:
+          OPENAI_API_KEY: test-key-for-import-only
+        shell: bash
+        run: |
+          for test_file in tests/test_*.py; do
+            python -m pytest -q "$test_file"
+          done

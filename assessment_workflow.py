@@ -186,8 +186,11 @@ def begin(core, extracted, age, plans, modifiers, metadata):
     with _lock:
         _prune()
         if len(_sessions) >= MAX_SESSIONS:
-            oldest = min(_sessions, key=lambda token: _sessions[token]["expires"])
-            del _sessions[oldest]
+            raise HTTPException(
+                503,
+                "Assessment capacity is temporarily full. Existing active assessments were preserved; retry after an earlier session expires.",
+                headers={"Retry-After": "60"},
+            )
         token = secrets.token_urlsafe(32)
         session = {"extracted": deepcopy(extracted), "expires": monotonic() + TTL_SECONDS, "ready": None}
         _sessions[token] = session
