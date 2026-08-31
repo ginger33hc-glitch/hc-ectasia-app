@@ -320,11 +320,21 @@ def install(core: Any) -> None:
     core._cerai_reset_principal = reset_current_principal
     core._cerai_current_principal = current_principal
 
+    def audit(event_type: str, **kwargs) -> None:
+        callback = getattr(core, "_cerai_audit_event", None)
+        if callback is not None:
+            callback(event_type, **kwargs)
+
     if NAMED_USERS_ENABLED:
         @core.app.post("/auth/login")
         def login(payload: Dict[str, Any] = Body(...)):
             principal = authenticate_credentials(payload.get("username"), payload.get("password"))
             token = create_session(principal)
+            try:
+                audit("LOGIN_SUCCESS", actor=principal, details={"role": principal.role})
+            except Exception:
+                remove_session(token)
+                raise
             response = JSONResponse({"user": principal.public()})
             response.set_cookie(
                 SESSION_COOKIE,
@@ -339,7 +349,11 @@ def install(core: Any) -> None:
 
         @core.app.post("/auth/logout")
         def logout(request: Request):
-            remove_session(request.cookies.get(SESSION_COOKIE, ""))
+            token = request.cookies.get(SESSION_COOKIE, "")
+            principal = principal_for_token(token)
+            remove_session(token)
+            if principal is not None:
+                audit("LOGOUT", actor=principal)
             response = JSONResponse({"status": "SIGNED_OUT"})
             response.delete_cookie(SESSION_COOKIE, path="/")
             return response
