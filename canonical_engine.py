@@ -3,6 +3,8 @@
 Single supported composition point. Production and production-runtime tests must import this
 module rather than assembling policy wrappers independently.
 """
+import os
+
 import pachymetry_policy as _runtime
 import bootstrap
 import reports
@@ -27,7 +29,15 @@ reports.APP_VERSION = CANONICAL_VERSION
 nice_policy.install(core)
 assessment_workflow.install(core)
 operational_security.install(core)
-case_archive.install(core)
+
+# Keep archive provisioning inert until every bucket credential and encryption secret has been
+# configured and verified. REQUIRED=1 always implies enabled and deliberately fails closed.
+_archive_required = os.getenv("CERAI_ARCHIVE_REQUIRED", "0").strip() == "1"
+_archive_enabled = os.getenv("CERAI_ARCHIVE_ENABLED", "0").strip() == "1" or _archive_required
+if _archive_enabled:
+    case_archive.install(core)
+else:
+    case_archive.install(core, runtime=case_archive.CaseArchiveRuntime(None, required=False))
 
 # ERSS morphology auto-read cleanup must wrap the fully installed assessment workflow.
 # Keep it out of bootstrap so the production composition order remains explicit here.
