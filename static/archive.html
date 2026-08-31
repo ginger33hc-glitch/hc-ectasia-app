@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CER-AI Case Archive</title>
+  <meta name="theme-color" content="#05090d">
+  <style>
+    :root{--navy:#173b57;--blue:#1f5e8c;--ink:#17212b;--muted:#66717d;--line:#d9e0e6;--bg:#f4f6f8;--green:#176b3a;--amber:#9a5a00;--red:#a31212}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,sans-serif}.top{background:#05090d;color:#fff;padding:12px 20px}.top-inner{max-width:1180px;margin:auto;display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap}.brand{font-weight:800;letter-spacing:.4px}.user{font-size:12px;color:#d7e1e8;display:flex;gap:10px;align-items:center}.user button,.user a{font:inherit;color:#fff;background:#173b57;border:1px solid #56728a;border-radius:6px;padding:6px 9px;text-decoration:none;cursor:pointer}
+    main{max-width:1180px;margin:18px auto;padding:0 14px 40px}.card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:16px;margin:14px 0;box-shadow:0 1px 2px rgba(0,0,0,.03)}h1{font-size:22px;color:var(--navy);margin:0 0 5px}h2{font-size:16px;color:var(--navy);margin:0 0 12px}.sub{color:var(--muted);font-size:12px;margin:0 0 14px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}.field label{display:block;font-weight:700;font-size:12px;margin-bottom:5px;color:var(--navy)}input,select{width:100%;padding:9px;border:1px solid #bcc8d1;border-radius:6px;background:#fff}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}button{border:0;border-radius:7px;padding:9px 12px;background:var(--navy);color:#fff;font-weight:700;cursor:pointer}button.secondary{background:#fff;color:var(--navy);border:1px solid var(--navy)}button:disabled{opacity:.6;cursor:wait}
+    .status{min-height:20px;font-size:12px;margin-top:10px;color:var(--muted)}.error{color:var(--red);font-weight:700}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:8px}table{width:100%;border-collapse:collapse;min-width:980px}th,td{border-bottom:1px solid var(--line);padding:8px;text-align:left;font-size:11px;vertical-align:top}th{background:#eef3f6;color:var(--navy);position:sticky;top:0}tr:last-child td{border-bottom:0}.decision{font-weight:800}.decision.pass{color:var(--green)}.decision.caution{color:var(--amber)}.decision.stop{color:var(--red)}.links{display:flex;gap:5px;flex-wrap:wrap}.links a{font-size:10px;padding:5px 7px;border:1px solid #9db3c3;border-radius:5px;color:var(--blue);text-decoration:none;background:#fff}.owner-only[hidden]{display:none!important}.audit-box{max-height:330px;overflow:auto;background:#f7f9fb;border:1px solid var(--line);border-radius:8px;padding:9px}.audit-item{padding:8px;border-bottom:1px solid var(--line);font-size:11px}.audit-item:last-child{border-bottom:0}.mono{font-family:Consolas,monospace;word-break:break-all}@media(max-width:800px){.grid{grid-template-columns:1fr}.top-inner{align-items:flex-start}}
+  </style>
+</head>
+<body>
+<header class="top"><div class="top-inner"><div class="brand">CER-AI · Case Archive</div><div class="user"><span id="userLabel">Loading…</span><a href="/">Clinical workspace</a><button id="logoutButton" type="button">Sign out</button></div></div></header>
+<main>
+  <section class="card">
+    <h1>Archived cases</h1>
+    <p id="scopeNote" class="sub">Search archived case revisions.</p>
+    <form id="searchForm">
+      <div class="grid">
+        <div class="field"><label for="patient_name">Patient name</label><input id="patient_name" autocomplete="off"></div>
+        <div class="field"><label for="patient_id">Patient ID</label><input id="patient_id" autocomplete="off"></div>
+        <div class="field"><label for="report_date">Report date</label><input id="report_date" placeholder="YYYY-MM-DD" autocomplete="off"></div>
+        <div class="field"><label for="decision">Decision</label><input id="decision" placeholder="PASS / CAUTION / DO NOT PROCEED" autocomplete="off"></div>
+        <div class="field"><label for="reviewer">Reviewer</label><input id="reviewer" autocomplete="off"></div>
+        <div class="field"><label for="limit">Maximum results</label><select id="limit"><option>50</option><option selected>100</option><option>250</option><option>500</option></select></div>
+      </div>
+      <div class="actions"><button id="searchButton" type="submit">Search</button><button id="clearButton" class="secondary" type="button">Clear</button></div>
+      <div id="searchStatus" class="status" aria-live="polite"></div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Results</h2>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Patient</th><th>ID</th><th>Decision</th><th>Reviewer</th><th>Created by</th><th>Revision</th><th>Reports</th></tr></thead><tbody id="resultsBody"><tr><td colspan="8">Run a search to list cases.</td></tr></tbody></table></div>
+  </section>
+
+  <section id="ownerTools" class="card owner-only" hidden>
+    <h2>Owner tools</h2>
+    <p class="sub">Research export is pseudonymized and excludes direct identifiers. Audit records remain encrypted in the clinical archive.</p>
+    <div class="actions"><button id="researchLatest" type="button">Research CSV · latest revisions</button><button id="researchAll" class="secondary" type="button">Research CSV · all revisions</button><button id="auditButton" class="secondary" type="button">Load recent audit events</button></div>
+    <div id="ownerStatus" class="status" aria-live="polite"></div>
+    <div id="auditBox" class="audit-box" hidden></div>
+  </section>
+</main>
+<script>
+(() => {
+  let currentUser = null;
+  const $ = id => document.getElementById(id);
+  const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
+  const request = async (url, options={}) => {
+    const response = await fetch(url, {credentials:"same-origin", cache:"no-store", ...options});
+    if (response.status === 401) {
+      window.location.replace("/auth/login-page?next=/archive-ui");
+      throw new Error("Session expired.");
+    }
+    return response;
+  };
+  const readError = async response => {
+    try { const data = await response.json(); return data.detail || `Request failed (${response.status}).`; }
+    catch (_) { return `Request failed (${response.status}).`; }
+  };
+  const decisionClass = value => {
+    const text = String(value || "").toUpperCase();
+    if (text.includes("DO NOT") || text.includes("STOP") || text.includes("FAIL")) return "stop";
+    if (text.includes("CAUTION") || text.includes("REVIEW")) return "caution";
+    if (text.includes("PASS")) return "pass";
+    return "";
+  };
+  const reportLinks = entry => {
+    const c = encodeURIComponent(entry.case_id), r = encodeURIComponent(entry.revision_id);
+    const base = `/archive/cases/${c}/revisions/${r}`;
+    return `<div class="links">
+      <a href="${base}/report/pdf?locale=en">Original PDF EN</a><a href="${base}/report/pdf?locale=tr">Original PDF TR</a>
+      <a href="${base}/report/docx?locale=en">Original DOCX EN</a><a href="${base}/report/docx?locale=tr">Original DOCX TR</a>
+      <a href="${base}/regenerate/pdf?locale=en">Regenerate PDF EN</a><a href="${base}/regenerate/pdf?locale=tr">Regenerate PDF TR</a>
+      <a href="${base}/regenerate/docx?locale=en">Regenerate DOCX EN</a><a href="${base}/regenerate/docx?locale=tr">Regenerate DOCX TR</a>
+    </div>`;
+  };
+  const renderResults = results => {
+    const body = $("resultsBody");
+    if (!results.length) { body.innerHTML = `<tr><td colspan="8">No matching archived cases.</td></tr>`; return; }
+    body.innerHTML = results.map(entry => {
+      const patient = entry.patient || {}, decision = entry.decision || {}, creator = entry.created_by || {};
+      return `<tr>
+        <td>${escapeHtml(entry.report_date || "")}</td>
+        <td>${escapeHtml(patient.name || "")}</td>
+        <td>${escapeHtml(patient.id || "")}</td>
+        <td><span class="decision ${decisionClass(decision.status)}">${escapeHtml(decision.status || "")}</span></td>
+        <td>${escapeHtml(entry.reviewer || "")}</td>
+        <td>${escapeHtml(creator.display_name || (creator.user_id ? creator.user_id : "Legacy / unassigned"))}</td>
+        <td class="mono">${escapeHtml(entry.revision_id || "")}</td>
+        <td>${reportLinks(entry)}</td>
+      </tr>`;
+    }).join("");
+  };
+  const search = async () => {
+    const status = $("searchStatus");
+    status.className = "status"; status.textContent = "Searching…";
+    $("searchButton").disabled = true;
+    const payload = {};
+    ["patient_name","patient_id","report_date","decision","reviewer"].forEach(id => { const value = $(id).value.trim(); if (value) payload[id] = value; });
+    payload.limit = Number($("limit").value);
+    try {
+      const response = await request("/archive/search", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
+      if (!response.ok) throw new Error(await readError(response));
+      const data = await response.json();
+      renderResults(data.results || []);
+      status.textContent = `${data.count || 0} archived revision(s) found.`;
+    } catch (exc) { status.className = "status error"; status.textContent = exc.message || "Archive search failed."; }
+    finally { $("searchButton").disabled = false; }
+  };
+  const downloadResearch = async latestOnly => {
+    const status = $("ownerStatus"); status.className="status"; status.textContent="Preparing research CSV…";
+    try {
+      const response = await request("/archive/research/export.csv", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({latest_only:latestOnly})});
+      if (!response.ok) throw new Error(await readError(response));
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href=url; a.download="CER-AI_research_export.csv"; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      status.textContent="Research CSV generated.";
+    } catch (exc) { status.className="status error"; status.textContent=exc.message || "Research export failed."; }
+  };
+  const loadAudit = async () => {
+    const status=$("ownerStatus"), box=$("auditBox"); status.className="status"; status.textContent="Loading audit records…";
+    try {
+      const response=await request("/archive/audit/search", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({limit:200})});
+      if(!response.ok) throw new Error(await readError(response));
+      const data=await response.json(); const events=data.events||[];
+      box.hidden=false; box.innerHTML=events.length ? events.map(item => `<div class="audit-item"><strong>${escapeHtml(item.event_type||"")}</strong> · ${escapeHtml(item.occurred_at_utc||"")}<br>${escapeHtml((item.actor||{}).display_name||"")} ${item.case_id?`· case <span class="mono">${escapeHtml(item.case_id)}</span>`:""}</div>`).join("") : "No audit records.";
+      status.textContent=`${events.length} audit event(s) loaded.`;
+    } catch(exc){status.className="status error";status.textContent=exc.message||"Audit search failed.";}
+  };
+
+  $("searchForm").addEventListener("submit", e => { e.preventDefault(); search(); });
+  $("clearButton").addEventListener("click", () => { ["patient_name","patient_id","report_date","decision","reviewer"].forEach(id => $(id).value=""); $("limit").value="100"; renderResults([]); $("searchStatus").textContent=""; });
+  $("logoutButton").addEventListener("click", async () => { try { await fetch("/auth/logout", {method:"POST",credentials:"same-origin",cache:"no-store"}); } finally { window.location.replace("/auth/login-page"); } });
+  $("researchLatest").addEventListener("click", () => downloadResearch(true));
+  $("researchAll").addEventListener("click", () => downloadResearch(false));
+  $("auditButton").addEventListener("click", loadAudit);
+
+  request("/auth/me").then(async response => {
+    if (!response.ok) throw new Error(await readError(response));
+    const data = await response.json(); currentUser=data.user;
+    $("userLabel").textContent=`${currentUser.display_name} · ${currentUser.role}`;
+    $("scopeNote").textContent=currentUser.role==="OWNER" ? "OWNER scope: all archived cases and legacy/unassigned cases." : "DOCTOR scope: only cases created under your account.";
+    if(currentUser.role==="OWNER") $("ownerTools").hidden=false;
+    search();
+  }).catch(exc => { $("searchStatus").className="status error"; $("searchStatus").textContent=exc.message||"Unable to load account."; });
+})();
+</script>
+</body>
+</html>
