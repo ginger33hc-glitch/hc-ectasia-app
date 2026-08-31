@@ -5,25 +5,28 @@ from fastapi.testclient import TestClient
 
 import named_user_ui
 import operational_security
-
-
-class Principal:
-    def __init__(self, display_name="Doctor <One>"):
-        self.display_name = display_name
+import user_access
 
 
 def make_client():
     app = FastAPI()
+    principal = user_access.Principal("doctor-1", "doctor", "Doctor <One>", "DOCTOR")
 
     def authenticate(request):
         if request.cookies.get("cer_ai_session") == "valid":
-            return Principal()
+            return principal
         return None
 
     core = SimpleNamespace(
         app=app,
         _cerai_named_users_enabled=True,
         _cerai_authenticate_request=authenticate,
+        _cerai_bind_principal=user_access.bind_current_principal,
+        _cerai_reset_principal=user_access.reset_current_principal,
+        _cerai_case_archive_runtime=SimpleNamespace(enabled=True),
+        _cerai_audit_log_installed=True,
+        _cerai_historical_report_installed=True,
+        _cerai_research_export_enabled=False,
     )
     operational_security.install(core)
     named_user_ui.install(core)
@@ -70,8 +73,27 @@ def test_archive_page_requires_session_and_contains_role_aware_tools():
     allowed = client.get("/archive-ui")
     assert allowed.status_code == 200
     assert "/archive/search" in allowed.text
+    assert "/archive/capabilities" in allowed.text
     assert "/archive/research/export.csv" in allowed.text
     assert "/archive/audit/search" in allowed.text
     assert "Original PDF EN" in allowed.text
     assert "Regenerate PDF EN" in allowed.text
     assert allowed.headers["cache-control"] == "no-store"
+
+
+def test_archive_capabilities_are_session_protected_and_role_aware():
+    client, _core = make_client()
+    denied = client.get("/archive/capabilities")
+    assert denied.status_code == 401
+    client.cookies.set("cer_ai_session", "valid")
+    allowed = client.get("/archive/capabilities")
+    assert allowed.status_code == 200
+    payload = allowed.json()
+    assert payload == {
+        "role": "DOCTOR",
+        "archive_enabled": True,
+        "audit_enabled": True,
+        "historical_report_enabled": True,
+        "research_export_enabled": False,
+    }
+    assert user_access.current_principal() is None
