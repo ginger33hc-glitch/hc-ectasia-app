@@ -231,6 +231,11 @@ def install(core: Any, archive_runtime: Any) -> None:
     previous_complete = assessment_workflow.complete
     export_payload = assessment_workflow.export_payload
 
+    def audit(event_type: str, **kwargs) -> None:
+        callback = getattr(core, "_cerai_audit_event", None)
+        if callback is not None:
+            callback(event_type, **kwargs)
+
     def catalog_if_ready(response: Dict[str, Any]) -> Dict[str, Any]:
         if not archive_runtime.enabled or response.get("workflow_status") != "READY":
             return response
@@ -250,14 +255,25 @@ def install(core: Any, archive_runtime: Any) -> None:
                 "locale": "en",
             })
             revision = RevisionRef(case_id=case_id, revision_id=revision_id, artifacts=tuple())
+            actor = user_access.current_principal()
             ref = write_entry(
                 archive_runtime.archive,
                 revision,
                 ready,
-                actor=user_access.current_principal(),
+                actor=actor,
             )
             response["archive"]["catalog_status"] = "INDEXED"
             response["archive"]["catalog_sha256"] = ref.sha256
+            audit(
+                "CASE_ARCHIVED",
+                actor=actor,
+                case_id=case_id,
+                revision_id=revision_id,
+                details={
+                    "decision": (ready.get("decision") or {}).get("status"),
+                    "report_date": (ready.get("patient") or {}).get("report_date"),
+                },
+            )
         except Exception as exc:
             archive_runtime.fail_or_continue(exc)
             response["archive"]["catalog_status"] = "UNAVAILABLE"
@@ -292,6 +308,15 @@ def install(core: Any, archive_runtime: Any) -> None:
             if principal.role == "DOCTOR":
                 filters["created_by_user_id"] = principal.user_id
             results = search_entries(archive_runtime.archive, **filters)
+            audit(
+                "ARCHIVE_SEARCH",
+                actor=principal,
+                details={
+                    "filters": {key: payload.get(key) for key in allowed if key in payload},
+                    "result_count": len(results),
+                    "scope": "ALL_CASES" if principal.role == "OWNER" else "OWN_CASES",
+                },
+            )
             return {"results": results, "count": len(results)}
 
         @core.app.get("/archive/cases/{case_id}/revisions/{revision_id}/report/{kind}")
@@ -311,6 +336,13 @@ def install(core: Any, archive_runtime: Any) -> None:
             if ref is None:
                 raise HTTPException(404, "Archived CER-AI report not found.")
             content = archive_runtime.archive.get_bytes(ref)
+            audit(
+                "REPORT_DOWNLOAD",
+                actor=principal,
+                case_id=case_id,
+                revision_id=revision_id,
+                details={"kind": kind, "locale": locale},
+            )
             if kind == "pdf":
                 media_type = "application/pdf"
                 filename = "CER-AI_Report.pdf"
