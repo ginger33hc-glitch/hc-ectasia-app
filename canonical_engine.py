@@ -24,6 +24,7 @@ import audit_log
 import case_catalog
 import historical_report
 import research_export
+import named_user_ui
 
 core = bootstrap.core
 app = _runtime.app
@@ -51,6 +52,7 @@ audit_log.install(core, _archive_runtime)
 case_catalog.install(core, _archive_runtime)
 historical_report.install(core, _archive_runtime)
 research_export.install(core, _archive_runtime)
+named_user_ui.install(core)
 
 # ERSS morphology auto-read cleanup must wrap the fully installed assessment workflow.
 # Keep it out of bootstrap so the production composition order remains explicit here.
@@ -99,6 +101,7 @@ def runtime_invariants():
     if not getattr(core,"_cerai_case_catalog_installed",False):errors.append("Encrypted case catalog boundary is not active")
     if not getattr(core,"_cerai_historical_report_installed",False):errors.append("Historical report regeneration boundary is not active")
     if not getattr(core,"_cerai_research_export_installed",False):errors.append("Research export boundary is not active")
+    if not getattr(core,"_cerai_named_user_ui_installed",False):errors.append("Named-user archive UI boundary is not active")
     if not getattr(core,"_erss_topography_evidence_policy_installed",False):errors.append("ERSS I-S/topography evidence gate is not active")
     if not getattr(core,"_erss_auto_read_policy_installed",False):errors.append("ERSS morphology auto-read separation policy is not active")
     if getattr(core.lasik_topography_points, "__module__", None) != "app":errors.append("ERSS evidence gate must not replace or duplicate the canonical topography point mapper")
