@@ -1,9 +1,8 @@
-"""Minimal named-user web UI routing without changing the clinical frontend source file.
+"""Named-user web UI routing kept outside the clinical frontend and decision engine.
 
 When named-user authentication is enabled, unauthenticated visits to the main application or archive
 page are redirected to a dedicated login page. The existing clinical HTML is served unchanged except
-for a small authenticated navigation/session script injected at response time, keeping the clinical UI
-source and clinical engine isolated from authentication concerns.
+for a small authenticated navigation/session script injected at response time.
 """
 
 from __future__ import annotations
@@ -51,13 +50,23 @@ def install(core: Any) -> None:
     enabled = bool(getattr(core, "_cerai_named_users_enabled", False))
 
     if enabled:
+        import operational_security
+
         @core.app.get("/auth/login-page", include_in_schema=False)
         def login_page():
-            return FileResponse(LOGIN_HTML, media_type="text/html")
+            return FileResponse(
+                LOGIN_HTML,
+                media_type="text/html",
+                headers={"Cache-Control": "no-store"},
+            )
 
         @core.app.get("/archive-ui", include_in_schema=False)
         def archive_page():
-            return FileResponse(ARCHIVE_HTML, media_type="text/html")
+            return FileResponse(
+                ARCHIVE_HTML,
+                media_type="text/html",
+                headers={"Cache-Control": "no-store"},
+            )
 
         @core.app.middleware("http")
         async def named_user_page_gate(request, call_next):
@@ -66,12 +75,16 @@ def install(core: Any) -> None:
                 principal = core._cerai_authenticate_request(request)
                 if principal is None:
                     destination = "/auth/login-page?next=" + quote(path, safe="/")
-                    return RedirectResponse(destination, status_code=303)
+                    return operational_security._secure_response(
+                        RedirectResponse(destination, status_code=303),
+                        path,
+                    )
                 if path == "/":
-                    return HTMLResponse(
+                    response = HTMLResponse(
                         _authenticated_root_html(principal.display_name),
                         headers={"Cache-Control": "no-store"},
                     )
+                    return operational_security._secure_response(response, path)
             return await call_next(request)
 
     core._cerai_named_user_ui_installed = True
