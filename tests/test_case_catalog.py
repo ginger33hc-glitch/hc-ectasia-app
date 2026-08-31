@@ -3,6 +3,7 @@ import json
 
 import case_archive
 import case_catalog
+import user_access
 
 
 KEY = bytes(range(32))
@@ -43,6 +44,14 @@ def ready_payload(
 
 def revision(case_id, revision_id="a" * 24):
     return case_archive.RevisionRef(case_id, revision_id, tuple())
+
+
+def doctor(user_id="doctor-1"):
+    return user_access.Principal(user_id, user_id, "Doctor One", "DOCTOR")
+
+
+def owner():
+    return user_access.Principal("owner-1", "owner", "Owner", "OWNER")
 
 
 def test_catalog_entry_contains_search_fields_and_orders_eyes_od_first():
@@ -130,3 +139,46 @@ def test_search_limit_is_bounded():
         payload = deepcopy(ready_payload(patient_id=f"P-{index}"))
         case_catalog.write_entry(archive, revision(case_id, revision_id), payload)
     assert len(case_catalog.search_entries(archive, limit=2)) == 2
+
+
+def test_authenticated_creator_is_encrypted_in_catalog_and_filterable_by_user_id():
+    archive = make_archive()
+    actor = doctor("doctor-7")
+    ref = case_catalog.write_entry(
+        archive,
+        revision("b" * 32, "c" * 24),
+        ready_payload(),
+        actor=actor,
+    )
+    assert "doctor-7" not in ref.key
+    stored = archive.store.get(ref.key)
+    assert "doctor-7" not in " ".join(stored.metadata.values())
+    matches = case_catalog.search_entries(archive, created_by_user_id="doctor-7")
+    assert len(matches) == 1
+    assert matches[0]["created_by"]["user_id"] == "doctor-7"
+
+
+def test_owner_sees_all_doctor_only_own_and_legacy_is_owner_only():
+    own_entry = case_catalog.build_entry(
+        ready_payload(),
+        case_id="d" * 32,
+        revision_id="e" * 24,
+        actor=doctor("doctor-1"),
+    )
+    other_entry = case_catalog.build_entry(
+        ready_payload(),
+        case_id="f" * 32,
+        revision_id="1" * 24,
+        actor=doctor("doctor-2"),
+    )
+    legacy_entry = case_catalog.build_entry(
+        ready_payload(),
+        case_id="2" * 32,
+        revision_id="3" * 24,
+    )
+    assert case_catalog._principal_can_access(owner(), own_entry)
+    assert case_catalog._principal_can_access(owner(), other_entry)
+    assert case_catalog._principal_can_access(owner(), legacy_entry)
+    assert case_catalog._principal_can_access(doctor("doctor-1"), own_entry)
+    assert not case_catalog._principal_can_access(doctor("doctor-1"), other_entry)
+    assert not case_catalog._principal_can_access(doctor("doctor-1"), legacy_entry)
