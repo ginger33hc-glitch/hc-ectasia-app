@@ -1,16 +1,20 @@
-"""Composition root for CERAI runtime policy modules."""
-import importlib
+from importlib import import_module
 
-# Import app first so every policy module patches the same canonical module object.
-import app as core
+# Canonical runtime module.
+core = import_module("app")
 
-# Runtime policy modules. Order matters where wrappers are layered.
-import extraction_guard  # noqa: F401
-import erss_topography_guard  # noqa: F401
-import erss_visual_morphology_policy  # noqa: F401
-import randleman_bad_independence  # noqa: F401
-import nice_policy  # noqa: F401
-import erss_auto_read_policy  # noqa: F401
-import assessment_workflow  # noqa: F401
+# Install policy modules in the established order.  Each module patches the same
+# canonical app module object; this file is intentionally small so start.py and
+# tests import a single composed runtime.
+for module_name in (
+    "extraction_guard",
+    "erss_topography_guard",
+    "erss_visual_morphology_policy",
+    "randleman_bad_independence",
+    "nice_policy",
+    "erss_auto_read_policy",
+    "assessment_workflow",
+):
+    import_module(module_name)
 
 __all__ = ["core"]
