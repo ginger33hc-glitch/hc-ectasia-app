@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 from collections import deque
 from contextlib import asynccontextmanager
+import hashlib
 import os
 import secrets
 from threading import RLock
@@ -45,7 +46,17 @@ ANALYSIS_QUEUE_TIMEOUT_SECONDS = max(
 )
 
 ACCESS_KEY = os.getenv("CERAI_ACCESS_KEY", "").strip()
-REQUIRE_ACCESS_KEY = os.getenv("CERAI_REQUIRE_ACCESS_KEY", "0").strip() == "1"
+# Railway does not expose a usable password-entry workflow for this project.  The
+# fallback stores only a salted PBKDF2 verifier; the access key itself is never
+# committed.  A deployment secret still takes precedence when one is available.
+EMBEDDED_ACCESS_KEY_HASH = (
+    "pbkdf2_sha256$600000$45af5e97bcbf0cb878b3ac0ceccc7258$"
+    "16dad2560cb1deef49e5c916e6da9953bdf382ac14fe2d991912eedf09748d57"
+)
+ACCESS_KEY_HASH = os.getenv("CERAI_ACCESS_KEY_HASH", EMBEDDED_ACCESS_KEY_HASH).strip()
+REQUIRE_ACCESS_KEY = os.getenv(
+    "CERAI_REQUIRE_ACCESS_KEY", "1" if (ACCESS_KEY or ACCESS_KEY_HASH) else "0"
+).strip() == "1"
 EXPOSE_API_DOCS = os.getenv("CERAI_EXPOSE_API_DOCS", "0").strip() == "1"
 PROTECTED_PATHS = frozenset({
     "/analyze",
@@ -140,9 +151,47 @@ async def read_uploads(images: list[UploadFile]) -> list[tuple[bytes, str]]:
     return payloads
 
 
+def _verify_access_key_hash(supplied: str, encoded: str) -> bool:
+    try:
+        algorithm, iterations_text, salt_hex, expected_hex = encoded.split("$", 3)
+        iterations = int(iterations_text)
+        if algorithm != "pbkdf2_sha256" or not 100_000 <= iterations <= 2_000_000:
+            return False
+        salt = bytes.fromhex(salt_hex)
+        expected = bytes.fromhex(expected_hex)
+        if len(salt) < 16 or len(expected) != 32:
+            return False
+    except (TypeError, ValueError):
+        return False
+    actual = hashlib.pbkdf2_hmac(
+        "sha256", supplied.encode("utf-8"), salt, iterations, dklen=len(expected)
+    )
+    return secrets.compare_digest(actual, expected)
+
+
+def _access_key_hash_well_formed(encoded: str) -> bool:
+    try:
+        algorithm, iterations_text, salt_hex, expected_hex = encoded.split("$", 3)
+        iterations = int(iterations_text)
+        salt = bytes.fromhex(salt_hex)
+        expected = bytes.fromhex(expected_hex)
+    except (TypeError, ValueError):
+        return False
+    return (
+        algorithm == "pbkdf2_sha256"
+        and 100_000 <= iterations <= 2_000_000
+        and len(salt) >= 16
+        and len(expected) == 32
+    )
+
+
 def _access_key_valid(request: Request) -> bool:
     supplied = request.headers.get("X-CERAI-Access-Key", "")
-    return bool(ACCESS_KEY) and secrets.compare_digest(supplied, ACCESS_KEY)
+    if not supplied:
+        return False
+    if ACCESS_KEY:
+        return secrets.compare_digest(supplied, ACCESS_KEY)
+    return bool(ACCESS_KEY_HASH) and _verify_access_key_hash(supplied, ACCESS_KEY_HASH)
 
 
 def _request_limit(path: str) -> int:
@@ -182,12 +231,14 @@ def install(core) -> None:
     """Install once around the fully assembled FastAPI application."""
     if getattr(core, "_cerai_operational_security_installed", False):
         return
-    if REQUIRE_ACCESS_KEY and not ACCESS_KEY:
+    if REQUIRE_ACCESS_KEY and not (ACCESS_KEY or ACCESS_KEY_HASH):
         raise RuntimeError(
-            "CERAI_REQUIRE_ACCESS_KEY=1 but CERAI_ACCESS_KEY is not configured."
+            "CERAI_REQUIRE_ACCESS_KEY=1 but no access-key verifier is configured."
         )
     if ACCESS_KEY and len(ACCESS_KEY) < 20:
         raise RuntimeError("CERAI_ACCESS_KEY must contain at least 20 characters.")
+    if ACCESS_KEY_HASH and not _access_key_hash_well_formed(ACCESS_KEY_HASH):
+        raise RuntimeError("CERAI_ACCESS_KEY_HASH has an invalid or unsupported format.")
 
     _remove_public_documentation_routes(core.app)
 
@@ -209,7 +260,7 @@ def install(core) -> None:
                         status_code=400,
                         content={"detail": "Invalid Content-Length header."},
                     ), path)
-            if ACCESS_KEY and not _access_key_valid(request):
+            if REQUIRE_ACCESS_KEY and not _access_key_valid(request):
                 return _secure_response(JSONResponse(
                     status_code=401,
                     content={"detail": "CER-AI access key required."},

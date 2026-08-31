@@ -19,7 +19,7 @@ import operational_security
 
 core = bootstrap.core
 app = _runtime.app
-CANONICAL_VERSION = "0.7.54"
+CANONICAL_VERSION = "0.7.55"
 core.APP_VERSION = CANONICAL_VERSION
 core.app.title = f"CER-AI v{CANONICAL_VERSION}"
 reports.APP_VERSION = CANONICAL_VERSION
