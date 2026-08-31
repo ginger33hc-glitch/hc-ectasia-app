@@ -14,6 +14,8 @@ import re
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
+from fastapi import Body, HTTPException
+
 from case_archive import EncryptedArchive
 
 
@@ -86,6 +88,8 @@ def list_events(
     limit: int = 500,
 ) -> list[Dict[str, Any]]:
     limit = max(1, min(int(limit), 2000))
+    if case_id is not None and not re.fullmatch(r"[0-9a-f]{32}", str(case_id)):
+        raise ValueError("Audit case_id filter must be a 32-character hexadecimal identifier.")
     prefix = f"cases/{case_id}/audit/" if case_id else "cases/"
     requested_type = str(event_type or "").strip().upper()
     requested_actor = str(actor_user_id or "").strip()
@@ -113,7 +117,7 @@ def list_events(
 
 
 def install(core: Any, archive_runtime: Any) -> None:
-    """Expose a fail-aware audit callback that uses the same encrypted archive backend."""
+    """Expose fail-aware audit writes and an OWNER-only audit review API."""
     if getattr(core, "_cerai_audit_log_installed", False):
         return
 
@@ -128,4 +132,39 @@ def install(core: Any, archive_runtime: Any) -> None:
 
     core._cerai_audit_event = audit_event
     core._cerai_audit_log_runtime = archive_runtime
+
+    if bool(getattr(core, "_cerai_named_users_enabled", False)):
+        import user_access
+
+        @core.app.post("/archive/audit/search")
+        def search_audit(payload: Dict[str, Any] = Body(default={})):
+            principal = user_access.require_current_principal()
+            if principal.role != "OWNER":
+                raise HTTPException(403, "Only the CER-AI OWNER role may review audit records.")
+            if not archive_runtime.enabled:
+                raise HTTPException(503, "CER-AI secure archive is not enabled.")
+            allowed = {"case_id", "event_type", "actor_user_id", "limit"}
+            unknown = set(payload) - allowed
+            if unknown:
+                raise HTTPException(422, "Unsupported audit search field(s): " + ", ".join(sorted(unknown)))
+            try:
+                events = list_events(
+                    archive_runtime.archive,
+                    case_id=payload.get("case_id"),
+                    event_type=payload.get("event_type"),
+                    actor_user_id=payload.get("actor_user_id"),
+                    limit=payload.get("limit", 500),
+                )
+            except (TypeError, ValueError) as exc:
+                raise HTTPException(422, str(exc)) from exc
+            audit_event(
+                "AUDIT_VIEW",
+                actor=principal,
+                details={
+                    "filters": {key: payload.get(key) for key in allowed if key in payload},
+                    "result_count": len(events),
+                },
+            )
+            return {"events": events, "count": len(events)}
+
     core._cerai_audit_log_installed = True
