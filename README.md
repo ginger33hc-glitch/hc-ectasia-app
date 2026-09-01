@@ -60,8 +60,9 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
   box in the browser, print, PDF, and DOCX reports.
 - Complete machine-readable extraction and decision records remain available for audit.
 - A status-independent post-assessment ML7 planning module runs only after favorable LASIK results
-  (`PASS` or `PASS WITH CAUTION`). It extracts labeled K1/K2 axes and corneal diameter/W2W when
-  available, applies the active Turkish ML7 vacuum-ring/blade reference, and applies the CER-AI
+  (`PASS` or `PASS WITH CAUTION`). It extracts labeled K1/K2 axes and the Pentacam horizontal
+  white-to-white (HWTW) value when available, applies the active Turkish ML7 vacuum-ring/blade
+  reference, and applies the CER-AI
   `steep K − flat K >4.00 D` hinge rule. The perpendicular-to-steep-axis hinge is primary; a
   `+10` temporal/nasal alternative is shown only as an anatomy-dependent contingency when projected
   RSB remains `>=300 µm` and projected PTA remains `<40%`. The module cannot change the ectasia status.
