@@ -12,7 +12,8 @@ import secrets
 from fastapi import HTTPException, Body, Response
 from nice_scoring import finite
 from pentacam_field_registry import COMPLETION_NUMERIC_FIELDS
-from pentacam_source_regions import region_hint, region_hints
+from pentacam_quality_policy import is_quality_only_issue
+from pentacam_source_regions import region_hints
 
 _lock = RLock()
 _sessions = {}
@@ -22,7 +23,6 @@ MAX_SESSIONS = 64
 NUMERIC_FIELDS = COMPLETION_NUMERIC_FIELDS
 PATTERNS = {"anterior_pattern": ["REASSURING", "BORDERLINE", "ABNORMAL"],
             "posterior_pattern": ["REASSURING", "BORDERLINE", "ABNORMAL"]}
-SOURCE_CONFIRMATIONS = {"pentacam_qs": ["OK"]}
 
 
 def _prune():
@@ -40,9 +40,14 @@ def _session(token):
 
 
 def missing_items(decision):
-    items = [("GLOBAL", str(x)) for x in decision.get("critical_input_issues") or []]
+    items = [
+        ("GLOBAL", str(x)) for x in decision.get("critical_input_issues") or []
+        if not is_quality_only_issue(x)
+    ]
     for eye in decision.get("eyes") or []:
         for message in eye.get("missing") or []:
+            if is_quality_only_issue(message):
+                continue
             text = str(message)
             normalized = text.lower()
             if normalized == "age" or "age within" in normalized:
@@ -64,12 +69,6 @@ def completion_items(items, plans):
             underlying = message_text.split(" extraction validation: ", 1)[1]
             if (audit_eye, underlying) in items:
                 continue
-        if (
-            eye == "GLOBAL"
-            and message_text.startswith("Pentacam acquisition requires a same-exam explicit QS: OK")
-            and any(item_eye in {"OD", "OS"} and item_message == "explicit Pentacam QS: OK" for item_eye, item_message in items)
-        ):
-            continue
         plan = plans.get(eye, {}) if eye in {"OD", "OS"} else {}
         intended_supplied = any(plan.get(field) is not None for field in (
             "intended_entered_sphere_D", "intended_cylinder_signed_D",
@@ -119,29 +118,6 @@ def _request(eye, message, extracted):
             "key": "surgeon_topography_category",
             "kind": "form",
             "form_id": f"{prefix}_surgeon_topography",
-        }, extracted)
-    if message == "explicit Pentacam QS: OK":
-        candidate = _with_region({
-            **item,
-            "key": "pentacam_qs",
-            "label": "Explicitly printed Pentacam QS",
-            "kind": "select",
-            "destination": "source_confirmation",
-            "options": SOURCE_CONFIRMATIONS["pentacam_qs"],
-        }, extracted)
-        if candidate.get("source_region"):
-            return candidate
-        return {
-            **item,
-            "label": "Explicit Pentacam QS: OK is required from the source image",
-            "help": "This cannot be completed by typing. Upload a source image that visibly shows QS: OK.",
-        }
-    if message == "adequate-quality tomography/topography":
-        return _with_region({
-            **item,
-            "key": "source_quality",
-            "label": "A clearer/correct Pentacam or topography source image is required",
-            "help": "This cannot be completed by typing. Replace the displayed limited/inadequate source image.",
         }, extracted)
     for term, suffix in (("manifest sphere", "manifest_sphere"), ("manifest cylinder magnitude", "manifest_cylinder"),
                          ("intended sphere", "sphere"), ("intended cylinder magnitude", "cylinder"),
@@ -202,19 +178,6 @@ def _overrides(extracted, overrides):
             elif key in PATTERNS:
                 if value not in PATTERNS[key]:
                     raise HTTPException(422, f"Invalid {key}.")
-            elif key in SOURCE_CONFIRMATIONS:
-                if value not in SOURCE_CONFIRMATIONS[key]:
-                    raise HTTPException(422, f"Invalid {key} source confirmation.")
-                hint = region_hint(working, eye["eye"], key)
-                if not hint:
-                    raise HTTPException(422, f"{eye['eye']} {key}: localized source evidence is required.")
-                source_file = hint.get("file")
-                matching_contexts = [
-                    context for context in working.get("document_contexts") or []
-                    if context.get("source_filename") == source_file
-                ]
-                if any(context.get("pentacam_qs") == "NOT_OK" for context in matching_contexts):
-                    raise HTTPException(422, "A visibly non-OK Pentacam QS cannot be overridden.")
             else:
                 raise HTTPException(422, f"Manual override of {key} is not supported; upload the correct source.")
             eye.setdefault("surgeon_corrections", []).append({"field": key, "original": eye.get(key), "value": value})
@@ -224,16 +187,6 @@ def _overrides(extracted, overrides):
                 eye.setdefault("field_provenance", {})[key] = [{"source": "SURGEON_CONFIRMED"}]
             elif key in PATTERNS:
                 eye.setdefault("field_provenance", {})[key] = [{"source": "SURGEON_CONFIRMED"}]
-            elif key in SOURCE_CONFIRMATIONS:
-                eye.setdefault("field_provenance", {})[key] = [{
-                    "file": hint.get("file"),
-                    "source": "SURGEON_CONFIRMED_FROM_LOCALIZED_SOURCE",
-                }]
-                eye.setdefault("surgeon_source_confirmations", []).append({
-                    "field": key,
-                    "value": value,
-                    "file": hint.get("file"),
-                })
             resolved = [x for x in eye.get("data_conflicts") or [] if str(x).split(":", 1)[0].strip() == key]
             eye.setdefault("surgeon_resolved_conflicts", []).extend(resolved)
             eye["data_conflicts"] = [x for x in eye.get("data_conflicts") or [] if x not in resolved]
@@ -245,12 +198,10 @@ def _overrides(extracted, overrides):
             eye["extraction_validation"] = audit
             working.setdefault("extraction_validation", {})[eye["eye"]] = audit
             working.setdefault("critical_input_issues", []).extend(f"{eye['eye']} extraction validation: {x}" for x in audit["issues"])
-    eyes = [eye for eye in working.get("eyes") or [] if eye.get("eye") in {"OD", "OS"}]
-    if eyes and all(eye.get("pentacam_qs") == "OK" for eye in eyes):
-        working["critical_input_issues"] = [
-            issue for issue in working.get("critical_input_issues") or []
-            if not str(issue).startswith("Pentacam acquisition requires a same-exam explicit QS: OK")
-        ]
+    working["critical_input_issues"] = [
+        issue for issue in working.get("critical_input_issues") or []
+        if not is_quality_only_issue(issue)
+    ]
     return working
 
 

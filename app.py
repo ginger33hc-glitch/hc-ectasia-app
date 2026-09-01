@@ -12,10 +12,11 @@ from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 
 from pentacam_field_registry import EXCLUSIVE_LABELED_BOX_FIELDS
+from pentacam_quality_policy import is_quality_only_issue, warnings_for_extracted
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.69")
+app = FastAPI(title="CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.70")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -770,10 +771,6 @@ def required_tomography_missing(eye: Dict[str, Any]) -> List[str]:
         missing.append("readable posterior pattern")
     if eye.get("anterior_pattern") in (None, "UNREADABLE"):
         missing.append("readable anterior pattern")
-    if eye.get("quality") in ("LIMITED", "INADEQUATE"):
-        missing.append("adequate-quality tomography/topography")
-    if eye.get("pentacam_qs") != "OK":
-        missing.append("explicit Pentacam QS: OK")
     plausible_ranges = {
         "pachy_thinnest_um": (300, 800), "K1_D": (20, 80), "K2_D": (20, 80),
         "K1_axis_deg": (0, 180), "K2_axis_deg": (0, 180), "Kmax_D": (20, 90),
@@ -1442,7 +1439,10 @@ def hc_engine(
     derived_age = extracted.get("derived_age_years")
     if age is None and is_number(derived_age):
         age = int(derived_age)
-    global_issues = list(extracted.get("critical_input_issues", []))
+    global_issues = [
+        issue for issue in extracted.get("critical_input_issues", [])
+        if not is_quality_only_issue(issue)
+    ]
     identity_warnings = list(extracted.get("identity_warnings", []))
     if set(assessed_ids) != set(EYES):
         global_issues.append("Both OD and OS tomography assessments are required; fellow-eye assessment is missing.")
@@ -1492,6 +1492,7 @@ def hc_engine(
             "identity_warnings": identity_warnings,
             "critical_input_issues": sorted(set(global_issues + ["No classifiable OD/OS tomography was extracted."])),
             "document_contexts": extracted.get("document_contexts", []),
+            "source_quality_warnings": warnings_for_extracted(extracted),
         }
 
     overall = "PASS"
@@ -1512,8 +1513,9 @@ def hc_engine(
         "identity_warnings": identity_warnings,
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
+        "source_quality_warnings": warnings_for_extracted(extracted),
         "protocol": "CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.69 / source set 2026-08-25 plus binding CER-AI amendments",
+        "version": "software v0.7.70 / source set 2026-08-25 plus binding CER-AI amendments",
     }
 
 
@@ -1620,7 +1622,12 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             item for item in result.get("treatment_corrections", []) if isinstance(item, dict)
         )
         for raw_eye in result.get("eyes", []):
-            eye = normalized_eye(raw_eye)
+            source_eye = dict(raw_eye)
+            if isinstance(context, dict) and context.get("document_type") == "PENTACAM_TOPOGRAPHY":
+                # QS belongs to the acquisition/document, not to an independently inferred eye
+                # value. Keep one canonical transfer path even for imported/legacy extractions.
+                source_eye["_pentacam_qs"] = context.get("pentacam_qs", "NOT_SHOWN")
+            eye = normalized_eye(source_eye)
             eye_id = eye.get("eye", "UNKNOWN")
             source_filename = eye.get("_source_filename")
             eye["source_files"] = [source_filename] if source_filename else []
@@ -1926,13 +1933,6 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 "PATIENT IDENTITY NOT VERIFIED: OD and OS Pentacam sources could not be confirmed "
                 f"as the same patient ({identity_readings}). Surgeon confirmation is required."
             )
-    if pentacam_contexts and (
-        not any(c.get("pentacam_qs") == "OK" for c in pentacam_contexts)
-        or any(c.get("pentacam_qs") == "NOT_OK" for c in pentacam_contexts)
-    ):
-        merged["critical_input_issues"].append(
-            "Pentacam acquisition requires a same-exam explicit QS: OK; a non-OK QS cannot be overridden."
-        )
     merged["global_warnings"] = sorted(set(merged["global_warnings"]))
     merged["identity_warnings"] = sorted(set(merged["identity_warnings"]))
     merged["critical_input_issues"] = sorted(set(merged["critical_input_issues"]))

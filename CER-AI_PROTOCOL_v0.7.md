@@ -14,9 +14,12 @@ as separate layers. No rule in one layer is silently presented as a validated ru
   a visible surgeon-confirmation warning without suppressing the eye assessments.
 - A mismatch between entered and source patient ID or derived age prohibits PASS.
 - Both OD and OS are required for overall PASS; eyes remain separately assessed and are not averaged.
-- An unclassified upload, an upload yielding no usable eye/treatment data, a limited/inadequate
-  decision-source image, or an unresolved decision-field conflict prohibits PASS.
-- Pentacam clearance requires a same-exam explicit `QS: OK`; a visible non-OK QS cannot be overridden.
+- An unclassified upload, an upload yielding no usable eye/treatment data, or an unresolved
+  decision-critical field conflict prohibits PASS.
+- Literal Pentacam QS and generic source-image quality are retained as acquisition audit data.
+  Non-OK/unconfirmed QS and limited/inadequate quality do not alone suppress a report when required
+  clinical measurements are readable; they generate a prominent surgeon-attention warning at the
+  bottom of the browser, PDF, and Word reports. They are never silently changed to `OK`.
 - Record field-level provenance as labeled table, permitted map fallback, or visual classification.
 - Same-field readings from one accepted provenance class reconcile only when their full relative
   spread is `<=1%`. Retain the lower value for pachymetry, ARTmax, and Rmin; retain the higher value

@@ -240,7 +240,7 @@ class TestSafetyGates(unittest.TestCase):
         self.assertEqual(result["status"], "DATA INSUFFICIENT")
         self.assertTrue(any("Both OD and OS" in item for item in result["critical_input_issues"]))
 
-    def test_identity_date_conflicts_and_non_ok_qs_are_global_blockers(self):
+    def test_identity_and_date_conflicts_block_but_non_ok_qs_warns(self):
         first = {"document_context": document_context("A", qs="OK"), "eyes": [normal_eye("OD")], "treatment_corrections": [], "global_warnings": []}
         second_context = document_context("B", exam_date="2026-08-26", qs="NOT_OK", patient_name="Different Patient")
         second_context["source_filename"] = "other.png"
@@ -249,7 +249,9 @@ class TestSafetyGates(unittest.TestCase):
         self.assertTrue(any("conflicting patient IDs" in item for item in merged["identity_warnings"]))
         self.assertTrue(any("different patient names" in item for item in merged["identity_warnings"]))
         self.assertTrue(any("Conflicting Pentacam" in item for item in merged["critical_input_issues"]))
-        self.assertTrue(any("non-OK QS" in item for item in merged["critical_input_issues"]))
+        self.assertFalse(any("QS" in item for item in merged["critical_input_issues"]))
+        decision = app.hc_engine(merged, 35, {"OD": plan(), "OS": plan()}, MODIFIERS)
+        self.assertTrue(any("QS is NOT_OK" in item for item in decision["source_quality_warnings"]))
 
     def test_different_extracted_ids_do_not_block_when_name_and_age_match(self):
         od_context = document_context(
@@ -642,12 +644,20 @@ class TestScoringAndCompleteness(unittest.TestCase):
         self.assertEqual(len(result["tomography_review"]["cross_sectional_flags"]), 4)
         self.assertEqual(result["status"], "REVIEW — NOT CLEARED")
 
-    def test_limited_image_quality_prohibits_pass(self):
+    def test_limited_image_quality_allows_pass_with_warning(self):
         eye = normal_eye()
         eye["quality"] = "LIMITED"
         result = app.assess_eye(eye, plan(), 35, MODIFIERS)
-        self.assertEqual(result["status"], "DATA INSUFFICIENT")
-        self.assertIn("adequate-quality tomography/topography", result["missing"])
+        self.assertEqual(result["status"], "PASS")
+        self.assertNotIn("adequate-quality tomography/topography", result["missing"])
+        extracted = {"eyes": [eye, normal_eye("OS")], "global_warnings": []}
+        decision = app.hc_engine(extracted, 35, {"OD": plan(), "OS": plan()}, MODIFIERS)
+        self.assertTrue(any("source image quality is LIMITED" in item for item in decision["source_quality_warnings"]))
+
+        eye_without_bad_d = dict(eye, BAD_D=None)
+        incomplete = app.assess_eye(eye_without_bad_d, plan(), 35, MODIFIERS)
+        self.assertEqual(incomplete["status"], "DATA INSUFFICIENT")
+        self.assertIn("BAD_D", incomplete["missing"])
 
     def test_limited_ancillary_page_does_not_poison_adequate_same_eye_source(self):
         adequate = normal_eye()
@@ -680,7 +690,8 @@ class TestScoringAndCompleteness(unittest.TestCase):
         assert limited_eye["quality"] == "LIMITED"
         assert not any("source image quality" in item for item in limited_eye["data_conflicts"])
         limited_result = app.assess_eye(limited_eye, plan(), 35, MODIFIERS)
-        assert "adequate-quality tomography/topography" in limited_result["missing"]
+        assert limited_result["status"] == "PASS"
+        assert "adequate-quality tomography/topography" not in limited_result["missing"]
 
     def test_unreadable_anterior_map_prohibits_pass(self):
         eye = normal_eye()
@@ -1130,6 +1141,31 @@ class TestApiIntegration(unittest.TestCase):
             node.text or "" for node in body_children[patient_index + 1].xpath(".//w:t")
         )
         self.assertIn("OVERALL DISPOSITION", next_text)
+
+    def test_quality_warning_is_at_the_end_of_pdf_and_word_without_blocking_report(self):
+        od = normal_eye()
+        od.update(quality="LIMITED", pentacam_qs="NOT_OK")
+        extracted = {"eyes": [od, normal_eye("OS")], "global_warnings": []}
+        decision = app.hc_engine(extracted, 35, {"OD": plan(), "OS": plan()}, MODIFIERS)
+        self.assertEqual(decision["status"], "PASS")
+        payload = {"patient": {"name": "Quality Warning"}, "decision": decision, "extracted": extracted}
+
+        pdf_text = "\n".join(
+            page.extract_text() or ""
+            for page in PdfReader(BytesIO(reports.build_pdf(payload))).pages
+        )
+        self.assertIn("PENTACAM ACQUISITION QUALITY", pdf_text)
+        self.assertIn("QS is NOT_OK", pdf_text)
+        self.assertGreater(pdf_text.index("PENTACAM ACQUISITION QUALITY"), pdf_text.index("Interpretation note"))
+
+        document = Document(BytesIO(reports.build_docx(payload)))
+        body_text = "\n".join(
+            "".join(node.text or "" for node in child.xpath(".//w:t"))
+            for child in document.element.body
+        )
+        self.assertIn("PENTACAM ACQUISITION QUALITY", body_text)
+        self.assertIn("QS is NOT_OK", body_text)
+        self.assertGreater(body_text.index("PENTACAM ACQUISITION QUALITY"), body_text.index("Interpretation note"))
 
     def test_browser_report_places_large_bold_patient_name_immediately_before_status(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
