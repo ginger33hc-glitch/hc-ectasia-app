@@ -5,7 +5,10 @@ import mimetypes
 import os
 from contextlib import asynccontextmanager
 from io import BytesIO
+from threading import RLock
+from time import monotonic
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
@@ -37,6 +40,14 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
 VALIDATED_MODEL = "gpt-5.6-terra"
+
+# A mobile browser can lose the HTTP connection after the upload while the
+# assessment is still running. Keep a short-lived, user-scoped task registry so
+# a transparent retry waits for the original work instead of running the same
+# clinical extraction twice.
+ANALYSIS_REQUEST_TTL_SECONDS = 10 * 60
+_analysis_request_lock = RLock()
+_analysis_request_tasks: Dict[tuple[str, str], tuple[float, asyncio.Task]] = {}
 
 EYES = ("OD", "OS")
 PRK_EPITHELIUM_UM = 50
@@ -2056,28 +2067,44 @@ def extract_one_image(raw: bytes, filename: str) -> Dict[str, Any]:
         raise RuntimeError(f"OpenAI output was not valid JSON: {exc}") from exc
 
 
-@app.post("/analyze")
-async def analyze(
-    images: List[UploadFile] = File(...),
-    age: Optional[int] = Form(None),
-    eye_plans: str = Form("{}"),
-    patient_modifiers: str = Form("{}"),
-    patient_metadata: str = Form("{}"),
-):
-    if not images:
-        raise HTTPException(400, "No images supplied.")
+def _analysis_request_key(request_id: Optional[str]) -> Optional[tuple[str, str]]:
+    if not request_id:
+        return None
     try:
-        plans = json.loads(eye_plans)
-        modifiers = json.loads(patient_modifiers)
-        metadata = json.loads(patient_metadata)
-    except json.JSONDecodeError as exc:
-        raise HTTPException(400, f"Invalid structured clinical input: {exc}") from exc
-    if not isinstance(plans, dict) or not isinstance(modifiers, dict) or not isinstance(metadata, dict):
-        raise HTTPException(400, "eye_plans, patient_modifiers, and patient_metadata must be JSON objects.")
+        normalized = str(UUID(str(request_id)))
+    except (ValueError, AttributeError) as exc:
+        raise HTTPException(400, "Invalid assessment request identifier.") from exc
 
-    from operational_security import admit_analysis, analysis_slot, read_uploads
+    from user_access import current_principal
 
-    image_payloads = await read_uploads(images)
+    principal = current_principal()
+    actor = principal.user_id if principal is not None else "access-key-session"
+    return actor, normalized
+
+
+def _cached_analysis_task(key: tuple[str, str]) -> Optional[asyncio.Task]:
+    now = monotonic()
+    with _analysis_request_lock:
+        expired = [
+            item_key
+            for item_key, (created, _task) in _analysis_request_tasks.items()
+            if now - created > ANALYSIS_REQUEST_TTL_SECONDS
+        ]
+        for item_key in expired:
+            _analysis_request_tasks.pop(item_key, None)
+        record = _analysis_request_tasks.get(key)
+        return record[1] if record else None
+
+
+async def _run_image_assessment(
+    image_payloads: list[tuple[bytes, str]],
+    age: Optional[int],
+    plans: Dict[str, Any],
+    modifiers: Dict[str, Any],
+    metadata: Dict[str, Any],
+) -> Dict[str, Any]:
+    from operational_security import admit_analysis, analysis_slot
+
     admit_analysis()
 
     # Every image remains an independent extraction. Bounded concurrency prevents the total
@@ -2111,3 +2138,69 @@ async def analyze(
         sys.modules[__name__], extracted, age, plans, modifiers, metadata,
         source_images=image_payloads,
     )
+
+
+async def _await_analysis_task(
+    task: asyncio.Task,
+    key: Optional[tuple[str, str]],
+) -> Dict[str, Any]:
+    try:
+        # The extraction must survive a mobile client disconnect so that the
+        # retry can recover its result using the same request identifier.
+        return await asyncio.shield(task)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        if key is not None and task.done():
+            with _analysis_request_lock:
+                record = _analysis_request_tasks.get(key)
+                if record and record[1] is task:
+                    _analysis_request_tasks.pop(key, None)
+        raise
+
+
+@app.post("/analyze")
+async def analyze(
+    images: List[UploadFile] = File(...),
+    age: Optional[int] = Form(None),
+    eye_plans: str = Form("{}"),
+    patient_modifiers: str = Form("{}"),
+    patient_metadata: str = Form("{}"),
+    assessment_request_id: Optional[str] = Form(None),
+):
+    if not images:
+        raise HTTPException(400, "No images supplied.")
+    try:
+        plans = json.loads(eye_plans)
+        modifiers = json.loads(patient_modifiers)
+        metadata = json.loads(patient_metadata)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(400, f"Invalid structured clinical input: {exc}") from exc
+    if not isinstance(plans, dict) or not isinstance(modifiers, dict) or not isinstance(metadata, dict):
+        raise HTTPException(400, "eye_plans, patient_modifiers, and patient_metadata must be JSON objects.")
+
+    from operational_security import read_uploads
+
+    request_key = _analysis_request_key(assessment_request_id)
+    if request_key is not None:
+        existing = _cached_analysis_task(request_key)
+        if existing is not None:
+            return await _await_analysis_task(existing, request_key)
+
+    image_payloads = await read_uploads(images)
+    task = None
+    if request_key is not None:
+        with _analysis_request_lock:
+            record = _analysis_request_tasks.get(request_key)
+            if record is not None:
+                task = record[1]
+            else:
+                task = asyncio.create_task(
+                    _run_image_assessment(image_payloads, age, plans, modifiers, metadata)
+                )
+                _analysis_request_tasks[request_key] = (monotonic(), task)
+    if task is None:
+        task = asyncio.create_task(
+            _run_image_assessment(image_payloads, age, plans, modifiers, metadata)
+        )
+    return await _await_analysis_task(task, request_key)
