@@ -15,7 +15,7 @@ from pentacam_field_registry import EXCLUSIVE_LABELED_BOX_FIELDS
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.68")
+app = FastAPI(title="CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.69")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -1513,7 +1513,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.68 / source set 2026-08-25 plus binding CER-AI amendments",
+        "version": "software v0.7.69 / source set 2026-08-25 plus binding CER-AI amendments",
     }
 
 

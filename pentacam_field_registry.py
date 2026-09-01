@@ -7,7 +7,7 @@ defined in this module.
 
 TARGET_FIELDS = (
     "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmax_D",
-    "corneal_diameter_mm", "pachy_thinnest_um", "central_pachy_um", "BAD_D", "Df", "Db",
+    "corneal_diameter_mm", "pachy_thinnest_um", "central_pachy_um", "B_Ele_Th_um", "BAD_D", "Df", "Db",
     "Dp", "Dt", "Da", "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um",
     "ISV", "IVA", "KI", "CKI", "IHD", "I_S", "KISA", "IHA",
     "Rmin_mm", "anterior_elevation_thinnest_um",
@@ -24,6 +24,7 @@ EXCLUSIVE_LABELED_BOX_FIELDS = frozenset({
     "ARTmax_um",
     "pachy_thinnest_um",
     "central_pachy_um",
+    "B_Ele_Th_um",
 })
 
 COMPLETION_NUMERIC_FIELDS = {

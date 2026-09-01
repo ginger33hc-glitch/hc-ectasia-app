@@ -12,7 +12,7 @@ from typing import Any
 
 REQUEST_SOURCE_KEYS = {
     "surgeon_nice_central_um": "central_pachy_um",
-    "surgeon_nice_pe_um": "posterior_pupil_max_um",
+    "surgeon_nice_pe_um": "B_Ele_Th_um",
     "surgeon_I_S_D": "I_S",
     "surgeon_topography_category": "erss_topography",
 }

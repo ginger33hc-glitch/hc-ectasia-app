@@ -82,28 +82,6 @@ def reading(
     }
 
 
-def posterior_reading(
-    value, *, status="CONFIDENT", eye="OD", title="Elevation (Back)",
-    location="LOWER_RIGHT", reference="BFS_FLOAT", diameter=8.0,
-    boundary=True, maximum=True, tile="LOWER_RIGHT",
-    source_box=(120, 120, 880, 880),
-):
-    return {
-        "eye": eye,
-        "value": value,
-        "status": status,
-        "map_title": title,
-        "map_location": location,
-        "posterior_reference": reference,
-        "bfs_diameter_mm": diameter,
-        "pupil_boundary_visible": boundary,
-        "maximum_rule_applied": maximum,
-        "evidence": "Compared every printed signed value inside the dashed boundary.",
-        "source_tile": tile,
-        "source_box": list(source_box) if source_box is not None else None,
-    }
-
-
 def test_tiles_cover_source_with_overlap_and_are_valid_png_images():
     tiles = targeted.build_overlapping_tiles(image_bytes())
     assert [name for name, _ in tiles] == [
@@ -137,6 +115,8 @@ def test_landmark_labels_and_existing_central_reading_control_targets():
     assert not targeted.label_supports_field("central_pachy_um", "Pachy Vertex N.")
     assert targeted.label_supports_field("Kmax_D", "KMax")
     assert targeted.label_supports_field("ARTmax_um", "ARTmax")
+    assert targeted.label_supports_field("B_Ele_Th_um", "B. Ele.Th")
+    assert not targeted.label_supports_field("B_Ele_Th_um", "Elevation (Back)")
     assert targeted.label_supports_field("corneal_diameter_mm", "HWTW")
     assert not targeted.label_supports_field("corneal_diameter_mm", "HTWT")
 
@@ -149,20 +129,19 @@ def test_landmark_labels_and_existing_central_reading_control_targets():
     assert "central_pachy_um" not in targeted.missing_targets_by_eye(result)["OD"]
 
 
-def test_only_canonical_nice_posterior_reading_suppresses_map_reread():
+def test_only_canonical_b_ele_th_reading_suppresses_targeted_reread():
     result = pentacam_result()
-    assert targeted.missing_posterior_targets(result) == ["OD"]
+    assert "B_Ele_Th_um" in targeted.missing_targets_by_eye(result)["OD"]
     result["nice_readings"] = [{
         "eye": "OD",
-        "posterior_pupil_max_um": 23,
-        "posterior_status": "CONFIDENT",
-        "posterior_reference": "BFS_FLOAT",
-        "bfs_diameter_mm": 8,
-        "pupil_boundary_visible": True,
+        "B_Ele_Th_um": 23,
+        "b_ele_th_status": "CONFIDENT",
+        "b_ele_th_landmark": "B_ELE_TH_LABELED_BOX",
+        "b_ele_th_page": "BAD_DISPLAY",
     }]
-    assert targeted.missing_posterior_targets(result) == []
-    result["nice_readings"][0]["bfs_diameter_mm"] = 9
-    assert targeted.missing_posterior_targets(result) == ["OD"]
+    assert "B_Ele_Th_um" not in targeted.missing_targets_by_eye(result)["OD"]
+    result["nice_readings"][0]["b_ele_th_landmark"] = "OTHER"
+    assert "B_Ele_Th_um" in targeted.missing_targets_by_eye(result)["OD"]
 
 
 def test_patient_age_request_is_patient_level_and_only_for_pentacam():
@@ -352,91 +331,67 @@ def test_pupil_center_reread_feeds_nice_and_unreadable_region_reaches_form():
     assert item["form_id"] == "od_nice_central"
 
 
-def test_lower_right_elevation_back_maximum_feeds_only_nice_posterior_input():
-    result = pentacam_result()
-    reread = {
-        "screen_family": "FOUR_MAPS_REFRACTIVE",
-        "readings": [],
-        "posterior_pupil_readings": [posterior_reading(23)],
-        "warnings": [],
-    }
-    targeted.apply_targeted_readings(
-        Core, result, reread, {}, "od.png", posterior_requested=["OD"]
-    )
-    nice = result["nice_readings"][-1]
-    assert nice["posterior_pupil_max_um"] == 23
-    assert nice["posterior_status"] == "CONFIDENT"
-    assert nice["central_pachy_um"] is None
-    assert nice["central_landmark"] == "UNREADABLE"
-    assert result["eyes"][0]["central_pachy_um"] is None
-    assert result["eyes"][0]["targeted_reread_evidence"]["posterior_pupil_max_um"][0]["source"] == (
-        "TARGETED_NICE_POSTERIOR_MAP_REREAD"
-    )
-
-
-@pytest.mark.parametrize(
-    "override",
-    [
-        {"map_title": "Elevation (Front)"},
-        {"map_location": "OTHER"},
-        {"posterior_reference": "BFTE"},
-        {"bfs_diameter_mm": 9},
-        {"pupil_boundary_visible": False},
-        {"maximum_rule_applied": False},
-        {"source_tile": "UPPER_RIGHT"},
-    ],
-)
-def test_posterior_map_reread_rejects_wrong_source_or_incomplete_maximum(override):
-    result = pentacam_result()
-    candidate = posterior_reading(23)
-    candidate.update(override)
-    reread = {
-        "screen_family": "FOUR_MAPS_REFRACTIVE",
-        "readings": [],
-        "posterior_pupil_readings": [candidate],
-        "warnings": [],
-    }
-    targeted.apply_targeted_readings(
-        Core, result, reread, {}, "od.png", posterior_requested=["OD"]
-    )
-    assert not result.get("nice_readings")
-    assert any("posterior reread rejected" in warning for warning in result["global_warnings"])
-
-
-def test_posterior_map_reread_rejects_non_four_maps_screen_family():
+def test_bad_display_b_ele_th_box_feeds_only_nice_posterior_input():
     result = pentacam_result()
     reread = {
         "screen_family": "BAD_DISPLAY",
-        "readings": [],
-        "posterior_pupil_readings": [posterior_reading(23)],
+        "readings": [reading(
+            "B_Ele_Th_um", 23, "B. Ele.Th", tile="LOWER_LEFT",
+            source_box=[120, 120, 880, 320],
+        )],
         "warnings": [],
     }
     targeted.apply_targeted_readings(
-        Core, result, reread, {}, "od.png", posterior_requested=["OD"]
+        Core, result, reread, {"OD": ["B_Ele_Th_um"]}, "od.png"
     )
-    assert not result.get("nice_readings")
-    assert any("posterior reread rejected" in warning for warning in result["global_warnings"])
+    nice = result["nice_readings"][-1]
+    assert nice["B_Ele_Th_um"] == 23
+    assert nice["b_ele_th_status"] == "CONFIDENT"
+    assert nice["b_ele_th_landmark"] == "B_ELE_TH_LABELED_BOX"
+    assert nice["b_ele_th_page"] == "BAD_DISPLAY"
+    assert nice["central_pachy_um"] is None
+    assert nice["central_landmark"] == "UNREADABLE"
+    assert result["eyes"][0]["targeted_reread_evidence"]["B_Ele_Th_um"][0]["source"] == "TARGETED_LABELED_TILE_REREAD"
 
 
-def test_unreadable_posterior_map_region_is_shown_beside_surgeon_input():
+def test_elevation_back_map_cannot_substitute_for_b_ele_th_box():
     result = pentacam_result()
     reread = {
         "screen_family": "FOUR_MAPS_REFRACTIVE",
-        "readings": [],
-        "posterior_pupil_readings": [posterior_reading(None, status="UNREADABLE")],
+        "readings": [reading(
+            "B_Ele_Th_um", 23, "Elevation (Back)", tile="LOWER_RIGHT",
+        )],
         "warnings": [],
     }
     targeted.apply_targeted_readings(
-        Core, result, reread, {}, "od.png", posterior_requested=["OD"]
+        Core, result, reread, {"OD": ["B_Ele_Th_um"]}, "od.png"
     )
-    region = result["eyes"][0]["unreadable_source_regions"]["posterior_pupil_max_um"]
+    assert not result.get("nice_readings")
+    assert any("verified BAD Display" in warning for warning in result["global_warnings"])
+
+
+def test_unreadable_b_ele_th_box_region_is_shown_beside_surgeon_input():
+    result = pentacam_result()
+    reread = {
+        "screen_family": "BAD_DISPLAY",
+        "readings": [reading(
+            "B_Ele_Th_um", None, "B. Ele.Th", status="UNREADABLE",
+            tile="LOWER_LEFT", source_box=[120, 120, 880, 320],
+        )],
+        "warnings": [],
+    }
+    targeted.apply_targeted_readings(
+        Core, result, reread, {"OD": ["B_Ele_Th_um"]}, "od.png"
+    )
+    assert not result.get("nice_readings")
+    region = result["eyes"][0]["unreadable_source_regions"]["B_Ele_Th_um"]
     assert region == {
         "file": "od.png",
-        "tile": "LOWER_RIGHT",
-        "source_box": [120, 120, 880, 880],
-        "printed_label": "Elevation (Back)",
+        "tile": "LOWER_LEFT",
+        "source_box": [120, 120, 880, 320],
+        "printed_label": "B. Ele.Th",
     }
-    item = assessment_workflow._request("OD", "NICE: posterior_pupil_max_um", result)
+    item = assessment_workflow._request("OD", "NICE: B_Ele_Th_um", result)
     assert item["source_region"] is True
     assert item["form_id"] == "od_nice_pe"
 
@@ -532,16 +487,15 @@ def test_targeted_call_uses_original_and_four_crops_with_focused_settings(monkey
     assert captured["text"]["format"]["strict"] is True
 
 
-def test_targeted_call_states_exact_posterior_map_maximum_rule(monkeypatch):
+def test_targeted_call_states_b_ele_th_bad_display_box_only_rule(monkeypatch):
     captured = {}
     payload = {
-        "screen_family": "FOUR_MAPS_REFRACTIVE",
+        "screen_family": "BAD_DISPLAY",
         "readings": [],
         "patient_age_reading": {
             "value": None, "status": "NOT_SHOWN", "printed_label": None,
             "source_tile": "ORIGINAL", "source_box": None,
         },
-        "posterior_pupil_readings": [],
         "warnings": [],
     }
 
@@ -551,13 +505,11 @@ def test_targeted_call_states_exact_posterior_map_maximum_rule(monkeypatch):
 
     core = Core()
     core.openai_client = lambda: SimpleNamespace(responses=SimpleNamespace(create=create))
-    targeted.targeted_reread(
-        core, image_bytes(), "od.png", {}, posterior_requested=["OD"]
-    )
+    targeted.targeted_reread(core, image_bytes(), "od.png", {"OD": ["B_Ele_Th_um"]})
     prompt = captured["input"][0]["content"][0]["text"]
-    assert "LOWER-RIGHT map explicitly titled 'Elevation (Back)'" in prompt
-    assert "highest positive printed value" in prompt
-    assert "central_pachy_um" not in prompt.split("DEDICATED NICE POSTERIOR MAP TARGETS:", 1)[1]
+    assert "explicitly printed \"B. Ele.Th\" box" in prompt
+    assert "Never use an Elevation (Back) map" in prompt
+    assert "B_Ele_Th_um" in prompt
 
 
 def test_age_reread_adds_dedicated_top_header_crop(monkeypatch):

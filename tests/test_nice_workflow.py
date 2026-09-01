@@ -28,7 +28,7 @@ def scenario(procedure="LASIK"):
 
 @pytest.mark.parametrize("value,points", [(0,1),(14,1),(15,1),(15.5,1),(15.5001,2),(16,2),(17,2),(17.5,2),(17.999,2),(18,3),(50,3)])
 def test_pe_boundary_no_gap_or_rounding(value, points):
-    assert score_nice(43, 550, value, .5)["rows"]["posterior_elevation"] == points
+    assert score_nice(43, 550, value, .5)["rows"]["B_Ele_Th"] == points
 
 
 @pytest.mark.parametrize("k2,pachy,pe,i_s", list(itertools.product([44,46,48],[550,510,490],[8,16,18],[.5,1.2,1.5])))
@@ -39,14 +39,20 @@ def test_all_81_score_combinations(k2,pachy,pe,i_s):
     assert result["category"] == ("NO_NICE_ESCALATION" if result["total"]==4 else "CAUTION" if result["total"]<=8 else "HARD_STOP")
 
 
-@pytest.mark.parametrize("value", [None, True, "15", float("nan"), float("inf"), -1])
+@pytest.mark.parametrize("value", [None, True, "15", float("nan"), float("inf"), -301, 301])
 def test_invalid_pe_is_not_scored(value):
     assert score_nice(43,550,value,.5)["total"] is None
 
 
+def test_signed_b_ele_th_value_is_preserved_and_scored():
+    result = score_nice(43, 550, -1, .5)
+    assert result["values"]["B_Ele_Th_um"] == -1
+    assert result["rows"]["B_Ele_Th"] == 1
+
+
 def test_exact_other_boundaries_and_signed_i_s():
-    assert score_nice(45,520,15.5,1)["rows"] == {"K2":2,"central_pachymetry":2,"posterior_elevation":1,"I_S":2}
-    assert score_nice(47,500,15.5,1.4)["rows"] == {"K2":2,"central_pachymetry":2,"posterior_elevation":1,"I_S":2}
+    assert score_nice(45,520,15.5,1)["rows"] == {"K2":2,"central_pachymetry":2,"B_Ele_Th":1,"I_S":2}
+    assert score_nice(47,500,15.5,1.4)["rows"] == {"K2":2,"central_pachymetry":2,"B_Ele_Th":1,"I_S":2}
     assert score_nice(43,550,8,-2)["rows"]["I_S"] == 1
 
 
@@ -77,7 +83,7 @@ def test_runtime_4_5_8_9_and_no_duplicate_erss(procedure,pe,k2,central,total,sta
     extracted,plans=scenario(procedure)
     eye=extracted["eyes"][0]
     eye["K2_D"]=k2
-    eye["nice_candidates"][0].update(posterior_pupil_max_um=pe,central_pachy_um=central)
+    eye["nice_candidates"][0].update(B_Ele_Th_um=pe,central_pachy_um=central)
     from microkeratome_planning_policy import hc_engine_with_microkeratome_planning
     before=hc_engine_with_microkeratome_planning(deepcopy(extracted),35,deepcopy(plans),MODIFIERS)["eyes"][0]
     after=core.hc_engine(extracted,35,plans,MODIFIERS)["eyes"][0]
@@ -96,29 +102,28 @@ def test_nice_cannot_reduce_bad_hard_stop_or_rescue_with_flap_change():
     assert core.hc_engine(extracted,35,plans,MODIFIERS)["eyes"][0]["status"]=="DO NOT PROCEED"
     extracted["eyes"][0]["BAD_D"]=1
     extracted["eyes"][0]["K2_D"]=48
-    extracted["eyes"][0]["nice_candidates"][0].update(central_pachy_um=490,posterior_pupil_max_um=18)
+    extracted["eyes"][0]["nice_candidates"][0].update(central_pachy_um=490,B_Ele_Th_um=18)
     for flap in (90,100,120):
         plans["OD"]["flap_um"]=flap
         assert core.hc_engine(extracted,35,plans,MODIFIERS)["eyes"][0]["status"]=="DO NOT PROCEED"
 
 
-@pytest.mark.parametrize("key,value", [("pupil_boundary_visible",False),("posterior_reference","BFTE"),("bfs_diameter_mm",9),("posterior_status","UNREADABLE")])
-def test_wrong_map_settings_never_accepted(key,value):
+@pytest.mark.parametrize("key,value", [("b_ele_th_landmark","OTHER"),("b_ele_th_status","UNREADABLE"),("b_ele_th_page","OTHER")])
+def test_non_b_ele_th_box_sources_never_accepted(key,value):
     eye=normal_eye();eye["nice_candidates"][0][key]=value
-    assert "posterior_pupil_max_um" in evaluate(eye,plan())["missing"]
+    assert "B_Ele_Th_um" in evaluate(eye,plan())["missing"]
 
 
 def test_no_substitution_of_thinnest_pachy_or_elevation():
     eye=normal_eye();eye["nice_candidates"]=[]
-    assert set(evaluate(eye,plan())["missing"])=={"central_pachy_um","posterior_pupil_max_um"}
+    assert set(evaluate(eye,plan())["missing"])=={"central_pachy_um","B_Ele_Th_um"}
 
 
 def test_conflicting_nice_readings_require_confirmation_and_keep_source():
-    eye=normal_eye();eye["nice_candidates"].append({**eye["nice_candidates"][0],"posterior_pupil_max_um":16})
-    assert evaluate(eye,plan())["input_sources"]["posterior_elevation"]=="CONFLICT"
-    result=evaluate(eye,{**plan(),"surgeon_nice_pe_um":15.5})
-    assert result["rows"]["posterior_elevation"]==1
-    assert result["input_sources"]["posterior_elevation"]=="SURGEON_CONFIRMED"
+    eye=normal_eye();eye["nice_candidates"].append({**eye["nice_candidates"][0],"B_Ele_Th_um":16})
+    result=evaluate(eye,plan())
+    assert result["values"]["B_Ele_Th_um"]==8
+    assert result["input_sources"]["B_Ele_Th"]=="PENTACAM_BAD_DISPLAY_B_ELE_TH"
 
 
 def test_central_pachy_accepts_only_pupil_center_plus_and_never_conflicts():
@@ -141,6 +146,8 @@ def test_dedicated_readings_laterality_and_schema():
     assert extracted["eyes"][1]["nice_candidates"]==[]
     assert "nice_readings" in core.SCHEMA["required"]
     assert "central_landmark" in core.SCHEMA["properties"]["nice_readings"]["items"]["required"]
+    assert "B_Ele_Th_um" in core.SCHEMA["properties"]["nice_readings"]["items"]["required"]
+    assert "b_ele_th_page" in core.SCHEMA["properties"]["nice_readings"]["items"]["required"]
     assert core.lasik_topography_points.__module__=="app"
     assert runtime.runtime_invariants()
 
@@ -261,7 +268,7 @@ def test_stale_or_forged_exports_rejected_and_expiry_safe():
 
 def test_nice_report_pdf_contains_values_class_and_hc_footnote():
     extracted,plans=scenario()
-    extracted["eyes"][0]["nice_candidates"][0]["posterior_pupil_max_um"]=16
+    extracted["eyes"][0]["nice_candidates"][0]["B_Ele_Th_um"]=16
     ready=workflow.begin(core,extracted,35,plans,MODIFIERS,{"name":"SYNTHETIC QA"})
     pdf=TestClient(core.app).post("/report/pdf",json={"assessment_token":ready["assessment_token"],"report_token":ready["report_token"]})
     assert pdf.status_code==200
