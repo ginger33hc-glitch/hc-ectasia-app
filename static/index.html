@@ -551,8 +551,11 @@ function renderEye(r, extracted){
   const v=r.values||{}, s=r.score||{};
   const erssEvidence=r.erss_topography_evidence||{};
   const transition=v.transition_zone_mm===null||v.transition_zone_mm===undefined?(v.transition_zone_not_applicable==="yes"?"Not applicable":"—"):`${fmt(v.transition_zone_mm,1)} mm`;
-  const rows=[
-    ["Procedure",v.procedure??"—"],["Score / category",`${s.total ?? "—"} / ${s.category ?? "—"}`],
+  const rows=[["Procedure",v.procedure??"—"]];
+  if(String(v.procedure||"").toUpperCase()==="PRK") rows.push(
+    ["CER-AI provisional PRK-EWSS score / category",`${s.total ?? "—"} / ${s.category ?? "—"}`]
+  );
+  rows.push(
     ["Randleman ERSS / category",`${r.randleman_erss?.total??"Not applicable"} / ${r.randleman_erss?.category??"—"}`],
     ["Final BAD-D / class",`${fmt(r.bad_summary?.value,2)} / ${r.bad_summary?.category??"—"}`],
     ["CER-AI-adapted NICE / class",`${r.nice?.total??"Not applicable"} / ${r.nice?.category??"—"}`],
@@ -573,7 +576,7 @@ function renderEye(r, extracted){
     ["Randleman I-S / source",`${fmt(erssEvidence.I_S_D,2)} D / ${erssEvidence.I_S_source??"—"}`],
     ["Validated Randleman topography",`${erssEvidence.validated_category??"—"} / ${erssEvidence.category_source??"—"}`],
     ["Anterior-map read confidence",erssEvidence.image_category_confidence??"—"]
-  ];
+  );
   const source=(extracted.eyes||[]).find(x=>x.eye===r.eye)||{};
   const targetedReadText=Object.entries(source.targeted_reread_evidence||{}).flatMap(([field,records])=>(records||[]).map(record=>{
     const label=[record.group_label,record.printed_label].filter(Boolean).join(" / ")||field;
