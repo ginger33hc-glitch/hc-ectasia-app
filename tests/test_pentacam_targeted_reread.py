@@ -562,7 +562,7 @@ def test_targeted_qs_reread_accepts_only_explicit_labeled_ok_and_updates_eye():
     assert result["document_context"]["targeted_qs_reread_evidence"]["file"] == "od.png"
 
 
-def test_unreadable_labeled_qs_becomes_localized_surgeon_confirmation():
+def test_unreadable_labeled_qs_is_retained_as_nonblocking_warning_source():
     result = pentacam_result()
     result["document_context"]["pentacam_qs"] = "UNREADABLE"
     result["document_contexts"] = [{
@@ -588,20 +588,12 @@ def test_unreadable_labeled_qs_becomes_localized_surgeon_confirmation():
     targeted.apply_targeted_readings(
         Core, result, reread, {}, "od.png", pentacam_qs_requested=True
     )
-    item = assessment_workflow._request("OD", "explicit Pentacam QS: OK", result)
-    assert item["kind"] == "select"
-    assert item["options"] == ["OK"]
-    assert item["source_region"] is True
-    corrected = assessment_workflow._overrides(result, {"OD": {"pentacam_qs": "OK"}})
-    assert corrected["eyes"][0]["pentacam_qs"] == "OK"
-    assert corrected["eyes"][0]["field_provenance"]["pentacam_qs"] == [{
-        "file": "od.png",
-        "source": "SURGEON_CONFIRMED_FROM_LOCALIZED_SOURCE",
-    }]
-    assert corrected["critical_input_issues"] == []
+    assert result["eyes"][0]["unreadable_source_regions"]["pentacam_qs"]["file"] == "od.png"
+    decision = {"critical_input_issues": result["critical_input_issues"], "eyes": [{"eye": "OD", "missing": ["explicit Pentacam QS: OK"]}]}
+    assert assessment_workflow.missing_items(decision) == []
 
 
-def test_visibly_non_ok_qs_cannot_be_overridden():
+def test_qs_cannot_be_manually_rewritten_even_though_it_no_longer_blocks():
     result = pentacam_result()
     result["eyes"][0]["unreadable_source_regions"] = {
         "pentacam_qs": {
@@ -614,7 +606,7 @@ def test_visibly_non_ok_qs_cannot_be_overridden():
         "source_filename": "od.png",
         "pentacam_qs": "NOT_OK",
     }]
-    with pytest.raises(Exception, match="cannot be overridden"):
+    with pytest.raises(Exception, match="Manual override"):
         assessment_workflow._overrides(result, {"OD": {"pentacam_qs": "OK"}})
 
 

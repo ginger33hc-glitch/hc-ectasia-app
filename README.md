@@ -2,7 +2,13 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.69 implements
+## What v0.7.70 implements
+
+- Pentacam acquisition quality and literal QS remain faithfully recorded but no longer suppress a
+  report when the decision-critical clinical measurements are readable. A non-OK, unreadable, or
+  absent QS and `LIMITED`/`INADEQUATE` source quality produce a prominent surgeon-attention warning
+  at the bottom of the browser, PDF, and Word reports. Missing or conflicting clinical values remain
+  blockers; image quality is never silently converted to `OK`.
 
 - Locks KMax, ARTmax, circle-marked `Thinnest Locat.`, and plus-marked `Pupil Center` to their own
   explicitly labeled Pentacam boxes/rows. These fields are never reconstructed from maps or
@@ -11,12 +17,11 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Readiness now converts unresolved anterior/posterior pattern conflicts into a surgeon-selectable
   field and shows every same-eye conflicting map beside it. A completed selection clears both the
   clinical conflict and its extraction-audit duplicate before readiness is recalculated.
-- Literal Pentacam QS receives a focused second read. If the printed QS box is localized but remains
-  machine-unreadable, the surgeon may confirm only `OK` from that displayed box; a visibly non-OK
-  QS remains non-overridable. Source-only blockers are visually separated from fillable inputs.
+- Literal Pentacam QS receives a focused second read and remains an acquisition-quality audit value.
+  It is not manually converted to `OK`; any non-OK/unconfirmed state is disclosed in the final warning.
 - An ancillary limited-quality page no longer creates a false decision-source conflict when the
-  merged same-eye record has an adequate source. If no adequate source exists, the original
-  fail-closed image-quality gate remains active.
+  merged same-eye record has an adequate source. If no adequate source exists, the quality state is
+  retained and disclosed without replacing the clinical required-data gate.
 
 - One centralized `pentacam_source_regions.py` policy now resolves localized unread
   Pentacam/topography evidence for readiness without duplicating extraction or clinical scoring.
@@ -108,7 +113,8 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Excimer Laser Takip Kartı reading limited to the eye-specific `Düzeltme Miktarı` row; confident minus-cylinder values can fill otherwise empty sphere/cylinder/axis fields, while manual input wins and uncertain/conflicting readings remain warnings.
 - Independent OD and OS assessment; eye values are never averaged, and a missing fellow-eye assessment prohibits overall PASS.
 - Source identity review reads Pentacam patient names only from the labeled `First Name` and `Last Name` demographics fields and records the source filename. An unreadable or unverified name produces a prominent surgeon-confirmation warning without suppressing the eye assessments; acquisition-date conflicts and unclassified/unusable uploads remain clinical/source blockers.
-- Pentacam clearance requires a same-exam explicit `QS: OK`; a visible non-OK QS cannot be masked by another page.
+- Pentacam QS is recorded per acquisition; absent, unreadable, or visible non-OK QS produces a final
+  surgeon warning but does not by itself prevent a report based on readable clinical measurements.
 - Age is read from the explicitly printed Pentacam age; a conflicting manually entered age remains a blocker. Date of birth is not collected.
 - Preoperative manifest refraction is separated from intended treatment correction. LASIK ERSS MRSE uses only the former; ablation and CER-AI treatment-range gates use only the latter.
 - Prior PRK/LASIK/SMILE short-circuits virgin-cornea scoring and routes to `POST-REFRACTIVE PATHWAY REQUIRED`.
@@ -128,7 +134,11 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Procedure-correct PTA formulas for LASIK and PRK.
 - BAD-D/component display interpretation plus adjunctive ARTmax/TP/Dt/Da evidence flags.
 - Positive tomography concern flags require review and cannot receive automatic PASS.
-- Limited/inadequate decision-source image quality, implausible numeric values, failed PPI/ARTmax consistency checks, and unresolved cross-image value conflicts prohibit PASS. Same-provenance numeric differences `<=1%` retain the parameter-specific safety-limiting value: lower for pachymetry, ARTmax, and Rmin; higher for the remaining supported numeric fields.
+- Limited/inadequate image quality produces a prominent final report warning without suppressing
+  otherwise readable results. Implausible numeric values, failed PPI/ARTmax consistency checks, and
+  unresolved decision-critical cross-image value conflicts still prohibit PASS. Same-provenance
+  numeric differences `<=1%` retain the parameter-specific safety-limiting value: lower for
+  pachymetry, ARTmax, and Rmin; higher for the remaining supported numeric fields.
 - PRK PTA above the supplied 35.28% direct-cohort envelope requires review and cannot receive automatic PASS.
 - Expanded extraction/reporting of anterior and posterior elevation, pachymetric progression,
   topometric, thinnest-point location, corneal-volume, and HOA/coma fields when visibly available.
@@ -216,7 +226,8 @@ inputs plus missing NICE components. `/analyze` returns NEEDS_INPUT (without a
 clinical decision) and eye-specific completion requests until ready. The browser
 retains manual entries; `/assessment/complete` resumes without another model call.
 Explicit surgeon corrections retain an audit trail and rerun input validation.
-Unreadable source identity/quality may require a clearer source, not a guessed value.
+Unreadable decision-critical clinical data may require a clearer source or surgeon completion;
+acquisition-quality limitations remain visible as warnings and are never guessed as acceptable.
 
 PDF/Word exports require server-issued assessment and current ready-report tokens;
 client-supplied clinical decisions cannot bypass completeness. Tokens reference

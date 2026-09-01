@@ -31,6 +31,7 @@ from reportlab.platypus import (
 )
 
 from cerai_i18n import authorship_notice, liability_notice, normalize_locale, translate_text
+from pentacam_quality_policy import WARNING_HEADING, warnings_for_extracted
 
 
 NAVY = "173B57"
@@ -46,7 +47,7 @@ GRAY = "52616D"
 GRAY_FILL = "EEF2F5"
 LINE = "D7E0E7"
 INK = "17212B"
-APP_VERSION = "0.7.69"
+APP_VERSION = "0.7.70"
 PROGRAM_NAME = "Cornea Ectasia Risk Assessment Intelligence"
 LIABILITY_NOTICE = (
     "The final surgical decision and all associated responsibility and liability rest with the surgeon. "
@@ -351,6 +352,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     styles.add(ParagraphStyle(name="BodySmall", parent=styles["BodyText"], fontName=regular_font, fontSize=8.5, leading=11, textColor=_rl(INK), spaceAfter=3))
     styles.add(ParagraphStyle(name="Tiny", parent=styles["BodyText"], fontName=regular_font, fontSize=7.2, leading=9, textColor=_rl(GRAY)))
     styles.add(ParagraphStyle(name="Liability", parent=styles["BodyText"], fontName=bold_font, fontSize=9, leading=12, textColor=_rl(RED), backColor=_rl(RED_FILL), borderColor=_rl(RED), borderWidth=0.8, borderPadding=7, spaceAfter=11))
+    styles.add(ParagraphStyle(name="QualityWarning", parent=styles["BodyText"], fontName=bold_font, fontSize=9, leading=12, textColor=_rl(AMBER), backColor=_rl(AMBER_FILL), borderColor=_rl(AMBER), borderWidth=1, borderPadding=8, spaceBefore=10, spaceAfter=6))
     styles.add(ParagraphStyle(name="PatientName", parent=styles["BodyText"], fontName=PDF_UNICODE_BOLD, fontSize=15, leading=18, textColor=_rl(NAVY), spaceBefore=2, spaceAfter=6))
     styles.add(ParagraphStyle(name="TableText", parent=styles["BodyText"], fontName=regular_font, fontSize=7.5, leading=9, textColor=_rl(INK), spaceAfter=0))
     styles.add(ParagraphStyle(name="TableLabel", parent=styles["BodyText"], fontName=bold_font, fontSize=7.3, leading=8.7, textColor=_rl(INK), spaceAfter=0))
@@ -497,6 +499,12 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
            "DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review."),
         styles["Tiny"],
     ))
+    quality_warnings = decision.get("source_quality_warnings") or warnings_for_extracted(extracted)
+    if quality_warnings:
+        warning_text = "<b>" + _ascii(tr(WARNING_HEADING)) + "</b><br/>" + "<br/>".join(
+            "- " + _ascii(tr(item)) for item in quality_warnings
+        )
+        story.append(Paragraph(warning_text, styles["QualityWarning"]))
 
     def page_footer(canvas, pdf_doc):
         canvas.saveState()
@@ -801,6 +809,21 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     for run in note.runs:
         run.font.size = Pt(8)
         run.font.color.rgb = RGBColor.from_string(GRAY)
+
+    quality_warnings = decision.get("source_quality_warnings") or warnings_for_extracted(extracted)
+    if quality_warnings:
+        quality_box = document.add_table(rows=1, cols=1)
+        quality_box.style = "Table Grid"
+        quality_box.cell(0, 0).text = tr(WARNING_HEADING) + "\n" + "\n".join(
+            "• " + tr(item) for item in quality_warnings
+        )
+        _set_cell_shading(quality_box.cell(0, 0), AMBER_FILL)
+        _set_cell_margins(quality_box.cell(0, 0), top=140, bottom=140, start=170, end=170)
+        for run in quality_box.cell(0, 0).paragraphs[0].runs:
+            run.font.name = "Arial"
+            run.font.size = Pt(9)
+            run.font.bold = True
+            run.font.color.rgb = RGBColor.from_string(AMBER)
 
     output = BytesIO()
     document.save(output)

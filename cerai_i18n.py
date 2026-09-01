@@ -143,6 +143,7 @@ TR = {
     "Anterior pattern": "Ön yüz paterni",
     "Posterior pattern": "Arka yüz paterni",
     "Image quality": "Görüntü kalitesi",
+    "PENTACAM ACQUISITION QUALITY — SURGEON ATTENTION": "PENTACAM ÇEKİM KALİTESİ — CERRAHIN DİKKATİNE",
     "Source files": "Kaynak dosyalar",
     "PASS": "UYGUN",
     "PASS WITH CAUTION": "DİKKATLE UYGUN",
@@ -261,6 +262,11 @@ TR_CLINICAL = {
 
 
 REPLACEMENTS = (
+    (r"device QS is NOT_OK", "cihaz QS değeri NOT_OK"),
+    (r"explicit QS: OK was not confirmed", "açık QS: OK doğrulanmadı"),
+    (r"source image quality is LIMITED", "kaynak görüntü kalitesi SINIRLI"),
+    (r"source image quality is INADEQUATE", "kaynak görüntü kalitesi YETERSİZ"),
+    (r"The assessment was generated from the readable data, but acquisition quality is not confirmed as OK\. The surgeon must review the source images and interpret all findings with caution\.", "Değerlendirme okunabilen verilerden oluşturuldu; ancak çekim kalitesinin uygun olduğu doğrulanmadı. Cerrah kaynak görüntüleri incelemeli ve tüm bulguları dikkatle yorumlamalıdır."),
     (r"CER-AI SCORE — SOURCE & BREAKDOWN:", "CER-AI PUANI — KAYNAK VE DÖKÜM:"),
     (r"provisional evidence-weighted triage score \(not validated\)", "geçici kanıt ağırlıklı triyaj puanı (doğrulanmamıştır)"),
     (r"CER-AI-modified age bands", "CER-AI'ye uyarlanmış yaş aralıkları"),

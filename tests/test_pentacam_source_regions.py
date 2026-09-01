@@ -138,22 +138,15 @@ def test_pattern_conflict_is_a_completable_select_with_all_source_regions():
     assert item["source_region_count"] == 2
 
 
-def test_true_quality_blocker_shows_each_limited_source_but_has_no_fake_input():
+def test_quality_only_issue_is_filtered_from_completion_requests():
     extracted = extracted_with_eyes()
     extracted["eyes"][0]["quality_by_source"] = {
         "od-limited.png": "LIMITED",
         "od-inadequate.png": "INADEQUATE",
         "od-adequate.png": "ADEQUATE",
     }
-    item = assessment_workflow._request(
-        "OD", "adequate-quality tomography/topography", extracted
-    )
-    assert item["kind"] == "instruction"
-    assert item["key"] == "source_quality"
-    assert item["source_region_count"] == 2
-    assert [hint["file"] for hint in region_hints(extracted, "OD", "source_quality")] == [
-        "od-inadequate.png", "od-limited.png"
-    ]
+    decision = {"eyes": [{"eye": "OD", "missing": ["adequate-quality tomography/topography"]}]}
+    assert assessment_workflow.missing_items(decision) == []
 
 
 def test_generic_unread_regions_survive_multi_image_merge():
