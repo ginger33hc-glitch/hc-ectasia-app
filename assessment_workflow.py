@@ -12,6 +12,7 @@ import secrets
 from fastapi import HTTPException, Body, Response
 from nice_scoring import finite
 from pentacam_field_registry import COMPLETION_NUMERIC_FIELDS
+from pentacam_source_regions import region_hint
 
 _lock = RLock()
 _sessions = {}
@@ -74,30 +75,8 @@ def completion_items(items, plans):
     return result
 
 
-def _region_hint(extracted, eye, key):
-    if eye == "PATIENT" and key == "age":
-        direct = (extracted.get("document_context") or {}).get("targeted_unreadable_age_region")
-        if direct:
-            return direct
-        hints = [
-            context.get("targeted_unreadable_age_region")
-            for context in extracted.get("document_contexts") or []
-            if context.get("targeted_unreadable_age_region")
-        ]
-        return hints[0] if len(hints) == 1 else None
-    source_key = {
-        "surgeon_nice_central_um": "central_pachy_um",
-        "surgeon_nice_pe_um": "posterior_pupil_max_um",
-        "surgeon_I_S_D": "I_S",
-    }.get(key, key)
-    for candidate in extracted.get("eyes") or []:
-        if candidate.get("eye") == eye:
-            return (candidate.get("targeted_unreadable_regions") or {}).get(source_key)
-    return None
-
-
 def _with_region(item, extracted):
-    hint = _region_hint(extracted, item.get("eye"), item.get("key"))
+    hint = region_hint(extracted, item.get("eye"), item.get("key"))
     if hint and hint.get("file") and hint.get("tile"):
         return {**item, "source_region": True}
     return item
@@ -119,9 +98,14 @@ def _request(eye, message, extracted):
         return _with_region({**item, "key": key, "label": label, "kind": "form", "form_id": f"{prefix}_{suffix}"}, extracted)
     text = message.lower()
     if "i-s" in text or "i_s" in text:
-        return _with_region({**item, "kind": "form", "form_id": f"{prefix}_surgeon_i_s"}, extracted)
+        return _with_region({**item, "key": "surgeon_I_S_D", "kind": "form", "form_id": f"{prefix}_surgeon_i_s"}, extracted)
     if "topograph" in text and ("category" in text or "morphology" in text):
-        return {**item, "kind": "form", "form_id": f"{prefix}_surgeon_topography"}
+        return _with_region({
+            **item,
+            "key": "surgeon_topography_category",
+            "kind": "form",
+            "form_id": f"{prefix}_surgeon_topography",
+        }, extracted)
     for term, suffix in (("manifest sphere", "manifest_sphere"), ("manifest cylinder magnitude", "manifest_cylinder"),
                          ("intended sphere", "sphere"), ("intended cylinder magnitude", "cylinder"),
                          ("cylinder axis", "axis"), ("optical zone", "optical"), ("transition zone", "transition"),
@@ -153,7 +137,10 @@ def _request(eye, message, extracted):
         return _with_region({**item, "kind": "number", "key": key, "destination": "measurement", "label": NUMERIC_FIELDS[key] + " — " + item["label"]}, extracted)
     for key in PATTERNS:
         if message == "readable " + key.replace("_", " "):
-            return {**item, "kind": "select", "key": key, "destination": "measurement", "options": PATTERNS[key]}
+            return _with_region({
+                **item, "kind": "select", "key": key,
+                "destination": "measurement", "options": PATTERNS[key],
+            }, extracted)
     return item
 
 
@@ -303,7 +290,7 @@ def install(core):
             session = _session(payload.get("assessment_token"))
             if (eye, key) not in session.get("region_requests", set()):
                 raise HTTPException(404, "No unresolved localized source region is available.")
-            hint = deepcopy(_region_hint(session["extracted"], eye, key))
+            hint = deepcopy(region_hint(session["extracted"], eye, key))
             matches = [
                 raw for raw, filename in session.get("source_images") or []
                 if hint and filename == hint.get("file")

@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.65")
+app = FastAPI(title="CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.66")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -1511,7 +1511,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.65 / source set 2026-08-25 plus binding CER-AI amendments",
+        "version": "software v0.7.66 / source set 2026-08-25 plus binding CER-AI amendments",
     }
 
 
@@ -1683,6 +1683,9 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             target.setdefault("targeted_unreadable_regions", {})
             for field, region in (eye.get("targeted_unreadable_regions") or {}).items():
                 target["targeted_unreadable_regions"].setdefault(field, dict(region))
+            target.setdefault("unreadable_source_regions", {})
+            for field, region in (eye.get("unreadable_source_regions") or {}).items():
+                target["unreadable_source_regions"].setdefault(field, dict(region))
             if quality_rank.get(eye.get("quality"), 0) > quality_rank.get(target.get("quality"), 0):
                 target["quality"] = eye.get("quality")
             if any(value in ("LIMITED", "INADEQUATE") for value in target["quality_by_source"].values()):
@@ -1703,6 +1706,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     "_pentacam_qs", "pentacam_qs", "scoring_morphology", "field_provenance",
                     "planning_data_issues", "targeted_reread_evidence",
                     "targeted_unreadable_regions",
+                    "unreadable_source_regions",
                 ):
                     continue
                 old = target.get(key)

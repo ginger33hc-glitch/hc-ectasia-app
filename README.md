@@ -2,7 +2,14 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.65 implements
+## What v0.7.66 implements
+
+- One centralized `pentacam_source_regions.py` policy now resolves localized unread
+  Pentacam/topography evidence for readiness without duplicating extraction or clinical scoring.
+  It covers numeric fields, NICE inputs, elevation patterns, and Randleman morphology. The
+  morphology completion field uses only the same-eye upper-left `Axial/Sagittal Curvature (Front)`
+  source; ambiguous or cross-eye sources fail closed. The crop and surgeon field are displayed
+  side by side on larger screens and stacked on mobile.
 
 - The visible program expansion is now exactly `Cornea Ectasia Risk Assessment Intelligence`.
   The approved `CER-AI` lettermark remains unchanged; the former embedded subtitle is cropped at

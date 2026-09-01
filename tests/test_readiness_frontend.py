@@ -89,7 +89,11 @@ def test_patient_age_completion_uses_one_shared_field():
 def test_only_unread_fields_can_request_a_temporary_source_region():
     workflow = (ROOT / 'assessment_workflow.py').read_text()
     readiness = (ROOT / 'static/assessment-readiness.js').read_text()
+    html = (ROOT / 'static/index.html').read_text()
     assert '"source_region": True' in workflow
     assert '/assessment/source-region' in workflow
     assert "if(item.source_region)" in readiness
     assert "assessment_token:this.token" in readiness
+    assert 'Pentacam/topography region the application could not read' in readiness
+    assert '.completion-with-source>input,.completion-with-source>select{grid-column:2' in html
+    assert '.completion-source-region{grid-column:1' in html
