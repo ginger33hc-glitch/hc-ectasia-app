@@ -22,7 +22,7 @@ from docx import Document
 from docx.shared import Pt
 
 IDENTITY_HEADING="PATIENT IDENTITY NOT VERIFIED - SURGEON CONFIRMATION REQUIRED"
-PDF_BAD=[["Final BAD-D","CER-AI interpretation / action"],["<=1.6","NORMAL"],[">1.6 to <2.60","SUSPICIOUS - REVIEW / NOT CLEARED"],[">=2.60","ABNORMAL CORNEA - DO NOT PROCEED"]]
+PDF_BAD=[["Final BAD-D","CER-AI interpretation / action"],["<=1.6","NORMAL"],[">1.6 to <2.60","SUSPICIOUS - CAUTION"],[">=2.60","ABNORMAL CORNEA - STOP-DEFER"]]
 TOPOGRAPHY=[["Category","What to look for","ERSS points"],*[list(row) for row in reports.RANDLEMAN_TOPOGRAPHY_REFERENCE]]
 ACTIVE_ERSS=[list(row) for row in reports.RANDLEMAN_ACTIVE_ERSS_REFERENCE]
 

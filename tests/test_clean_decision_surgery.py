@@ -9,11 +9,11 @@ from clean_engine import surgery
 def test_clean_final_hierarchy_matrix():
     for bad in ("NORMAL", "SUSPICIOUS"):
         for erss in (0, 1, 2):
-            out = decide(DecisionInput("REVIEW — NOT CLEARED", bad, erss))
-            assert out.status == "PASS WITH CAUTION"
-    assert decide(DecisionInput("PASS", "NORMAL", 3)).status == "CAUTION — DEFER"
-    assert decide(DecisionInput("PASS", "ABNORMAL", 0)).status == "DO NOT PROCEED"
-    assert decide(DecisionInput("DO NOT PROCEED", "NORMAL", 0, has_hard_stop=True)).status == "DO NOT PROCEED"
+            out = decide(DecisionInput("CAUTION", bad, erss))
+            assert out.status == "CAUTION"
+    assert decide(DecisionInput("PASS", "NORMAL", 3)).status == "STOP-DEFER"
+    assert decide(DecisionInput("PASS", "ABNORMAL", 0)).status == "STOP-DEFER"
+    assert decide(DecisionInput("STOP-DEFER", "NORMAL", 0, has_hard_stop=True)).status == "STOP-DEFER"
     assert decide(DecisionInput("DATA INSUFFICIENT", "NORMAL", 0, decision_critical_incomplete=True)).status == "DATA INSUFFICIENT"
 
 
@@ -64,7 +64,7 @@ def test_clean_independent_hard_stop_final_k_boundaries_are_inclusive():
     assert surgery.lasik_independent_hard_stop(final_kmean=48.001, **common)
 
 
-def outcome(index, status="PASS WITH CAUTION", pta=35.0, hard_stop=False):
+def outcome(index, status="PASS", pta=35.0, hard_stop=False):
     return surgery.LasikPlanOutcome(surgery.LASIK_PLANS[index], status, pta, hard_stop)
 
 
@@ -75,12 +75,12 @@ def test_lasik_fallback_stops_when_plan_a_is_acceptable():
 
 def test_lasik_failure_falls_back_a_to_b_and_preserves_a():
     seq = surgery.select_lasik_sequence([
-        outcome(0, status="DO NOT PROCEED", pta=35.0),
-        outcome(1, status="PASS WITH CAUTION", pta=35.0),
+        outcome(0, status="STOP-DEFER", pta=35.0),
+        outcome(1, status="PASS", pta=35.0),
         outcome(2),
     ])
     assert [x.plan.name for x in seq] == ["Plan A", "Plan B"]
-    assert surgery.final_lasik_status(seq) == "PASS WITH CAUTION"
+    assert surgery.final_lasik_status(seq) == "PASS"
 
 
 def test_typed_evaluator_is_lazy_and_stops_after_acceptable_plan_b():
@@ -88,8 +88,8 @@ def test_typed_evaluator_is_lazy_and_stops_after_acceptable_plan_b():
     def evaluator(plan):
         called.append(plan.name)
         if plan.name == "Plan A":
-            return surgery.LasikPlanOutcome(plan, "DO NOT PROCEED", 41.0)
-        return surgery.LasikPlanOutcome(plan, "PASS WITH CAUTION", 39.0)
+            return surgery.LasikPlanOutcome(plan, "STOP-DEFER", 41.0)
+        return surgery.LasikPlanOutcome(plan, "PASS", 39.0)
     seq = surgery.evaluate_lasik_fallback(evaluator)
     assert called == ["Plan A", "Plan B"]
     assert [x.plan.name for x in seq] == called
@@ -99,10 +99,10 @@ def test_typed_evaluator_stops_immediately_on_independent_hard_stop():
     called = []
     def evaluator(plan):
         called.append(plan.name)
-        return surgery.LasikPlanOutcome(plan, "DO NOT PROCEED", 45.0, independent_hard_stop=True)
+        return surgery.LasikPlanOutcome(plan, "STOP-DEFER", 45.0, independent_hard_stop=True)
     seq = surgery.evaluate_lasik_fallback(evaluator)
     assert called == ["Plan A"]
-    assert surgery.final_lasik_status(seq) == "DO NOT PROCEED"
+    assert surgery.final_lasik_status(seq) == "STOP-DEFER"
 
 
 def test_plan_a_preserves_actual_laser_ablation():
@@ -162,21 +162,21 @@ def test_pta_at_exactly_40_triggers_fallback():
 
 def test_independent_hard_stop_prevents_parameter_fallback():
     seq = surgery.select_lasik_sequence([
-        outcome(0, status="DO NOT PROCEED", pta=45.0, hard_stop=True),
+        outcome(0, status="STOP-DEFER", pta=45.0, hard_stop=True),
         outcome(1), outcome(2),
     ])
     assert [x.plan.name for x in seq] == ["Plan A"]
-    assert surgery.final_lasik_status(seq) == "DO NOT PROCEED"
+    assert surgery.final_lasik_status(seq) == "STOP-DEFER"
 
 
 def test_plan_c_pta_cutoff_forces_final_do_not_proceed():
     seq = surgery.select_lasik_sequence([
-        outcome(0, status="DO NOT PROCEED", pta=42.0),
-        outcome(1, status="DO NOT PROCEED", pta=41.0),
-        outcome(2, status="PASS WITH CAUTION", pta=40.0),
+        outcome(0, status="STOP-DEFER", pta=42.0),
+        outcome(1, status="STOP-DEFER", pta=41.0),
+        outcome(2, status="PASS", pta=40.0),
     ])
     assert [x.plan.name for x in seq] == ["Plan A", "Plan B", "Plan C"]
-    assert surgery.final_lasik_status(seq) == "DO NOT PROCEED"
+    assert surgery.final_lasik_status(seq) == "STOP-DEFER"
 
 
 def test_lasik_calculations():

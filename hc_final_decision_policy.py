@@ -1,24 +1,9 @@
-"""Canonical CER-AI final decision hierarchy.
-
-CER-AI policy:
-- Independent hard stops always prevail.
-- Missing/unresolved decision-critical data can never be promoted to clearance.
-- Final BAD-D ABNORMAL (>=2.60) remains a hard stop.
-- Randleman/ERSS total >=3 remains an adverse/defer pathway.
-- Otherwise, when Final BAD-D is available and not ABNORMAL and Randleman is complete
-  with total <3, secondary/contextual findings may generate warnings but the final
-  classification is PASS WITH CAUTION.
-
-This policy intentionally prevents isolated secondary tomography/topometric concern
-flags from escalating an otherwise non-abnormal Final BAD-D + ERSS<3 case to defer.
-"""
+"""Canonical CER-AI final hierarchy using PASS / CAUTION / STOP-DEFER."""
 import bootstrap
+from clinical_disposition import CAUTION, PASS, STATUS_RANK, STOP_DEFER
 
 core = bootstrap.core
 _previous_assess_eye = core.assess_eye
-
-_ADVERSE_STATUSES = {"DO NOT PROCEED", "FAIL"}
-
 
 def _decision_critical_incomplete(result):
     if result.get("missing"):
@@ -31,8 +16,12 @@ def _decision_critical_incomplete(result):
 def assess_eye_with_hc_final_hierarchy(eye, plan, age, patient_modifiers):
     result = _previous_assess_eye(eye, plan, age, patient_modifiers)
 
-    # Never override any independent hard stop or explicit upstream FAIL.
-    if result.get("hard_stops") or str(result.get("status") or "").upper() in _ADVERSE_STATUSES:
+    if result.get("status") not in STATUS_RANK:
+        raise ValueError(f"Non-canonical CER-AI disposition escaped the clinical engine: {result.get('status')!r}")
+
+    if result.get("hard_stops") or result.get("status") == STOP_DEFER:
+        result["status"] = STOP_DEFER
+        result["action"] = "STOP-DEFER; do not proceed unless the stated stop/defer condition is resolved."
         return result
     if _decision_critical_incomplete(result):
         return result
@@ -52,33 +41,32 @@ def assess_eye_with_hc_final_hierarchy(eye, plan, age, patient_modifiers):
             result["hard_stops"].append(stop)
         if stop not in result.setdefault("reasons", []):
             result["reasons"].append(stop)
-        result["status"] = "DO NOT PROCEED"
-        result["action"] = "DO NOT PROCEED — ABNORMAL CORNEA. Final BAD-D is >=2.60 and meets the CER-AI abnormal cutoff."
+        result["status"] = STOP_DEFER
+        result["action"] = "STOP-DEFER — ABNORMAL CORNEA. Final BAD-D is >=2.60 and meets the CER-AI abnormal cutoff."
         return result
 
     if float(erss_total) >= 3:
         # Do not weaken the existing ERSS adverse pathway. If an upstream layer happened
         # to leave PASS, enforce the CER-AI threshold explicitly.
-        if str(result.get("status") or "").upper() in {"PASS", "PASS WITH CAUTION"}:
-            result["status"] = "CAUTION — DEFER"
-            result["action"] = "DEFER / NOT CLEARED. Randleman/ERSS score is 3 or greater."
+        result["status"] = STOP_DEFER
+        result["action"] = "STOP-DEFER. Randleman/ERSS score is 3 or greater."
         reason = f"CER-AI final hierarchy: Randleman/ERSS total {float(erss_total):g} is >=3."
         if reason not in result.setdefault("reasons", []):
             result["reasons"].append(reason)
         return result
 
-    # New governing rule: Final BAD-D not abnormal + complete ERSS <3 = PASS WITH CAUTION.
-    # Secondary findings remain visible as warnings/reasons but cannot independently
-    # escalate the final classification to defer.
-    result["status"] = "PASS WITH CAUTION"
+    # Preserve a truly reassuring upstream PASS. Contextual review findings become
+    # CAUTION without an automatic defer instruction.
+    result["status"] = CAUTION if result.get("status") == CAUTION else PASS
     result["action"] = (
-        "PASS WITH CAUTION — Final BAD-D is not abnormal and Randleman/ERSS is <3. "
-        "Review all displayed secondary/contextual findings and apply surgeon judgment."
+        "CAUTION — surgeon review is required; this category does not automatically defer surgery."
+        if result["status"] == CAUTION
+        else "CER-AI assessment PASS; this is not a guarantee of zero ectasia risk."
     )
     result["hc_final_decision_hierarchy"] = {
         "final_BAD_D_status": bad_status,
         "randleman_erss_total": float(erss_total),
-        "rule": "FINAL_BAD_D_NOT_ABNORMAL_AND_ERSS_LT_3_PASS_WITH_CAUTION",
+        "rule": "FINAL_BAD_D_NOT_ABNORMAL_AND_ERSS_LT_3_PRESERVE_PASS_OR_CAUTION",
     }
     return result
 

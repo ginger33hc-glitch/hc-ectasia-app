@@ -19,7 +19,7 @@ def ready_payload(
     patient_id="P-123",
     reviewer="Dr. Example",
     report_date="2026-08-31",
-    status="PASS WITH CAUTION",
+    status="PASS",
 ):
     return {
         "report_token": "never-index-this-token",
@@ -34,7 +34,7 @@ def ready_payload(
             "status": status,
             "action": "Surgeon review",
             "eyes": [
-                {"eye": "OS", "status": "PASS WITH CAUTION"},
+                {"eye": "OS", "status": "PASS"},
                 {"eye": "OD", "status": "PASS"},
             ],
         },
@@ -63,7 +63,7 @@ def test_catalog_entry_contains_search_fields_and_orders_eyes_od_first():
     assert entry["patient"] == {"name": "Şule Işık", "id": "P-123", "age": 42}
     assert entry["reviewer"] == "Dr. Example"
     assert entry["report_date"] == "2026-08-31"
-    assert entry["decision"]["status"] == "PASS WITH CAUTION"
+    assert entry["decision"]["status"] == "PASS"
     assert [eye["eye"] for eye in entry["decision"]["eyes"]] == ["OD", "OS"]
 
 
@@ -100,7 +100,7 @@ def test_search_is_turkish_diacritic_and_punctuation_insensitive():
 
 def test_search_supports_patient_id_date_and_decision_filters_together():
     archive = make_archive()
-    case_catalog.write_entry(archive, revision("6" * 32), ready_payload())
+    case_catalog.write_entry(archive, revision("6" * 32), ready_payload(status="CAUTION"))
     matches = case_catalog.search_entries(
         archive,
         patient_id="p123",
@@ -122,13 +122,13 @@ def test_multiple_revisions_remain_distinct_for_auditable_history():
     archive = make_archive()
     case_id = "8" * 32
     first = ready_payload(report_date="2026-08-30", status="PASS")
-    second = ready_payload(report_date="2026-08-31", status="DO NOT PROCEED")
+    second = ready_payload(report_date="2026-08-31", status="STOP-DEFER")
     case_catalog.write_entry(archive, revision(case_id, "9" * 24), first)
     case_catalog.write_entry(archive, revision(case_id, "a" * 24), second)
     entries = case_catalog.list_entries(archive)
     assert len(entries) == 2
     assert entries[0]["report_date"] == "2026-08-31"
-    assert entries[0]["decision"]["status"] == "DO NOT PROCEED"
+    assert entries[0]["decision"]["status"] == "STOP-DEFER"
 
 
 def test_search_limit_is_bounded():

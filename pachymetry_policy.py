@@ -73,8 +73,8 @@ def assess_eye_with_hc_pachymetry(eye, plan, age, patient_modifiers):
             if stop not in reasons:
                 reasons.insert(0, stop)
             result["reasons"] = list(dict.fromkeys(reasons))
-            result["status"] = "DO NOT PROCEED"
-            result["action"] = "DO NOT PROCEED with elective corneal refractive surgery."
+            result["status"] = "STOP-DEFER"
+            result["action"] = "STOP-DEFER; do not proceed with elective corneal refractive surgery."
 
         if result.get("values", {}).get("procedure") == "LASIK":
             score = result.get("score") or {}

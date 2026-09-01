@@ -11,12 +11,13 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 
+from clinical_disposition import combine_status as combine_clinical_status
 from pentacam_field_registry import EXCLUSIVE_LABELED_BOX_FIELDS
 from pentacam_quality_policy import is_quality_only_issue, warnings_for_extracted
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.70")
+app = FastAPI(title="CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.71")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -380,15 +381,7 @@ def tri(value: Any) -> str:
 
 
 def combine_status(current: str, new: str) -> str:
-    rank = {
-        "PASS": 0,
-        "POST-REFRACTIVE PATHWAY REQUIRED": 1,
-        "DATA INSUFFICIENT": 2,
-        "REVIEW — NOT CLEARED": 3,
-        "CAUTION — STOP/DEFER": 4,
-        "DO NOT PROCEED": 5,
-    }
-    return new if rank[new] > rank[current] else current
+    return combine_clinical_status(current, new)
 
 
 def _transpose_axis(axis: Optional[float]) -> Optional[float]:
@@ -1043,36 +1036,36 @@ def assess_eye(
         )
 
     if hard_stops:
-        status = "DO NOT PROCEED"
+        status = "STOP-DEFER"
         reasons.extend(hard_stops)
 
     if stable == "no" or progression == "yes":
-        status = combine_status(status, "CAUTION — STOP/DEFER")
+        status = combine_status(status, "STOP-DEFER")
         reasons.append("Refractive instability or documented progression: defer and re-evaluate after >=6 months.")
     if cdva == "yes":
-        status = combine_status(status, "REVIEW — NOT CLEARED")
+        status = combine_status(status, "CAUTION")
         reasons.append("Unexplained preoperative CDVA <20/20 requires investigation.")
     if eye_rubbing == "yes":
         modifiers.append("Chronic eye rubbing/repetitive ocular trauma present.")
     if family_history == "yes":
         modifiers.append("Family history of keratoconus present.")
     if inter_eye == "yes":
-        status = combine_status(status, "REVIEW — NOT CLEARED")
+        status = combine_status(status, "CAUTION")
         modifiers.append("Marked inter-eye asymmetry requires escalated review.")
     if pregnancy_nursing == "yes":
-        status = combine_status(status, "CAUTION — STOP/DEFER")
+        status = combine_status(status, "STOP-DEFER")
         modifiers.append("Pregnancy or nursing reported; separate refractive-surgery eligibility review required.")
     if collagen_tissue_disease == "yes":
-        status = combine_status(status, "REVIEW — NOT CLEARED")
+        status = combine_status(status, "CAUTION")
         modifiers.append("Collagen/connective-tissue disease reported; separate clinical eligibility review required.")
     if drug_usage == "yes":
-        status = combine_status(status, "REVIEW — NOT CLEARED")
+        status = combine_status(status, "CAUTION")
         modifiers.append("Relevant medication/drug usage reported; medication-specific clinical review required.")
     if dry_eye == "yes":
-        status = combine_status(status, "REVIEW — NOT CLEARED")
+        status = combine_status(status, "CAUTION")
         modifiers.append("Dry-eye disease reported; ocular-surface optimization and eligibility review required.")
     if systemic_disease == "yes":
-        status = combine_status(status, "REVIEW — NOT CLEARED")
+        status = combine_status(status, "CAUTION")
         modifiers.append("Systemic disease reported; disease-specific refractive-surgery eligibility review required.")
 
     contact_lens_type = str(patient_modifiers.get("contact_lens_type") or "UNKNOWN").upper()
@@ -1104,10 +1097,10 @@ def assess_eye(
             score_total = int(sum(score_rows.values()))
             category = score_category("LASIK", score_total)
             if category == "HIGH":
-                status = combine_status(status, "DO NOT PROCEED")
+                status = combine_status(status, "STOP-DEFER")
                 reasons.append("Validated LASIK ERSS high-risk category (score >=4).")
             elif category == "MODERATE":
-                status = combine_status(status, "CAUTION — STOP/DEFER")
+                status = combine_status(status, "STOP-DEFER")
                 reasons.append(
                     "Validated LASIK ERSS moderate-risk category (score 3): defer and re-evaluate after >=6 months."
                 )
@@ -1121,46 +1114,46 @@ def assess_eye(
             score_total = int(sum(score_rows.values()))
             category = score_category("PRK", score_total)
             if category == "HIGH_CONCERN":
-                status = combine_status(status, "DO NOT PROCEED")
+                status = combine_status(status, "STOP-DEFER")
                 reasons.append("PRK-EWSS v1.0 provisional high-concern category (score >=4).")
             elif category == "CAUTION":
-                status = combine_status(status, "CAUTION — STOP/DEFER")
+                status = combine_status(status, "STOP-DEFER")
                 reasons.append(
                     "PRK-EWSS v1.0 provisional caution category (score 2-3): defer and re-evaluate after >=6 months."
                 )
 
     if hyperopic_or_mixed:
-        status = combine_status(status, "REVIEW — NOT CLEARED")
+        status = combine_status(status, "CAUTION")
         reasons.append(
             "The supplied procedure-specific scoring evidence is predominantly myopic; "
             "hyperopic or mixed-meridian applicability is not established."
         )
     if procedure == "LASIK" and mixed_plan and is_number(age) and age < 21:
-        status = combine_status(status, "REVIEW — NOT CLEARED")
+        status = combine_status(status, "CAUTION")
         reasons.append(
             "The planned mixed-astigmatism LASIK profile is outside the Alcon WaveLight labeled age range (<21 years)."
         )
     if procedure == "LASIK" and mixed_plan and is_number(intended_cylinder) and intended_cylinder > 6.0:
-        status = combine_status(status, "REVIEW — NOT CLEARED")
+        status = combine_status(status, "CAUTION")
         reasons.append(
             "The planned mixed-astigmatism cylinder exceeds the Alcon WaveLight labeled range (>6.00 D)."
         )
 
     if tomo["status"] == "ABNORMAL" and visible_morphology != "ABNORMAL_ECTATIC":
-        status = combine_status(status, "REVIEW — NOT CLEARED")
+        status = combine_status(status, "CAUTION")
         reasons.append("Abnormal adjunctive tomography display: morphology/clinical concordance review required.")
     elif tomo["status"] == "SUSPICIOUS":
-        status = combine_status(status, "REVIEW — NOT CLEARED")
+        status = combine_status(status, "CAUTION")
         reasons.append("Suspicious adjunctive tomography display: repeat/confirm and review concordance.")
     elif tomo["status"] == "CONCERN FLAGS":
-        status = combine_status(status, "REVIEW — NOT CLEARED")
+        status = combine_status(status, "CAUTION")
         reasons.append(
             "One or more supplied cross-sectional tomography concern thresholds are positive; "
             "confirm repeatability and clinical/map concordance before any clearance."
         )
 
     if procedure == "PRK" and surgical_load_flags:
-        status = combine_status(status, "REVIEW — NOT CLEARED")
+        status = combine_status(status, "CAUTION")
         reasons.append(
             "The PRK plan lies outside the supplied reassuring 2-year direct-cohort PTA envelope; "
             "the evidence gap requires documented review and cannot receive automatic PASS."
@@ -1180,10 +1173,10 @@ def assess_eye(
         "eye": eye_id,
         "status": status,
         "action": (
-            "STOP/DEFER; repeat relevant ectasia screening and reassess after at least 6 months."
-            if status == "CAUTION — STOP/DEFER"
-            else "DO NOT PROCEED with elective corneal refractive surgery."
-            if status == "DO NOT PROCEED"
+            "STOP-DEFER; do not proceed unless the stated stop/defer condition is resolved."
+            if status == "STOP-DEFER"
+            else "CAUTION — surgeon review required; this category does not automatically defer surgery."
+            if status == "CAUTION"
             else "No surgical clearance; resolve the stated review/data requirement."
             if status != "PASS"
             else "CER-AI assessment PASS; this is not a guarantee of zero ectasia risk."
@@ -1515,7 +1508,7 @@ def hc_engine(
         "document_contexts": extracted.get("document_contexts", []),
         "source_quality_warnings": warnings_for_extracted(extracted),
         "protocol": "CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.70 / source set 2026-08-25 plus binding CER-AI amendments",
+        "version": "software v0.7.71 / source set 2026-08-25 plus binding CER-AI amendments",
     }
 
 

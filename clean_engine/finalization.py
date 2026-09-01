@@ -5,6 +5,7 @@ from typing import Optional, Tuple
 from .decision import DecisionInput, DecisionOutput, decide
 from .models import PrkScoreValues
 from .status import combine_status
+from clinical_disposition import CAUTION, PASS, STOP_DEFER
 
 
 @dataclass(frozen=True)
@@ -27,18 +28,18 @@ class FinalizationOutput:
 def finalize(inp: FinalizationInput) -> FinalizationOutput:
     """Compose procedure-specific upstream status, then apply principal hierarchy."""
     procedure = (inp.procedure or "").upper()
-    upstream = "DO NOT PROCEED" if inp.hard_stops else ("DATA INSUFFICIENT" if inp.missing else "PASS")
+    upstream = STOP_DEFER if inp.hard_stops else ("DATA INSUFFICIENT" if inp.missing else PASS)
 
     if procedure == "PRK" and not inp.hard_stops and not inp.missing:
         if inp.prk_scores.category == "HIGH_CONCERN":
-            upstream = combine_status(upstream, "DO NOT PROCEED")
+            upstream = combine_status(upstream, STOP_DEFER)
         elif inp.prk_scores.category == "CAUTION":
-            upstream = combine_status(upstream, "CAUTION — STOP/DEFER")
+            upstream = combine_status(upstream, STOP_DEFER)
         if inp.prk_scores.pta_evidence_gap:
-            upstream = combine_status(upstream, "REVIEW — NOT CLEARED")
+            upstream = combine_status(upstream, CAUTION)
     elif procedure == "LASIK" and not inp.hard_stops and not inp.missing:
         if inp.lasik_erss_total == 3:
-            upstream = combine_status(upstream, "CAUTION — STOP/DEFER")
+            upstream = combine_status(upstream, STOP_DEFER)
 
     decision: DecisionOutput = decide(DecisionInput(
         upstream_status=upstream,

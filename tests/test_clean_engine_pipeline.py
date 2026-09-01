@@ -18,7 +18,7 @@ def base(**changes):
 
 def test_complete_favorable_case_is_pass_with_caution():
     out = assess(base())
-    assert out.status == "PASS WITH CAUTION"
+    assert out.status == "PASS"
     assert not out.hard_stops and not out.missing
 
 
@@ -41,27 +41,27 @@ def test_fallback_plan_a_rsb_failure_is_rescued_by_plan_b_recalculation():
 def test_fallback_independent_pachymetry_stop_never_advances_to_plan_b():
     out = assess(base(pachy_thinnest_um=479))
     assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A"]
-    assert out.status == "DO NOT PROCEED" and "PACHYMETRY_LT_480" in out.hard_stops
+    assert out.status == "STOP-DEFER" and "PACHYMETRY_LT_480" in out.hard_stops
 
 
 def test_fallback_independent_ectatic_topography_never_advances_to_plan_b():
     out = assess(base(morphology="ABNORMAL_ECTATIC", ablation_um=121))
     assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A"]
-    assert out.status == "DO NOT PROCEED"
+    assert out.status == "STOP-DEFER"
     assert "ABNORMAL_ECTATIC_TOPOGRAPHY" in out.hard_stops
 
 
 def test_fallback_independent_myopic_magnitude_stop_never_advances_to_plan_b():
     out = assess(base(intended_sphere_d=-10.001, intended_mrse_d=-10.001, ablation_um=121))
     assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A"]
-    assert out.status == "DO NOT PROCEED"
+    assert out.status == "STOP-DEFER"
     assert "INTENDED_SPHERE_LT_MINUS_10" in out.hard_stops
 
 
 def test_fallback_independent_hyperopic_magnitude_stop_never_advances_to_plan_b():
     out = assess(base(intended_sphere_d=6.001, intended_mrse_d=6.001, ablation_um=121))
     assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A"]
-    assert out.status == "DO NOT PROCEED"
+    assert out.status == "STOP-DEFER"
     assert "INTENDED_SPHERE_GT_PLUS_6" in out.hard_stops
 
 
@@ -70,7 +70,7 @@ def test_fallback_independent_final_k_stop_never_advances_to_plan_b():
     out = assess(base(preop_kmean_d=44, intended_mrse_d=5.001, intended_sphere_d=5.001, ablation_um=121))
     assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A"]
     assert out.calculations.final_kmean_d > 48
-    assert out.status == "DO NOT PROCEED"
+    assert out.status == "STOP-DEFER"
     assert "FINAL_KMEAN_OUTSIDE_36_48" in out.hard_stops
 
 
@@ -78,7 +78,7 @@ def test_fallback_plan_c_pta_at_40_is_final_hard_stop():
     out = assess(base(pachy_thinnest_um=500, ablation_um=120, intended_sphere_d=-5.5, intended_cylinder_magnitude_d=5.5, intended_mrse_d=-8.25))
     assert [x.plan_name for x in out.lasik_planning_sequence] == ["Plan A", "Plan B", "Plan C"]
     assert out.lasik_planning_sequence[-1].pta_percent == 44.4
-    assert "LASIK_PTA_GE_40_AFTER_FALLBACK" in out.hard_stops and out.status == "DO NOT PROCEED"
+    assert "LASIK_PTA_GE_40_AFTER_FALLBACK" in out.hard_stops and out.status == "STOP-DEFER"
 
 
 def test_fallback_hyperopic_plan_b_cannot_invent_ablation():
@@ -109,7 +109,7 @@ def test_prk_score_three_defers():
     out = assess(base(procedure="PRK", flap_um=None, pachy_thinnest_um=520, morphology="NORMAL_SYMMETRIC", age_years=18, ablation_um=60))
     assert out.prk_scores.total == 3
     assert out.prk_scores.category == "CAUTION"
-    assert out.status == "CAUTION — STOP/DEFER"
+    assert out.status == "STOP-DEFER"
 
 
 def test_prk_score_four_or_more_is_score_driven_stop_not_independent_hard_stop():
@@ -117,7 +117,7 @@ def test_prk_score_four_or_more_is_score_driven_stop_not_independent_hard_stop()
     assert out.prk_scores.total == 5
     assert out.prk_scores.category == "HIGH_CONCERN"
     assert "PRK_SCORE_GE_4" not in out.hard_stops
-    assert out.status == "DO NOT PROCEED"
+    assert out.status == "STOP-DEFER"
 
 
 def test_prk_pta_exact_35_28_is_not_evidence_gap_but_above_is_review():
@@ -127,7 +127,7 @@ def test_prk_pta_exact_35_28_is_not_evidence_gap_but_above_is_review():
     assert exact.prk_scores.pta_evidence_gap is False
     above = assess(base(procedure="PRK", flap_um=None, pachy_thinnest_um=500, ablation_um=exact_ablation + 0.001, age_years=30))
     assert above.prk_scores.pta_evidence_gap is True
-    assert above.status == "REVIEW — NOT CLEARED"
+    assert above.status == "CAUTION"
     assert "PRK_PTA_EVIDENCE_GAP" not in above.hard_stops
 
 
@@ -136,7 +136,7 @@ def test_pachymetry_480_scores_and_479_is_independent_hard_stop():
     stopped = assess(base(pachy_thinnest_um=479))
     assert "PACHYMETRY_LT_480" not in scoring.hard_stops
     assert scoring.scores.pachymetry_points == 2
-    assert stopped.status == "DO NOT PROCEED" and "PACHYMETRY_LT_480" in stopped.hard_stops
+    assert stopped.status == "STOP-DEFER" and "PACHYMETRY_LT_480" in stopped.hard_stops
 
 
 def test_lasik_rsb_just_below_300_triggers_automatic_fallback():
@@ -157,19 +157,19 @@ def test_bad_d_2_60_is_inclusive_hard_stop_and_just_below_is_not():
     below = assess(base(bad_d=2.5999))
     boundary = assess(base(bad_d=2.6))
     assert "FINAL_BAD_D_ABNORMAL" not in below.hard_stops
-    assert boundary.status == "DO NOT PROCEED"
+    assert boundary.status == "STOP-DEFER"
     assert "FINAL_BAD_D_ABNORMAL" in boundary.hard_stops
 
 
 def test_lasik_score_two_has_no_score_escalation():
     out = assess(base(age_years=19, pachy_thinnest_um=520))
     assert out.scores.erss_total == 2
-    assert out.status == "PASS WITH CAUTION"
+    assert out.status == "PASS"
 
 
 def test_lasik_score_three_defers_and_four_stops():
-    score3 = assess(base(age_years=18, pachy_thinnest_um=520)); assert score3.scores.erss_total == 3 and score3.status == "CAUTION — STOP/DEFER"
-    score4 = assess(base(age_years=18, pachy_thinnest_um=500)); assert score4.scores.erss_total == 4 and score4.status == "DO NOT PROCEED"
+    score3 = assess(base(age_years=18, pachy_thinnest_um=520)); assert score3.scores.erss_total == 3 and score3.status == "STOP-DEFER"
+    score4 = assess(base(age_years=18, pachy_thinnest_um=500)); assert score4.scores.erss_total == 4 and score4.status == "STOP-DEFER"
 
 
 def test_missing_principal_input_never_passes():
@@ -208,7 +208,7 @@ def test_all_procedure_critical_inputs_fail_closed():
         assert out.status == "DATA INSUFFICIENT"
         assert field in out.missing
     default_flap = assess(base(flap_um=None))
-    assert default_flap.status == "PASS WITH CAUTION"
+    assert default_flap.status == "PASS"
     assert default_flap.lasik_planning_sequence[0].flap_um == 100
 
 

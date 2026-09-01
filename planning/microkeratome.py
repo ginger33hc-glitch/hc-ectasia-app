@@ -10,9 +10,10 @@ Source rules: the user-supplied Turkish ML7 reference (MED-LOGICS document
 from dataclasses import asdict, dataclass, field
 from typing import Optional, Tuple
 import math
+from clinical_disposition import FAVORABLE_PLANNING_STATUSES
 
 
-FAVORABLE_LASIK_STATUSES = frozenset({"PASS", "PASS WITH CAUTION"})
+FAVORABLE_LASIK_STATUSES = FAVORABLE_PLANNING_STATUSES
 LASIK_RSB_MIN_UM = 300.0
 LASIK_PTA_MAX_EXCLUSIVE_PERCENT = 40.0
 

@@ -55,5 +55,5 @@ def test_final_bad_d_abnormal_boundary_remains_inclusive():
 
 
 def test_hard_stop_status_outranks_every_favorable_status():
-    assert core.combine_status("PASS", "DO NOT PROCEED") == "DO NOT PROCEED"
-    assert core.combine_status("PASS WITH CAUTION", "DO NOT PROCEED") == "DO NOT PROCEED"
+    assert core.combine_status("PASS", "STOP-DEFER") == "STOP-DEFER"
+    assert core.combine_status("PASS", "STOP-DEFER") == "STOP-DEFER"

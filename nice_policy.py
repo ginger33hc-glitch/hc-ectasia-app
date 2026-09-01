@@ -3,6 +3,7 @@
 The canonical ERSS/BAD scorers, their input rules, and LASIK fallback planner remain intact.
 """
 from nice_scoring import score_nice, finite
+from clinical_disposition import CAUTION, FAVORABLE_PLANNING_STATUSES, STOP_DEFER
 
 
 B_ELE_TH_EXTRACTION_RULE = """B_Ele_Th_um is one dedicated NICE input only.
@@ -148,16 +149,14 @@ def install(core):
                 reason = f"CER-AI NICE hard stop: total {nice['total']} >=9 (LASIK and PRK)."
                 result.setdefault("hard_stops", []).append(reason)
                 result.setdefault("reasons", []).append(reason)
-                result["status"] = core.combine_status(result["status"], "DO NOT PROCEED")
-                result["action"] = "DO NOT PROCEED with corneal refractive surgery. NICE >=9."
+                result["status"] = core.combine_status(result["status"], STOP_DEFER)
+                result["action"] = "STOP-DEFER. NICE >=9 is a CER-AI hard stop."
             elif nice["total"] >= 5:
                 result.setdefault("reasons", []).append(f"CER-AI NICE caution: total {nice['total']} is in 5-8 inclusive.")
-                old_status = result["status"]
-                result["status"] = core.combine_status(old_status, "CAUTION — STOP/DEFER")
-                if result["status"] != old_status or old_status.startswith("CAUTION"):
-                    result["action"] = "STOP/DEFER; reassess after at least 6 months. NICE 5-8 does not clear surgery."
-            # The previous post-assessment planner must never survive a NICE stop.
-            if result["status"] not in {"PASS", "PASS WITH CAUTION"}:
+                result["status"] = core.combine_status(result["status"], CAUTION)
+                if result["status"] == CAUTION:
+                    result["action"] = "CAUTION — surgeon review required; NICE 5-8 does not automatically defer surgery."
+            if result["status"] not in FAVORABLE_PLANNING_STATUSES:
                 result.pop("microkeratome_planning", None)
             decision["status"] = core.combine_status(decision["status"], result["status"])
         decision["version"] = f"software v{core.APP_VERSION} / CER-AI NICE and data-readiness policy"

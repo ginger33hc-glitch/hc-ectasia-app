@@ -7,7 +7,7 @@ import runtime_composition as composition
 
 core = composition.core
 app = composition.app
-CANONICAL_VERSION = "0.7.70"
+CANONICAL_VERSION = "0.7.71"
 _archive_runtime = composition.compose(CANONICAL_VERSION)
 
 
@@ -61,8 +61,8 @@ def runtime_invariants():
     if not getattr(core,"_cerai_targeted_pentacam_reread_installed",False):errors.append("Targeted Pentacam numeric reread layer is not active")
     if getattr(core.lasik_topography_points, "__module__", None) != "app":errors.append("ERSS evidence gate must not replace or duplicate the canonical topography point mapper")
     try:
-        if core.combine_status("PASS", "PASS WITH CAUTION") != "PASS WITH CAUTION":errors.append("PASS WITH CAUTION aggregate ranking is invalid")
-        if core.combine_status("PASS WITH CAUTION", "DO NOT PROCEED") != "DO NOT PROCEED":errors.append("Hard-stop aggregate ranking is invalid")
+        if core.combine_status("PASS", "CAUTION") != "CAUTION":errors.append("CAUTION aggregate ranking is invalid")
+        if core.combine_status("CAUTION", "STOP-DEFER") != "STOP-DEFER":errors.append("STOP-DEFER aggregate ranking is invalid")
     except Exception as exc:errors.append(f"Aggregate status ranking failed: {type(exc).__name__}")
     if not getattr(core,"_hc_lasik_fallback_installed",False):errors.append("LASIK fallback planner is not active")
     if getattr(core,"PRK_EPITHELIUM_UM",None) != 50:errors.append("PRK epithelial convention is not 50 µm")

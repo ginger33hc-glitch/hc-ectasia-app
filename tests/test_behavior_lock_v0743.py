@@ -16,7 +16,7 @@ core = canonical_engine.core
 
 
 def test_canonical_version_lock():
-    assert canonical_engine.CANONICAL_VERSION == "0.7.70"
+    assert canonical_engine.CANONICAL_VERSION == "0.7.71"
 
 
 def test_hc_age_boundaries():
@@ -68,50 +68,50 @@ def _run_final_policy(monkeypatch, upstream, bad_status="NORMAL", erss_total=0):
     return final_policy.assess_eye_with_hc_final_hierarchy({"BAD_D": 1.0}, {}, 30, {})
 
 
-def test_final_hierarchy_bad_normal_or_suspicious_and_erss_below_3_passes_with_caution(monkeypatch):
+def test_final_hierarchy_preserves_caution_when_principal_scores_are_below_3(monkeypatch):
     for bad_status in ("NORMAL", "SUSPICIOUS"):
         for erss_total in (0, 1, 2):
-            out = _run_final_policy(monkeypatch, {"status": "REVIEW — NOT CLEARED"}, bad_status, erss_total)
-            assert out["status"] == "PASS WITH CAUTION"
+            out = _run_final_policy(monkeypatch, {"status": "CAUTION"}, bad_status, erss_total)
+            assert out["status"] == "CAUTION"
 
 
 def test_final_hierarchy_erss_3_is_adverse(monkeypatch):
     out = _run_final_policy(monkeypatch, {"status": "PASS"}, "NORMAL", 3)
-    assert out["status"] == "CAUTION — DEFER"
+    assert out["status"] == "STOP-DEFER"
 
 
 def test_final_hierarchy_preserves_upstream_erss_4_hard_stop(monkeypatch):
     out = _run_final_policy(
         monkeypatch,
-        {"status": "DO NOT PROCEED", "hard_stops": ["Validated LASIK ERSS high-risk category (score >=4)."]},
+        {"status": "STOP-DEFER", "hard_stops": ["Validated LASIK ERSS high-risk category (score >=4)."]},
         "NORMAL",
         4,
     )
-    assert out["status"] == "DO NOT PROCEED"
+    assert out["status"] == "STOP-DEFER"
     assert out["hard_stops"]
 
 
 def test_final_hierarchy_abnormal_bad_is_hard_stop(monkeypatch):
     out = _run_final_policy(monkeypatch, {"status": "PASS"}, "ABNORMAL", 0)
-    assert out["status"] == "DO NOT PROCEED"
+    assert out["status"] == "STOP-DEFER"
     assert any("Final BAD-D abnormal" in reason for reason in out["hard_stops"])
 
 
 def test_final_hierarchy_never_overrides_missing_or_hard_stop(monkeypatch):
     missing = _run_final_policy(monkeypatch, {"status": "DATA INSUFFICIENT", "missing": ["BAD-D"]}, "NORMAL", 0)
     assert missing["status"] == "DATA INSUFFICIENT"
-    stopped = _run_final_policy(monkeypatch, {"status": "DO NOT PROCEED", "hard_stops": ["independent stop"]}, "NORMAL", 0)
-    assert stopped["status"] == "DO NOT PROCEED"
+    stopped = _run_final_policy(monkeypatch, {"status": "STOP-DEFER", "hard_stops": ["independent stop"]}, "NORMAL", 0)
+    assert stopped["status"] == "STOP-DEFER"
 
 
 def test_secondary_review_alone_does_not_override_principal_hierarchy(monkeypatch):
     out = _run_final_policy(
         monkeypatch,
-        {"status": "REVIEW — NOT CLEARED", "warnings": ["secondary contextual finding"]},
+        {"status": "CAUTION", "warnings": ["secondary contextual finding"]},
         "SUSPICIOUS",
         2,
     )
-    assert out["status"] == "PASS WITH CAUTION"
+    assert out["status"] == "CAUTION"
     assert out["warnings"] == ["secondary contextual finding"]
 
 
@@ -121,9 +121,11 @@ def test_safety_constants():
     assert core.FINAL_KMEAN_MAX_D == 48.0
 
 
-def test_runtime_html_maps_pass_with_caution_to_green_pass_class():
+def test_runtime_html_maps_three_clinical_dispositions_separately():
     html = Path("static/index.html").read_text(encoding="utf-8")
-    assert 'if(s === "PASS" || s === "PASS WITH CAUTION") return "pass";' in html
+    assert 'if(s === "PASS") return "pass";' in html
+    assert 'if(s === "CAUTION") return "caution";' in html
+    assert 'if(s === "STOP-DEFER") return "fail";' in html
 
 
 def test_canonical_import_does_not_mutate_frontend_assets():

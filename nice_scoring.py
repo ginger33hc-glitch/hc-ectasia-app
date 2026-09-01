@@ -11,7 +11,7 @@ NOTE = (
     "B. Ele.Th value on the Pentacam BAD Display page; no map or calculated substitute is accepted. "
     "Central pachymetry uses the plus-marked Pupil Center field (not Pachy Vertex N. or thinnest pachymetry), "
     "or a surgeon-confirmed central measurement. CER-AI disposition for LASIK and PRK: "
-    "4 = no NICE-specific escalation, 5-8 = CAUTION / STOP-DEFER, >=9 = HARD STOP. "
+    "4 = no NICE-specific escalation, 5-8 = CAUTION without automatic defer, >=9 = STOP-DEFER hard stop. "
     "NICE 4 does not establish surgical safety or override ERSS, BAD or other CER-AI stops. "
     "No individual absolute ectasia probability is inferred. Source: Navarro-Naranjo et al., "
     "Clin Ophthalmol 2024;18:881-883. DOI: 10.2147/OPTH.S464217."

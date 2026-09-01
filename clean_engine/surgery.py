@@ -86,7 +86,7 @@ def lasik_pta_cutoff(pta_percent: Optional[float]) -> bool:
 def needs_lasik_fallback(outcome: LasikPlanOutcome) -> bool:
     if outcome.independent_hard_stop:
         return False
-    return outcome.status == "DO NOT PROCEED" or lasik_pta_cutoff(outcome.pta_percent)
+    return outcome.status == "STOP-DEFER" or lasik_pta_cutoff(outcome.pta_percent)
 
 
 def select_lasik_sequence(outcomes: Sequence[LasikPlanOutcome]) -> Tuple[LasikPlanOutcome, ...]:
@@ -142,5 +142,5 @@ def final_lasik_status(sequence: Sequence[LasikPlanOutcome]) -> str:
         raise ValueError("At least one LASIK plan outcome is required")
     last = sequence[-1]
     if lasik_pta_cutoff(last.pta_percent):
-        return "DO NOT PROCEED"
+        return "STOP-DEFER"
     return last.status
