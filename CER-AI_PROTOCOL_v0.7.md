@@ -11,7 +11,7 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 - Extract and compare patient ID/name, printed age, examination date/time, laterality, filename, and
   literal Pentacam QS.
 - Conflicting patient age or Pentacam examination date prohibits PASS; identity uncertainty remains
-  a visible surgeon-confirmation warning without suppressing the eye analyses.
+  a visible surgeon-confirmation warning without suppressing the eye assessments.
 - A mismatch between entered and source patient ID or derived age prohibits PASS.
 - Both OD and OS are required for overall PASS; eyes remain separately assessed and are not averaged.
 - An unclassified upload, an upload yielding no usable eye/treatment data, a limited/inadequate

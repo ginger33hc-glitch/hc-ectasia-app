@@ -75,7 +75,7 @@ def admit_analysis() -> None:
         if len(_analysis_starts) >= ANALYSIS_RATE_LIMIT:
             raise HTTPException(
                 429,
-                "Analysis capacity limit reached. Wait before retrying; repeated retries increase the delay.",
+                "Assessment capacity limit reached. Wait before retrying; repeated retries increase the delay.",
                 headers={"Retry-After": str(ANALYSIS_RATE_WINDOW_SECONDS)},
             )
         _analysis_starts.append(now)
@@ -91,7 +91,7 @@ async def analysis_slot():
     except TimeoutError as exc:
         raise HTTPException(
             429,
-            "The analysis service is busy. Wait briefly before retrying.",
+            "The assessment service is busy. Wait briefly before retrying.",
             headers={"Retry-After": "10"},
         ) from exc
     try:
