@@ -23,6 +23,8 @@ class MicrokeratomePlanningInput:
     procedure: str
     steepest_k_d: Optional[float]
     flattest_k_d: Optional[float]
+    # The active ML7 reference uses corneal diameter as horizontal white-to-white.
+    # This input must never contain a vertical, averaged, or visually estimated diameter.
     w2w_mm: Optional[float]
     pachy_um: Optional[float]
     t_zone_mm: Optional[float] = None
@@ -144,7 +146,10 @@ def plan_microkeratome(inp: MicrokeratomePlanningInput) -> MicrokeratomePlan:
         if ring is None:
             warnings.append("Steepest K is outside the supplied nomogram range; no ring is inferred.")
     else:
-        warnings.append("Steepest K and W2W are required for vacuum-ring selection.")
+        warnings.append(
+            "Steepest K and labeled Pentacam horizontal white-to-white (HWTW) are required; "
+            "no vacuum-ring recommendation was generated."
+        )
 
     if pachy is not None and pachy < 530:
         notes.append("Active ML7 reference advises 580-590 mmHg when pachymetry is <530 µm, with corneal K taking priority.")
@@ -223,4 +228,3 @@ def plan_microkeratome(inp: MicrokeratomePlanningInput) -> MicrokeratomePlan:
         warnings=tuple(dict.fromkeys(warnings)),
         notes=tuple(dict.fromkeys(notes)),
     )
-
