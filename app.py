@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="CER-AI v0.7.55")
+app = FastAPI(title="CER-AI v0.7.56")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -1462,7 +1462,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.55 / source set 2026-08-25 plus binding CER-AI amendments",
+        "version": "software v0.7.56 / source set 2026-08-25 plus binding CER-AI amendments",
     }
 
 
@@ -1577,7 +1577,10 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             if source_filename:
                 for field in eye.get("table_verified_numeric_fields", []):
                     if eye.get(field) is not None:
-                        eye["field_provenance"][field] = [{"file": source_filename, "source": "LABELED_TABLE"}]
+                        targeted = list((eye.get("targeted_reread_evidence") or {}).get(field) or [])
+                        eye["field_provenance"][field] = targeted or [
+                            {"file": source_filename, "source": "LABELED_TABLE"}
+                        ]
                 for field in eye.get("map_fallback_numeric_fields", []):
                     if eye.get(field) is not None:
                         eye["field_provenance"][field] = [{"file": source_filename, "source": "PERMITTED_MAP_FALLBACK"}]
@@ -1618,6 +1621,14 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             target["morphology_evidence"] = list(
                 dict.fromkeys(target.get("morphology_evidence", []) + eye.get("morphology_evidence", []))
             )
+            target.setdefault("targeted_reread_evidence", {})
+            for field, records in (eye.get("targeted_reread_evidence") or {}).items():
+                combined = target["targeted_reread_evidence"].setdefault(field, []) + list(records or [])
+                target["targeted_reread_evidence"][field] = [
+                    dict(item) for item in {
+                        json.dumps(record, sort_keys=True): record for record in combined
+                    }.values()
+                ]
             if quality_rank.get(eye.get("quality"), 0) > quality_rank.get(target.get("quality"), 0):
                 target["quality"] = eye.get("quality")
             if any(value in ("LIMITED", "INADEQUATE") for value in target["quality_by_source"].values()):
@@ -1636,7 +1647,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     "table_verified_numeric_fields", "map_fallback_numeric_fields",
                     "morphology_evidence", "source_files", "quality_by_source", "_source_filename",
                     "_pentacam_qs", "pentacam_qs", "scoring_morphology", "field_provenance",
-                    "planning_data_issues",
+                    "planning_data_issues", "targeted_reread_evidence",
                 ):
                     continue
                 old = target.get(key)

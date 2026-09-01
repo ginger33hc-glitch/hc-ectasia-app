@@ -2,7 +2,15 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.55 implements
+## What v0.7.56 implements
+
+- A focused Pentacam numeric reread now runs only for still-empty labeled fields. It keeps the
+  complete screen for eye/screen context and supplies four overlapping original-detail crops so
+  small BAD, PPI, ARTmax, keratometry, pachymetry, HWTW, topometric, and elevation labels can be
+  transcribed without changing the clinical engine.
+- The reread cannot overwrite an existing value or calculate a missing index. Only confident
+  eye-specific label/value pairs are accepted; ambiguous labels, wrong-eye readings, and conflicting
+  crop readings remain missing. Field provenance records the source file, crop, and printed label.
 
 - The surgeon-confirmation panel and report appendix now use one concise Randleman topography
   reference. The same four mutually exclusive categories feed the existing single point mapper:
@@ -16,7 +24,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Mobile-safe signed refraction parsing now recognizes common Unicode plus/minus characters.
 - Invalid or partial manifest/intended manual entries block analysis with a field-specific warning instead of silently becoming missing data.
 
-- Sequential original-detail extraction of each uploaded Pentacam/topography or treatment-card image.
+- Independent original-detail extraction of each uploaded Pentacam/topography or treatment-card image.
 - Pentacam numeric-source priority: explicitly labeled side/summary-table fields are used first.
   When that field is unreadable, a directly corresponding marked local-map value may be used only
   for thinnest pachymetry or anterior/posterior elevation at the marked thinnest point. Local spots

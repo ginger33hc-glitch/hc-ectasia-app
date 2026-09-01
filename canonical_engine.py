@@ -25,10 +25,11 @@ import case_catalog
 import historical_report
 import research_export
 import named_user_ui
+import pentacam_targeted_reread
 
 core = bootstrap.core
 app = _runtime.app
-CANONICAL_VERSION = "0.7.55"
+CANONICAL_VERSION = "0.7.56"
 core.APP_VERSION = CANONICAL_VERSION
 core.app.title = f"CER-AI v{CANONICAL_VERSION}"
 reports.APP_VERSION = CANONICAL_VERSION
@@ -53,6 +54,7 @@ case_catalog.install(core, _archive_runtime)
 historical_report.install(core, _archive_runtime)
 research_export.install(core, _archive_runtime)
 named_user_ui.install(core)
+pentacam_targeted_reread.install(core)
 
 # ERSS morphology auto-read cleanup must wrap the fully installed assessment workflow.
 # Keep it out of bootstrap so the production composition order remains explicit here.
@@ -80,7 +82,8 @@ def runtime_invariants():
     try:
         import erss_topography_guard as erss
         import erss_topography_evidence_policy as erss_evidence
-        if core.extract_one_image is not erss.extract_one_image_with_erss:errors.append("Dedicated ERSS anterior-curvature image reader is not active")
+        if core.extract_one_image is not pentacam_targeted_reread.extract_one_image_with_targeted_reread:errors.append("Targeted Pentacam numeric reread is not active")
+        if pentacam_targeted_reread._previous_extract_one_image is not erss.extract_one_image_with_erss:errors.append("Dedicated ERSS reader is not preserved immediately below the targeted numeric reread")
         if core.merge_extractions is not erss.merge_extractions_with_erss_source_guard:errors.append("ERSS source-aware multi-image merge is not the active merge layer")
         if core.scoring_morphology is not erss_evidence.scoring_morphology_with_i_s_evidence_gate:errors.append("ERSS I-S evidence gate is not the active morphology handoff")
         if erss_evidence._previous_scoring_morphology is not erss.scoring_morphology_with_dedicated_source:errors.append("Dedicated ERSS morphology reader is not preserved immediately below the I-S evidence gate")
@@ -104,6 +107,7 @@ def runtime_invariants():
     if not getattr(core,"_cerai_named_user_ui_installed",False):errors.append("Named-user archive UI boundary is not active")
     if not getattr(core,"_erss_topography_evidence_policy_installed",False):errors.append("ERSS I-S/topography evidence gate is not active")
     if not getattr(core,"_erss_auto_read_policy_installed",False):errors.append("ERSS morphology auto-read separation policy is not active")
+    if not getattr(core,"_cerai_targeted_pentacam_reread_installed",False):errors.append("Targeted Pentacam numeric reread layer is not active")
     if getattr(core.lasik_topography_points, "__module__", None) != "app":errors.append("ERSS evidence gate must not replace or duplicate the canonical topography point mapper")
     try:
         if core.combine_status("PASS", "PASS WITH CAUTION") != "PASS WITH CAUTION":errors.append("PASS WITH CAUTION aggregate ranking is invalid")
