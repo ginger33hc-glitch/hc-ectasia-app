@@ -3,62 +3,12 @@
 Single supported composition point. Production and production-runtime tests must import this
 module rather than assembling policy wrappers independently.
 """
-import os
+import runtime_composition as composition
 
-import pachymetry_policy as _runtime
-import bootstrap
-import reports
-import randleman_bad_independence  # noqa: F401
-import erss_visual_morphology_policy  # noqa: F401
-import hc_final_decision_policy  # noqa: F401
-import status_rank_policy  # noqa: F401
-import inter_eye_tomography_policy  # noqa: F401
-import microkeratome_planning_policy  # noqa: F401
-import erss_topography_evidence_policy  # noqa: F401
-import nice_policy
-import assessment_workflow
-import user_access
-import operational_security
-import case_archive
-import audit_log
-import case_catalog
-import historical_report
-import research_export
-import named_user_ui
-import pentacam_targeted_reread
-
-core = bootstrap.core
-app = _runtime.app
-CANONICAL_VERSION = "0.7.60"
-core.APP_VERSION = CANONICAL_VERSION
-core.app.title = f"CER-AI v{CANONICAL_VERSION}"
-reports.APP_VERSION = CANONICAL_VERSION
-nice_policy.install(core)
-assessment_workflow.install(core)
-user_access.install(core)
-operational_security.install(core)
-
-# Keep archive provisioning inert until every bucket credential and encryption secret has been
-# configured and verified. REQUIRED=1 always implies enabled and deliberately fails closed.
-_archive_required = os.getenv("CERAI_ARCHIVE_REQUIRED", "0").strip() == "1"
-_archive_enabled = os.getenv("CERAI_ARCHIVE_ENABLED", "0").strip() == "1" or _archive_required
-if _archive_enabled:
-    _archive_runtime = case_archive.install(core)
-else:
-    _archive_runtime = case_archive.install(
-        core,
-        runtime=case_archive.CaseArchiveRuntime(None, required=False),
-    )
-audit_log.install(core, _archive_runtime)
-case_catalog.install(core, _archive_runtime)
-historical_report.install(core, _archive_runtime)
-research_export.install(core, _archive_runtime)
-named_user_ui.install(core)
-pentacam_targeted_reread.install(core)
-
-# ERSS morphology auto-read cleanup must wrap the fully installed assessment workflow.
-# Keep it out of bootstrap so the production composition order remains explicit here.
-import erss_auto_read_policy  # noqa: E402,F401
+core = composition.core
+app = composition.app
+CANONICAL_VERSION = "0.7.61"
+_archive_runtime = composition.compose(CANONICAL_VERSION)
 
 
 def runtime_invariants():
@@ -80,10 +30,11 @@ def runtime_invariants():
         if actual != expected:errors.append(f"Randleman topography mapping {category} expected {expected}, got {actual}")
 
     try:
-        import erss_topography_guard as erss
-        import erss_topography_evidence_policy as erss_evidence
-        if core.extract_one_image is not pentacam_targeted_reread.extract_one_image_with_targeted_reread:errors.append("Targeted Pentacam numeric reread is not active")
-        if pentacam_targeted_reread._previous_extract_one_image is not erss.extract_one_image_with_erss:errors.append("Dedicated ERSS reader is not preserved immediately below the targeted numeric reread")
+        erss = composition.erss_topography_guard
+        erss_evidence = composition.erss_topography_evidence_policy
+        targeted = composition.pentacam_targeted_reread
+        if core.extract_one_image is not targeted.extract_one_image_with_targeted_reread:errors.append("Targeted Pentacam numeric reread is not active")
+        if targeted._previous_extract_one_image is not erss.extract_one_image_with_erss:errors.append("Dedicated ERSS reader is not preserved immediately below the targeted numeric reread")
         if core.merge_extractions is not erss.merge_extractions_with_erss_source_guard:errors.append("ERSS source-aware multi-image merge is not the active merge layer")
         if core.scoring_morphology is not erss_evidence.scoring_morphology_with_i_s_evidence_gate:errors.append("ERSS I-S evidence gate is not the active morphology handoff")
         if erss_evidence._previous_scoring_morphology is not erss.scoring_morphology_with_dedicated_source:errors.append("Dedicated ERSS morphology reader is not preserved immediately below the I-S evidence gate")
@@ -116,7 +67,8 @@ def runtime_invariants():
     if not getattr(core,"_hc_lasik_fallback_installed",False):errors.append("LASIK fallback planner is not active")
     if getattr(core,"PRK_EPITHELIUM_UM",None) != 50:errors.append("PRK epithelial convention is not 50 µm")
     if getattr(core,"FINAL_KMEAN_MIN_D",None) != 36.0 or getattr(core,"FINAL_KMEAN_MAX_D",None) != 48.0:errors.append("Final keratometry safety bounds are not 36-48 D")
-    if getattr(reports,"APP_VERSION",None) != CANONICAL_VERSION:errors.append("Report version is not synchronized with canonical runtime")
+    if getattr(composition.reports,"APP_VERSION",None) != CANONICAL_VERSION:errors.append("Report version is not synchronized with canonical runtime")
+    if getattr(core, "_cerai_composition_phases", None) != composition.COMPOSITION_PHASES:errors.append("Canonical composition manifest is not active")
 
     if errors:raise RuntimeError("Canonical CER-AI runtime invariant failure: " + "; ".join(errors))
     return True

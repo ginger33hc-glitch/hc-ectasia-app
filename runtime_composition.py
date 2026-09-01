@@ -1,0 +1,133 @@
+"""Ordered production composition for the canonical CER-AI runtime.
+
+This is the only module that assembles production concerns.  Leaf modules own
+one topic and may expose compatibility symbols for tests, but they must not
+decide installation order by importing unrelated policy modules.
+
+The order below is behavior-critical because the established runtime uses
+small wrappers around the legacy core.  Keeping that order explicit here makes
+the dependency chain reviewable and prevents accidental import-order changes.
+"""
+import os
+
+import bootstrap
+import reports
+
+# Base clinical policies and extraction pipeline.  These legacy-compatible
+# modules install their narrowly scoped wrapper when imported; their order is
+# deliberately centralized here.
+import hc_age_policy  # noqa: F401,E402
+import hc_bad_final_policy  # noqa: F401,E402
+import merge_policy_base  # noqa: F401,E402
+import extraction_guard  # noqa: F401,E402
+import erss_topography_guard  # noqa: F401,E402
+import report_export_guard  # noqa: F401,E402
+import critical_score_highlight  # noqa: F401,E402
+import pachymetry_policy  # noqa: F401,E402
+import randleman_bad_independence  # noqa: F401,E402
+import erss_visual_morphology_policy  # noqa: F401,E402
+import hc_final_decision_policy  # noqa: F401,E402
+import status_rank_policy  # noqa: F401,E402
+import inter_eye_tomography_policy  # noqa: F401,E402
+import microkeratome_planning_policy  # noqa: F401,E402
+import erss_topography_evidence_policy  # noqa: F401,E402
+
+# Explicitly installed clinical workflow and operational services.
+import nice_policy  # noqa: E402
+import assessment_workflow  # noqa: E402
+import user_access  # noqa: E402
+import operational_security  # noqa: E402
+import case_archive  # noqa: E402
+import audit_log  # noqa: E402
+import case_catalog  # noqa: E402
+import historical_report  # noqa: E402
+import research_export  # noqa: E402
+import named_user_ui  # noqa: E402
+import pentacam_targeted_reread  # noqa: E402
+
+
+core = bootstrap.core
+app = bootstrap.app
+
+# Public architecture manifest: each concern has one composition phase.  This
+# is intentionally data, not executable discovery, so production startup never
+# depends on filesystem scanning or import-name conventions.
+COMPOSITION_PHASES = {
+    "clinical_policy": (
+        "hc_age_policy",
+        "hc_bad_final_policy",
+        "pachymetry_policy",
+        "randleman_bad_independence",
+        "hc_final_decision_policy",
+        "status_rank_policy",
+        "inter_eye_tomography_policy",
+        "microkeratome_planning_policy",
+        "nice_policy",
+    ),
+    "pentacam_extraction": (
+        "merge_policy_base",
+        "extraction_guard",
+        "erss_topography_guard",
+        "erss_visual_morphology_policy",
+        "erss_topography_evidence_policy",
+        "pentacam_targeted_reread",
+        "erss_auto_read_policy",
+    ),
+    "reporting_and_readiness": (
+        "report_export_guard",
+        "critical_score_highlight",
+        "assessment_workflow",
+    ),
+    "access_and_persistence": (
+        "user_access",
+        "operational_security",
+        "case_archive",
+        "audit_log",
+        "case_catalog",
+        "historical_report",
+        "research_export",
+        "named_user_ui",
+    ),
+}
+
+
+def compose(version: str):
+    """Install the complete production runtime once and return archive state."""
+    if getattr(core, "_cerai_runtime_composed", False):
+        return getattr(core, "_cerai_case_archive_runtime", None)
+
+    core.APP_VERSION = version
+    core.app.title = f"CER-AI v{version}"
+    reports.APP_VERSION = version
+
+    nice_policy.install(core)
+    assessment_workflow.install(core)
+    user_access.install(core)
+    operational_security.install(core)
+
+    # Archive provisioning remains inert until the complete credential set is
+    # configured. REQUIRED=1 deliberately fails closed.
+    archive_required = os.getenv("CERAI_ARCHIVE_REQUIRED", "0").strip() == "1"
+    archive_enabled = os.getenv("CERAI_ARCHIVE_ENABLED", "0").strip() == "1" or archive_required
+    if archive_enabled:
+        archive_runtime = case_archive.install(core)
+    else:
+        archive_runtime = case_archive.install(
+            core,
+            runtime=case_archive.CaseArchiveRuntime(None, required=False),
+        )
+
+    audit_log.install(core, archive_runtime)
+    case_catalog.install(core, archive_runtime)
+    historical_report.install(core, archive_runtime)
+    research_export.install(core, archive_runtime)
+    named_user_ui.install(core)
+    pentacam_targeted_reread.install(core)
+
+    # This cleanup must wrap the fully installed NICE/readiness engine, so it is
+    # the sole intentionally deferred policy import.
+    import erss_auto_read_policy  # noqa: F401
+
+    core._cerai_runtime_composed = True
+    core._cerai_composition_phases = COMPOSITION_PHASES
+    return archive_runtime
