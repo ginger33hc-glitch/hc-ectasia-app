@@ -53,6 +53,21 @@ def test_login_page_exists_and_does_not_store_password_in_browser_storage():
     assert response.headers["cache-control"] == "no-store"
 
 
+def test_trial_login_page_requests_doctor_name_without_password():
+    client, core = make_client()
+    core._cerai_trial_name_login_enabled = True
+
+    response = client.get("/auth/login-page")
+    text = response.text
+
+    assert response.status_code == 200
+    assert "Doktor adı / Doctor name" in text
+    assert 'type="password"' not in text
+    assert "display_name" in text
+    assert "sessionStorage" not in text
+    assert "localStorage" not in text
+
+
 def test_authenticated_root_injects_archive_navigation_and_escapes_display_name():
     client, _core = make_client()
     client.cookies.set("cer_ai_session", "valid")

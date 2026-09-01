@@ -80,6 +80,24 @@ def test_authentication_and_session_preserve_named_role():
         user_access._reset_for_tests()
 
 
+def test_trial_name_creates_stable_doctor_identity_without_password():
+    first = user_access.authenticate_trial_name("  Dr. İdil   Göksel ")
+    repeated = user_access.authenticate_trial_name("Dr. İdil Göksel")
+
+    assert first == repeated
+    assert first.display_name == "Dr. İdil Göksel"
+    assert first.role == "DOCTOR"
+    assert first.user_id.startswith("trial-")
+    assert len(first.user_id) == 30
+
+
+@pytest.mark.parametrize("value", ["", " ", "7", "A\x00B"])
+def test_trial_name_rejects_missing_or_unsafe_identity(value):
+    with pytest.raises(Exception) as exc:
+        user_access.authenticate_trial_name(value)
+    assert getattr(exc.value, "status_code", None) == 422
+
+
 def test_disabled_account_cannot_authenticate():
     owner = account_payload()
     disabled = account_payload(
@@ -173,5 +191,44 @@ def test_named_session_can_replace_shared_access_key_and_login_logout_are_audite
         assert events[-1][0] == "LOGOUT"
         assert events[-1][1]["actor"].user_id == "owner-1"
         assert client.post("/assessment/complete", json={}).status_code == 401
+    finally:
+        user_access._reset_for_tests()
+
+
+def test_trial_login_accepts_only_doctor_name_and_keeps_secure_session(monkeypatch):
+    user_access._reset_for_tests()
+    monkeypatch.setattr(user_access, "NAMED_USERS_ENABLED", True)
+    monkeypatch.setattr(user_access, "TRIAL_NAME_LOGIN_ENABLED", True)
+
+    app = FastAPI()
+    events = []
+    core = SimpleNamespace(
+        app=app,
+        _cerai_audit_event=lambda event_type, **kwargs: events.append((event_type, kwargs)),
+    )
+    try:
+        user_access.install(core)
+        operational_security.install(core)
+
+        @app.post("/assessment/complete")
+        def protected_route():
+            principal = user_access.current_principal()
+            return principal.public() if principal else None
+
+        client = TestClient(app, base_url="https://testserver")
+        login = client.post("/auth/login", json={"display_name": "Dr. İdil Göksel"})
+
+        assert login.status_code == 200
+        assert login.json()["user"]["display_name"] == "Dr. İdil Göksel"
+        assert login.json()["user"]["role"] == "DOCTOR"
+        assert "password" not in login.request.content.decode("utf-8")
+        cookie = login.headers.get("set-cookie", "")
+        assert "HttpOnly" in cookie
+        assert "Secure" in cookie
+        assert "SameSite=strict" in cookie
+        admitted = client.post("/assessment/complete", json={})
+        assert admitted.status_code == 200
+        assert admitted.json()["user_id"].startswith("trial-")
+        assert events[0][1]["details"]["authentication_mode"] == "TRIAL_NAME"
     finally:
         user_access._reset_for_tests()

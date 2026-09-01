@@ -15,6 +15,7 @@ import json
 import os
 import re
 import secrets
+import unicodedata
 from threading import RLock
 from time import monotonic
 from typing import Any, Dict, Optional
@@ -28,6 +29,13 @@ ROLE_DOCTOR = "DOCTOR"
 ALLOWED_ROLES = frozenset({ROLE_OWNER, ROLE_DOCTOR})
 SESSION_COOKIE = "cer_ai_session"
 NAMED_USERS_ENABLED = os.getenv("CERAI_NAMED_USERS_ENABLED", "0").strip() == "1"
+# Temporary supervised trial mode. Existing named-user deployments enter the trial flow unless
+# they explicitly opt out; deployments without named users remain unchanged. Set this to 0 to
+# restore the password-backed registry without changing or deleting the stored account hashes.
+TRIAL_NAME_LOGIN_ENABLED = os.getenv(
+    "CERAI_TRIAL_NAME_LOGIN_ENABLED",
+    "1" if NAMED_USERS_ENABLED else "0",
+).strip() == "1"
 SESSION_TTL_SECONDS = max(
     900,
     min(int(os.getenv("CERAI_SESSION_TTL_SECONDS", "43200")), 86400),
@@ -195,6 +203,9 @@ def configure_from_environment() -> None:
     if not NAMED_USERS_ENABLED:
         _users_by_username = {}
         return
+    if TRIAL_NAME_LOGIN_ENABLED:
+        _users_by_username = {}
+        return
     raw = os.getenv("CERAI_USERS_JSON", "").strip()
     if not raw:
         raise UserConfigurationError(
@@ -256,6 +267,25 @@ def authenticate_credentials(username: Any, password: Any) -> Principal:
     return account.principal
 
 
+def authenticate_trial_name(value: Any) -> Principal:
+    """Create a stable DOCTOR identity from a displayed name during supervised trial use."""
+    display_name = " ".join(str(value or "").strip().split())
+    if not 2 <= len(display_name) <= 160:
+        raise HTTPException(422, "Doctor name must contain 2 to 160 characters.")
+    if not any(character.isalpha() for character in display_name):
+        raise HTTPException(422, "Doctor name must contain letters.")
+    if any(unicodedata.category(character).startswith("C") for character in display_name):
+        raise HTTPException(422, "Doctor name contains unsupported characters.")
+    normalized = unicodedata.normalize("NFKC", display_name).casefold()
+    identity_digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:24]
+    return Principal(
+        user_id=f"trial-{identity_digest}",
+        username=display_name,
+        display_name=display_name,
+        role=ROLE_DOCTOR,
+    )
+
+
 def create_session(principal: Principal) -> str:
     token = secrets.token_urlsafe(32)
     with _lock:
@@ -315,6 +345,7 @@ def install(core: Any) -> None:
     configure_from_environment()
 
     core._cerai_named_users_enabled = NAMED_USERS_ENABLED
+    core._cerai_trial_name_login_enabled = TRIAL_NAME_LOGIN_ENABLED
     core._cerai_authenticate_request = authenticate_request
     core._cerai_bind_principal = bind_current_principal
     core._cerai_reset_principal = reset_current_principal
@@ -328,10 +359,21 @@ def install(core: Any) -> None:
     if NAMED_USERS_ENABLED:
         @core.app.post("/auth/login")
         def login(payload: Dict[str, Any] = Body(...)):
-            principal = authenticate_credentials(payload.get("username"), payload.get("password"))
+            if TRIAL_NAME_LOGIN_ENABLED:
+                principal = authenticate_trial_name(
+                    payload.get("display_name", payload.get("username"))
+                )
+                auth_mode = "TRIAL_NAME"
+            else:
+                principal = authenticate_credentials(payload.get("username"), payload.get("password"))
+                auth_mode = "PASSWORD"
             token = create_session(principal)
             try:
-                audit("LOGIN_SUCCESS", actor=principal, details={"role": principal.role})
+                audit(
+                    "LOGIN_SUCCESS",
+                    actor=principal,
+                    details={"role": principal.role, "authentication_mode": auth_mode},
+                )
             except Exception:
                 remove_session(token)
                 raise
@@ -368,19 +410,23 @@ def install(core: Any) -> None:
     core._cerai_named_user_access_installed = True
 
 
-def _configure_for_tests(users: Dict[str, UserAccount], *, enabled: bool = True) -> None:
-    global _users_by_username, NAMED_USERS_ENABLED
+def _configure_for_tests(
+    users: Dict[str, UserAccount], *, enabled: bool = True, trial: bool = False
+) -> None:
+    global _users_by_username, NAMED_USERS_ENABLED, TRIAL_NAME_LOGIN_ENABLED
     with _lock:
         _users_by_username = dict(users)
         _sessions.clear()
         _failed_logins.clear()
     NAMED_USERS_ENABLED = enabled
+    TRIAL_NAME_LOGIN_ENABLED = trial
 
 
 def _reset_for_tests() -> None:
-    global _users_by_username, NAMED_USERS_ENABLED
+    global _users_by_username, NAMED_USERS_ENABLED, TRIAL_NAME_LOGIN_ENABLED
     with _lock:
         _users_by_username = {}
         _sessions.clear()
         _failed_logins.clear()
     NAMED_USERS_ENABLED = False
+    TRIAL_NAME_LOGIN_ENABLED = False

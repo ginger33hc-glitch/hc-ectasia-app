@@ -29,7 +29,7 @@ import pentacam_targeted_reread
 
 core = bootstrap.core
 app = _runtime.app
-CANONICAL_VERSION = "0.7.56"
+CANONICAL_VERSION = "0.7.57"
 core.APP_VERSION = CANONICAL_VERSION
 core.app.title = f"CER-AI v{CANONICAL_VERSION}"
 reports.APP_VERSION = CANONICAL_VERSION

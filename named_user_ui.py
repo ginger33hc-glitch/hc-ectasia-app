@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 ROOT_HTML = Path("static/index.html")
 LOGIN_HTML = Path("static/login.html")
+TRIAL_LOGIN_HTML = Path("static/trial-login.html")
 ARCHIVE_HTML = Path("static/archive.html")
 
 
@@ -56,7 +57,9 @@ def install(core: Any) -> None:
         @core.app.get("/auth/login-page", include_in_schema=False)
         def login_page():
             return FileResponse(
-                LOGIN_HTML,
+                TRIAL_LOGIN_HTML
+                if bool(getattr(core, "_cerai_trial_name_login_enabled", False))
+                else LOGIN_HTML,
                 media_type="text/html",
                 headers={"Cache-Control": "no-store"},
             )

@@ -2,7 +2,12 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.56 implements
+## What v0.7.57 implements
+
+- Supervised trial access can temporarily accept only a doctor's displayed name while retaining
+  secure session cookies, a stable per-name DOCTOR identity, archive ownership, and audit records.
+  Password hashes and the normal named-account flow remain intact and are restored with
+  `CERAI_TRIAL_NAME_LOGIN_ENABLED=0`.
 
 - A focused Pentacam numeric reread now runs only for still-empty labeled fields. It keeps the
   complete screen for eye/screen context and supplies four overlapping original-detail crops so
