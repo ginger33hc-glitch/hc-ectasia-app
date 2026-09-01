@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>CER-AI v0.7.64</title>
+  <title>CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.65</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=9">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=8">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=8">
@@ -15,7 +15,7 @@
     :root{--navy:#173b57;--ink:#17212b;--muted:#66717d;--line:#d9e0e6;--bg:#f4f6f8;--blue:#eaf3fa;--blueInk:#1f5e8c;--green:#e6f4ea;--greenInk:#176b3a;--orange:#fff0d8;--orangeInk:#9a4d00;--red:#fde5e5;--redInk:#a31212;--gray:#eef2f5;--grayInk:#4b5965}
     *{box-sizing:border-box}body{font-family:Arial,sans-serif;background:var(--bg);margin:0;color:var(--ink);line-height:1.42}
     .app-header{background:#05090d;border-bottom:1px solid #1f2a33;padding:8px 22px;box-shadow:0 2px 8px rgba(0,0,0,.28)}
-    .brand-lockup{position:relative;width:min(100%,900px);margin:0 auto}.brand-logo{display:block;width:100%;height:auto}.brand-version{position:absolute;right:1.5%;top:4%;font-size:11px;font-weight:700;color:#9aa6b5;letter-spacing:.4px}
+    .brand-lockup{position:relative;width:min(100%,900px);margin:0 auto}.brand-logo-frame{overflow:hidden;aspect-ratio:1500/445}.brand-logo{display:block;width:100%;height:auto}.brand-subtitle{text-align:center;color:#8fbce4;font-size:clamp(12px,2.55vw,27px);font-weight:300;letter-spacing:1.15px;line-height:1.15;white-space:nowrap;margin:2px 0 7px}.brand-subtitle .brand-initial{color:#ef7f2d}.brand-version{position:absolute;right:1.5%;top:4%;font-size:11px;font-weight:700;color:#9aa6b5;letter-spacing:.4px}
     .language-switch{display:flex;justify-content:flex-end;align-items:center;gap:6px;max-width:900px;margin:2px auto 0;color:#b8c7d5;font-size:12px}.language-switch button{padding:5px 10px;border:1px solid #56728a;border-radius:6px;background:#101a22;color:#d8e4ed;font-size:12px}.language-switch button.active{background:#2f668d;border-color:#8ab6d3;color:#fff}.language-switch button:focus-visible{outline:2px solid #ef7f2d;outline-offset:2px}
     .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
     main{max-width:1100px;margin:20px auto;padding:0 14px 40px}.card{background:white;border:1px solid var(--line);border-radius:11px;padding:18px;margin:14px 0;box-shadow:0 1px 2px rgba(0,0,0,.03)}
@@ -42,7 +42,7 @@
   <style>@media print{.report-card[hidden]{display:none!important}}</style>
 </head>
 <body>
-<header class="app-header"><div class="brand-lockup"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Corneal Ectasia Risk Analysis Intelligence"><span class="brand-version">v0.7.64</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI v0.7.64</h1></header>
+<header class="app-header"><div class="brand-lockup"><div class="brand-logo-frame"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Cornea Ectasia Risk Assessment Intelligence"></div><div class="brand-subtitle">Cornea Ectasia Risk <span class="brand-initial">A</span>ssessment <span class="brand-initial">I</span>ntelligence</div><span class="brand-version">v0.7.65</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.65</h1></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -92,8 +92,8 @@
       <p class="note">Preoperative manifest refraction is used only for LASIK ERSS MRSE. Intended treatment correction is used for ablation and CER-AI treatment-range gates. Unless a different role-specific value is entered, the treatment card’s Düzeltme Miktarı auto-fills both manifest and intended correction. Every refraction field accepts positive or negative values; use the +/− buttons when a phone keyboard has no sign key. Equivalent plus-cylinder entries are safely transposed to minus-cylinder notation for calculation and disclosed in the report.</p>
       <p id="cardTransferNote" class="note"></p>
       <section id="readinessPanel" class="card" aria-live="polite" hidden></section>
-      <button id="analyzeBtn" type="submit">Analyze images and run CER-AI assessment</button>
-      <p id="analysisProgress" class="alert" role="status" aria-live="polite" hidden></p>
+      <button id="assessBtn" type="submit">Assess images and run CER-AI assessment</button>
+      <p id="assessmentProgress" class="alert" role="status" aria-live="polite" hidden></p>
     </form>
   </div>
 
@@ -105,8 +105,8 @@
     </div>
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
-        <div><div class="report-kicker">CER-AI Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.7.64</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div><div class="report-kicker">CER-AI Clinical Decision Support</div><div class="note">Cornea Ectasia Risk Assessment Intelligence</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
+        <div class="report-version"><strong>Software v0.7.65</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <p class="report-liability-notice">The final surgical decision and all associated responsibility and liability rest with the surgeon. This application is a clinical decision-support aid only.</p>
       <table class="meta-table"><tbody>
@@ -260,8 +260,8 @@ const extractBox = document.querySelector("#extract");
 const eyeResults = document.querySelector("#eye-results");
 const overallNote = document.querySelector("#overall-note");
 const identityWarning = document.querySelector("#identityWarning");
-const analyzeBtn = document.querySelector("#analyzeBtn");
-const analysisProgress = document.querySelector("#analysisProgress");
+const assessBtn = document.querySelector("#assessBtn");
+const assessmentProgress = document.querySelector("#assessmentProgress");
 const reportCard = document.querySelector("#reportCard");
 const cardTransferNote = document.querySelector("#cardTransferNote");
 const pdfBtn = document.querySelector("#pdfBtn");
@@ -618,8 +618,8 @@ f.addEventListener('input',()=>{reportCard.hidden=true;lastReport=null;});
 f.addEventListener('change',()=>{reportCard.hidden=true;lastReport=null;});
 
 const showFormMessage=(message)=>{
-  analysisProgress.textContent=message;
-  analysisProgress.hidden=false;
+  assessmentProgress.textContent=message;
+  assessmentProgress.hidden=false;
 };
 function applyERSSTopographyPrompts(decision){
   const requested=[];
@@ -673,7 +673,7 @@ f.addEventListener("submit", async (e) => {
     unreviewedEyes.forEach(eye=>document.querySelector(`#${eye}_clinical`).classList.add("review-required"));
     const first=document.querySelector(`#${unreviewedEyes[0]}_clinical`);
     first.scrollIntoView({behavior:"smooth",block:"center"});
-    showFormMessage(`Before analysis, open and review the Clinical eligibility and stability options for ${labels}. Changes are not required.`);
+    showFormMessage(`Before assessment, open and review the Clinical eligibility and stability options for ${labels}. Changes are not required.`);
     return;
   }
   const manualImages=[...imageInput.files];
@@ -682,11 +682,11 @@ f.addEventListener("submit", async (e) => {
   let modifiers;
   try{modifiers=patientModifiers()}catch(error){showFormMessage(error.message||String(error));return}
 
-  const originalText=analyzeBtn.textContent;
-  analyzeBtn.disabled=true; analyzeBtn.textContent="Analyzing images... Please wait";
-  analyzeBtn.setAttribute("aria-busy","true");
-  showFormMessage("Analyzing images... Please wait.");
-  statusBox.className="status insufficient"; statusBox.textContent="ANALYZING...";
+  const originalText=assessBtn.textContent;
+  assessBtn.disabled=true; assessBtn.textContent="Assessing images... Please wait";
+  assessBtn.setAttribute("aria-busy","true");
+  showFormMessage("Assessing images... Please wait.");
+  statusBox.className="status insufficient"; statusBox.textContent="ASSESSING...";
   reportCard.hidden=true;lastReport=null;eyeResults.innerHTML=""; decisionBox.textContent=""; extractBox.textContent=""; overallNote.textContent="";cardTransferNote.textContent="";
   try{
     await allowLoadingStateToPaint();
@@ -739,14 +739,14 @@ f.addEventListener("submit", async (e) => {
       const firstPrefix=erssPrompts[0].startsWith("OD")?"od":"os";
       document.getElementById(`${firstPrefix}_erss_confirmation`).scrollIntoView({behavior:"smooth",block:"center"});
     }else{
-      analysisProgress.hidden=true;
+      assessmentProgress.hidden=true;
       reportCard.scrollIntoView({behavior:"smooth",block:"start"});
     }
   }catch(err){
     statusBox.textContent="ERROR";statusBox.className="status fail";decisionBox.textContent=String(err);
-    showFormMessage(`Analysis failed: ${err.message||String(err)}`);
+    showFormMessage(`Assessment failed: ${err.message||String(err)}`);
   }finally{
-    analyzeBtn.disabled=false;analyzeBtn.textContent=readiness.token?'Continue with completed information':originalText;analyzeBtn.removeAttribute("aria-busy");
+    assessBtn.disabled=false;assessBtn.textContent=readiness.token?'Continue with completed information':originalText;assessBtn.removeAttribute("aria-busy");
   }
 });
 

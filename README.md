@@ -2,7 +2,17 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.64 implements
+## What v0.7.65 implements
+
+- The visible program expansion is now exactly `Cornea Ectasia Risk Assessment Intelligence`.
+  The approved `CER-AI` lettermark remains unchanged; the former embedded subtitle is cropped at
+  presentation time and the exact new subtitle is rendered consistently in the app, PWA metadata,
+  PDF, and Word. In the on-screen subtitle only the initial `A` of Assessment and initial `I` of
+  Intelligence use the orange brand accent; all remaining subtitle letters are blue.
+- User-facing terminology now consistently uses `assessment/assess` in interface states,
+  validation failures, operational errors, reports, and bilingual presentation text. Stable
+  technical contracts such as `/analyze` and existing deployment environment-variable names are
+  retained for compatibility.
 
 - NICE `posterior_pupil_max_um` now has a dedicated targeted reread of only the lower-right
   `Elevation (Back)` map on a Pentacam 4 Maps Refractive screen. It accepts only the highest
@@ -67,7 +77,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
   published reference bands that differ from the running CER-AI policy.
 
 - Mobile-safe signed refraction parsing now recognizes common Unicode plus/minus characters.
-- Invalid or partial manifest/intended manual entries block analysis with a field-specific warning instead of silently becoming missing data.
+- Invalid or partial manifest/intended manual entries block assessment with a field-specific warning instead of silently becoming missing data.
 
 - Independent original-detail extraction of each uploaded Pentacam/topography or treatment-card image.
 - Pentacam numeric-source priority: explicitly labeled side/summary-table fields are used first.
@@ -78,7 +88,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Installable Android PWA with a Web Share Target: one or multiple images shared from Samsung Gallery can open CER-AI and populate its image intake.
 - Excimer Laser Takip Kartı reading limited to the eye-specific `Düzeltme Miktarı` row; confident minus-cylinder values can fill otherwise empty sphere/cylinder/axis fields, while manual input wins and uncertain/conflicting readings remain warnings.
 - Independent OD and OS assessment; eye values are never averaged, and a missing fellow-eye assessment prohibits overall PASS.
-- Source identity review reads Pentacam patient names only from the labeled `First Name` and `Last Name` demographics fields and records the source filename. An unreadable or unverified name produces a prominent surgeon-confirmation warning without suppressing the eye analyses; acquisition-date conflicts and unclassified/unusable uploads remain clinical/source blockers.
+- Source identity review reads Pentacam patient names only from the labeled `First Name` and `Last Name` demographics fields and records the source filename. An unreadable or unverified name produces a prominent surgeon-confirmation warning without suppressing the eye assessments; acquisition-date conflicts and unclassified/unusable uploads remain clinical/source blockers.
 - Pentacam clearance requires a same-exam explicit `QS: OK`; a visible non-OK QS cannot be masked by another page.
 - Age is read from the explicitly printed Pentacam age; a conflicting manually entered age remains a blocker. Date of birth is not collected.
 - Preoperative manifest refraction is separated from intended treatment correction. LASIK ERSS MRSE uses only the former; ablation and CER-AI treatment-range gates use only the latter.

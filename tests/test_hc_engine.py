@@ -1062,6 +1062,7 @@ class TestApiIntegration(unittest.TestCase):
         pdf_reader = PdfReader(BytesIO(pdf.content))
         self.assertGreaterEqual(len(pdf_reader.pages), 1)
         pdf_text = "\n".join(page.extract_text() or "" for page in pdf_reader.pages)
+        self.assertIn("Cornea Ectasia Risk Assessment Intelligence", pdf_text)
         self.assertIn(
             "The final surgical decision and all associated responsibility and liability rest with the surgeon. "
             "This application is a clinical decision-support aid only.",
@@ -1078,6 +1079,8 @@ class TestApiIntegration(unittest.TestCase):
             "\n".join(paragraph.text for paragraph in document.paragraphs),
         )
         text = "\n".join(paragraph.text for paragraph in document.paragraphs)
+        self.assertIn("Cornea Ectasia Risk Assessment Intelligence", text)
+        self.assertEqual(document.core_properties.title, "CER-AI — Cornea Ectasia Risk Assessment Intelligence")
         self.assertIn("CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT", text)
         self.assertIn("PASS", text)
         patient_paragraph = next(p for p in document.paragraphs if p.text == "TEST PATIENT")
@@ -1147,6 +1150,7 @@ class TestPwaIcons(unittest.TestCase):
     def test_manifest_and_html_use_cache_busted_png_assets(self):
         static_dir = Path(__file__).resolve().parents[1] / "static"
         manifest = json.loads((static_dir / "manifest.webmanifest").read_text())
+        self.assertEqual(manifest["name"], "CER-AI — Cornea Ectasia Risk Assessment Intelligence")
         self.assertEqual({icon["src"] for icon in manifest["icons"]}, {
             "/static/icons/icon-192.png?v=8",
             "/static/icons/icon-512.png?v=8",
@@ -1157,7 +1161,10 @@ class TestPwaIcons(unittest.TestCase):
         self.assertIn('/static/icons/favicon-32.png?v=8', html)
         self.assertIn('/static/icons/apple-touch-icon.png?v=8', html)
         self.assertIn('/static/branding/cer-ai-logo-final.png?v=4', html)
-        self.assertIn('alt="CER-AI — Corneal Ectasia Risk Analysis Intelligence"', html)
+        self.assertIn('alt="CER-AI — Cornea Ectasia Risk Assessment Intelligence"', html)
+        self.assertIn('Cornea Ectasia Risk <span class="brand-initial">A</span>ssessment <span class="brand-initial">I</span>ntelligence', html)
+        self.assertIn('.brand-subtitle .brand-initial{color:#ef7f2d}', html)
+        self.assertNotIn("Corneal Ectasia Risk Analysis Intelligence", html)
         self.assertNotIn('/static/icons/icon-source.svg', html)
 
 
@@ -1440,14 +1447,14 @@ class TestAnalyzeLoadingStateUi(unittest.TestCase):
     def test_loading_message_paints_before_network_request_and_validation_is_visible(self):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
         self.assertIn('<form id="f" novalidate>', html)
-        self.assertIn('id="analysisProgress"', html)
+        self.assertIn('id="assessmentProgress"', html)
         self.assertIn('role="status" aria-live="polite"', html)
-        self.assertIn('analyzeBtn.textContent="Analyzing images... Please wait"', html)
-        self.assertIn('showFormMessage("Analyzing images... Please wait.")', html)
+        self.assertIn('assessBtn.textContent="Assessing images... Please wait"', html)
+        self.assertIn('showFormMessage("Assessing images... Please wait.")', html)
         self.assertIn("await allowLoadingStateToPaint()", html)
         self.assertLess(html.index("await allowLoadingStateToPaint()"), html.index('ceraiFetch("/analyze"'))
         self.assertIn("f.reportValidity()", html)
-        self.assertIn('showFormMessage(`Analysis failed:', html)
+        self.assertIn('showFormMessage(`Assessment failed:', html)
 
 
 class TestPatientModifierUi(unittest.TestCase):

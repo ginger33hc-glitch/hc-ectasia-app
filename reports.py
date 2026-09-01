@@ -46,7 +46,8 @@ GRAY = "52616D"
 GRAY_FILL = "EEF2F5"
 LINE = "D7E0E7"
 INK = "17212B"
-APP_VERSION = "0.7.64"
+APP_VERSION = "0.7.65"
+PROGRAM_NAME = "Cornea Ectasia Risk Assessment Intelligence"
 LIABILITY_NOTICE = (
     "The final surgical decision and all associated responsibility and liability rest with the surgeon. "
     "This application is a clinical decision-support aid only."
@@ -340,7 +341,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     doc = SimpleDocTemplate(
         buffer, pagesize=letter, rightMargin=0.65 * inch, leftMargin=0.65 * inch,
         topMargin=0.72 * inch, bottomMargin=0.82 * inch,
-        title=tr("CER-AI Preoperative Ectasia Risk Assessment"),
+        title=f"CER-AI — {PROGRAM_NAME} | {tr('CER-AI Preoperative Ectasia Risk Assessment')}",
         author="CER-AI",
     )
     styles = getSampleStyleSheet()
@@ -360,7 +361,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
 
     story: List[Any] = []
     story.append(Paragraph(tr("CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT"), styles["ReportTitle"]))
-    story.append(Paragraph(tr("Corneal refractive surgery clinical decision-support report") + f" | {tr('Software')} v{APP_VERSION}", styles["ReportSub"]))
+    story.append(Paragraph(PROGRAM_NAME + " | " + tr("Corneal refractive surgery clinical decision-support report") + f" | {tr('Software')} v{APP_VERSION}", styles["ReportSub"]))
     story.append(Paragraph(liability_notice(locale), styles["Liability"]))
 
     metadata = [
@@ -583,6 +584,9 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     extracted = payload.get("extracted") or {}
     report_eyes = _ordered_eyes(decision)
     document = Document()
+    document.core_properties.title = f"CER-AI — {PROGRAM_NAME}"
+    document.core_properties.subject = tr("CER-AI Preoperative Ectasia Risk Assessment")
+    document.core_properties.author = "CER-AI"
     section = document.sections[0]
     section.top_margin = Inches(0.72)
     section.bottom_margin = Inches(0.72)
@@ -646,7 +650,7 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     run.font.size = Pt(18)
     run.bold = True
     run.font.color.rgb = RGBColor.from_string(NAVY)
-    subtitle = document.add_paragraph(tr("Corneal refractive surgery clinical decision-support report") + f" | {tr('Software')} v{APP_VERSION}")
+    subtitle = document.add_paragraph(PROGRAM_NAME + " | " + tr("Corneal refractive surgery clinical decision-support report") + f" | {tr('Software')} v{APP_VERSION}")
     subtitle.paragraph_format.space_after = Pt(10)
     for run in subtitle.runs:
         run.font.name = "Arial"

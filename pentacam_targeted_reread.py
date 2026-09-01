@@ -204,7 +204,7 @@ Only perform this map reading for the requested eyes. Confirm the map title, low
 BFS/Float reference, Dia 8.00 mm and visible central dashed boundary independently. Compare all
 printed signed measurement labels whose points are inside that boundary; do not stop at the first
 positive number. Set maximum_rule_applied=true only after comparing the complete bounded field.
-source_tile must be LOWER_RIGHT. source_box must enclose the dashed analysis field and its printed
+source_tile must be LOWER_RIGHT. source_box must enclose the dashed assessment field and its printed
 measurements so an unreadable result can be shown beside the surgeon correction input. If any
 required landmark, sign or digit is ambiguous, return value=null and UNREADABLE/UNCERTAIN. Return
 an empty posterior_pupil_readings array when no posterior target is requested or the map is absent.
