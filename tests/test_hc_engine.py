@@ -819,6 +819,13 @@ class TestScoringAndCompleteness(unittest.TestCase):
         self.assertEqual(eye["posterior_pattern"], "REASSURING")
         self.assertEqual(eye["data_conflicts"], [])
 
+    def test_legacy_morphology_confidence_conflict_never_requires_surgeon_input(self):
+        eye = normal_eye()
+        eye["data_conflicts"] = ["morphology_confidence: UNREADABLE vs HIGH"]
+        self.assertFalse(any(
+            "morphology_confidence" in item for item in app.required_tomography_missing(eye)
+        ))
+
     def test_unsupported_asymmetric_bowtie_label_does_not_override_supported_normal_map(self):
         normal = normal_eye()
         unsupported = normal_eye(morphology="ASYMMETRIC_BOWTIE")

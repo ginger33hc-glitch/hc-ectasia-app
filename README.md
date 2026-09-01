@@ -2,7 +2,11 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.57 implements
+## What v0.7.58 implements
+
+- Multi-image `morphology_confidence` differences are treated as source coverage, not as a
+  surgeon-resolvable clinical conflict. The dedicated anterior-curvature source owns the final
+  confidence value, preventing an instruction-only readiness blocker with no field to complete.
 
 - Supervised trial access can temporarily accept only a doctor's displayed name while retaining
   secure session cookies, a stable per-name DOCTOR identity, archive ownership, and audit records.
