@@ -5,25 +5,21 @@ The canonical ERSS/BAD scorers, their input rules, and LASIK fallback planner re
 from nice_scoring import score_nice, finite
 
 
-POSTERIOR_PUPIL_EXTRACTION_RULE = """posterior_pupil_max_um is one dedicated NICE input only.
-Use only the LOWER-RIGHT map explicitly titled 'Elevation (Back)' on a Pentacam 4 Maps
-Refractive screen. Identify the central dashed pupil boundary, inspect every explicitly printed
-signed elevation measurement whose measurement point lies inside that dashed boundary, and return
-the highest positive printed value in micrometres. Do not use the upper-right Elevation (Front)
-map, Corneal Thickness map, colour scale, a value outside the dashed boundary, elevation at the
-thinnest point, or any other NICE/Pentacam parameter. The map must state BFS/Float with Dia 8.00 mm.
-Never estimate from colour or interpolate an unprinted value."""
+B_ELE_TH_EXTRACTION_RULE = """B_Ele_Th_um is one dedicated NICE input only.
+Use only the explicitly labeled 'B. Ele.Th' numeric box on the Pentacam BAD Display page.
+Preserve the printed sign and value in micrometres. Never use an Elevation (Back) map, a pupil
+boundary, BFS/Float values, BFTE, a colour scale, another elevation field, a neighboring number,
+or a value calculated from any other parameter. If the B. Ele.Th label or attached digits are
+unreadable, return null; no other source may substitute for this box."""
 
 
-def posterior_candidate_is_acceptable(candidate):
-    """Canonical source/geometry gate shared by NICE extraction passes."""
+def b_ele_th_candidate_is_acceptable(candidate):
+    """Canonical labeled-box gate shared by NICE extraction passes."""
     return (
-        candidate.get("posterior_status") == "CONFIDENT"
-        and finite(candidate.get("posterior_pupil_max_um"))
-        and candidate.get("posterior_pupil_max_um") > 0
-        and candidate.get("posterior_reference") == "BFS_FLOAT"
-        and candidate.get("bfs_diameter_mm") == 8
-        and candidate.get("pupil_boundary_visible") is True
+        candidate.get("b_ele_th_status") == "CONFIDENT"
+        and finite(candidate.get("B_Ele_Th_um"))
+        and candidate.get("b_ele_th_landmark") == "B_ELE_TH_LABELED_BOX"
+        and candidate.get("b_ele_th_page") == "BAD_DISPLAY"
     )
 
 
@@ -33,11 +29,10 @@ def install_schema(core):
         "central_pachy_um": {"type": ["number", "null"]},
         "central_status": {"type": "string", "enum": ["CONFIDENT", "UNREADABLE", "NOT_SHOWN"]},
         "central_landmark": {"type": "string", "enum": ["PUPIL_CENTER_PLUS", "OTHER", "UNREADABLE"]},
-        "posterior_pupil_max_um": {"type": ["number", "null"]},
-        "posterior_status": {"type": "string", "enum": ["CONFIDENT", "UNREADABLE", "NOT_SHOWN"]},
-        "posterior_reference": {"type": "string", "enum": ["BFS_FLOAT", "BFTE", "OTHER", "UNREADABLE"]},
-        "bfs_diameter_mm": {"type": ["number", "null"]},
-        "pupil_boundary_visible": {"type": "boolean"},
+        "B_Ele_Th_um": {"type": ["number", "null"]},
+        "b_ele_th_status": {"type": "string", "enum": ["CONFIDENT", "UNREADABLE", "NOT_SHOWN"]},
+        "b_ele_th_landmark": {"type": "string", "enum": ["B_ELE_TH_LABELED_BOX", "OTHER", "UNREADABLE"]},
+        "b_ele_th_page": {"type": "string", "enum": ["BAD_DISPLAY", "OTHER", "UNREADABLE"]},
         "evidence": {"type": "string"},
     }
     core.SCHEMA["properties"]["nice_readings"] = {
@@ -53,13 +48,11 @@ printed label and its plus marker are unambiguous. NEVER use 'Pachy Vertex N.', 
 the circle-marked thinnest value, or any number printed inside a corneal-thickness map as central
 pachymetry. If the Pupil Center label, plus marker, or digits are unreadable, use null,
 central_status=UNREADABLE and central_landmark=UNREADABLE.
-{POSTERIOR_PUPIL_EXTRACTION_RULE}
-Read the printed BFS/Float reference and diameter separately. Do not estimate any
-number from colour or interpolate unprinted values. If the pupil boundary, sign,
-measurement location or digits are ambiguous, return null and UNREADABLE.
-Record the source label, raw value and location (relative to pupil) in evidence.
-Never return zero to replace missing data. All negative values/no positive label
-means unreadable for this positive-maximum field and requires surgeon confirmation.
+{B_ELE_TH_EXTRACTION_RULE}
+Set b_ele_th_landmark=B_ELE_TH_LABELED_BOX and b_ele_th_page=BAD_DISPLAY only when the printed
+B. Ele.Th label, its attached value, and the BAD Display page identity are all unambiguous.
+Otherwise use B_Ele_Th_um=null, b_ele_th_status=UNREADABLE, b_ele_th_landmark=UNREADABLE and
+b_ele_th_page=UNREADABLE. Record the exact source label and raw signed value in evidence.
 """
 
 
@@ -92,13 +85,15 @@ def _read(eye, plan, key, manual, status):
             continue
         if key == "central_pachy_um" and candidate.get("central_landmark") != "PUPIL_CENTER_PLUS":
             continue
-        if key == "posterior_pupil_max_um" and not posterior_candidate_is_acceptable(candidate):
+        if key == "B_Ele_Th_um" and not b_ele_th_candidate_is_acceptable(candidate):
             continue
         candidates.append(candidate)
     # Pupil Center (+) is an exclusive printed-row source, not a consensus field.
     # Retain the first valid same-eye transcription and never create a cross-screen conflict.
     if key == "central_pachy_um" and candidates:
         return candidates[0][key], "PENTACAM_PRINTED", [candidates[0]]
+    if key == "B_Ele_Th_um" and candidates:
+        return candidates[0][key], "PENTACAM_BAD_DISPLAY_B_ELE_TH", [candidates[0]]
     distinct = {candidate[key] for candidate in candidates}
     if len(distinct) != 1:
         return None, "CONFLICT" if distinct else "UNREADABLE", candidates
@@ -107,7 +102,7 @@ def _read(eye, plan, key, manual, status):
 
 def evaluate(eye, plan):
     central, central_source, central_evidence = _read(eye, plan, "central_pachy_um", "surgeon_nice_central_um", "central_status")
-    pe, pe_source, pe_evidence = _read(eye, plan, "posterior_pupil_max_um", "surgeon_nice_pe_um", "posterior_status")
+    pe, pe_source, pe_evidence = _read(eye, plan, "B_Ele_Th_um", "surgeon_nice_pe_um", "b_ele_th_status")
     verified = set(eye.get("table_verified_numeric_fields") or []) | set(eye.get("surgeon_verified_numeric_fields") or [])
     conflicts = {str(x).split(":", 1)[0].strip() for x in eye.get("data_conflicts") or []}
     k2 = eye.get("K2_D") if "K2_D" in verified and "K2_D" not in conflicts else None
@@ -120,10 +115,10 @@ def evaluate(eye, plan):
     if plan.get("surgeon_I_S_D") is not None:
         i_s = plan["surgeon_I_S_D"]
     result = score_nice(k2, central, pe, i_s)
-    result["input_sources"] = {"central_pachy": central_source, "posterior_elevation": pe_source,
+    result["input_sources"] = {"central_pachy": central_source, "B_Ele_Th": pe_source,
                                "K2": "SURGEON_CONFIRMED" if "K2_D" in (eye.get("surgeon_verified_numeric_fields") or []) else "PENTACAM_LABELED_K2",
                                "I_S": "SURGEON_CONFIRMED" if plan.get("surgeon_I_S_D") is not None else "PENTACAM_LABELED_IS"}
-    result["evidence"] = {"central_pachy": central_evidence, "posterior_elevation": pe_evidence}
+    result["evidence"] = {"central_pachy": central_evidence, "B_Ele_Th": pe_evidence}
     result["evidence_notes"] = list(dict.fromkeys(
         f"{candidate.get('source_filename') or 'Pentacam'}: {candidate['evidence']}"
         for candidate in central_evidence + pe_evidence if candidate.get("evidence")))

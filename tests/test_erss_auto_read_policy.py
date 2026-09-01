@@ -14,10 +14,10 @@ def test_resolved_erss_does_not_require_morphology_prompt():
 
 def test_nice_never_owns_srax_or_abt():
     result = {
-        "missing": ["NICE: SRAX", "NICE: asymmetric bow-tie", "NICE: posterior_pupil_max_um"]
+        "missing": ["NICE: SRAX", "NICE: asymmetric bow-tie", "NICE: B_Ele_Th_um"]
     }
     policy._clean_missing(result)
-    assert result["missing"] == ["NICE: posterior_pupil_max_um"]
+    assert result["missing"] == ["NICE: B_Ele_Th_um"]
 
 
 def test_unresolved_erss_remains_reviewable():

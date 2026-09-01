@@ -104,7 +104,7 @@ def _request(eye, message, extracted):
             "destination": "source", "help": "Correct the clinical form or upload a clearer/correct source image."}
     exact = {
         "NICE: central_pachy_um": ("surgeon_nice_central_um", "Central pachymetry (µm; not thinnest)", "nice_central"),
-        "NICE: posterior_pupil_max_um": ("surgeon_nice_pe_um", "Highest positive posterior elevation inside pupil (µm), standard 8-mm BFS Float", "nice_pe"),
+        "NICE: B_Ele_Th_um": ("surgeon_nice_pe_um", "B. Ele.Th (µm; BAD Display labeled box only)", "nice_pe"),
         "NICE: I_S_D": ("surgeon_I_S_D", "Signed I-S (D)", "surgeon_i_s"),
     }
     if message in exact:

@@ -46,12 +46,12 @@
     "Hard stop / 2 / 1 / 0":"Kesin durdurma / 2 / 1 / 0",
     "Randleman/ERSS is calculated from five independent LASIK inputs. BAD-D and NICE remain separate pathways. Overall ERSS: 0–2 low, 3 moderate, ≥4 high; CER-AI does not clear totals ≥3.":"Randleman/ERSS beş bağımsız LASIK girdisinden hesaplanır. BAD-D ve NICE ayrı değerlendirme yollarıdır. ERSS toplamı: 0–2 düşük, 3 orta, ≥4 yüksek; CER-AI toplam ≥3 olduğunda cerrahi onay vermez.",
     "Source:":"Kaynak:",
-    "Leave blank for image reading. Enter only when requested or to explicitly correct a reading. Central pachymetry is not thinnest pachymetry. Posterior elevation uses the highest positive printed value inside the dashed pupil boundary on the standard 8-mm BFS Float back-elevation map.":"Görüntüden okuma için boş bırakın. Yalnızca istendiğinde veya bir okumayı açıkça düzeltmek için girin. Santral pakimetri, en ince pakimetri değildir. Posterior elevasyon için standart 8 mm BFS Float arka elevasyon haritasında kesikli pupil sınırı içindeki yazılı en yüksek pozitif değer kullanılır.",
+    "Leave blank for image reading. Enter only when requested or to explicitly correct a reading. Central pachymetry is read only from Pupil Center (+). NICE posterior elevation is read only from the B. Ele.Th box on the BAD Display page.":"Görüntüden okuma için boş bırakın. Yalnızca istendiğinde veya bir okumayı açıkça düzeltmek için girin. Santral pakimetri yalnızca Pupil Center (+) alanından okunur. NICE posterior elevasyonu yalnızca BAD Display sayfasındaki B. Ele.Th kutusundan okunur.",
     "Surgeon-confirmed I-S (D)":"Cerrah tarafından doğrulanan I-S (D)",
     "Surgeon-confirmed Randleman topography category":"Cerrah tarafından doğrulanan Randleman topografi kategorisi",
     "Select only when requested":"Yalnızca istendiğinde seçin",
     "NICE — optional surgeon-confirmed measurements":"NICE — cerrah tarafından doğrulanabilecek isteğe bağlı ölçümler",
-    "Central pachymetry (µm)":"Santral pakimetri (µm)","Posterior pupil maximum (µm)":"Pupil içi maksimum posterior elevasyon (µm)",
+    "Central pachymetry (µm)":"Santral pakimetri (µm)","B. Ele.Th (µm; BAD Display)":"B. Ele.Th (µm; BAD Display)",
     "Clinical eligibility and stability":"Klinik uygunluk ve stabilite","Clinical eligibility and stability — reviewed":"Klinik uygunluk ve stabilite — değerlendirildi",
     "Refraction stable?":"Refraksiyon stabil mi?","Documented progression?":"Belgelenmiş progresyon var mı?",
     "Unexplained CDVA <20/20?":"Açıklanamayan EİDGK <20/20 mi?","Enhancement anticipated?":"Ek düzeltme öngörülüyor mu?",
@@ -176,8 +176,9 @@
       .replace(/point\(s\)/gi,"puan")
       .replace(/\bcentral_pachymetry\b/gi,"santral pakimetri")
       .replace(/\bposterior_elevation\b/gi,"posterior elevasyon")
+      .replace(/\bB_Ele_Th\b/g,"B. Ele.Th")
       .replace(/\bcentral_pachy\b/gi,"santral pakimetri")
-      .replace(/\bposterior_pupil_max_um\b/gi,"pupil içi maksimum posterior elevasyon (µm)")
+      .replace(/\bB_Ele_Th_um\b/g,"B. Ele.Th (µm)")
       .replace(/\bcentral_pachy_um\b/gi,"santral pakimetri (µm)")
       .replace(/\bI_S\b/g,"I-S")
       .replace(/\bK2_D\b/g,"K2 (D)")

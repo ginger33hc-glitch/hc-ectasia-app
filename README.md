@@ -2,7 +2,7 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.68 implements
+## What v0.7.69 implements
 
 - Locks KMax, ARTmax, circle-marked `Thinnest Locat.`, and plus-marked `Pupil Center` to their own
   explicitly labeled Pentacam boxes/rows. These fields are never reconstructed from maps or
@@ -36,14 +36,11 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
   technical contracts such as `/analyze` and existing deployment environment-variable names are
   retained for compatibility.
 
-- NICE `posterior_pupil_max_um` now has a dedicated targeted reread of only the lower-right
-  `Elevation (Back)` map on a Pentacam 4 Maps Refractive screen. It accepts only the highest
-  positive printed elevation inside the central dashed boundary when BFS/Float and Dia 8.00 mm
-  are independently visible; it cannot substitute anterior elevation, pachymetry, colour-scale,
-  thinnest-point, or out-of-boundary values.
-- When that bounded posterior field remains unreadable, its localized lower-right map crop is
-  retained beside the single surgeon correction field. Other NICE parameters keep their own
-  previously defined sources and are not read from this map.
+- NICE posterior elevation is locked to the explicitly labeled `B. Ele.Th` box on the Pentacam
+  BAD Display page. The former Elevation (Back) map/pupil-boundary reader has been removed.
+- When `B. Ele.Th` remains unreadable, its localized label/value-box crop is retained beside the
+  single surgeon correction field. No map, BFS/Float, BFTE, neighboring, or calculated value can
+  substitute for this box.
 
 - Pentacam landmark reading now recognizes the circle-marked `Thinnest Locat.` pachymetry and
   the plus-marked `Pupil Center` central pachymetry while keeping the two measurements separate.
@@ -207,12 +204,12 @@ STOP-DEFER, >=9: HARD STOP. A stronger existing stop always wins.
 The report labels this as **CER-AI-adapted NICE**, documents all four components and
 provenance, and cites DOI 10.2147/OPTH.S464217. The approved posterior bands are
 <=15.5 / >15.5 and <18 / >=18 µm, scoring 1/2/3 points (not zero). The automatic
-reader uses the highest printed positive value inside the visible dashed pupil
-on a standard 8-mm BFS Float posterior elevation map. It never substitutes a
-colour estimate, a whole-map maximum, BFTE, BAD difference or thinnest-point
-elevation. Central pachymetry is the labeled Pachy Vertex N. reading, not thinnest.
-The pupil-maximum method and 15.5 boundary are disclosed CER-AI adaptations, not a
-claim that the original study independently validated this implementation.
+reader uses only the signed value in the explicitly labeled `B. Ele.Th` box on the
+BAD Display page. No elevation map, pupil-boundary maximum, BFS/Float, BFTE, color
+estimate, neighboring value, or calculation is accepted. Central pachymetry uses
+only the plus-marked `Pupil Center` row, not Pachy Vertex N. or thinnest pachymetry.
+The source selection and 15.5 boundary are disclosed CER-AI adaptations, not a claim
+that the original study independently validated this implementation.
 
 `assessment_workflow.py` gates reports using all canonical decision-critical missing
 inputs plus missing NICE components. `/analyze` returns NEEDS_INPUT (without a
