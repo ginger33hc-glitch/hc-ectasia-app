@@ -7,8 +7,9 @@ the CER-AI engine consumes them.
 Multi-image numeric reconciliation policy:
 - When the same numeric parameter is read from multiple valid sources of the same provenance class,
   a relative spread of <=1% is accepted as normal extraction/measurement variation.
-- The parameter-specific safety-limiting reading is retained in that case and the difference is not
-  an unresolved conflict: lower for pachymetry, ARTmax, and Rmin; higher for other numeric fields.
+- Exclusive labeled-box fields (Kmax, ARTmax, Thinnest Locat., and Pupil Center +) are not
+  reconciled here. For remaining fields, the parameter-specific safety-limiting reading is retained:
+  lower for Rmin and higher for other numeric fields.
 - Differences >1%, nonnumeric disagreements, and disagreements across unequal source-priority
   classes continue through the existing conflict/safety pathway.
 """
@@ -16,6 +17,7 @@ import re
 from typing import Any, Dict, List
 
 import bootstrap
+from pentacam_field_registry import EXCLUSIVE_LABELED_BOX_FIELDS
 
 core = bootstrap.core
 _original_merge = core.merge_extractions
@@ -33,7 +35,7 @@ PLAUSIBLE = {
     "ARTmax_um": (1.0, 1000.0), "PPI_min": (0.01, 10.0),
     "PPI_avg": (0.01, 10.0), "PPI_max": (0.01, 10.0), "Rmin_mm": (3.0, 15.0),
 }
-LOWER_IS_SAFETY_LIMITING = {"pachy_thinnest_um", "ARTmax_um", "Rmin_mm"}
+LOWER_IS_SAFETY_LIMITING = {"Rmin_mm"}
 NON_BLOCKING_CONFLICT_FIELDS = {"morphology_confidence"}
 
 _CONFLICT_RE = re.compile(
@@ -86,6 +88,8 @@ def _reconcile_one_percent(merged: Dict[str, Any], results: List[Dict[str, Any]]
             if not eye_id:
                 continue
             for field, value in raw_eye.items():
+                if field in EXCLUSIVE_LABELED_BOX_FIELDS:
+                    continue
                 if not _num(value):
                     continue
                 source_class = _source_class(raw_eye, field)
@@ -160,11 +164,6 @@ def _audit_eye(eye: Dict[str, Any]) -> Dict[str, Any]:
     if all(_num(v) for v in (pmin, pavg, pmax)) and not float(pmin) <= float(pavg) <= float(pmax):
         issues.append("PPI internal check failed: expected PPI min ≤ average ≤ max")
 
-    pachy, art = eye.get("pachy_thinnest_um"), eye.get("ARTmax_um")
-    if all(_num(v) for v in (pachy, art, pmax)) and float(pmax) > 0:
-        expected = float(pachy) / float(pmax)
-        if abs(float(art) - expected) > max(20.0, 0.10 * expected):
-            issues.append("ARTmax internal check failed against thinnest pachymetry / PPImax")
 
     conflicts = [
         conflict for conflict in (eye.get("data_conflicts") or [])

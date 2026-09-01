@@ -32,6 +32,7 @@ def install_schema(core):
         "eye": {"type": "string", "enum": ["OD", "OS", "UNKNOWN"]},
         "central_pachy_um": {"type": ["number", "null"]},
         "central_status": {"type": "string", "enum": ["CONFIDENT", "UNREADABLE", "NOT_SHOWN"]},
+        "central_landmark": {"type": "string", "enum": ["PUPIL_CENTER_PLUS", "OTHER", "UNREADABLE"]},
         "posterior_pupil_max_um": {"type": ["number", "null"]},
         "posterior_status": {"type": "string", "enum": ["CONFIDENT", "UNREADABLE", "NOT_SHOWN"]},
         "posterior_reference": {"type": "string", "enum": ["BFS_FLOAT", "BFTE", "OTHER", "UNREADABLE"]},
@@ -47,10 +48,11 @@ def install_schema(core):
 NICE SEPARATE INPUT READING (do not calculate scores):
 Return nice_readings only for Pentacam images with unambiguous OD/OS; otherwise [].
 central_pachy_um: read the printed pachymetry value identified as 'Pupil Center' by the
-plus-shaped (+) marker next to it. 'Pachy Vertex N.' remains acceptable when explicitly labeled
-as the central/vertex pachymetry on that Pentacam screen. NEVER use 'Thinnest Locat.' or the
-circle-marked thinnest value as central pachymetry. If the Pupil Center/central label, plus marker,
-or digits are unreadable, use null and UNREADABLE.
+plus-shaped (+) marker next to it. Set central_landmark=PUPIL_CENTER_PLUS only when both that
+printed label and its plus marker are unambiguous. NEVER use 'Pachy Vertex N.', 'Thinnest Locat.',
+the circle-marked thinnest value, or any number printed inside a corneal-thickness map as central
+pachymetry. If the Pupil Center label, plus marker, or digits are unreadable, use null,
+central_status=UNREADABLE and central_landmark=UNREADABLE.
 {POSTERIOR_PUPIL_EXTRACTION_RULE}
 Read the printed BFS/Float reference and diameter separately. Do not estimate any
 number from colour or interpolate unprinted values. If the pupil boundary, sign,
@@ -88,9 +90,15 @@ def _read(eye, plan, key, manual, status):
     for candidate in eye.get("nice_candidates") or []:
         if candidate.get(status) != "CONFIDENT" or not finite(candidate.get(key)):
             continue
+        if key == "central_pachy_um" and candidate.get("central_landmark") != "PUPIL_CENTER_PLUS":
+            continue
         if key == "posterior_pupil_max_um" and not posterior_candidate_is_acceptable(candidate):
             continue
         candidates.append(candidate)
+    # Pupil Center (+) is an exclusive printed-row source, not a consensus field.
+    # Retain the first valid same-eye transcription and never create a cross-screen conflict.
+    if key == "central_pachy_um" and candidates:
+        return candidates[0][key], "PENTACAM_PRINTED", [candidates[0]]
     distinct = {candidate[key] for candidate in candidates}
     if len(distinct) != 1:
         return None, "CONFLICT" if distinct else "UNREADABLE", candidates

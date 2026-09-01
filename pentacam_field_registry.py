@@ -16,6 +16,16 @@ TARGET_FIELDS = (
     "total_RMS_um", "spherical_aberration_um",
 )
 
+# These values have one authoritative printed Pentacam box/row. They are not
+# cross-image consensus fields and must never be reconstructed from a map or a
+# neighboring value. The first valid same-eye labeled-box transcription is retained.
+EXCLUSIVE_LABELED_BOX_FIELDS = frozenset({
+    "Kmax_D",
+    "ARTmax_um",
+    "pachy_thinnest_um",
+    "central_pachy_um",
+})
+
 COMPLETION_NUMERIC_FIELDS = {
     "pachy_thinnest_um": "Thinnest pachymetry (µm)",
     "BAD_D": "Final BAD-D",

@@ -35,11 +35,7 @@ def test_exactly_one_percent_full_spread_is_accepted_and_higher_retained():
 
 
 def test_lower_is_retained_for_safety_limiting_fields_within_one_percent():
-    cases = (
-        ("pachy_thinnest_um", 500.0, 504.0, 500.0),
-        ("ARTmax_um", 350.0, 353.0, 350.0),
-        ("Rmin_mm", 7.03, 7.09, 7.03),
-    )
+    cases = (("Rmin_mm", 7.03, 7.09, 7.03),)
     for field, first, second, expected in cases:
         merged = core.merge_extractions([
             _numeric_result("a.jpg", field, first),
@@ -50,17 +46,20 @@ def test_lower_is_retained_for_safety_limiting_fields_within_one_percent():
         assert not any(field in str(x) for x in od.get("data_conflicts", []))
 
 
-def test_pachymetry_difference_under_10um_but_over_one_percent_remains_conflict():
-    merged = core.merge_extractions([
-        _numeric_result("a.jpg", "pachy_thinnest_um", 500.0),
-        _numeric_result("b.jpg", "pachy_thinnest_um", 509.0),
-    ])
-    od = merged["eyes"][0]
-    # This specifically locks out the superseded legacy <=10 um reconciliation rule.
-    assert any("pachy_thinnest_um" in str(x) for x in od.get("data_conflicts", [])) or any(
-        "pachy_thinnest_um" in str(x) and "conflict" in str(x).lower()
-        for x in merged.get("critical_input_issues", [])
-    )
+def test_exclusive_labeled_box_fields_retain_first_without_cross_screen_conflict():
+    for field, first, second in (
+        ("Kmax_D", 47.5, 48.1),
+        ("ARTmax_um", 584.0, 600.0),
+        ("pachy_thinnest_um", 521.0, 524.0),
+    ):
+        merged = core.merge_extractions([
+            _numeric_result("a.jpg", field, first),
+            _numeric_result("b.jpg", field, second),
+        ])
+        od = merged["eyes"][0]
+        assert od[field] == first
+        assert not any(field in str(x) for x in od.get("data_conflicts", []))
+        assert field not in od.get("numeric_reconciliation", {})
 
 
 def test_labeled_table_has_priority_over_map_fallback():
