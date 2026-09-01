@@ -258,7 +258,7 @@ def _tomography_rows(extracted: Dict[str, Any], eye_id: str, locale: str = "en")
     keys = [
         ("K1", "K1_D", " D", 2), ("K1 axis", "K1_axis_deg", " degrees", 0),
         ("K2", "K2_D", " D", 2), ("K2 axis", "K2_axis_deg", " degrees", 0),
-        ("Corneal diameter / W2W", "corneal_diameter_mm", " mm", 2),
+        ("Horizontal white-to-white (HWTW)", "corneal_diameter_mm", " mm", 2),
         ("Kmax", "Kmax_D", " D", 2), ("Thinnest pachymetry", "pachy_thinnest_um", " um", 0),
         ("BAD-D final", "BAD_D", "", 2), ("BAD-Df", "Df", "", 2),
         ("BAD-Db", "Db", "", 2), ("BAD-Dp", "Dp", "", 2),
