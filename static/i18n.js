@@ -88,6 +88,7 @@
     "PASS":"UYGUN","PASS WITH CAUTION":"DİKKATLE UYGUN","CAUTION — STOP/DEFER":"DİKKAT — DURDUR/ERTELE","DO NOT PROCEED":"İŞLEME DEVAM ETMEYİN",
     "REVIEW — NOT CLEARED":"DEĞERLENDİR — ONAYLANMADI","DATA INSUFFICIENT":"VERİ YETERSİZ","ERROR":"HATA","ANALYZING...":"ANALİZ EDİLİYOR...",
     "Required information — no report has been generated":"Gerekli bilgiler — henüz rapor oluşturulmadı",
+    "PATIENT":"Hasta","Patient age (years)":"Hasta yaşı (yıl)",
     "Complete all items below, then continue. Existing inputs and image readings are retained. No calculation is required from the surgeon.":"Aşağıdaki tüm alanları tamamlayıp devam edin. Mevcut girdiler ve görüntü okumaları korunur. Cerrahın hesaplama yapması gerekmez.",
     "Continue with completed information":"Tamamlanan bilgilerle devam et","Preparing...":"Hazırlanıyor...",
     "Eye rubbing / ocular trauma":"Göz ovalama / oküler travma","Family history":"Aile öyküsü","Inter-eye asymmetry":"Gözler arası asimetri",
