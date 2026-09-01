@@ -238,6 +238,7 @@ def _findings(eye: Dict[str, Any], locale: str = "en") -> Iterable[tuple[str, Li
         ("Surgical-load evidence flags", eye.get("surgical_load_flags") or []),
         ("Clinical modifiers", eye.get("clinical_modifiers") or []),
         ("Warnings", eye.get("warnings") or []),
+        ("PRK Mitomycin-C guidance", eye.get("prk_mitomycin_c_guidance") or []),
         ("NICE component audit", [f"{key}: {value} point(s)" for key, value in (eye.get("nice") or {}).get("rows", {}).items()]
          + [f"Input {key}: {value}" for key, value in (eye.get("nice") or {}).get("values", {}).items()]
          + [f"Source {key}: {value}" for key, value in (eye.get("nice") or {}).get("input_sources", {}).items()]

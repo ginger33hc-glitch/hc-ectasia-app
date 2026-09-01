@@ -47,6 +47,10 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 - LASIK ERSS MRSE uses preoperative manifest sphere and minus-cylinder magnitude:
   `MRSE = manifest sphere − manifest cylinder magnitude / 2`.
 - Ablation and CER-AI treatment-range gates use intended treatment sphere/cylinder only.
+- PRK Mitomycin-C guidance uses intended treatment MRSE magnitude and does not change the ectasia
+  score or disposition. Use is required for all hyperopic PRK and for myopic PRK at 4.00 D or
+  greater magnitude (for example, -4.00 D and -5.00 D); use is recommended below 4.00 D myopic
+  magnitude (for example, -3.99 D). Mixed astigmatism requires separate surgeon review.
 - Treatment-card extraction may auto-fill intended correction only from `Düzeltme Miktarı`.
 - Invalid numeric ranges are not used in any formula.
 - Manifest and intended corrections are normalized to minus-cylinder notation, then classified
