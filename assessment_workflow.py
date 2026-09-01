@@ -11,21 +11,14 @@ import secrets
 
 from fastapi import HTTPException, Body, Response
 from nice_scoring import finite
+from pentacam_field_registry import COMPLETION_NUMERIC_FIELDS
 
 _lock = RLock()
 _sessions = {}
 TTL_SECONDS = 3600
 MAX_SESSIONS = 64
 
-NUMERIC_FIELDS = {
-    "pachy_thinnest_um": "Thinnest pachymetry (µm)", "BAD_D": "Final BAD-D",
-    "Df": "BAD Df", "Db": "BAD Db", "Dp": "BAD Dp", "Dt": "BAD Dt", "Da": "BAD Da",
-    "ARTmax_um": "ARTmax (µm)", "PPI_min": "PPI minimum", "PPI_avg": "PPI average",
-    "PPI_max": "PPI maximum", "K1_D": "K1 (D)", "K2_D": "K2 (D; not Kmax)",
-    "Kmean_D": "Preoperative Kmean (D)", "Kmax_D": "Kmax (D)",
-    "srax_deg": "SRAX (degrees)", "inferior_opposite_steepening_D": "Inferior-opposite steepening (D)",
-    "Rmin_mm": "Rmin (mm)", "I_S": "Signed I-S (D; not ISV/IVA)",
-}
+NUMERIC_FIELDS = COMPLETION_NUMERIC_FIELDS
 PATTERNS = {"anterior_pattern": ["REASSURING", "BORDERLINE", "ABNORMAL"],
             "posterior_pattern": ["REASSURING", "BORDERLINE", "ABNORMAL"]}
 

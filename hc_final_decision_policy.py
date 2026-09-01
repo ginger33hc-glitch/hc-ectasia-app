@@ -13,7 +13,6 @@ This policy intentionally prevents isolated secondary tomography/topometric conc
 flags from escalating an otherwise non-abnormal Final BAD-D + ERSS<3 case to defer.
 """
 import bootstrap
-import randleman_bad_independence  # ensure BAD-independent ERSS is installed first
 
 core = bootstrap.core
 _previous_assess_eye = core.assess_eye

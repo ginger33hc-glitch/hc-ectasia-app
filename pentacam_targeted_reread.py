@@ -18,18 +18,7 @@ import re
 from typing import Any, Callable
 
 from PIL import Image, ImageOps
-
-
-TARGET_FIELDS = (
-    "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmax_D",
-    "corneal_diameter_mm", "pachy_thinnest_um", "BAD_D", "Df", "Db",
-    "Dp", "Dt", "Da", "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um",
-    "ISV", "IVA", "KI", "CKI", "IHD", "I_S", "KISA", "IHA",
-    "Rmin_mm", "anterior_elevation_thinnest_um",
-    "posterior_elevation_thinnest_um", "thinnest_x_mm", "thinnest_y_mm",
-    "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um", "Kmean_D",
-    "total_RMS_um", "spherical_aberration_um",
-)
+from pentacam_field_registry import TARGET_FIELDS
 
 PENTACAM_SCREEN_FAMILIES = {
     "BAD_DISPLAY",

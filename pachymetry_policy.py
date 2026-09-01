@@ -13,7 +13,6 @@ refractive-surgery literature commonly discusses <500 µm as a thin-cornea risk 
 while also recognizing that pachymetry alone has no validated binary safe/unsafe cutoff.
 Exactly 480 µm remains scoreable because the independent CER-AI hard stop applies only below 480 µm.
 """
-import critical_score_highlight as runtime
 import bootstrap
 
 core = bootstrap.core
@@ -95,4 +94,4 @@ def assess_eye_with_hc_pachymetry(eye, plan, age, patient_modifiers):
 
 core.assess_eye = assess_eye_with_hc_pachymetry
 
-app = runtime.app
+app = bootstrap.app

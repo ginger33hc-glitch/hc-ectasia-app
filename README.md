@@ -2,7 +2,14 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.60 implements
+## What v0.7.61 implements
+
+- `runtime_composition.py` is the single ordered production assembly point. Clinical policy,
+  Pentacam extraction, reporting/readiness, and access/persistence are owned by explicit phases;
+  leaf policy modules no longer load unrelated policies to determine startup order.
+- Pentacam reread targets and surgeon-completion numeric labels share one
+  `pentacam_field_registry.py`, preventing the extraction and readiness pathways from maintaining
+  divergent copies of the same field contract.
 
 - When a labeled Pentacam value remains unreadable, the completion panel shows only that
   localized source region beside the surgeon-entry field. Successfully read values do not show
