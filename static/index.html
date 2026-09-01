@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>CER-AI v0.7.55</title>
+  <title>CER-AI v0.7.56</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=9">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=8">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=8">
@@ -41,7 +41,7 @@
   <style>@media print{.report-card[hidden]{display:none!important}}</style>
 </head>
 <body>
-<header class="app-header"><div class="brand-lockup"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Corneal Ectasia Risk Analysis Intelligence"><span class="brand-version">v0.7.55</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI v0.7.55</h1></header>
+<header class="app-header"><div class="brand-lockup"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Corneal Ectasia Risk Analysis Intelligence"><span class="brand-version">v0.7.56</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI v0.7.56</h1></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -105,7 +105,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">CER-AI Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.7.55</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.7.56</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <p class="report-liability-notice">The final surgical decision and all associated responsibility and liability rest with the surgeon. This application is a clinical decision-support aid only.</p>
       <table class="meta-table"><tbody>
@@ -521,6 +521,10 @@ function renderEye(r, extracted){
     ["Anterior-map read confidence",erssEvidence.image_category_confidence??"—"]
   ];
   const source=(extracted.eyes||[]).find(x=>x.eye===r.eye)||{};
+  const targetedReadText=Object.entries(source.targeted_reread_evidence||{}).flatMap(([field,records])=>(records||[]).map(record=>{
+    const label=[record.group_label,record.printed_label].filter(Boolean).join(" / ")||field;
+    return `${field}: ${label} (${String(record.tile||"original").replaceAll("_"," ").toLowerCase()})`;
+  })).join("; ")||"—";
   const tomoRows=[
     ["K1",fmt(source.K1_D,2)+" D"],["K1 axis",fmt(source.K1_axis_deg,0)+"°"],["K2",fmt(source.K2_D,2)+" D"],["K2 axis",fmt(source.K2_axis_deg,0)+"°"],["Kmax",fmt(source.Kmax_D,2)+" D"],["Horizontal white-to-white (HWTW)",fmt(source.corneal_diameter_mm,2)+" mm"],
     ["Thinnest pachymetry",fmt(source.pachy_thinnest_um,0)+" µm"],["BAD-D final",fmt(source.BAD_D,2)],
@@ -534,7 +538,7 @@ function renderEye(r, extracted){
     ["Thinnest X / Y",`${fmt(source.thinnest_x_mm,2)} / ${fmt(source.thinnest_y_mm,2)} mm`],["Corneal volume",fmt(source.corneal_volume_mm3,2)+" mm³"],
     ["RMS-HOA",fmt(source.RMS_HOA_um,3)+" µm"],["Vertical coma",fmt(source.vertical_coma_um,3)+" µm"],
     ["Morphology",source.morphology??"—"],["Anterior pattern",source.anterior_pattern??"—"],["Posterior pattern",source.posterior_pattern??"—"],["Image quality",source.quality??"—"],
-    ["Pentacam QS",source.pentacam_qs??"—"],["Source files",(source.source_files||[]).join(", ")||"—"]
+    ["Pentacam QS",source.pentacam_qs??"—"],["Targeted crop reread",targetedReadText],["Source files",(source.source_files||[]).join(", ")||"—"]
   ];
   return `<section class="eye-result"><div class="eye-head"><strong>${safe(r.eye)} ASSESSMENT</strong><span class="status ${statusClass(r.status)}">${safe(statusHeadline(r))}</span></div><div class="eye-body">
     <p class="eye-action"><strong>Clinical action:</strong> ${safe(i18n.clinical(r.action))}</p>
