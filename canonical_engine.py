@@ -3,6 +3,8 @@
 Single supported composition point. Production and production-runtime tests must import this
 module rather than assembling policy wrappers independently.
 """
+import os
+
 import pachymetry_policy as _runtime
 import bootstrap
 import reports
@@ -15,7 +17,14 @@ import microkeratome_planning_policy  # noqa: F401
 import erss_topography_evidence_policy  # noqa: F401
 import nice_policy
 import assessment_workflow
+import user_access
 import operational_security
+import case_archive
+import audit_log
+import case_catalog
+import historical_report
+import research_export
+import named_user_ui
 
 core = bootstrap.core
 app = _runtime.app
@@ -25,7 +34,25 @@ core.app.title = f"CER-AI v{CANONICAL_VERSION}"
 reports.APP_VERSION = CANONICAL_VERSION
 nice_policy.install(core)
 assessment_workflow.install(core)
+user_access.install(core)
 operational_security.install(core)
+
+# Keep archive provisioning inert until every bucket credential and encryption secret has been
+# configured and verified. REQUIRED=1 always implies enabled and deliberately fails closed.
+_archive_required = os.getenv("CERAI_ARCHIVE_REQUIRED", "0").strip() == "1"
+_archive_enabled = os.getenv("CERAI_ARCHIVE_ENABLED", "0").strip() == "1" or _archive_required
+if _archive_enabled:
+    _archive_runtime = case_archive.install(core)
+else:
+    _archive_runtime = case_archive.install(
+        core,
+        runtime=case_archive.CaseArchiveRuntime(None, required=False),
+    )
+audit_log.install(core, _archive_runtime)
+case_catalog.install(core, _archive_runtime)
+historical_report.install(core, _archive_runtime)
+research_export.install(core, _archive_runtime)
+named_user_ui.install(core)
 
 # ERSS morphology auto-read cleanup must wrap the fully installed assessment workflow.
 # Keep it out of bootstrap so the production composition order remains explicit here.
@@ -67,7 +94,14 @@ def runtime_invariants():
     if not getattr(core,"_hc_microkeratome_planning_installed",False):errors.append("Post-assessment ML7 microkeratome planning layer is not active")
     if not getattr(core,"_hc_nice_installed",False):errors.append("Independent CER-AI NICE policy is not active")
     if not getattr(core,"_hc_readiness_installed",False):errors.append("Pre-report readiness workflow is not active")
+    if not getattr(core,"_cerai_named_user_access_installed",False):errors.append("Named-user access boundary is not active")
     if not getattr(core,"_cerai_operational_security_installed",False):errors.append("Operational security boundary is not active")
+    if not getattr(core,"_cerai_case_archive_installed",False):errors.append("Encrypted case archive boundary is not active")
+    if not getattr(core,"_cerai_audit_log_installed",False):errors.append("Encrypted audit-log boundary is not active")
+    if not getattr(core,"_cerai_case_catalog_installed",False):errors.append("Encrypted case catalog boundary is not active")
+    if not getattr(core,"_cerai_historical_report_installed",False):errors.append("Historical report regeneration boundary is not active")
+    if not getattr(core,"_cerai_research_export_installed",False):errors.append("Research export boundary is not active")
+    if not getattr(core,"_cerai_named_user_ui_installed",False):errors.append("Named-user archive UI boundary is not active")
     if not getattr(core,"_erss_topography_evidence_policy_installed",False):errors.append("ERSS I-S/topography evidence gate is not active")
     if not getattr(core,"_erss_auto_read_policy_installed",False):errors.append("ERSS morphology auto-read separation policy is not active")
     if getattr(core.lasik_topography_points, "__module__", None) != "app":errors.append("ERSS evidence gate must not replace or duplicate the canonical topography point mapper")

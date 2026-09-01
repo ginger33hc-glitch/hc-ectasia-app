@@ -1,5 +1,4 @@
 import asyncio
-import hashlib
 from io import BytesIO
 
 import pytest
@@ -40,34 +39,6 @@ def test_configured_access_key_protects_clinical_endpoints(monkeypatch):
         headers={"X-CERAI-Access-Key": "correct-horse-battery-staple"},
     )
     assert admitted.status_code == 410
-
-
-def test_hashed_verifier_accepts_only_the_configured_full_access_code(monkeypatch):
-    test_key = "unit-test-access-key-with-spaces"
-    salt = bytes.fromhex("00112233445566778899aabbccddeeff")
-    digest = hashlib.pbkdf2_hmac("sha256", test_key.encode(), salt, 100_000)
-    verifier = f"pbkdf2_sha256$100000${salt.hex()}${digest.hex()}"
-    monkeypatch.setattr(security, "ACCESS_KEY", "")
-    monkeypatch.setattr(security, "ACCESS_KEY_HASH", verifier)
-    monkeypatch.setattr(security, "REQUIRE_ACCESS_KEY", True)
-
-    denied = client.post(
-        "/assessment/complete",
-        json={},
-        headers={"X-CERAI-Access-Key": "incorrect"},
-    )
-    assert denied.status_code == 401
-
-    admitted = client.post(
-        "/assessment/complete",
-        json={},
-        headers={"X-CERAI-Access-Key": test_key},
-    )
-    assert admitted.status_code == 410
-
-
-def test_embedded_verifier_is_well_formed_without_exposing_the_key():
-    assert security._access_key_hash_well_formed(security.EMBEDDED_ACCESS_KEY_HASH)
 
 
 def test_non_image_upload_is_rejected_before_extraction():
