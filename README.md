@@ -2,7 +2,11 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.59 implements
+## What v0.7.60 implements
+
+- When a labeled Pentacam value remains unreadable, the completion panel shows only that
+  localized source region beside the surgeon-entry field. Successfully read values do not show
+  image evidence; manual values remain explicitly recorded as `SURGEON_CONFIRMED`.
 
 - Patient age remains one patient-level value shared by OD and OS. If the general read misses the
   printed Pentacam age, the extraction adapter performs a focused top-demographic-header reread.

@@ -1,7 +1,25 @@
 /* Input completion only. Clinical completeness and scores are owned by the server. */
 window.HCReadiness = class {
-  constructor(panel) { this.panel=panel; this.reset(); }
-  reset() { this.token=null; this.overrides={}; this.panel.hidden=true; this.panel.replaceChildren(); }
+  constructor(panel) { this.panel=panel; this.regionUrls=[]; this.reset(); }
+  reset() {
+    for(const url of this.regionUrls||[])URL.revokeObjectURL(url);
+    this.regionUrls=[];this.token=null;this.overrides={};this.panel.hidden=true;this.panel.replaceChildren();
+  }
+  async loadSourceRegion(container,item) {
+    const tr=value=>window.CERAI_I18N?.translate(value)??value;
+    const status=document.createElement('span');status.textContent=tr('Loading unread Pentacam region...');container.append(status);
+    try{
+      const request=window.ceraiFetch||window.fetch.bind(window);
+      const response=await request('/assessment/source-region',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({assessment_token:this.token,eye:item.eye,key:item.key})
+      });
+      if(!response.ok)throw new Error('source region unavailable');
+      const url=URL.createObjectURL(await response.blob());this.regionUrls.push(url);
+      const image=document.createElement('img');image.src=url;image.alt=tr('Pentacam region the application could not read');
+      image.addEventListener('load',()=>status.remove());container.prepend(image);
+    }catch(error){status.textContent=tr('The unread source region could not be displayed. Enter the value from the original Pentacam image.');}
+  }
   collect() {
     for(const input of this.panel.querySelectorAll('[data-measurement]')) {
       if(!input.value.trim()) continue;
@@ -17,6 +35,8 @@ window.HCReadiness = class {
     return this.overrides;
   }
   show(response) {
+    for(const url of this.regionUrls||[])URL.revokeObjectURL(url);
+    this.regionUrls=[];
     this.token=response.assessment_token;
     this.panel.replaceChildren();
     this.panel.hidden=response.workflow_status!=='NEEDS_INPUT';
@@ -31,6 +51,11 @@ window.HCReadiness = class {
       if(seen.has(identity))continue;seen.add(identity);
       const row=document.createElement('div');row.className='row';
       const label=document.createElement('label');label.textContent=`${tr(item.eye)}: ${tr(item.label)}`;row.append(label);
+      if(item.source_region){
+        row.classList.add('completion-with-source');
+        const region=document.createElement('div');region.className='completion-source-region';
+        row.append(region);this.loadSourceRegion(region,item);
+      }
       let input;
       if(item.kind==='form') {
         const original=document.getElementById(item.form_id);
