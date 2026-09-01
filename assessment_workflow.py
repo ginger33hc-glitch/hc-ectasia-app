@@ -12,7 +12,7 @@ import secrets
 from fastapi import HTTPException, Body, Response
 from nice_scoring import finite
 from pentacam_field_registry import COMPLETION_NUMERIC_FIELDS
-from pentacam_source_regions import region_hint
+from pentacam_source_regions import region_hint, region_hints
 
 _lock = RLock()
 _sessions = {}
@@ -22,6 +22,7 @@ MAX_SESSIONS = 64
 NUMERIC_FIELDS = COMPLETION_NUMERIC_FIELDS
 PATTERNS = {"anterior_pattern": ["REASSURING", "BORDERLINE", "ABNORMAL"],
             "posterior_pattern": ["REASSURING", "BORDERLINE", "ABNORMAL"]}
+SOURCE_CONFIRMATIONS = {"pentacam_qs": ["OK"]}
 
 
 def _prune():
@@ -57,6 +58,18 @@ def completion_items(items, plans):
     """Ask only for manifest when a wholly blank intended role will default to it."""
     result = []
     for eye, message in items:
+        message_text = str(message)
+        if eye == "GLOBAL" and message_text.startswith(("OD extraction validation: ", "OS extraction validation: ")):
+            audit_eye = message_text[:2]
+            underlying = message_text.split(" extraction validation: ", 1)[1]
+            if (audit_eye, underlying) in items:
+                continue
+        if (
+            eye == "GLOBAL"
+            and message_text.startswith("Pentacam acquisition requires a same-exam explicit QS: OK")
+            and any(item_eye in {"OD", "OS"} and item_message == "explicit Pentacam QS: OK" for item_eye, item_message in items)
+        ):
+            continue
         plan = plans.get(eye, {}) if eye in {"OD", "OS"} else {}
         intended_supplied = any(plan.get(field) is not None for field in (
             "intended_entered_sphere_D", "intended_cylinder_signed_D",
@@ -76,15 +89,16 @@ def completion_items(items, plans):
 
 
 def _with_region(item, extracted):
-    hint = region_hint(extracted, item.get("eye"), item.get("key"))
-    if hint and hint.get("file") and hint.get("tile"):
-        return {**item, "source_region": True}
+    hints = region_hints(extracted, item.get("eye"), item.get("key"))
+    if hints:
+        return {**item, "source_region": True, "source_region_count": len(hints)}
     return item
 
 
 def _request(eye, message, extracted):
     if eye == "GLOBAL" and message[:2] in {"OD", "OS"}:
         eye = message[:2]
+        message = message[3:] if message.startswith(f"{eye} ") else message
     prefix = eye.lower()
     item = {"eye": eye, "label": message, "kind": "instruction", "key": message,
             "destination": "source", "help": "Correct the clinical form or upload a clearer/correct source image."}
@@ -105,6 +119,29 @@ def _request(eye, message, extracted):
             "key": "surgeon_topography_category",
             "kind": "form",
             "form_id": f"{prefix}_surgeon_topography",
+        }, extracted)
+    if message == "explicit Pentacam QS: OK":
+        candidate = _with_region({
+            **item,
+            "key": "pentacam_qs",
+            "label": "Explicitly printed Pentacam QS",
+            "kind": "select",
+            "destination": "source_confirmation",
+            "options": SOURCE_CONFIRMATIONS["pentacam_qs"],
+        }, extracted)
+        if candidate.get("source_region"):
+            return candidate
+        return {
+            **item,
+            "label": "Explicit Pentacam QS: OK is required from the source image",
+            "help": "This cannot be completed by typing. Upload a source image that visibly shows QS: OK.",
+        }
+    if message == "adequate-quality tomography/topography":
+        return _with_region({
+            **item,
+            "key": "source_quality",
+            "label": "A clearer/correct Pentacam or topography source image is required",
+            "help": "This cannot be completed by typing. Replace the displayed limited/inadequate source image.",
         }, extracted)
     for term, suffix in (("manifest sphere", "manifest_sphere"), ("manifest cylinder magnitude", "manifest_cylinder"),
                          ("intended sphere", "sphere"), ("intended cylinder magnitude", "cylinder"),
@@ -136,7 +173,11 @@ def _request(eye, message, extracted):
         key = fields[0]
         return _with_region({**item, "kind": "number", "key": key, "destination": "measurement", "label": NUMERIC_FIELDS[key] + " — " + item["label"]}, extracted)
     for key in PATTERNS:
-        if message == "readable " + key.replace("_", " "):
+        if (
+            message == "readable " + key.replace("_", " ")
+            or text.startswith(f"unresolved multi-image conflict: {key}:")
+            or text.startswith(f"extraction validation: unresolved multi-image conflict: {key}:")
+        ):
             return _with_region({
                 **item, "kind": "select", "key": key,
                 "destination": "measurement", "options": PATTERNS[key],
@@ -161,6 +202,19 @@ def _overrides(extracted, overrides):
             elif key in PATTERNS:
                 if value not in PATTERNS[key]:
                     raise HTTPException(422, f"Invalid {key}.")
+            elif key in SOURCE_CONFIRMATIONS:
+                if value not in SOURCE_CONFIRMATIONS[key]:
+                    raise HTTPException(422, f"Invalid {key} source confirmation.")
+                hint = region_hint(working, eye["eye"], key)
+                if not hint:
+                    raise HTTPException(422, f"{eye['eye']} {key}: localized source evidence is required.")
+                source_file = hint.get("file")
+                matching_contexts = [
+                    context for context in working.get("document_contexts") or []
+                    if context.get("source_filename") == source_file
+                ]
+                if any(context.get("pentacam_qs") == "NOT_OK" for context in matching_contexts):
+                    raise HTTPException(422, "A visibly non-OK Pentacam QS cannot be overridden.")
             else:
                 raise HTTPException(422, f"Manual override of {key} is not supported; upload the correct source.")
             eye.setdefault("surgeon_corrections", []).append({"field": key, "original": eye.get(key), "value": value})
@@ -168,6 +222,18 @@ def _overrides(extracted, overrides):
             if key in NUMERIC_FIELDS:
                 eye["surgeon_verified_numeric_fields"] = sorted(set(eye.get("surgeon_verified_numeric_fields") or []) | {key})
                 eye.setdefault("field_provenance", {})[key] = [{"source": "SURGEON_CONFIRMED"}]
+            elif key in PATTERNS:
+                eye.setdefault("field_provenance", {})[key] = [{"source": "SURGEON_CONFIRMED"}]
+            elif key in SOURCE_CONFIRMATIONS:
+                eye.setdefault("field_provenance", {})[key] = [{
+                    "file": hint.get("file"),
+                    "source": "SURGEON_CONFIRMED_FROM_LOCALIZED_SOURCE",
+                }]
+                eye.setdefault("surgeon_source_confirmations", []).append({
+                    "field": key,
+                    "value": value,
+                    "file": hint.get("file"),
+                })
             resolved = [x for x in eye.get("data_conflicts") or [] if str(x).split(":", 1)[0].strip() == key]
             eye.setdefault("surgeon_resolved_conflicts", []).extend(resolved)
             eye["data_conflicts"] = [x for x in eye.get("data_conflicts") or [] if x not in resolved]
@@ -179,6 +245,12 @@ def _overrides(extracted, overrides):
             eye["extraction_validation"] = audit
             working.setdefault("extraction_validation", {})[eye["eye"]] = audit
             working.setdefault("critical_input_issues", []).extend(f"{eye['eye']} extraction validation: {x}" for x in audit["issues"])
+    eyes = [eye for eye in working.get("eyes") or [] if eye.get("eye") in {"OD", "OS"}]
+    if eyes and all(eye.get("pentacam_qs") == "OK" for eye in eyes):
+        working["critical_input_issues"] = [
+            issue for issue in working.get("critical_input_issues") or []
+            if not str(issue).startswith("Pentacam acquisition requires a same-exam explicit QS: OK")
+        ]
     return working
 
 
@@ -290,7 +362,11 @@ def install(core):
             session = _session(payload.get("assessment_token"))
             if (eye, key) not in session.get("region_requests", set()):
                 raise HTTPException(404, "No unresolved localized source region is available.")
-            hint = deepcopy(region_hint(session["extracted"], eye, key))
+            hints = deepcopy(region_hints(session["extracted"], eye, key))
+            index = payload.get("index", 0)
+            if not isinstance(index, int) or isinstance(index, bool) or not 0 <= index < len(hints):
+                raise HTTPException(404, "No localized unread source region is available at that index.")
+            hint = hints[index]
             matches = [
                 raw for raw, filename in session.get("source_images") or []
                 if hint and filename == hint.get("file")

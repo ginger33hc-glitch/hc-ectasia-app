@@ -2,13 +2,24 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.66 implements
+## What v0.7.67 implements
+
+- Readiness now converts unresolved anterior/posterior pattern conflicts into a surgeon-selectable
+  field and shows every same-eye conflicting map beside it. A completed selection clears both the
+  clinical conflict and its extraction-audit duplicate before readiness is recalculated.
+- Literal Pentacam QS receives a focused second read. If the printed QS box is localized but remains
+  machine-unreadable, the surgeon may confirm only `OK` from that displayed box; a visibly non-OK
+  QS remains non-overridable. Source-only blockers are visually separated from fillable inputs.
+- An ancillary limited-quality page no longer creates a false decision-source conflict when the
+  merged same-eye record has an adequate source. If no adequate source exists, the original
+  fail-closed image-quality gate remains active.
 
 - One centralized `pentacam_source_regions.py` policy now resolves localized unread
   Pentacam/topography evidence for readiness without duplicating extraction or clinical scoring.
   It covers numeric fields, NICE inputs, elevation patterns, and Randleman morphology. The
   morphology completion field uses only the same-eye upper-left `Axial/Sagittal Curvature (Front)`
-  source; ambiguous or cross-eye sources fail closed. The crop and surgeon field are displayed
+  source; cross-eye sources fail closed, while same-eye pattern conflicts show each relevant map.
+  The crop and surgeon field are displayed
   side by side on larger screens and stacked on mobile.
 
 - The visible program expansion is now exactly `Cornea Ectasia Risk Assessment Intelligence`.

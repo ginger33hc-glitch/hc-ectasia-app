@@ -647,6 +647,39 @@ class TestScoringAndCompleteness(unittest.TestCase):
         self.assertEqual(result["status"], "DATA INSUFFICIENT")
         self.assertIn("adequate-quality tomography/topography", result["missing"])
 
+    def test_limited_ancillary_page_does_not_poison_adequate_same_eye_source(self):
+        adequate = normal_eye()
+        adequate["_source_filename"] = "decision.png"
+        limited = normal_eye()
+        limited["quality"] = "LIMITED"
+        limited["_source_filename"] = "ancillary.png"
+        merged = app.merge_extractions([
+            {"eyes": [adequate], "global_warnings": []},
+            {"eyes": [limited], "global_warnings": []},
+        ])
+        eye = merged["eyes"][0]
+        assert eye["quality"] == "ADEQUATE"
+        assert not any("source image quality" in item for item in eye["data_conflicts"])
+
+        merged_late_adequate = app.merge_extractions([
+            {"eyes": [limited], "global_warnings": []},
+            {"eyes": [dict(limited, _source_filename="second-limited.png")], "global_warnings": []},
+            {"eyes": [adequate], "global_warnings": []},
+        ])
+        late_eye = merged_late_adequate["eyes"][0]
+        assert late_eye["quality"] == "ADEQUATE"
+        assert not any("source image quality" in item for item in late_eye["data_conflicts"])
+
+        all_limited = app.merge_extractions([
+            {"eyes": [limited], "global_warnings": []},
+            {"eyes": [dict(limited, _source_filename="second-limited.png")], "global_warnings": []},
+        ])
+        limited_eye = all_limited["eyes"][0]
+        assert limited_eye["quality"] == "LIMITED"
+        assert not any("source image quality" in item for item in limited_eye["data_conflicts"])
+        limited_result = app.assess_eye(limited_eye, plan(), 35, MODIFIERS)
+        assert "adequate-quality tomography/topography" in limited_result["missing"]
+
     def test_unreadable_anterior_map_prohibits_pass(self):
         eye = normal_eye()
         eye["anterior_pattern"] = "UNREADABLE"

@@ -20,6 +20,11 @@ REQUEST_SOURCE_KEYS = {
 # Normalized ORIGINAL-image boxes are intentionally broad enough to contain the
 # complete map. Exact extractor-supplied boxes always take precedence.
 CANONICAL_MAP_REGIONS = {
+    "source_quality": {
+        "tile": "ORIGINAL",
+        "source_box": None,
+        "printed_label": "Complete source image requiring replacement",
+    },
     "erss_topography": {
         "tile": "ORIGINAL",
         "source_box": [300, 60, 700, 560],
@@ -107,14 +112,14 @@ def _eye(extracted: dict[str, Any], eye_id: str) -> dict[str, Any] | None:
     )
 
 
-def _provenance_file(eye: dict[str, Any], key: str) -> str | None:
+def _provenance_files(eye: dict[str, Any], key: str) -> list[str]:
     records = (eye.get("field_provenance") or {}).get(key) or []
     files = {
         str(record.get("file"))
         for record in records
         if isinstance(record, dict) and record.get("file")
     }
-    return next(iter(files)) if len(files) == 1 else None
+    return sorted(files)
 
 
 def _erss_file(eye: dict[str, Any]) -> str | None:
@@ -135,32 +140,47 @@ def _erss_file(eye: dict[str, Any]) -> str | None:
     return str(selected["file"])
 
 
-def region_hint(
+def region_hints(
     extracted: dict[str, Any], eye_id: str, request_key: Any
-) -> dict[str, Any] | None:
-    """Resolve an exact unread box first, then a safe canonical source panel."""
+) -> list[dict[str, Any]]:
+    """Resolve exact unread boxes first, then safe same-eye canonical panels."""
     key = source_key(request_key)
     if eye_id == "PATIENT" and key == "age":
-        return _patient_age_region(extracted)
+        hint = _patient_age_region(extracted)
+        return [hint] if hint else []
     eye = _eye(extracted, eye_id)
     if eye is None:
-        return None
+        return []
 
     exact = (eye.get("unreadable_source_regions") or {}).get(key)
     if exact:
-        return exact
+        return [exact]
     # Backward compatibility for snapshots created before the generic region contract.
     legacy = (eye.get("targeted_unreadable_regions") or {}).get(key)
     if legacy:
-        return legacy
+        return [legacy]
 
     panel = CANONICAL_MAP_REGIONS.get(key)
     if panel is None:
-        return None
-    filename = _erss_file(eye) if key in {
+        return []
+    if key == "source_quality":
+        filenames = sorted(
+            str(filename) for filename, quality in (eye.get("quality_by_source") or {}).items()
+            if filename and quality in {"LIMITED", "INADEQUATE"}
+        )
+    elif key in {
         "erss_topography", "morphology", "asymmetric_bow_tie", "srax",
         "srax_deg", "inferior_opposite_steepening_D",
-    } else _provenance_file(eye, key)
-    if not filename:
-        return None
-    return {"file": filename, **panel}
+    }:
+        filenames = [_erss_file(eye)]
+    else:
+        filenames = _provenance_files(eye, key)
+    return [{"file": filename, **panel} for filename in filenames if filename]
+
+
+def region_hint(
+    extracted: dict[str, Any], eye_id: str, request_key: Any
+) -> dict[str, Any] | None:
+    """Backward-compatible single-region accessor."""
+    hints = region_hints(extracted, eye_id, request_key)
+    return hints[0] if hints else None

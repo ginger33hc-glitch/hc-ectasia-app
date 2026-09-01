@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 import assessment_workflow
-from pentacam_source_regions import region_hint
+from pentacam_source_regions import region_hint, region_hints
 
 
 def extracted_with_eyes():
@@ -103,7 +103,7 @@ def test_legacy_region_snapshot_remains_readable_without_becoming_primary_contra
     assert region_hint(extracted, "OD", "PPI_max") == legacy
 
 
-def test_pattern_region_requires_one_eye_specific_provenance_file():
+def test_pattern_region_returns_each_same_eye_conflicting_source():
     extracted = extracted_with_eyes()
     extracted["eyes"][0]["field_provenance"] = {
         "posterior_pattern": [{"file": "od-four-maps.png"}],
@@ -114,7 +114,46 @@ def test_pattern_region_requires_one_eye_specific_provenance_file():
     extracted["eyes"][0]["field_provenance"]["posterior_pattern"].append(
         {"file": "od-other.png"}
     )
-    assert region_hint(extracted, "OD", "posterior_pattern") is None
+    hints = region_hints(extracted, "OD", "posterior_pattern")
+    assert [item["file"] for item in hints] == ["od-four-maps.png", "od-other.png"]
+    assert all(item["printed_label"].startswith("Elevation (Back)") for item in hints)
+
+
+def test_pattern_conflict_is_a_completable_select_with_all_source_regions():
+    extracted = extracted_with_eyes()
+    extracted["eyes"][0]["field_provenance"] = {
+        "anterior_pattern": [
+            {"file": "od-a.png", "source": "VISUAL_CLASSIFICATION"},
+            {"file": "od-b.png", "source": "VISUAL_CLASSIFICATION"},
+        ]
+    }
+    item = assessment_workflow._request(
+        "OD",
+        "unresolved multi-image conflict: anterior_pattern: BORDERLINE vs REASSURING",
+        extracted,
+    )
+    assert item["kind"] == "select"
+    assert item["key"] == "anterior_pattern"
+    assert item["source_region"] is True
+    assert item["source_region_count"] == 2
+
+
+def test_true_quality_blocker_shows_each_limited_source_but_has_no_fake_input():
+    extracted = extracted_with_eyes()
+    extracted["eyes"][0]["quality_by_source"] = {
+        "od-limited.png": "LIMITED",
+        "od-inadequate.png": "INADEQUATE",
+        "od-adequate.png": "ADEQUATE",
+    }
+    item = assessment_workflow._request(
+        "OD", "adequate-quality tomography/topography", extracted
+    )
+    assert item["kind"] == "instruction"
+    assert item["key"] == "source_quality"
+    assert item["source_region_count"] == 2
+    assert [hint["file"] for hint in region_hints(extracted, "OD", "source_quality")] == [
+        "od-inadequate.png", "od-limited.png"
+    ]
 
 
 def test_generic_unread_regions_survive_multi_image_merge():
@@ -164,3 +203,37 @@ def test_morphology_source_endpoint_renders_the_canonical_panel():
         assert region.format == "PNG"
         assert region.width < 600
         assert region.height < 600
+
+
+def test_source_endpoint_can_return_second_conflicting_pattern_panel():
+    token = "synthetic-second-pattern-region-session"
+    extracted = extracted_with_eyes()
+    extracted["eyes"][0]["field_provenance"] = {
+        "anterior_pattern": [{"file": "od-a.png"}, {"file": "od-b.png"}],
+    }
+    assessment_workflow._sessions[token] = {
+        "extracted": extracted,
+        "expires": monotonic() + 60,
+        "ready": None,
+        "source_images": [
+            (image_bytes(), "od-a.png"),
+            (image_bytes(), "od-b.png"),
+        ],
+        "region_requests": {("OD", "anterior_pattern")},
+    }
+    core = SimpleNamespace(app=FastAPI())
+    assessment_workflow.install(core)
+    try:
+        response = TestClient(core.app).post(
+            "/assessment/source-region",
+            json={
+                "assessment_token": token,
+                "eye": "OD",
+                "key": "anterior_pattern",
+                "index": 1,
+            },
+        )
+    finally:
+        assessment_workflow._sessions.pop(token, None)
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"

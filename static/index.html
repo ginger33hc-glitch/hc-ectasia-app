@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.66</title>
+  <title>CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.67</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=9">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=8">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=8">
@@ -32,7 +32,7 @@
     .meta-table,.clinical-table{width:100%;border-collapse:collapse}.meta-table{margin-bottom:17px}.meta-table th,.meta-table td{border:1px solid var(--line);padding:7px 9px;font-size:12px;text-align:left}.meta-table th{width:15%;background:#f1f4f6;color:#42515d}.meta-table td{width:35%}.report-section-title{font-size:13px;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--line);padding-bottom:5px;margin:20px 0 8px}.report-patient-name{font-size:24px;line-height:1.2;font-weight:800;color:var(--navy);text-transform:uppercase;letter-spacing:.6px;margin:0 0 8px;overflow-wrap:anywhere}
     .eye-result{border:1px solid var(--line);margin:18px 0;page-break-inside:avoid}.eye-head{padding:10px 12px;background:#f1f4f6;display:flex;justify-content:space-between;gap:10px;align-items:center;border-bottom:1px solid var(--line)}.eye-head strong{color:var(--navy);font-size:15px}.eye-head .status{font-size:13px;padding:6px 9px;border-left-width:4px}.eye-body{padding:13px}.eye-action{margin:0 0 11px;padding:9px 11px;background:#f7f9fb;border-left:4px solid var(--navy);font-size:12px}.clinical-table{margin:9px 0 12px}.clinical-table th,.clinical-table td{border:1px solid var(--line);padding:6px 8px;font-size:11px;text-align:left;vertical-align:middle}.clinical-table th{background:var(--navy);color:white}.clinical-table td:first-child{font-weight:bold;width:38%;background:#f7f9fb}.finding-group{page-break-inside:avoid}.finding-group h4{color:var(--navy);font-size:12px;margin:12px 0 4px}.finding-group ul{margin:4px 0 8px;padding-left:21px}.finding-group li{font-size:11px;margin:3px 0}.report-footer-note{margin-top:19px;padding-top:10px;border-top:1px solid var(--line);font-size:9px;color:var(--muted)}
     .note{font-size:12px;color:var(--muted)}.file-picker-wrap{min-width:0}.selected-files{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}.selected-file{display:inline-block;max-width:100%;padding:6px 9px;border:1px solid #b8c9d6;border-radius:6px;background:#f2f7fa;color:var(--blueInk);font-size:12px;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.selected-file:hover,.selected-file:focus{background:#e3f0f8;text-decoration:underline}.alert{background:#fff7e8;border-left:5px solid #dc8b1a;padding:11px 13px;border-radius:5px}.liability-notice{color:#a31212;font-weight:bold;font-size:14px;margin:4px 0 12px}.required{color:#a31212}details{margin-top:12px}pre{white-space:pre-wrap;overflow:auto;background:#f7f9fb;padding:12px;border-radius:7px;font-size:12px}
-    .completion-with-source{grid-template-columns:minmax(0,1fr) minmax(190px,320px);align-items:start}.completion-with-source>label{grid-column:1/-1}.completion-source-region{grid-column:1;display:flex;flex-direction:column;gap:6px;padding:9px;border:1px solid #b8c9d6;border-radius:7px;background:#f4f8fb;color:var(--muted);font-size:12px}.completion-source-region img{display:block;width:100%;max-height:280px;object-fit:contain;background:#111;border-radius:5px}.completion-with-source>input,.completion-with-source>select{grid-column:2;width:100%;align-self:start}
+    .completion-with-source{grid-template-columns:minmax(0,1fr) minmax(190px,320px);align-items:start}.completion-with-source>label{grid-column:1/-1}.completion-source-region{grid-column:1;display:flex;flex-direction:column;gap:6px;padding:9px;border:1px solid #b8c9d6;border-radius:7px;background:#f4f8fb;color:var(--muted);font-size:12px}.completion-source-region img{display:block;width:100%;max-height:280px;object-fit:contain;background:#111;border-radius:5px}.completion-with-source>input,.completion-with-source>select{grid-column:2;width:100%;align-self:start}.completion-blocker{border-left:5px solid var(--redInk);background:var(--red);padding:11px}.completion-blocker>span{font-weight:700;color:var(--redInk)}
     .app-legal-footer,.report-legal-footer{text-align:center;color:#52616d;font-size:11px;line-height:1.4}.app-legal-footer{max-width:1100px;margin:8px auto 22px;padding:12px 18px;border-top:1px solid var(--line)}.report-legal-footer{margin-top:12px;padding-top:8px;border-top:1px solid var(--line)}
     .identity-alert{background:#fff0d8;color:#7a3d00;border:2px solid #d9790d;border-left-width:7px;padding:12px 14px;border-radius:6px;margin:10px 0 16px;font-size:12px}.identity-alert strong{display:block;font-size:13px;margin-bottom:5px}.identity-alert ul{margin:5px 0 0;padding-left:20px}
     .report-liability-notice{color:var(--redInk);font-weight:bold;font-size:12px;border:1px solid #c52b2b;border-left:6px solid #c52b2b;background:var(--red);padding:9px 11px;margin:0 0 16px;border-radius:5px}
@@ -42,7 +42,7 @@
   <style>@media print{.report-card[hidden]{display:none!important}}</style>
 </head>
 <body>
-<header class="app-header"><div class="brand-lockup"><div class="brand-logo-frame"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Cornea Ectasia Risk Assessment Intelligence"></div><div class="brand-subtitle">Cornea Ectasia Risk <span class="brand-initial">A</span>ssessment <span class="brand-initial">I</span>ntelligence</div><span class="brand-version">v0.7.66</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.66</h1></header>
+<header class="app-header"><div class="brand-lockup"><div class="brand-logo-frame"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Cornea Ectasia Risk Assessment Intelligence"></div><div class="brand-subtitle">Cornea Ectasia Risk <span class="brand-initial">A</span>ssessment <span class="brand-initial">I</span>ntelligence</div><span class="brand-version">v0.7.67</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.67</h1></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -106,7 +106,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">CER-AI Clinical Decision Support</div><div class="note">Cornea Ectasia Risk Assessment Intelligence</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.7.66</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.7.67</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <p class="report-liability-notice">The final surgical decision and all associated responsibility and liability rest with the surgeon. This application is a clinical decision-support aid only.</p>
       <table class="meta-table"><tbody>
@@ -406,6 +406,7 @@ async function loadSharedImages(){
 
 imageInput.addEventListener("change",()=>{
   readiness.reset();reportCard.hidden=true;lastReport=null;
+  assessBtn.disabled=false;assessBtn.textContent=i18n.translate("Assess images and run CER-AI assessment");
   resetAgeAcquisition();
   renderSelectedFiles(imageInput.files);
   if(imageInput.files.length){
@@ -746,7 +747,10 @@ f.addEventListener("submit", async (e) => {
     statusBox.textContent="ERROR";statusBox.className="status fail";decisionBox.textContent=String(err);
     showFormMessage(`Assessment failed: ${err.message||String(err)}`);
   }finally{
-    assessBtn.disabled=false;assessBtn.textContent=readiness.token?'Continue with completed information':originalText;assessBtn.removeAttribute("aria-busy");
+    const sourceBlocked=Boolean(readiness.token&&!readiness.hasCompletableInputs);
+    assessBtn.disabled=sourceBlocked;
+    assessBtn.textContent=sourceBlocked?'Replace source images to continue':readiness.token?'Continue with completed information':originalText;
+    assessBtn.removeAttribute("aria-busy");
   }
 });
 
