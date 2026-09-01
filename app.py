@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="CER-AI v0.7.57")
+app = FastAPI(title="CER-AI v0.7.58")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -787,7 +787,9 @@ def required_tomography_missing(eye: Dict[str, Any]) -> List[str]:
             missing.append("ARTmax consistency with thinnest pachymetry / PPImax")
     # Defensive compatibility filter: legacy/cached extraction payloads may still contain
     # conflicts for descriptive, non-decision fields. They must never prohibit PASS.
-    non_decision_conflict_fields = {"K1_D", "K2_D", "thinnest_x_mm", "thinnest_y_mm"}
+    non_decision_conflict_fields = {
+        "K1_D", "K2_D", "thinnest_x_mm", "thinnest_y_mm", "morphology_confidence"
+    }
     for conflict in eye.get("data_conflicts", []):
         conflict_field = str(conflict).split(":", 1)[0].strip()
         if conflict_field in non_decision_conflict_fields:
@@ -1469,7 +1471,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.57 / source set 2026-08-25 plus binding CER-AI amendments",
+        "version": "software v0.7.58 / source set 2026-08-25 plus binding CER-AI amendments",
     }
 
 
@@ -1501,7 +1503,9 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     # Descriptive values that do not drive a CER-AI decision must never become unresolved conflicts
     # that prohibit PASS. Across overlapping Pentacam screens, preserve source priority
     # (labeled table over permitted map fallback); at equal priority retain the first reading.
-    non_decision_conflict_fields = {"thinnest_x_mm", "thinnest_y_mm"}
+    non_decision_conflict_fields = {
+        "thinnest_x_mm", "thinnest_y_mm", "morphology_confidence"
+    }
     planning_conflict_fields = {"K1_axis_deg", "K2_axis_deg", "corneal_diameter_mm"}
 
     def normalized_eye(raw_eye: Dict[str, Any]) -> Dict[str, Any]:

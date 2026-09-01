@@ -19,6 +19,14 @@ class TestERSSCanonicalEngine(unittest.TestCase):
     def test_map_role_fields_never_become_conflicts(self):
         merged=core.merge_extractions([result(eye(False,"UNCERTAIN","bad.jpg"),"bad.jpg"),result(eye(True,"NORMAL_SYMMETRIC","4maps.jpg"),"4maps.jpg")])
         self.assertFalse(any("anterior_curvature_map" in str(x) for x in merged["eyes"][0].get("data_conflicts",[])))
+    def test_unreadable_and_high_morphology_confidence_are_complementary_sources(self):
+        bad=eye(False,"UNCERTAIN","bad.jpg")
+        maps=eye(True,"NORMAL_SYMMETRIC","4maps.jpg");maps["erss_source_read"]="DEDICATED_CURVATURE_PASS"
+        merged=core.merge_extractions([result(bad,"bad.jpg"),result(maps,"4maps.jpg")])
+        od=merged["eyes"][0]
+        self.assertEqual(od["morphology_confidence"],"HIGH")
+        self.assertFalse(any("morphology_confidence" in str(x) for x in od.get("data_conflicts",[])))
+        self.assertFalse(any("morphology_confidence" in str(x) for x in merged.get("critical_input_issues",[])))
     def test_dedicated_asymmetric_category_reaches_randleman_points(self):
         maps=eye(True,"ASYMMETRIC_BOWTIE","4maps.jpg");maps["erss_source_read"]="DEDICATED_CURVATURE_PASS";maps["I_S"]=0.5;maps["table_verified_numeric_fields"]=["I_S"];maps["inferior_opposite_steepening_D"]=0.75;od=core.merge_extractions([result(maps,"4maps.jpg")])["eyes"][0];od["_erss_i_s_gate_required"]=True;scored=core.scoring_morphology(od)
         self.assertEqual(scored["category"],"ASYMMETRIC_BOWTIE");self.assertEqual(core.lasik_topography_points(scored["category"]),1)

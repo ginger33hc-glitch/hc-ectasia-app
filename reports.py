@@ -46,7 +46,7 @@ GRAY = "52616D"
 GRAY_FILL = "EEF2F5"
 LINE = "D7E0E7"
 INK = "17212B"
-APP_VERSION = "0.7.57"
+APP_VERSION = "0.7.58"
 LIABILITY_NOTICE = (
     "The final surgical decision and all associated responsibility and liability rest with the surgeon. "
     "This application is a clinical decision-support aid only."

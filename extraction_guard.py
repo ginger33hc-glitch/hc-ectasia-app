@@ -34,6 +34,7 @@ PLAUSIBLE = {
     "PPI_avg": (0.01, 10.0), "PPI_max": (0.01, 10.0), "Rmin_mm": (3.0, 15.0),
 }
 LOWER_IS_SAFETY_LIMITING = {"pachy_thinnest_um", "ARTmax_um", "Rmin_mm"}
+NON_BLOCKING_CONFLICT_FIELDS = {"morphology_confidence"}
 
 _CONFLICT_RE = re.compile(
     r"^(?P<field>[A-Za-z0-9_]+):\s*"
@@ -165,7 +166,10 @@ def _audit_eye(eye: Dict[str, Any]) -> Dict[str, Any]:
         if abs(float(art) - expected) > max(20.0, 0.10 * expected):
             issues.append("ARTmax internal check failed against thinnest pachymetry / PPImax")
 
-    conflicts = list(eye.get("data_conflicts") or [])
+    conflicts = [
+        conflict for conflict in (eye.get("data_conflicts") or [])
+        if str(conflict).split(":", 1)[0].strip() not in NON_BLOCKING_CONFLICT_FIELDS
+    ]
     if conflicts:
         issues.extend(f"unresolved multi-image conflict: {item}" for item in conflicts)
 
