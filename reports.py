@@ -170,8 +170,13 @@ def _eye_metrics(eye: Dict[str, Any], locale: str = "en") -> List[tuple[str, str
         if values.get("transition_zone_mm") is None and values.get("transition_zone_not_applicable") == "yes"
         else _fmt(values.get("transition_zone_mm"), 1, " mm")
     )
-    rows = [
-        ("Procedure", _text(values.get("procedure"))),
+    rows = [("Procedure", _text(values.get("procedure")))]
+    if str(values.get("procedure") or "").upper() == "PRK":
+        rows.append((
+            "CER-AI provisional PRK-EWSS score / category",
+            f"{_text(score.get('total'), '-')} / {_text(score.get('category'), '-')}",
+        ))
+    rows.extend([
         ("Prior refractive surgery", _text(values.get("prior_refractive_surgery"))),
         ("Stability / progression / CDVA flag", (
             f"{_text(values.get('refractive_stability'))} / "
@@ -183,7 +188,6 @@ def _eye_metrics(eye: Dict[str, Any], locale: str = "en") -> List[tuple[str, str
         ("Intended entered notation", entered_refraction("intended")),
         ("Intended normalized (minus-cylinder)", correction),
         ("Correction source", _text(values.get("correction_source"), "Manual / not documented")),
-        ("Score / category", f"{_text(score.get('total'), '-')} / {_text(score.get('category'), '-') }"),
         ("Randleman ERSS / category", f"{_text((eye.get('randleman_erss') or {}).get('total'))} / {_text((eye.get('randleman_erss') or {}).get('category'))}"),
         ("Final BAD-D / class", f"{_fmt((eye.get('bad_summary') or {}).get('value'), 2)} / {_text((eye.get('bad_summary') or {}).get('category'))}"),
         ("CER-AI-adapted NICE / class", f"{_text((eye.get('nice') or {}).get('total'))} / {_text((eye.get('nice') or {}).get('category'))}"),
@@ -221,7 +225,7 @@ def _eye_metrics(eye: Dict[str, Any], locale: str = "en") -> List[tuple[str, str
         )),
         ("Anterior-map read confidence", _text(erss_evidence.get("image_category_confidence"))),
         ("Pentacam QS", _text(values.get("pentacam_qs"))),
-    ]
+    ])
     return [(translate_text(label, locale), translate_text(value, locale)) for label, value in rows]
 
 
