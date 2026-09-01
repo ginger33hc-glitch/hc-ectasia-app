@@ -47,7 +47,13 @@ def _session(token):
 def missing_items(decision):
     items = [("GLOBAL", str(x)) for x in decision.get("critical_input_issues") or []]
     for eye in decision.get("eyes") or []:
-        items.extend((eye.get("eye", "GLOBAL"), str(x)) for x in eye.get("missing") or [])
+        for message in eye.get("missing") or []:
+            text = str(message)
+            normalized = text.lower()
+            if normalized == "age" or "age within" in normalized:
+                items.append(("PATIENT", "age"))
+            else:
+                items.append((eye.get("eye", "GLOBAL"), text))
     if not decision.get("eyes"):
         items.append(("GLOBAL", "No classifiable OD/OS tomography was extracted."))
     return list(dict.fromkeys(items))
@@ -81,7 +87,13 @@ def _request(eye, message):
         if term in text:
             return {**item, "kind": "form", "form_id": f"{prefix}_{suffix}"}
     if "age" == text or "age within" in text or "age conflicts" in text:
-        return {**item, "kind": "form", "form_id": "age"}
+        return {
+            **item,
+            "eye": "PATIENT" if eye != "GLOBAL" else eye,
+            "label": "Patient age (years)",
+            "kind": "form",
+            "form_id": "age",
+        }
     if "contact lens" in text or "contact-lens" in text:
         return {**item, "kind": "form", "form_id": "contact_lens_days" if "discontinued" in text else "contact_lens_type"}
     if "preoperative kmean" in text:

@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="CER-AI v0.7.58")
+app = FastAPI(title="CER-AI v0.7.59")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -243,7 +243,10 @@ explicitly labeled patient-ID field in the patient-demographics box (for example
 Pat.-ID). Never use an examination number, measurement number, scan number, accession number,
 page/report number, device serial number, date, time, or another unlabeled number as patient_id.
 If the patient-ID label or its value is not clearly readable, return patient_id=null. Use null/UNKNOWN
-when other identity fields are absent or unreadable. Do not extract or return date of birth. Never calculate age from another field and never
+when other identity fields are absent or unreadable. Patient age is one patient-level value shared by
+OD and OS: on every Pentacam source, inspect the top patient-demographics/header area for the explicitly
+printed Age field, but return it only when the label and completed-year integer are both unambiguous.
+Do not extract or return date of birth. Never calculate age from another field and never
 infer that two images belong to the same patient merely because their laterality matches. For a Pentacam image, transcribe
 the device quality specification only when the literal QS status is visible. Use OK only for an
 explicitly visible acceptable/OK QS. Use NOT_OK for a visible non-OK status, UNREADABLE when the QS
@@ -1471,7 +1474,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.58 / source set 2026-08-25 plus binding CER-AI amendments",
+        "version": "software v0.7.59 / source set 2026-08-25 plus binding CER-AI amendments",
     }
 
 
@@ -1811,7 +1814,11 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             f"First Name / Last Name fields ({identity_readings}). Surgeon confirmation is required."
         )
     if len(pentacam_ages) > 1:
-        merged["critical_input_issues"].append("Conflicting patient ages across Pentacam sources.")
+        merged["patient_age_conflict_values"] = sorted(pentacam_ages)
+        merged["global_warnings"].append(
+            "Different printed patient ages were transcribed across Pentacam sources; "
+            "no image-derived age was used and one surgeon-confirmed patient age is required."
+        )
     elif len(pentacam_ages) == 1:
         merged["derived_age_years"] = next(iter(pentacam_ages))
     if len(ids) > 1:

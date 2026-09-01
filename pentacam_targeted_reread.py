@@ -2,9 +2,10 @@
 
 This module is an extraction-only adapter.  It never changes clinical policy,
 calculates a missing Pentacam index, or overwrites a value from the general
-extractor.  When a Pentacam image contains still-missing labeled numeric
-fields, the adapter submits the original plus four overlapping crops to one
-focused, structured reread and accepts only high-confidence label/value pairs.
+extractor.  When a Pentacam image contains still-missing labeled values, the
+adapter submits the original plus four overlapping crops and, for missing age,
+one focused header crop to a structured reread. It accepts only high-confidence
+label/value pairs.
 """
 
 from __future__ import annotations
@@ -38,7 +39,9 @@ PENTACAM_SCREEN_FAMILIES = {
     "OTHER_PENTACAM",
 }
 
-SOURCE_TILES = ("ORIGINAL", "UPPER_LEFT", "UPPER_RIGHT", "LOWER_LEFT", "LOWER_RIGHT")
+SOURCE_TILES = (
+    "ORIGINAL", "TOP_HEADER", "UPPER_LEFT", "UPPER_RIGHT", "LOWER_LEFT", "LOWER_RIGHT"
+)
 MAX_SOURCE_PIXELS = 60_000_000
 
 REREAD_SCHEMA = {
@@ -72,9 +75,23 @@ REREAD_SCHEMA = {
                 ],
             },
         },
+        "patient_age_reading": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "value": {"type": ["integer", "null"]},
+                "status": {
+                    "type": "string",
+                    "enum": ["CONFIDENT", "UNCERTAIN", "UNREADABLE", "NOT_SHOWN"],
+                },
+                "printed_label": {"type": ["string", "null"]},
+                "source_tile": {"type": "string", "enum": list(SOURCE_TILES)},
+            },
+            "required": ["value", "status", "printed_label", "source_tile"],
+        },
         "warnings": {"type": "array", "items": {"type": "string"}},
     },
-    "required": ["screen_family", "readings", "warnings"],
+    "required": ["screen_family", "readings", "patient_age_reading", "warnings"],
 }
 
 REREAD_PROMPT = """You are ONLY a targeted Pentacam labeled-numeric-field transcriber.
@@ -98,6 +115,14 @@ that label is only Min, Avg/Ave, Max, X, or Y beneath a shared heading, copy the
 heading into group_label; otherwise use group_label=null. source_tile must identify the clearest
 image containing the heading/label and digits. Do not include unrequested fields. Do not make any
 clinical interpretation or recommendation.
+
+PATIENT-LEVEL AGE RULE:
+{age_target}
+Age belongs to the patient, never to OD or OS. When requested, transcribe it exactly once only from
+an explicitly printed Age/Patient Age field in the Pentacam demographic header. Accept a value only
+when the age label and completed-year integer are both visible. Do not use date of birth, birth year,
+exam date, another unlabeled number, or arithmetic. Never estimate or calculate age. If the printed
+age label or digits are unclear, return value=null with the appropriate status.
 
 REQUESTED FIELDS BY EYE:
 {targets}
@@ -135,8 +160,16 @@ def missing_targets_by_eye(result: dict[str, Any]) -> dict[str, list[str]]:
     return targets
 
 
-def build_overlapping_tiles(raw: bytes) -> list[tuple[str, bytes]]:
-    """Decode safely and return four overlapping PNG regions without altering the source."""
+def patient_age_is_missing(result: dict[str, Any]) -> bool:
+    """True only for a Pentacam source whose patient-level printed age remains empty."""
+    if not _looks_like_pentacam(result):
+        return False
+    context = result.get("document_context") or {}
+    return context.get("patient_age_years") is None
+
+
+def build_overlapping_tiles(raw: bytes, *, include_top_header: bool = False) -> list[tuple[str, bytes]]:
+    """Decode safely and return overlapping PNG regions without altering the source."""
     with Image.open(BytesIO(raw)) as opened:
         width, height = opened.size
         if width <= 0 or height <= 0 or width * height > MAX_SOURCE_PIXELS:
@@ -151,12 +184,14 @@ def build_overlapping_tiles(raw: bytes) -> list[tuple[str, bytes]]:
     right_start = min(width - 1, round(width * 0.42))
     top_end = max(1, round(height * 0.58))
     bottom_start = min(height - 1, round(height * 0.42))
-    boxes = (
+    boxes = [
         ("UPPER_LEFT", (0, 0, left_end, top_end)),
         ("UPPER_RIGHT", (right_start, 0, width, top_end)),
         ("LOWER_LEFT", (0, bottom_start, left_end, height)),
         ("LOWER_RIGHT", (right_start, bottom_start, width, height)),
-    )
+    ]
+    if include_top_header:
+        boxes.insert(0, ("TOP_HEADER", (0, 0, width, max(1, round(height * 0.36)))))
     tiles = []
     for name, box in boxes:
         crop = image.crop(box)
@@ -228,6 +263,13 @@ def label_supports_field(field: str, printed_label: Any, group_label: Any = None
     return bool(groups) and all(any(token in label for token in alternatives) for alternatives in groups)
 
 
+def label_supports_patient_age(printed_label: Any) -> bool:
+    label = _normalize_label(printed_label)
+    return label in {
+        "age", "agey", "ageyr", "ageyrs", "ageyear", "ageyears", "patientage", "alter"
+    }
+
+
 def _same_number(values: list[float]) -> bool:
     return max(values) - min(values) <= 1e-9
 
@@ -238,6 +280,7 @@ def apply_targeted_readings(
     reread: dict[str, Any],
     requested: dict[str, list[str]],
     filename: str,
+    patient_age_requested: bool = False,
 ) -> dict[str, Any]:
     """Fill only null requested fields from one conflict-free confident reread."""
     if reread.get("screen_family") not in PENTACAM_SCREEN_FAMILIES:
@@ -289,6 +332,39 @@ def apply_targeted_readings(
             "group_label": best.get("group_label"),
             "value": retained,
         })
+
+    if patient_age_requested:
+        context = result.setdefault("document_context", {})
+        age_reading = reread.get("patient_age_reading") or {}
+        value = age_reading.get("value")
+        valid_value = (
+            core.is_number(value)
+            and int(value) == value
+            and 18 <= int(value) <= 120
+        )
+        if (
+            context.get("patient_age_years") is None
+            and age_reading.get("status") == "CONFIDENT"
+            and valid_value
+            and label_supports_patient_age(age_reading.get("printed_label"))
+        ):
+            context["patient_age_years"] = int(value)
+            context["targeted_age_reread_evidence"] = {
+                "file": filename,
+                "source": "TARGETED_PENTACAM_DEMOGRAPHIC_REREAD",
+                "tile": age_reading.get("source_tile"),
+                "printed_label": age_reading.get("printed_label"),
+                "value": int(value),
+            }
+            context["missing_or_unreadable"] = [
+                item for item in context.get("missing_or_unreadable") or []
+                if _normalize_label(item) not in {"age", "patientage", "patientageyears"}
+            ]
+        elif age_reading.get("status") == "CONFIDENT" and value is not None:
+            result.setdefault("global_warnings", []).append(
+                f"Targeted Pentacam age reread rejected in {filename}: "
+                "the printed age label or adult completed-year value was not unambiguous."
+            )
     return result
 
 
@@ -296,13 +372,32 @@ def _target_summary(requested: dict[str, list[str]]) -> str:
     return "\n".join(f"{eye}: {', '.join(fields)}" for eye, fields in sorted(requested.items()))
 
 
-def targeted_reread(core: Any, raw: bytes, filename: str, requested: dict[str, list[str]]) -> dict[str, Any]:
+def targeted_reread(
+    core: Any,
+    raw: bytes,
+    filename: str,
+    requested: dict[str, list[str]],
+    patient_age_requested: bool = False,
+) -> dict[str, Any]:
+    age_target = (
+        "PATIENT: patient_age_years is requested."
+        if patient_age_requested
+        else "PATIENT: patient_age_years is not requested; return null/NOT_SHOWN."
+    )
     content: list[dict[str, Any]] = [
-        {"type": "input_text", "text": REREAD_PROMPT.format(targets=_target_summary(requested))},
+        {
+            "type": "input_text",
+            "text": REREAD_PROMPT.format(
+                targets=_target_summary(requested) or "No eye-level numeric fields requested.",
+                age_target=age_target,
+            ),
+        },
         {"type": "input_text", "text": "ORIGINAL complete screen:"},
         {"type": "input_image", "image_url": core.data_url(raw, filename), "detail": "original"},
     ]
-    for tile_name, tile_raw in build_overlapping_tiles(raw):
+    for tile_name, tile_raw in build_overlapping_tiles(
+        raw, include_top_header=patient_age_requested
+    ):
         content.extend((
             {"type": "input_text", "text": f"{tile_name} crop of the same screen:"},
             {"type": "input_image", "image_url": core.data_url(tile_raw, f"{tile_name}.png"), "detail": "original"},
@@ -331,11 +426,16 @@ def make_targeted_extractor(core: Any, previous: Callable[[bytes, str], dict[str
     def extract_one_image_with_targeted_reread(raw: bytes, filename: str) -> dict[str, Any]:
         result = previous(raw, filename)
         requested = missing_targets_by_eye(result)
-        if not _enabled() or not requested:
+        patient_age_requested = patient_age_is_missing(result)
+        if not _enabled() or (not requested and not patient_age_requested):
             return result
         try:
-            reread = targeted_reread(core, raw, filename, requested)
-            return apply_targeted_readings(core, result, reread, requested, filename)
+            reread = targeted_reread(
+                core, raw, filename, requested, patient_age_requested
+            )
+            return apply_targeted_readings(
+                core, result, reread, requested, filename, patient_age_requested
+            )
         except Exception as exc:
             result.setdefault("global_warnings", []).append(
                 f"Targeted Pentacam numeric reread failed for {filename}: "

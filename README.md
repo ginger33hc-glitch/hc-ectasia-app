@@ -2,7 +2,11 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.58 implements
+## What v0.7.59 implements
+
+- Patient age remains one patient-level value shared by OD and OS. If the general read misses the
+  printed Pentacam age, the extraction adapter performs a focused top-demographic-header reread.
+  If it is still unreadable, readiness presents exactly one shared Patient age field.
 
 - Multi-image `morphology_confidence` differences are treated as source coverage, not as a
   surgeon-resolvable clinical conflict. The dedicated anterior-curvature source owns the final

@@ -44,3 +44,12 @@ def test_hidden_reports_stay_hidden_when_printing_and_after_edits():
     assert "if(lastReport&&!reportCard.hidden)window.print()" in html
     assert "f.addEventListener('input',()=>{reportCard.hidden=true;lastReport=null;})" in html
     assert "f.addEventListener('change',()=>{reportCard.hidden=true;lastReport=null;})" in html
+
+
+def test_patient_age_completion_uses_one_shared_field():
+    workflow = (ROOT / 'assessment_workflow.py').read_text()
+    readiness = (ROOT / 'static/assessment-readiness.js').read_text()
+    assert 'items.append(("PATIENT", "age"))' in workflow
+    assert 'item.form_id===\'age\'' in readiness
+    assert 'originalRow.hidden=true' in readiness
+    assert 'original.required=false;input.required=true' in readiness

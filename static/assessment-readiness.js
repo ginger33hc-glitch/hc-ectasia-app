@@ -30,13 +30,17 @@ window.HCReadiness = class {
       const identity=[item.eye,item.form_id||item.key,item.kind].join(':');
       if(seen.has(identity))continue;seen.add(identity);
       const row=document.createElement('div');row.className='row';
-      const label=document.createElement('label');label.textContent=`${item.eye}: ${tr(item.label)}`;row.append(label);
+      const label=document.createElement('label');label.textContent=`${tr(item.eye)}: ${tr(item.label)}`;row.append(label);
       let input;
       if(item.kind==='form') {
         const original=document.getElementById(item.form_id);
         if(original){
           input=original.cloneNode(true);input.removeAttribute('id');input.removeAttribute('name');input.removeAttribute('required');
           input.readOnly=false;input.value=original.value;
+          if(item.form_id==='age'){
+            const originalRow=original.closest('.row');if(originalRow)originalRow.hidden=true;
+            original.required=false;input.required=true;
+          }
           input.addEventListener('input',()=>{original.value=input.value;original.setCustomValidity('');original.dispatchEvent(new Event('input',{bubbles:true}));});
           input.addEventListener('change',()=>{original.value=input.value;original.dispatchEvent(new Event('change',{bubbles:true}));});
         }

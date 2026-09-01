@@ -148,6 +148,17 @@ def test_missing_manifest_bad_nice_all_prompt_together_no_report(monkeypatch):
     assert response.status_code==409
 
 
+def test_missing_patient_age_is_requested_once_not_once_per_eye():
+    extracted, plans = scenario()
+    result = workflow.begin(core, extracted, None, plans, MODIFIERS, {})
+    age_requests = [
+        item for item in result["input_requests"] if item.get("form_id") == "age"
+    ]
+    assert len(age_requests) == 1
+    assert age_requests[0]["eye"] == "PATIENT"
+    assert age_requests[0]["label"] == "Patient age (years)"
+
+
 def test_complete_keeps_manual_signed_refraction_and_does_not_reextract(monkeypatch):
     extracted,plans=scenario()
     extracted["eyes"][0]["BAD_D"]=None

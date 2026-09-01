@@ -81,6 +81,77 @@ def test_only_null_fields_are_requested_and_non_pentacam_is_ignored():
     assert targeted.missing_targets_by_eye(result) == {}
 
 
+def test_patient_age_request_is_patient_level_and_only_for_pentacam():
+    result = pentacam_result()
+    result["document_context"]["patient_age_years"] = None
+    assert targeted.patient_age_is_missing(result)
+    result["document_context"]["patient_age_years"] = 42
+    assert not targeted.patient_age_is_missing(result)
+    result["document_context"]["document_type"] = "TREATMENT_CARD"
+    assert not targeted.patient_age_is_missing(result)
+
+
+def test_confident_labeled_patient_age_fills_context_once_and_records_evidence():
+    result = pentacam_result()
+    result["document_context"].update(
+        patient_age_years=None,
+        missing_or_unreadable=["patient_age_years"],
+    )
+    reread = {
+        "screen_family": "BAD_DISPLAY",
+        "readings": [],
+        "patient_age_reading": {
+            "value": 61,
+            "status": "CONFIDENT",
+            "printed_label": "Age [y]",
+            "source_tile": "TOP_HEADER",
+        },
+        "warnings": [],
+    }
+    output = targeted.apply_targeted_readings(
+        Core, result, reread, {}, "od.png", patient_age_requested=True
+    )
+    context = output["document_context"]
+    assert context["patient_age_years"] == 61
+    assert context["targeted_age_reread_evidence"] == {
+        "file": "od.png",
+        "source": "TARGETED_PENTACAM_DEMOGRAPHIC_REREAD",
+        "tile": "TOP_HEADER",
+        "printed_label": "Age [y]",
+        "value": 61,
+    }
+    assert "patient_age_years" not in context["missing_or_unreadable"]
+
+
+def test_patient_age_rejects_dob_or_implausible_value_and_never_overwrites():
+    for label, value in (("Date of Birth", 61), ("Age", 17), ("Age", 121)):
+        result = pentacam_result()
+        result["document_context"]["patient_age_years"] = None
+        reread = {
+            "screen_family": "BAD_DISPLAY",
+            "readings": [],
+            "patient_age_reading": {
+                "value": value,
+                "status": "CONFIDENT",
+                "printed_label": label,
+                "source_tile": "TOP_HEADER",
+            },
+            "warnings": [],
+        }
+        targeted.apply_targeted_readings(
+            Core, result, reread, {}, "od.png", patient_age_requested=True
+        )
+        assert result["document_context"]["patient_age_years"] is None
+
+    result = pentacam_result()
+    result["document_context"]["patient_age_years"] = 60
+    reread["patient_age_reading"].update(value=61, printed_label="Age")
+    targeted.apply_targeted_readings(
+        Core, result, reread, {}, "od.png", patient_age_requested=True
+    )
+    assert result["document_context"]["patient_age_years"] == 60
+
+
 def test_confident_labeled_reread_fills_only_requested_null_and_records_evidence():
     result = pentacam_result(ARTmax_um=399.0)
     requested = {"OD": ["PPI_max"]}
@@ -170,6 +241,55 @@ def test_targeted_call_uses_original_and_four_crops_with_focused_settings(monkey
     assert captured["reasoning"] == {"effort": "medium"}
     assert captured["text"]["verbosity"] == "high"
     assert captured["text"]["format"]["strict"] is True
+
+
+def test_age_reread_adds_dedicated_top_header_crop(monkeypatch):
+    captured = {}
+    payload = {
+        "screen_family": "BAD_DISPLAY",
+        "readings": [],
+        "patient_age_reading": {
+            "value": None,
+            "status": "UNREADABLE",
+            "printed_label": "Age",
+            "source_tile": "TOP_HEADER",
+        },
+        "warnings": [],
+    }
+
+    def create(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(output_text=json.dumps(payload))
+
+    core = Core()
+    core.openai_client = lambda: SimpleNamespace(responses=SimpleNamespace(create=create))
+    targeted.targeted_reread(core, image_bytes(), "od.png", {}, True)
+    content = captured["input"][0]["content"]
+    images = [item for item in content if item["type"] == "input_image"]
+    assert len(images) == 6
+    assert "patient_age_years is requested" in content[0]["text"]
+
+
+def test_wrapper_runs_for_missing_age_even_when_no_eye_numeric_field_is_missing(monkeypatch):
+    original = pentacam_result()
+    original["document_context"]["patient_age_years"] = None
+    for field in targeted.TARGET_FIELDS:
+        original["eyes"][0][field] = 1.0
+    payload = {
+        "screen_family": "BAD_DISPLAY",
+        "readings": [],
+        "patient_age_reading": {
+            "value": 61,
+            "status": "CONFIDENT",
+            "printed_label": "Age",
+            "source_tile": "TOP_HEADER",
+        },
+        "warnings": [],
+    }
+    monkeypatch.setattr(targeted, "targeted_reread", lambda *args: payload)
+    wrapper = targeted.make_targeted_extractor(Core, lambda raw, filename: original)
+    output = wrapper(image_bytes(), "od.png")
+    assert output["document_context"]["patient_age_years"] == 61
 
 
 def test_wrapper_fails_open_to_original_extraction_when_crop_decode_fails(monkeypatch):

@@ -286,7 +286,7 @@ class TestSafetyGates(unittest.TestCase):
         )
         self.assertEqual([eye["values"]["age_years"] for eye in decision["eyes"]], [35, 35])
 
-    def test_conflicting_pentacam_ages_block_overall_pass(self):
+    def test_conflicting_pentacam_ages_require_one_manual_patient_age(self):
         od_context = document_context(patient_age_years=35, laterality="OD")
         os_context = document_context(patient_age_years=36, laterality="OS")
         merged = app.merge_extractions([
@@ -294,7 +294,16 @@ class TestSafetyGates(unittest.TestCase):
             {"document_context": os_context, "eyes": [normal_eye("OS")], "treatment_corrections": [], "global_warnings": []},
         ])
         self.assertNotIn("derived_age_years", merged)
-        self.assertTrue(any("Conflicting patient ages" in item for item in merged["critical_input_issues"]))
+        self.assertEqual(merged["patient_age_conflict_values"], [35, 36])
+        self.assertFalse(any("patient ages" in item.lower() for item in merged["critical_input_issues"]))
+        without_confirmation = app.hc_engine(
+            merged, None, {"OD": plan(), "OS": plan()}, MODIFIERS
+        )
+        self.assertTrue(all("age" in eye["missing"] for eye in without_confirmation["eyes"]))
+        confirmed = app.hc_engine(
+            merged, 35, {"OD": plan(), "OS": plan()}, MODIFIERS
+        )
+        self.assertFalse(any("age" in eye["missing"] for eye in confirmed["eyes"]))
 
     def test_od_os_sources_without_shared_readable_identifier_cannot_be_verified(self):
         od_context = document_context(patient_id="P-77", patient_name=None, laterality="OD")
@@ -1213,7 +1222,7 @@ class TestAuthorshipAndLiabilityFooter(unittest.TestCase):
         i18n = (root / "static" / "i18n.js").read_text()
         self.assertIn('data-language="en"', html)
         self.assertIn('data-language="tr"', html)
-        self.assertIn('/static/i18n.js?v=4', html)
+        self.assertIn('/static/i18n.js?v=5', html)
         self.assertIn('locale:i18n.locale', html)
         self.assertIn('localStorage.setItem("cerai-language"', i18n)
         self.assertIn('"Case inputs":"Vaka girdileri"', i18n)
