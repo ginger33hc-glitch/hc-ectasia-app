@@ -53,3 +53,12 @@ def test_patient_age_completion_uses_one_shared_field():
     assert 'item.form_id===\'age\'' in readiness
     assert 'originalRow.hidden=true' in readiness
     assert 'original.required=false;input.required=true' in readiness
+
+
+def test_only_unread_fields_can_request_a_temporary_source_region():
+    workflow = (ROOT / 'assessment_workflow.py').read_text()
+    readiness = (ROOT / 'static/assessment-readiness.js').read_text()
+    assert '"source_region": True' in workflow
+    assert '/assessment/source-region' in workflow
+    assert "if(item.source_region)" in readiness
+    assert "assessment_token:this.token" in readiness

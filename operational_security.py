@@ -50,6 +50,7 @@ EXPOSE_API_DOCS = os.getenv("CERAI_EXPOSE_API_DOCS", "0").strip() == "1"
 PROTECTED_PATHS = frozenset({
     "/analyze",
     "/assessment/complete",
+    "/assessment/source-region",
     "/report/pdf",
     "/report/word",
 })

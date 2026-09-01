@@ -313,8 +313,11 @@ def install(core: Any, archive_runtime: Any) -> None:
             response["archive"]["catalog_status"] = "UNAVAILABLE"
         return response
 
-    def begin_cataloged(core_arg, extracted, age, plans, modifiers, metadata):
-        return catalog_if_ready(previous_begin(core_arg, extracted, age, plans, modifiers, metadata))
+    def begin_cataloged(core_arg, extracted, age, plans, modifiers, metadata, source_images=None):
+        return catalog_if_ready(previous_begin(
+            core_arg, extracted, age, plans, modifiers, metadata,
+            source_images=source_images,
+        ))
 
     def complete_cataloged(core_arg, payload):
         return catalog_if_ready(previous_complete(core_arg, payload))
