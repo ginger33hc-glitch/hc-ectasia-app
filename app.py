@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="CER-AI v0.7.63")
+app = FastAPI(title="CER-AI v0.7.64")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -1511,7 +1511,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.63 / source set 2026-08-25 plus binding CER-AI amendments",
+        "version": "software v0.7.64 / source set 2026-08-25 plus binding CER-AI amendments",
     }
 
 

@@ -7,6 +7,7 @@ from time import monotonic
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from PIL import Image
+import pytest
 
 import assessment_workflow
 import pentacam_targeted_reread as targeted
@@ -81,6 +82,28 @@ def reading(
     }
 
 
+def posterior_reading(
+    value, *, status="CONFIDENT", eye="OD", title="Elevation (Back)",
+    location="LOWER_RIGHT", reference="BFS_FLOAT", diameter=8.0,
+    boundary=True, maximum=True, tile="LOWER_RIGHT",
+    source_box=(120, 120, 880, 880),
+):
+    return {
+        "eye": eye,
+        "value": value,
+        "status": status,
+        "map_title": title,
+        "map_location": location,
+        "posterior_reference": reference,
+        "bfs_diameter_mm": diameter,
+        "pupil_boundary_visible": boundary,
+        "maximum_rule_applied": maximum,
+        "evidence": "Compared every printed signed value inside the dashed boundary.",
+        "source_tile": tile,
+        "source_box": list(source_box) if source_box is not None else None,
+    }
+
+
 def test_tiles_cover_source_with_overlap_and_are_valid_png_images():
     tiles = targeted.build_overlapping_tiles(image_bytes())
     assert [name for name, _ in tiles] == [
@@ -118,6 +141,22 @@ def test_landmark_labels_and_existing_central_reading_control_targets():
         "eye": "OD", "central_pachy_um": 542, "central_status": "CONFIDENT",
     }]
     assert "central_pachy_um" not in targeted.missing_targets_by_eye(result)["OD"]
+
+
+def test_only_canonical_nice_posterior_reading_suppresses_map_reread():
+    result = pentacam_result()
+    assert targeted.missing_posterior_targets(result) == ["OD"]
+    result["nice_readings"] = [{
+        "eye": "OD",
+        "posterior_pupil_max_um": 23,
+        "posterior_status": "CONFIDENT",
+        "posterior_reference": "BFS_FLOAT",
+        "bfs_diameter_mm": 8,
+        "pupil_boundary_visible": True,
+    }]
+    assert targeted.missing_posterior_targets(result) == []
+    result["nice_readings"][0]["bfs_diameter_mm"] = 9
+    assert targeted.missing_posterior_targets(result) == ["OD"]
 
 
 def test_patient_age_request_is_patient_level_and_only_for_pentacam():
@@ -306,6 +345,94 @@ def test_pupil_center_reread_feeds_nice_and_unreadable_region_reaches_form():
     assert item["form_id"] == "od_nice_central"
 
 
+def test_lower_right_elevation_back_maximum_feeds_only_nice_posterior_input():
+    result = pentacam_result()
+    reread = {
+        "screen_family": "FOUR_MAPS_REFRACTIVE",
+        "readings": [],
+        "posterior_pupil_readings": [posterior_reading(23)],
+        "warnings": [],
+    }
+    targeted.apply_targeted_readings(
+        Core, result, reread, {}, "od.png", posterior_requested=["OD"]
+    )
+    nice = result["nice_readings"][-1]
+    assert nice["posterior_pupil_max_um"] == 23
+    assert nice["posterior_status"] == "CONFIDENT"
+    assert nice["central_pachy_um"] is None
+    assert result["eyes"][0]["central_pachy_um"] is None
+    assert result["eyes"][0]["targeted_reread_evidence"]["posterior_pupil_max_um"][0]["source"] == (
+        "TARGETED_NICE_POSTERIOR_MAP_REREAD"
+    )
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"map_title": "Elevation (Front)"},
+        {"map_location": "OTHER"},
+        {"posterior_reference": "BFTE"},
+        {"bfs_diameter_mm": 9},
+        {"pupil_boundary_visible": False},
+        {"maximum_rule_applied": False},
+        {"source_tile": "UPPER_RIGHT"},
+    ],
+)
+def test_posterior_map_reread_rejects_wrong_source_or_incomplete_maximum(override):
+    result = pentacam_result()
+    candidate = posterior_reading(23)
+    candidate.update(override)
+    reread = {
+        "screen_family": "FOUR_MAPS_REFRACTIVE",
+        "readings": [],
+        "posterior_pupil_readings": [candidate],
+        "warnings": [],
+    }
+    targeted.apply_targeted_readings(
+        Core, result, reread, {}, "od.png", posterior_requested=["OD"]
+    )
+    assert not result.get("nice_readings")
+    assert any("posterior reread rejected" in warning for warning in result["global_warnings"])
+
+
+def test_posterior_map_reread_rejects_non_four_maps_screen_family():
+    result = pentacam_result()
+    reread = {
+        "screen_family": "BAD_DISPLAY",
+        "readings": [],
+        "posterior_pupil_readings": [posterior_reading(23)],
+        "warnings": [],
+    }
+    targeted.apply_targeted_readings(
+        Core, result, reread, {}, "od.png", posterior_requested=["OD"]
+    )
+    assert not result.get("nice_readings")
+    assert any("posterior reread rejected" in warning for warning in result["global_warnings"])
+
+
+def test_unreadable_posterior_map_region_is_shown_beside_surgeon_input():
+    result = pentacam_result()
+    reread = {
+        "screen_family": "FOUR_MAPS_REFRACTIVE",
+        "readings": [],
+        "posterior_pupil_readings": [posterior_reading(None, status="UNREADABLE")],
+        "warnings": [],
+    }
+    targeted.apply_targeted_readings(
+        Core, result, reread, {}, "od.png", posterior_requested=["OD"]
+    )
+    region = result["eyes"][0]["targeted_unreadable_regions"]["posterior_pupil_max_um"]
+    assert region == {
+        "file": "od.png",
+        "tile": "LOWER_RIGHT",
+        "source_box": [120, 120, 880, 880],
+        "printed_label": "Elevation (Back)",
+    }
+    item = assessment_workflow._request("OD", "NICE: posterior_pupil_max_um", result)
+    assert item["source_region"] is True
+    assert item["form_id"] == "od_nice_pe"
+
+
 def test_circle_marked_thinnest_location_is_retained_as_map_fallback():
     result = pentacam_result()
     reread = {
@@ -395,6 +522,34 @@ def test_targeted_call_uses_original_and_four_crops_with_focused_settings(monkey
     assert captured["reasoning"] == {"effort": "medium"}
     assert captured["text"]["verbosity"] == "high"
     assert captured["text"]["format"]["strict"] is True
+
+
+def test_targeted_call_states_exact_posterior_map_maximum_rule(monkeypatch):
+    captured = {}
+    payload = {
+        "screen_family": "FOUR_MAPS_REFRACTIVE",
+        "readings": [],
+        "patient_age_reading": {
+            "value": None, "status": "NOT_SHOWN", "printed_label": None,
+            "source_tile": "ORIGINAL", "source_box": None,
+        },
+        "posterior_pupil_readings": [],
+        "warnings": [],
+    }
+
+    def create(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(output_text=json.dumps(payload))
+
+    core = Core()
+    core.openai_client = lambda: SimpleNamespace(responses=SimpleNamespace(create=create))
+    targeted.targeted_reread(
+        core, image_bytes(), "od.png", {}, posterior_requested=["OD"]
+    )
+    prompt = captured["input"][0]["content"][0]["text"]
+    assert "LOWER-RIGHT map explicitly titled 'Elevation (Back)'" in prompt
+    assert "highest positive printed value" in prompt
+    assert "central_pachy_um" not in prompt.split("DEDICATED NICE POSTERIOR MAP TARGETS:", 1)[1]
 
 
 def test_age_reread_adds_dedicated_top_header_crop(monkeypatch):

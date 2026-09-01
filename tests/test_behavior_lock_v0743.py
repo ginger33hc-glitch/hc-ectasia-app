@@ -16,7 +16,7 @@ core = canonical_engine.core
 
 
 def test_canonical_version_lock():
-    assert canonical_engine.CANONICAL_VERSION == "0.7.63"
+    assert canonical_engine.CANONICAL_VERSION == "0.7.64"
 
 
 def test_hc_age_boundaries():
