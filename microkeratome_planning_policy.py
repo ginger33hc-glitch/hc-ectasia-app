@@ -6,12 +6,11 @@ missing data, or the ectasia action.
 """
 from typing import Any, Dict, Optional, Tuple
 
-import bootstrap
 from planning.microkeratome import MicrokeratomePlanningInput, plan_microkeratome
 
 
-core = bootstrap.core
-_previous_hc_engine = core.hc_engine
+core = None
+_previous_hc_engine = None
 
 
 def _number(value: Any) -> Optional[float]:
@@ -98,5 +97,13 @@ def hc_engine_with_microkeratome_planning(
     return decision
 
 
-core.hc_engine = hc_engine_with_microkeratome_planning
-core._hc_microkeratome_planning_installed = True
+def install(runtime_core) -> None:
+    """Attach ML7 planning explicitly and at most once."""
+    global core, _previous_hc_engine
+
+    if getattr(runtime_core, "_hc_microkeratome_planning_installed", False):
+        return
+    core = runtime_core
+    _previous_hc_engine = runtime_core.hc_engine
+    runtime_core.hc_engine = hc_engine_with_microkeratome_planning
+    runtime_core._hc_microkeratome_planning_installed = True

@@ -125,7 +125,9 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 ## Output semantics
 
 - Missing/unknown decision-critical data prohibit PASS.
-- `CAUTION` always means STOP/DEFER and reassessment after at least six months.
+- `CAUTION` requires explicit surgeon review but does not automatically defer surgery.
+  Any specific follow-up or reassessment interval must come from the finding that triggered
+  CAUTION; it is not implied by the category itself.
 - Overall status is the least favorable eye or global integrity gate.
 - PASS is decision support, not a guarantee of zero ectasia risk and not autonomous surgical clearance.
 - Every hyperopic/mixed report contains a case-specific `Surgeon attention` section. The final

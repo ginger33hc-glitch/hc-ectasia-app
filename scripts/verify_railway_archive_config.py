@@ -89,10 +89,22 @@ def validate_environment(env: dict[str, str] | None = None) -> dict[str, object]
             )
 
     named_users_enabled = _value(env, "CERAI_NAMED_USERS_ENABLED") == "1"
-    if named_users_enabled:
+    trial_name_login_enabled = (
+        str(
+            env.get(
+                "CERAI_TRIAL_NAME_LOGIN_ENABLED",
+                "1" if named_users_enabled else "0",
+            )
+            or ""
+        ).strip()
+        == "1"
+    )
+    if named_users_enabled and not trial_name_login_enabled:
         users_raw = _value(env, "CERAI_USERS_JSON")
         if not users_raw:
-            raise PreflightError("CERAI_NAMED_USERS_ENABLED=1 requires CERAI_USERS_JSON.")
+            raise PreflightError(
+                "Password-backed named-user mode requires CERAI_USERS_JSON."
+            )
         try:
             users = json.loads(users_raw)
         except json.JSONDecodeError as exc:
@@ -119,6 +131,7 @@ def validate_environment(env: dict[str, str] | None = None) -> dict[str, object]
         "archive_enabled": archive_enabled or archive_required,
         "archive_required": archive_required,
         "named_users_enabled": named_users_enabled,
+        "trial_name_login_enabled": trial_name_login_enabled,
         "research_export_enabled": research_enabled,
     }
 

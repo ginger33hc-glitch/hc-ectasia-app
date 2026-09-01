@@ -25,6 +25,8 @@ def b_ele_th_candidate_is_acceptable(candidate):
 
 
 def install_schema(core):
+    if getattr(core, "_hc_nice_schema_installed", False):
+        return
     props = {
         "eye": {"type": "string", "enum": ["OD", "OS", "UNKNOWN"]},
         "central_pachy_um": {"type": ["number", "null"]},
@@ -39,8 +41,9 @@ def install_schema(core):
     core.SCHEMA["properties"]["nice_readings"] = {
         "type": "array", "items": {"type": "object", "additionalProperties": False,
         "properties": props, "required": list(props)}}
-    core.SCHEMA["required"].append("nice_readings")
-    core.PROMPT += f"""
+    if "nice_readings" not in core.SCHEMA["required"]:
+        core.SCHEMA["required"].append("nice_readings")
+    prompt_addition = f"""
 NICE SEPARATE INPUT READING (do not calculate scores):
 Return nice_readings only for Pentacam images with unambiguous OD/OS; otherwise [].
 central_pachy_um: read the printed pachymetry value identified as 'Pupil Center' by the
@@ -55,6 +58,9 @@ B. Ele.Th label, its attached value, and the BAD Display page identity are all u
 Otherwise use B_Ele_Th_um=null, b_ele_th_status=UNREADABLE, b_ele_th_landmark=UNREADABLE and
 b_ele_th_page=UNREADABLE. Record the exact source label and raw signed value in evidence.
 """
+    if "NICE SEPARATE INPUT READING (do not calculate scores):" not in core.PROMPT:
+        core.PROMPT += prompt_addition
+    core._hc_nice_schema_installed = True
 
 
 def attach_readings(merged, results):
@@ -127,6 +133,8 @@ def evaluate(eye, plan):
 
 
 def install(core):
+    if getattr(core, "_hc_nice_installed", False):
+        return
     install_schema(core)
     previous = core.hc_engine
 

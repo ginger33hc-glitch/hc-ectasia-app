@@ -13,24 +13,24 @@ import os
 import bootstrap
 import reports
 
-# Base clinical policies and extraction pipeline.  These legacy-compatible
-# modules install their narrowly scoped wrapper when imported; their order is
-# deliberately centralized here.
-import hc_age_policy  # noqa: F401,E402
+# Base clinical policies and extraction pipeline. Some legacy-compatible
+# modules still install narrowly scoped wrappers when imported; their order is
+# deliberately centralized here while they are migrated to explicit installers.
+import hc_age_policy  # noqa: E402
 import hc_bad_final_policy  # noqa: F401,E402
 import merge_policy_base  # noqa: F401,E402
 import extraction_guard  # noqa: F401,E402
 import erss_topography_guard  # noqa: F401,E402
 import report_export_guard  # noqa: F401,E402
-import critical_score_highlight  # noqa: F401,E402
+import critical_score_highlight  # noqa: E402
 import pachymetry_policy  # noqa: F401,E402
 import randleman_bad_independence  # noqa: F401,E402
-import erss_visual_morphology_policy  # noqa: F401,E402
+import erss_visual_morphology_policy  # noqa: E402
 import hc_final_decision_policy  # noqa: F401,E402
-import status_rank_policy  # noqa: F401,E402
-import inter_eye_tomography_policy  # noqa: F401,E402
-import microkeratome_planning_policy  # noqa: F401,E402
-import erss_topography_evidence_policy  # noqa: F401,E402
+import status_rank_policy  # noqa: E402
+import inter_eye_tomography_policy  # noqa: E402
+import microkeratome_planning_policy  # noqa: E402
+import erss_topography_evidence_policy  # noqa: E402
 
 # Explicitly installed clinical workflow and operational services.
 import nice_policy  # noqa: E402
@@ -44,6 +44,7 @@ import historical_report  # noqa: E402
 import research_export  # noqa: E402
 import named_user_ui  # noqa: E402
 import pentacam_targeted_reread  # noqa: E402
+import erss_auto_read_policy  # noqa: E402
 
 
 core = bootstrap.core
@@ -100,6 +101,13 @@ def compose(version: str):
     core.app.title = f"CER-AI v{version}"
     reports.APP_VERSION = version
 
+    hc_age_policy.install(core, score_audit_owner=bootstrap)
+    status_rank_policy.install(core)
+    critical_score_highlight.install(core, reports)
+    erss_visual_morphology_policy.install(erss_topography_guard)
+    erss_topography_evidence_policy.install(core)
+    inter_eye_tomography_policy.install(core, compatibility_owner=bootstrap)
+    microkeratome_planning_policy.install(core)
     nice_policy.install(core)
     assessment_workflow.install(core)
     user_access.install(core)
@@ -123,11 +131,10 @@ def compose(version: str):
     research_export.install(core, archive_runtime)
     named_user_ui.install(core)
     pentacam_targeted_reread.install(core)
+    # This cleanup must remain outside the fully installed NICE engine.
+    erss_auto_read_policy.install(core)
 
-    # This cleanup must wrap the fully installed NICE/readiness engine, so it is
-    # the sole intentionally deferred policy import.
-    import erss_auto_read_policy  # noqa: F401
-
+    app.state.cerai_canonical_runtime_ready = True
     core._cerai_runtime_composed = True
     core._cerai_composition_phases = COMPOSITION_PHASES
     return archive_runtime

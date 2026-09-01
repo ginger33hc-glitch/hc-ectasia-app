@@ -3,6 +3,7 @@ import base64
 import json
 import mimetypes
 import os
+from contextlib import asynccontextmanager
 from io import BytesIO
 from typing import Any, Dict, List, Optional
 
@@ -17,7 +18,21 @@ from pentacam_quality_policy import is_quality_only_issue, warnings_for_extracte
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.71")
+@asynccontextmanager
+async def canonical_runtime_lifespan(application: FastAPI):
+    """Refuse to serve the uncomposed legacy core as a clinical runtime."""
+    if not getattr(application.state, "cerai_canonical_runtime_ready", False):
+        raise RuntimeError(
+            "Unsupported CER-AI startup target. Use python start.py or canonical_engine:app; "
+            "the uncomposed app:app target is not a clinical runtime."
+        )
+    yield
+
+
+app = FastAPI(
+    title="CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.71",
+    lifespan=canonical_runtime_lifespan,
+)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
