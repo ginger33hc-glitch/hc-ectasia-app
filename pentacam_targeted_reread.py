@@ -18,7 +18,11 @@ import re
 from typing import Any, Callable
 
 from PIL import Image, ImageOps
-from pentacam_field_registry import TARGET_FIELDS
+from pentacam_field_registry import (
+    CORNEA_FRONT_KERATOMETRY_FIELDS,
+    CORNEA_FRONT_KERATOMETRY_SOURCE,
+    TARGET_FIELDS,
+)
 from pentacam_source_regions import record_unreadable_region
 
 PENTACAM_SCREEN_FAMILIES = {
@@ -27,6 +31,7 @@ PENTACAM_SCREEN_FAMILIES = {
     "TOPOMETRIC_KC",
     "PACHYMETRY",
     "OTHER_PENTACAM",
+    "SHOW_2_EXAMS_TOPOMETRIC",
 }
 
 SOURCE_TILES = (
@@ -150,6 +155,12 @@ for corneal_diameter_mm only when it is the Pentacam horizontal white-to-white o
 the printed IS or I-S field, not ISV, IVA, IHD, IHA, or KISA.
 
 PENTACAM LANDMARK LABELS:
+- K1_D, K1_axis_deg, K2_D, K2_axis_deg, and Kmean_D are accepted only when the complete original
+  visibly says "Show 2 Exams Topometric" and the value is inside the corresponding eye's upper
+  parameter panel visibly headed "Cornea Front". For these readings, screen_family must be
+  SHOW_2_EXAMS_TOPOMETRIC and group_label must be "Cornea Front". Kmean_D is the printed Km row,
+  never a calculation. Reject every similarly named value from Cornea Back, True Net Power, Total
+  Corneal Refractive Power, another screen/panel, a map, or Kmax.
 - Kmax_D is only the value in its explicitly printed KMax/Kmax row.
 - ARTmax_um is only the value in its explicitly printed ARTmax row beneath Progression Index.
 - pachy_thinnest_um is the pachymetry number identified by the CIRCULAR marker beside the printed
@@ -241,6 +252,10 @@ def missing_targets_by_eye(result: dict[str, Any]) -> dict[str, list[str]]:
             field for field in TARGET_FIELDS
             if not (field == "central_pachy_um" and central_present)
             and not (field == "B_Ele_Th_um" and b_ele_th_present)
+            and not (
+                field in CORNEA_FRONT_KERATOMETRY_FIELDS
+                and eye.get("keratometry_source") != CORNEA_FRONT_KERATOMETRY_SOURCE
+            )
             and eye.get(field) is None
         ]
         if missing:
@@ -381,7 +396,7 @@ def label_supports_field(field: str, printed_label: Any, group_label: Any = None
         "IHD": {"ihd"}, "I_S": {"is", "isindex"}, "KISA": {"kisa", "kisaindex"},
         "IHA": {"iha"}, "K1_D": {"k1", "k1d"},
         "K2_D": {"k2", "k2d"},
-        "Kmax_D": {"kmax", "kmaxd"}, "Kmean_D": {"kmean", "kmeand"},
+        "Kmax_D": {"kmax", "kmaxd"}, "Kmean_D": {"km", "kmean", "kmeand"},
         "Rmin_mm": {"rmin", "rminmm"},
         "B_Ele_Th_um": {"beleth", "belethum", "backeleth"},
     }
@@ -436,6 +451,17 @@ def apply_targeted_readings(
             continue
         eye_id, field = reading.get("eye"), reading.get("field")
         if eye_id not in requested or field not in requested.get(eye_id, []):
+            continue
+        if field in CORNEA_FRONT_KERATOMETRY_FIELDS and (
+            reread.get("screen_family") != "SHOW_2_EXAMS_TOPOMETRIC"
+            or _normalize_label(reading.get("group_label")) != "corneafront"
+        ):
+            if reading.get("status") == "CONFIDENT" and core.is_number(reading.get("value")):
+                result.setdefault("global_warnings", []).append(
+                    f"Targeted Pentacam reread rejected {eye_id} {field} in {filename}: "
+                    "K1/K2/Km and their axes are accepted only from the Cornea Front panel "
+                    "on Show 2 Exams Topometric."
+                )
             continue
         if field == "B_Ele_Th_um" and reread.get("screen_family") != "BAD_DISPLAY":
             if reading.get("status") == "CONFIDENT" and core.is_number(reading.get("value")):
@@ -494,6 +520,8 @@ def apply_targeted_readings(
             })
         else:
             eye[field] = retained
+            if field in CORNEA_FRONT_KERATOMETRY_FIELDS:
+                eye["keratometry_source"] = CORNEA_FRONT_KERATOMETRY_SOURCE
             verified = set(eye.get("table_verified_numeric_fields") or [])
             verified.add(field)
             eye["table_verified_numeric_fields"] = sorted(verified)

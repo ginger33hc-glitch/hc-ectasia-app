@@ -16,10 +16,26 @@ TARGET_FIELDS = (
     "total_RMS_um", "spherical_aberration_um",
 )
 
+CORNEA_FRONT_KERATOMETRY_SOURCE = "SHOW_2_EXAMS_TOPOMETRIC_CORNEA_FRONT"
+CORNEA_FRONT_KERATOMETRY_FIELDS = frozenset({
+    "K1_D",
+    "K1_axis_deg",
+    "K2_D",
+    "K2_axis_deg",
+    "Kmean_D",
+})
+KERATOMETRY_SOURCE_VALUES = (
+    CORNEA_FRONT_KERATOMETRY_SOURCE,
+    "OTHER_PENTACAM_SOURCE",
+    "UNREADABLE",
+    "NOT_SHOWN",
+)
+
 # These values have one authoritative printed Pentacam box/row. They are not
 # cross-image consensus fields and must never be reconstructed from a map or a
 # neighboring value. The first valid same-eye labeled-box transcription is retained.
 EXCLUSIVE_LABELED_BOX_FIELDS = frozenset({
+    *CORNEA_FRONT_KERATOMETRY_FIELDS,
     "Kmax_D",
     "ARTmax_um",
     "pachy_thinnest_um",

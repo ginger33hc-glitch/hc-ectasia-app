@@ -26,6 +26,7 @@ def normal_eye(eye="OD", pachy=560, morphology="NORMAL_SYMMETRIC"):
                              "b_ele_th_page": "BAD_DISPLAY",
                              "evidence": "Synthetic central 565; BAD Display B. Ele.Th +8"}],
         "screen_types": ["4 Maps", "BAD Display"],
+        "keratometry_source": "SHOW_2_EXAMS_TOPOMETRIC_CORNEA_FRONT",
         "quality": "ADEQUATE",
         "pentacam_qs": "OK",
         "missing_or_unreadable": [],
@@ -599,7 +600,11 @@ class TestScoringAndCompleteness(unittest.TestCase):
         eye_schema = app.SCHEMA["properties"]["eyes"]["items"]
         self.assertIn("table_verified_numeric_fields", eye_schema["required"])
         self.assertIn("map_fallback_numeric_fields", eye_schema["required"])
+        self.assertIn("keratometry_source", eye_schema["required"])
         self.assertIn("PENTACAM NUMERIC-SOURCE RULE", app.PROMPT)
+        self.assertIn('screen whose visible title is "Show 2 Exams Topometric"', app.PROMPT)
+        self.assertIn('upper parameter panel explicitly headed "Cornea Front"', app.PROMPT)
+        self.assertIn("Kmean_D is the value printed in the Km row", app.PROMPT)
         self.assertIn("Never substitute a generic map spot value", app.PROMPT)
         self.assertIn("Only the categorical fields", app.PROMPT)
 
@@ -755,6 +760,57 @@ class TestScoringAndCompleteness(unittest.TestCase):
         merged = app.merge_extractions([{"eyes": [eye], "global_warnings": []}])
         self.assertEqual(merged["eyes"][0]["K2_D"], 46.8)
 
+    def test_keratometry_is_accepted_only_from_show2_topometric_cornea_front(self):
+        wrong_source = normal_eye()
+        wrong_source.update(
+            keratometry_source="OTHER_PENTACAM_SOURCE",
+            K1_D=47.1,
+            K1_axis_deg=12,
+            K2_D=48.2,
+            K2_axis_deg=102,
+            Kmean_D=47.6,
+        )
+        accepted = normal_eye()
+        accepted.update(
+            keratometry_source="SHOW_2_EXAMS_TOPOMETRIC_CORNEA_FRONT",
+            K1_D=42.1,
+            K1_axis_deg=5,
+            K2_D=42.7,
+            K2_axis_deg=95,
+            Kmean_D=42.4,
+        )
+
+        merged = app.merge_extractions([
+            {"eyes": [wrong_source], "global_warnings": []},
+            {"eyes": [accepted], "global_warnings": []},
+        ])
+        eye = merged["eyes"][0]
+
+        self.assertEqual(eye["K1_D"], 42.1)
+        self.assertEqual(eye["K1_axis_deg"], 5)
+        self.assertEqual(eye["K2_D"], 42.7)
+        self.assertEqual(eye["K2_axis_deg"], 95)
+        self.assertEqual(eye["Kmean_D"], 42.4)
+        self.assertEqual(
+            eye["keratometry_source"],
+            "SHOW_2_EXAMS_TOPOMETRIC_CORNEA_FRONT",
+        )
+        self.assertFalse(any(
+            field in str(conflict)
+            for conflict in eye["data_conflicts"]
+            for field in ("K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmean_D")
+        ))
+
+    def test_noncanonical_keratometry_is_removed_when_no_show2_source_exists(self):
+        eye = normal_eye()
+        eye["keratometry_source"] = "OTHER_PENTACAM_SOURCE"
+        extracted = app.merge_extractions([{"eyes": [eye], "global_warnings": []}])["eyes"][0]
+
+        for field in ("K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmean_D"):
+            self.assertIsNone(extracted[field])
+            self.assertNotIn(field, extracted["table_verified_numeric_fields"])
+            self.assertIn(field, extracted["missing_or_unreadable"])
+
     def test_thinnest_map_number_is_rejected_when_labeled_row_is_unreadable(self):
         eye = normal_eye(pachy=566)
         eye["table_verified_numeric_fields"].remove("pachy_thinnest_um")
@@ -846,14 +902,14 @@ class TestScoringAndCompleteness(unittest.TestCase):
         self.assertEqual(eye["K2_D"], 43.0)
         self.assertFalse(any("table_verified" in item for item in eye["data_conflicts"]))
 
-    def test_keratometry_difference_within_one_percent_reconciles(self):
+    def test_duplicate_cornea_front_keratometry_retains_first_without_conflict(self):
         first = normal_eye()
         second = normal_eye()
         second["K2_D"] = 43.3
         merged = app.merge_extractions(
             [{"eyes": [first], "global_warnings": []}, {"eyes": [second], "global_warnings": []}]
         )
-        self.assertEqual(merged["eyes"][0]["K2_D"], 43.3)
+        self.assertEqual(merged["eyes"][0]["K2_D"], 43.0)
         self.assertFalse(any("K2_D" in item for item in merged["eyes"][0]["data_conflicts"]))
 
     def test_uncertain_or_unreadable_page_does_not_conflict_with_readable_page(self):
