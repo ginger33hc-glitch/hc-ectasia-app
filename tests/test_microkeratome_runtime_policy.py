@@ -33,6 +33,9 @@ def _extracted():
     return {"eyes": [{
         "eye": "OD", "K1_D": 42.0, "K1_axis_deg": 110,
         "K2_D": 46.5, "K2_axis_deg": 20, "corneal_diameter_mm": 11.2,
+        "table_verified_numeric_fields": [
+            "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "corneal_diameter_mm",
+        ],
     }]}
 
 
@@ -71,7 +74,21 @@ def test_missing_w2w_or_axis_degrades_planning_only(monkeypatch):
     assert out["status"] == "PASS WITH CAUTION"
     assert plan["vacuum_ring_mm"] is None
     assert plan["primary_hinge"] == "Perpendicular to steep axis"
+    assert any("horizontal white-to-white (HWTW)" in warning for warning in plan["warnings"])
     assert any("numeric hinge axis cannot be calculated" in warning for warning in plan["warnings"])
+
+
+def test_unverified_or_non_pentacam_diameter_cannot_drive_ring_selection(monkeypatch):
+    extracted = _extracted()
+    extracted["eyes"][0]["table_verified_numeric_fields"].remove("corneal_diameter_mm")
+    monkeypatch.setattr(policy, "_previous_hc_engine", lambda *args, **kwargs: _decision())
+    out = policy.hc_engine_with_microkeratome_planning(
+        extracted, 30, {"OD": {"procedure": "LASIK", "flap_um": 100}}, {}, {}
+    )
+    plan = out["eyes"][0]["microkeratome_planning"]
+    assert plan["vacuum_ring_mm"] is None
+    assert plan["vacuum_pressure_mmhg"] is None
+    assert any("horizontal white-to-white (HWTW)" in warning for warning in plan["warnings"])
 
 
 def test_planning_is_present_in_pdf_and_word_exports(monkeypatch):
