@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.66")
+app = FastAPI(title="CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.67")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -1511,7 +1511,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.66 / source set 2026-08-25 plus binding CER-AI amendments",
+        "version": "software v0.7.67 / source set 2026-08-25 plus binding CER-AI amendments",
     }
 
 
@@ -1688,10 +1688,14 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 target["unreadable_source_regions"].setdefault(field, dict(region))
             if quality_rank.get(eye.get("quality"), 0) > quality_rank.get(target.get("quality"), 0):
                 target["quality"] = eye.get("quality")
-            if any(value in ("LIMITED", "INADEQUATE") for value in target["quality_by_source"].values()):
-                target.setdefault("data_conflicts", []).append(
-                    "source image quality: limited/inadequate decision source"
-                )
+            # Image quality is one canonical gate, not a synthetic multi-image value conflict.
+            # An ancillary/overlapping limited page must not poison an otherwise adequate
+            # same-eye source. If no adequate source exists, required_tomography_missing blocks
+            # readiness through the eye's final quality value.
+            target["data_conflicts"] = [
+                conflict for conflict in target.get("data_conflicts", [])
+                if conflict != "source image quality: limited/inadequate decision source"
+            ]
             qs_values = {target.get("pentacam_qs"), eye.get("pentacam_qs")}
             if "NOT_OK" in qs_values:
                 target["pentacam_qs"] = "NOT_OK"

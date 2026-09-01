@@ -187,6 +187,36 @@ def test_surgeon_i_s_resolves_conflict_for_both_scorers():
     assert ready["decision"]["eyes"][0]["nice"]["values"]["I_S_D"]==.5
 
 
+def test_surgeon_pattern_selection_resolves_multi_image_conflict_and_reaches_report():
+    extracted, plans = scenario()
+    eye = extracted["eyes"][0]
+    eye["data_conflicts"] = ["anterior_pattern: BORDERLINE vs REASSURING"]
+    eye.setdefault("field_provenance", {})["anterior_pattern"] = [
+        {"file": "od-a.png", "source": "VISUAL_CLASSIFICATION"},
+        {"file": "od-b.png", "source": "VISUAL_CLASSIFICATION"},
+    ]
+    result = workflow.begin(
+        core, extracted, 35, plans, MODIFIERS, {},
+        source_images=[(b"a", "od-a.png"), (b"b", "od-b.png")],
+    )
+    requests = [item for item in result["input_requests"] if item.get("key") == "anterior_pattern"]
+    assert len(requests) == 1
+    assert requests[0]["kind"] == "select"
+    assert requests[0]["source_region_count"] == 2
+    ready = workflow.complete(core, {
+        "assessment_token": result["assessment_token"],
+        "age": 35,
+        "eye_plans": plans,
+        "patient_modifiers": MODIFIERS,
+        "clinical_overrides": {"OD": {"anterior_pattern": "BORDERLINE"}},
+    })
+    assert ready["workflow_status"] == "READY", ready
+    corrected_eye = next(item for item in ready["extracted"]["eyes"] if item["eye"] == "OD")
+    assert corrected_eye["field_provenance"]["anterior_pattern"] == [{
+        "source": "SURGEON_CONFIRMED"
+    }]
+
+
 def test_hard_stop_does_not_skip_other_missing_questions():
     extracted,plans=scenario()
     extracted["eyes"][0]["BAD_D"]=4

@@ -3,16 +3,16 @@ window.HCReadiness = class {
   constructor(panel) { this.panel=panel; this.regionUrls=[]; this.reset(); }
   reset() {
     for(const url of this.regionUrls||[])URL.revokeObjectURL(url);
-    this.regionUrls=[];this.token=null;this.overrides={};this.panel.hidden=true;this.panel.replaceChildren();
+    this.regionUrls=[];this.token=null;this.overrides={};this.hasCompletableInputs=false;this.panel.hidden=true;this.panel.replaceChildren();
   }
-  async loadSourceRegion(container,item) {
+  async loadSourceRegion(container,item,index=0) {
     const tr=value=>window.CERAI_I18N?.translate(value)??value;
     const status=document.createElement('span');status.textContent=tr('Loading unread Pentacam/topography region...');container.append(status);
     try{
       const request=window.ceraiFetch||window.fetch.bind(window);
       const response=await request('/assessment/source-region',{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({assessment_token:this.token,eye:item.eye,key:item.key})
+        body:JSON.stringify({assessment_token:this.token,eye:item.eye,key:item.key,index})
       });
       if(!response.ok)throw new Error('source region unavailable');
       const url=URL.createObjectURL(await response.blob());this.regionUrls.push(url);
@@ -38,6 +38,7 @@ window.HCReadiness = class {
     for(const url of this.regionUrls||[])URL.revokeObjectURL(url);
     this.regionUrls=[];
     this.token=response.assessment_token;
+    this.hasCompletableInputs=false;
     this.panel.replaceChildren();
     this.panel.hidden=response.workflow_status!=='NEEDS_INPUT';
     if(this.panel.hidden)return false;
@@ -54,7 +55,9 @@ window.HCReadiness = class {
       if(item.source_region){
         row.classList.add('completion-with-source');
         const region=document.createElement('div');region.className='completion-source-region';
-        row.append(region);this.loadSourceRegion(region,item);
+        row.append(region);
+        const count=Math.max(1,Number(item.source_region_count)||1);
+        for(let index=0;index<count;index++)this.loadSourceRegion(region,item,index);
       }
       let input;
       if(item.kind==='form') {
@@ -76,8 +79,8 @@ window.HCReadiness = class {
         input.dataset.measurement=item.key;input.dataset.eye=item.eye;
         input.value=this.overrides[item.eye]?.[item.key]??'';
       }
-      if(input){input.id=`completion_${seen.size}`;label.htmlFor=input.id;row.append(input);}
-      else {const help=document.createElement('span');help.textContent=tr(item.help);row.append(help);}
+      if(input){this.hasCompletableInputs=true;input.id=`completion_${seen.size}`;label.htmlFor=input.id;row.append(input);}
+      else {row.classList.add('completion-blocker');const help=document.createElement('span');help.textContent=tr(item.help);row.append(help);}
       this.panel.append(row);
     }
     this.panel.scrollIntoView({behavior:'smooth',block:'start'});

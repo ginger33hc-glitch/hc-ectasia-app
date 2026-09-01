@@ -102,6 +102,31 @@ REREAD_SCHEMA = {
             },
             "required": ["value", "status", "printed_label", "source_tile", "source_box"],
         },
+        "pentacam_qs_reading": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "value": {"type": ["string", "null"], "enum": ["OK", "NOT_OK", None]},
+                "status": {
+                    "type": "string",
+                    "enum": ["CONFIDENT", "UNCERTAIN", "UNREADABLE", "NOT_SHOWN"],
+                },
+                "printed_label": {"type": ["string", "null"]},
+                "source_tile": {"type": "string", "enum": list(SOURCE_TILES)},
+                "source_box": {
+                    "anyOf": [
+                        {
+                            "type": "array",
+                            "items": {"type": "integer", "minimum": 0, "maximum": 999},
+                            "minItems": 4,
+                            "maxItems": 4,
+                        },
+                        {"type": "null"},
+                    ]
+                },
+            },
+            "required": ["value", "status", "printed_label", "source_tile", "source_box"],
+        },
         "posterior_pupil_readings": {
             "type": "array",
             "items": {
@@ -148,7 +173,7 @@ REREAD_SCHEMA = {
         "warnings": {"type": "array", "items": {"type": "string"}},
     },
     "required": [
-        "screen_family", "readings", "patient_age_reading",
+        "screen_family", "readings", "patient_age_reading", "pentacam_qs_reading",
         "posterior_pupil_readings", "warnings",
     ],
 }
@@ -194,6 +219,14 @@ an explicitly printed Age/Patient Age field in the Pentacam demographic header. 
 when the age label and completed-year integer are both visible. Do not use date of birth, birth year,
 exam date, another unlabeled number, or arithmetic. Never estimate or calculate age. If the printed
 age label or digits are unclear, return value=null with the appropriate status.
+
+PENTACAM QUALITY SPECIFICATION (QS) RULE:
+{qs_target}
+When requested, inspect the literal device field labeled QS/Quality Specification. Return OK only
+when the printed label and an explicitly acceptable/OK value are both unambiguous. Return NOT_OK
+for a visibly non-OK device status. Never infer QS from apparent image clarity or from another
+quality label. When the QS label is visible but its value is unclear, return value=null and localize
+the label/value box so it can be shown to the surgeon.
 
 REQUESTED FIELDS BY EYE:
 {targets}
@@ -260,6 +293,14 @@ def patient_age_is_missing(result: dict[str, Any]) -> bool:
         return False
     context = result.get("document_context") or {}
     return context.get("patient_age_years") is None
+
+
+def pentacam_qs_is_missing(result: dict[str, Any]) -> bool:
+    """True only when literal Pentacam QS has not already been read as OK/NOT_OK."""
+    if not _looks_like_pentacam(result):
+        return False
+    context = result.get("document_context") or {}
+    return context.get("pentacam_qs") not in {"OK", "NOT_OK"}
 
 
 def missing_posterior_targets(result: dict[str, Any]) -> list[str]:
@@ -441,6 +482,7 @@ def apply_targeted_readings(
     filename: str,
     patient_age_requested: bool = False,
     posterior_requested: list[str] | None = None,
+    pentacam_qs_requested: bool = False,
 ) -> dict[str, Any]:
     """Fill only null requested fields from one conflict-free confident reread."""
     if reread.get("screen_family") not in PENTACAM_SCREEN_FAMILIES:
@@ -647,6 +689,37 @@ def apply_targeted_readings(
                 "source_box": age_reading.get("source_box"),
                 "printed_label": age_reading.get("printed_label"),
             }
+    if pentacam_qs_requested:
+        context = result.setdefault("document_context", {})
+        qs_reading = reread.get("pentacam_qs_reading") or {}
+        label = _normalize_label(qs_reading.get("printed_label"))
+        value = qs_reading.get("value")
+        label_valid = label in {"qs", "qualityspecification", "qualityspec", "qualitystatus"}
+        if qs_reading.get("status") == "CONFIDENT" and value in {"OK", "NOT_OK"} and label_valid:
+            context["pentacam_qs"] = value
+            context["targeted_qs_reread_evidence"] = {
+                "file": filename,
+                "source": "TARGETED_PENTACAM_QS_REREAD",
+                "tile": qs_reading.get("source_tile"),
+                "printed_label": qs_reading.get("printed_label"),
+                "value": value,
+            }
+            for eye in eyes.values():
+                eye["_pentacam_qs"] = value
+                eye["pentacam_qs"] = value
+                eye.get("unreadable_source_regions", {}).pop("pentacam_qs", None)
+        elif (
+            qs_reading.get("status") in {"UNCERTAIN", "UNREADABLE"}
+            and label_valid
+            and qs_reading.get("source_box") is not None
+        ):
+            for eye in eyes.values():
+                record_unreadable_region(
+                    eye, "pentacam_qs", filename=filename,
+                    tile=qs_reading.get("source_tile"),
+                    source_box=qs_reading.get("source_box"),
+                    printed_label=qs_reading.get("printed_label"),
+                )
     return result
 
 
@@ -661,11 +734,17 @@ def targeted_reread(
     requested: dict[str, list[str]],
     patient_age_requested: bool = False,
     posterior_requested: list[str] | None = None,
+    pentacam_qs_requested: bool = False,
 ) -> dict[str, Any]:
     age_target = (
         "PATIENT: patient_age_years is requested."
         if patient_age_requested
         else "PATIENT: patient_age_years is not requested; return null/NOT_SHOWN."
+    )
+    qs_target = (
+        "Pentacam QS is requested."
+        if pentacam_qs_requested
+        else "Pentacam QS is not requested; return null/NOT_SHOWN."
     )
     content: list[dict[str, Any]] = [
         {
@@ -673,6 +752,7 @@ def targeted_reread(
             "text": REREAD_PROMPT.format(
                 targets=_target_summary(requested) or "No eye-level numeric fields requested.",
                 age_target=age_target,
+                qs_target=qs_target,
                 posterior_targets=(
                     ", ".join(posterior_requested or [])
                     or "No posterior_pupil_max_um map reading requested."
@@ -684,7 +764,7 @@ def targeted_reread(
         {"type": "input_image", "image_url": core.data_url(raw, filename), "detail": "original"},
     ]
     for tile_name, tile_raw in build_overlapping_tiles(
-        raw, include_top_header=patient_age_requested
+        raw, include_top_header=patient_age_requested or pentacam_qs_requested
     ):
         content.extend((
             {"type": "input_text", "text": f"{tile_name} crop of the same screen:"},
@@ -716,15 +796,20 @@ def make_targeted_extractor(core: Any, previous: Callable[[bytes, str], dict[str
         requested = missing_targets_by_eye(result)
         patient_age_requested = patient_age_is_missing(result)
         posterior_requested = missing_posterior_targets(result)
-        if not _enabled() or (not requested and not patient_age_requested and not posterior_requested):
+        pentacam_qs_requested = pentacam_qs_is_missing(result)
+        if not _enabled() or (
+            not requested and not patient_age_requested
+            and not posterior_requested and not pentacam_qs_requested
+        ):
             return result
         try:
             reread = targeted_reread(
-                core, raw, filename, requested, patient_age_requested, posterior_requested
+                core, raw, filename, requested, patient_age_requested, posterior_requested,
+                pentacam_qs_requested,
             )
             return apply_targeted_readings(
                 core, result, reread, requested, filename, patient_age_requested,
-                posterior_requested,
+                posterior_requested, pentacam_qs_requested,
             )
         except Exception as exc:
             result.setdefault("global_warnings", []).append(

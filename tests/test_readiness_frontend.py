@@ -94,6 +94,8 @@ def test_only_unread_fields_can_request_a_temporary_source_region():
     assert '/assessment/source-region' in workflow
     assert "if(item.source_region)" in readiness
     assert "assessment_token:this.token" in readiness
+    assert "source_region_count" in readiness
+    assert "index})" in readiness
     assert 'Pentacam/topography region the application could not read' in readiness
     assert '.completion-with-source>input,.completion-with-source>select{grid-column:2' in html
     assert '.completion-source-region{grid-column:1' in html
