@@ -133,6 +133,7 @@ TR = {
     "K1 axis": "K1 aksı",
     "K2 axis": "K2 aksı",
     "Corneal diameter / W2W": "Kornea çapı / W2W",
+    "Horizontal white-to-white (HWTW)": "Horizontal white-to-white (HWTW)",
     "Anterior elevation at TP": "En ince noktada ön elevasyon",
     "Posterior elevation at TP": "En ince noktada arka elevasyon",
     "Thinnest X": "En ince X",
