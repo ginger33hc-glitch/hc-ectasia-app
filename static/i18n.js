@@ -82,7 +82,7 @@
     "Clinical modifiers":"Klinik değiştiriciler","Warnings":"Uyarılar","Extracted tomography":"Çıkarılan tomografi verileri",
     "Global clinical / source blockers":"Genel klinik / kaynak engelleri","Post-assessment ML7 microkeratome planning":"Değerlendirme sonrası ML7 mikrokeratom planlaması",
     "Planning warnings":"Planlama uyarıları","Planning notes":"Planlama notları","Assessment gate":"Değerlendirme geçidi","Vacuum ring":"Vakum halkası",
-    "Vacuum pressure":"Vakum basıncı","Blade recommendation(s)":"Bıçak önerisi/önerileri","Primary hinge":"Birincil menteşe","Conditional alternative":"Koşullu alternatif",
+    "Vacuum pressure":"Vakum basıncı","Blade recommendation(s)":"Bıçak önerisi/önerileri","Primary hinge":"Birincil menteşe","Conditional alternative":"Koşullu alternatif","Horizontal white-to-white (HWTW)":"Horizontal white-to-white (HWTW)",
     "Alternative projected RSB / PTA":"Alternatif tahmini RSB / PTA","Alternative safety":"Alternatif güvenliği","Ring-zone clearance":"Halka-zon açıklığı","Source":"Kaynak",
     "Recommendation":"Öneri","Surgeon-review recommendation only; this module does not alter the ectasia disposition.":"Yalnızca cerrah değerlendirme önerisidir; bu modül ektazi kararını değiştirmez.",
     "PASS":"UYGUN","PASS WITH CAUTION":"DİKKATLE UYGUN","CAUTION — STOP/DEFER":"DİKKAT — DURDUR/ERTELE","DO NOT PROCEED":"İŞLEME DEVAM ETMEYİN",

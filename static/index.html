@@ -522,7 +522,7 @@ function renderEye(r, extracted){
   ];
   const source=(extracted.eyes||[]).find(x=>x.eye===r.eye)||{};
   const tomoRows=[
-    ["K1",fmt(source.K1_D,2)+" D"],["K1 axis",fmt(source.K1_axis_deg,0)+"°"],["K2",fmt(source.K2_D,2)+" D"],["K2 axis",fmt(source.K2_axis_deg,0)+"°"],["Kmax",fmt(source.Kmax_D,2)+" D"],["Corneal diameter / W2W",fmt(source.corneal_diameter_mm,2)+" mm"],
+    ["K1",fmt(source.K1_D,2)+" D"],["K1 axis",fmt(source.K1_axis_deg,0)+"°"],["K2",fmt(source.K2_D,2)+" D"],["K2 axis",fmt(source.K2_axis_deg,0)+"°"],["Kmax",fmt(source.Kmax_D,2)+" D"],["Horizontal white-to-white (HWTW)",fmt(source.corneal_diameter_mm,2)+" mm"],
     ["Thinnest pachymetry",fmt(source.pachy_thinnest_um,0)+" µm"],["BAD-D final",fmt(source.BAD_D,2)],
     ["BAD-Df",fmt(source.Df,2)],["BAD-Db",fmt(source.Db,2)],["BAD-Dp",fmt(source.Dp,2)],["BAD-Dt",fmt(source.Dt,3)],["BAD-Da",fmt(source.Da,3)],
     ["ARTmax",fmt(source.ARTmax_um,0)+" µm"],["PPI min",fmt(source.PPI_min,2)],["PPI avg",fmt(source.PPI_avg,2)],["PPI max",fmt(source.PPI_max,2)],

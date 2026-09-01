@@ -39,6 +39,13 @@ def test_large_w2w_changes_ring():
     assert p.vacuum_ring_mm == 9.0
 
 
+def test_missing_horizontal_wtw_blocks_ring_recommendation():
+    p = plan_microkeratome(base(w2w_mm=None))
+    assert p.vacuum_ring_mm is None
+    assert p.vacuum_pressure_mmhg is None
+    assert any("horizontal white-to-white (HWTW)" in warning for warning in p.warnings)
+
+
 def test_delta_k_strictly_over_four_uses_perpendicular_hinge():
     p = plan_microkeratome(base(steepest_k_d=46.1, flattest_k_d=42.0, steep_axis_deg=20))
     assert p.delta_k_d == 4.1

@@ -272,7 +272,8 @@ at that same marked thinnest point. A generic curvature-map spot is not Kmax or 
 or location is uncertain, return null.
 
 Never substitute a generic map spot value, color-scale value, axis label, neighboring parameter,
-calculated value, average, or visual estimate for K1, K2, their axes, corneal diameter/W2W, Kmax,
+calculated value, average, or visual estimate for K1, K2, their axes, horizontal white-to-white
+(HWTW), Kmax,
 Rmin, BAD-D/components, PPI, ARTmax, topometric
 indices, coordinates, corneal volume, HOA, or coma. Those summary/calculated fields must remain null
 when their own labeled table value is unreadable. A labeled BAD-display center/bottom numeric box
@@ -294,8 +295,14 @@ REASSURING, BORDERLINE, ABNORMAL, or UNREADABLE. ABNORMAL_ECTATIC is reserved fo
 forme-fruste keratoconus, pellucid/ectatic pattern; do not infer it from one isolated index.
 In particular, extract K1_D/K1_axis_deg and K2_D/K2_axis_deg only from the explicitly labeled K1
 and K2 summary-table fields. The axis must be printed as part of the corresponding K row; never use
-the refractive cylinder axis as a keratometric axis. Extract corneal_diameter_mm only from an
-explicitly labeled corneal diameter, HWTW, WTW, or white-to-white field.
+the refractive cylinder axis as a keratometric axis. corneal_diameter_mm means horizontal
+white-to-white (HWTW) only. Extract it only from the Pentacam's explicitly labeled HWTW,
+horizontal WTW, horizontal white-to-white, WTW/white-to-white, or Cornea Diameter/W2W field.
+The Pentacam Cornea Diameter/W2W output is used here solely as its horizontal white-to-white
+measurement. Never use a vertical diameter, an unlabeled caliper distance, a map estimate, an
+average of diameters, or a value calculated from another measurement. If the horizontal identity
+or printed value is uncertain, return corneal_diameter_mm=null and do not add it to
+table_verified_numeric_fields.
 Kmax_D and Rmin_mm may use the restricted, explicitly labeled local fallback described above only
 when their edge/side boxes are unreadable. Never use an ordinary numeric spot label printed inside a
 curvature map as K1, K2, Kmax, or Rmin. Classify morphology only when an axial,
