@@ -7,13 +7,10 @@ CER-AI age bands:
 - age >=21: 0 points
 Ages <18 or unavailable are not scored.
 """
-import bootstrap
-
-core = bootstrap.core
 
 
 def hc_age_points(age):
-    if not core.is_number(age) or age < 18:
+    if not isinstance(age, (int, float)) or isinstance(age, bool) or age < 18:
         return None
     age = float(age)
     if age < 19:
@@ -23,19 +20,31 @@ def hc_age_points(age):
     return 0
 
 
-# assess_eye resolves age_points from the app module at call time, so replacing
-# the module global applies this policy consistently to LASIK and PRK scoring.
-core.age_points = hc_age_points
+def install(core, *, score_audit_owner=None) -> None:
+    """Attach the age policy and its provenance note explicitly and once."""
+    if getattr(core, "_hc_age_policy_installed", False):
+        return
 
-# Preserve the already-installed assessment wrappers while making provenance
-# explicit in the score audit/report text.
-_original_score_audit = getattr(bootstrap, "_score_audit", None)
-if _original_score_audit:
-    def _hc_score_audit(result):
-        audit = _original_score_audit(result)
-        if audit and (result.get("values") or {}).get("procedure") in ("LASIK", "PRK"):
-            audit["source"] = audit.get("source", "") + "; CER-AI-modified age bands"
-        return audit
-    bootstrap._score_audit = _hc_score_audit
+    # assess_eye resolves age_points from the app module at call time, so this
+    # applies the policy consistently to LASIK and PRK scoring.
+    core.age_points = hc_age_points
 
-app = bootstrap.app
+    # Preserve the existing score-audit implementation while adding the
+    # CER-AI-specific provenance note.
+    original_score_audit = getattr(score_audit_owner, "_score_audit", None)
+    if original_score_audit:
+
+        def score_audit_with_hc_age(result):
+            audit = original_score_audit(result)
+            if audit and (result.get("values") or {}).get("procedure") in (
+                "LASIK",
+                "PRK",
+            ):
+                audit["source"] = (
+                    audit.get("source", "") + "; CER-AI-modified age bands"
+                )
+            return audit
+
+        score_audit_owner._score_audit = score_audit_with_hc_age
+
+    core._hc_age_policy_installed = True

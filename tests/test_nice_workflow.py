@@ -2,7 +2,7 @@
 from copy import deepcopy
 from io import BytesIO
 import itertools
-import json
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,11 +10,28 @@ from pypdf import PdfReader
 
 import canonical_engine as runtime
 import assessment_workflow as workflow
-from nice_scoring import score_nice
+from cerai_i18n import translate_text
+from nice_scoring import NOTE, score_nice
 from nice_policy import evaluate, attach_readings
-from test_hc_engine import normal_eye, plan, MODIFIERS, document_context
+from test_hc_engine import normal_eye, plan, MODIFIERS
 
 core = runtime.core
+
+
+def test_nice_caution_wording_is_consistent_in_reports_and_rule_documents():
+    translated = translate_text(NOTE, "tr")
+    assert "5-8 = otomatik erteleme olmadan DİKKAT" in translated
+    assert "≥9 = DURDUR-ERTELE" in translated
+    assert "CAUTION / STOP-DEFER" not in translated
+
+    browser_i18n = Path("static/i18n.js").read_text(encoding="utf-8")
+    assert NOTE in browser_i18n
+    assert "5-8 = otomatik erteleme olmadan DİKKAT" in browser_i18n
+
+    protocol = Path("CER-AI_PROTOCOL_v0.7.md").read_text(encoding="utf-8")
+    readme = Path("README.md").read_text(encoding="utf-8")
+    assert "`CAUTION` always means STOP/DEFER" not in protocol
+    assert "5–8: CAUTION /\nSTOP-DEFER" not in readme
 
 
 def scenario(procedure="LASIK"):
@@ -91,8 +108,10 @@ def test_runtime_4_5_8_9_and_no_duplicate_erss(procedure,pe,k2,central,total,sta
     assert before.get("randleman_erss")==after.get("randleman_erss")
     assert before["score"]==after["score"]
     assert before["tomography_review"]==after["tomography_review"]
-    if status: assert after["status"].startswith(status)
-    else: assert after["status"]==before["status"]
+    if status:
+        assert after["status"].startswith(status)
+    else:
+        assert after["status"]==before["status"]
     if total>=9:
         assert "microkeratome_planning" not in after
     elif procedure == "LASIK":
@@ -113,17 +132,20 @@ def test_nice_cannot_reduce_bad_hard_stop_or_rescue_with_flap_change():
 
 @pytest.mark.parametrize("key,value", [("b_ele_th_landmark","OTHER"),("b_ele_th_status","UNREADABLE"),("b_ele_th_page","OTHER")])
 def test_non_b_ele_th_box_sources_never_accepted(key,value):
-    eye=normal_eye();eye["nice_candidates"][0][key]=value
+    eye=normal_eye()
+    eye["nice_candidates"][0][key]=value
     assert "B_Ele_Th_um" in evaluate(eye,plan())["missing"]
 
 
 def test_no_substitution_of_thinnest_pachy_or_elevation():
-    eye=normal_eye();eye["nice_candidates"]=[]
+    eye=normal_eye()
+    eye["nice_candidates"]=[]
     assert set(evaluate(eye,plan())["missing"])=={"central_pachy_um","B_Ele_Th_um"}
 
 
 def test_conflicting_nice_readings_require_confirmation_and_keep_source():
-    eye=normal_eye();eye["nice_candidates"].append({**eye["nice_candidates"][0],"B_Ele_Th_um":16})
+    eye=normal_eye()
+    eye["nice_candidates"].append({**eye["nice_candidates"][0],"B_Ele_Th_um":16})
     result=evaluate(eye,plan())
     assert result["values"]["B_Ele_Th_um"]==8
     assert result["input_sources"]["B_Ele_Th"]=="PENTACAM_BAD_DISPLAY_B_ELE_TH"
@@ -249,8 +271,10 @@ def test_hard_stop_does_not_skip_other_missing_questions():
 
 def test_prior_surgery_not_forced_through_nice():
     extracted,plans=scenario()
-    for eye in extracted["eyes"]:eye["nice_candidates"]=[]
-    for p in plans.values():p["prior"]="yes"
+    for eye in extracted["eyes"]:
+        eye["nice_candidates"]=[]
+    for p in plans.values():
+        p["prior"]="yes"
     result=workflow.begin(core,extracted,35,plans,MODIFIERS,{})
     assert result["workflow_status"]=="READY"
     assert all(e["nice"]["category"]=="NOT_APPLICABLE" for e in result["decision"]["eyes"])

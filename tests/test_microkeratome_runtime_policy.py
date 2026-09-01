@@ -1,11 +1,17 @@
 import copy
 from io import BytesIO
 
+import canonical_engine
 import microkeratome_planning_policy as policy
 import pytest
 import reports
 from docx import Document
 from pypdf import PdfReader
+
+
+def test_policy_is_installed_only_by_canonical_composition():
+    assert policy.core is canonical_engine.core
+    assert canonical_engine.core._hc_microkeratome_planning_installed is True
 
 
 def _decision(status="PASS"):

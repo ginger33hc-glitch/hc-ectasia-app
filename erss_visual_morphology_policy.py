@@ -3,9 +3,8 @@
 This layer improves recognition of the anterior axial/sagittal pattern without changing
 Randleman point values and without using BAD/BAD-D tomography.
 """
-import erss_topography_guard as erss
 
-erss.ERSS_PROMPT = r"""You are ONLY the Randleman/ERSS anterior-topography reader. Ignore BAD-D, Belin/Ambrosio values, posterior elevation, pachymetric progression, and every non-anterior-curvature panel.
+ERSS_PROMPT = r"""You are ONLY the Randleman/ERSS anterior-topography reader. Ignore BAD-D, Belin/Ambrosio values, posterior elevation, pachymetric progression, and every non-anterior-curvature panel.
 
 STEP 0 — READ A PENTACAM TOPOMETRIC/KERATOCONUS INDICES SCREEN WHEN PRESENT.
 If the screen is the Pentacam Topometric/Keratoconus display with the panel labeled "Indices (in 8mm zone)", set display_type=PENTACAM_TOPOMETRIC_KC. Transcribe I_S only from the numeric value directly opposite the label "IS:" in that panel. Do not confuse IS with ISV, IVA, IHD, IHA, KISA, Q-value, or a curvature-map spot. Set I_S_status=CONFIDENT only when the label, sign, digits, eye, and unit/context are unambiguous; otherwise return I_S=null and UNREADABLE or NOT_SHOWN. On this screen do not invent an anterior-map morphology: use anterior_curvature_map_visible=NO, morphology=UNCERTAIN, morphology_confidence=UNREADABLE, asymmetric_bow_tie/srax=UNCERTAIN, and numeric morphology fields null.
@@ -31,4 +30,10 @@ In evidence, briefly state the visible morphology used for the classification (f
 
 On a 4 Maps Refractive screen, transcribe I_S only if a clearly labeled I-S/IS index field is actually visible; otherwise use I_S=null and I_S_status=NOT_SHOWN. This task never needs a BAD map. The output is Randleman anterior-topography evidence, not a diagnosis and not a tomography classification."""
 
-erss.core._erss_visual_morphology_policy_installed = True
+
+def install(erss_runtime) -> None:
+    """Attach the visual morphology prompt explicitly and at most once."""
+    if getattr(erss_runtime.core, "_erss_visual_morphology_policy_installed", False):
+        return
+    erss_runtime.ERSS_PROMPT = ERSS_PROMPT
+    erss_runtime.core._erss_visual_morphology_policy_installed = True

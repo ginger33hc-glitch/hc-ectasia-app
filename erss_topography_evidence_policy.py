@@ -6,13 +6,10 @@ validates the anterior-topography evidence passed to the canonical
 the BAD-independent five-row ERSS calculator remain the sole scoring authorities.
 """
 
-import bootstrap
-
-
-core = bootstrap.core
-_previous_scoring_morphology = core.scoring_morphology
-_previous_required_tomography_missing = core.required_tomography_missing
-_previous_assess_eye = core.assess_eye
+core = None
+_previous_scoring_morphology = None
+_previous_required_tomography_missing = None
+_previous_assess_eye = None
 
 VALID_CATEGORIES = {
     "NORMAL_SYMMETRIC",
@@ -211,9 +208,20 @@ def assess_eye_with_i_s_evidence(eye, plan, age, patient_modifiers):
     return result
 
 
-core.scoring_morphology = scoring_morphology_with_i_s_evidence_gate
-core.required_tomography_missing = required_tomography_missing_with_i_s
-core.assess_eye = assess_eye_with_i_s_evidence
-core._erss_topography_evidence_policy_installed = True
+def install(runtime_core) -> None:
+    """Attach ERSS evidence gates explicitly and at most once."""
+    global core
+    global _previous_scoring_morphology
+    global _previous_required_tomography_missing
+    global _previous_assess_eye
 
-app = bootstrap.app
+    if getattr(runtime_core, "_erss_topography_evidence_policy_installed", False):
+        return
+    core = runtime_core
+    _previous_scoring_morphology = runtime_core.scoring_morphology
+    _previous_required_tomography_missing = runtime_core.required_tomography_missing
+    _previous_assess_eye = runtime_core.assess_eye
+    runtime_core.scoring_morphology = scoring_morphology_with_i_s_evidence_gate
+    runtime_core.required_tomography_missing = required_tomography_missing_with_i_s
+    runtime_core.assess_eye = assess_eye_with_i_s_evidence
+    runtime_core._erss_topography_evidence_policy_installed = True

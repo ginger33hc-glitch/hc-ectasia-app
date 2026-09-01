@@ -4,11 +4,9 @@ This layer neutralizes the superseded manual inter-eye modifier and appends an
 automated bilateral tomography concern after the established CER-AI engine finishes.
 It must not change score, status, hard stops, BAD-D, or Randleman/ERSS decisions.
 """
-import bootstrap
 from inter_eye_tomography import assess_inter_eye_tomography
 
-core = bootstrap.core
-_previous_hc_engine = core.hc_engine
+_previous_hc_engine = None
 
 
 def hc_engine_with_inter_eye_tomography(extracted, age, eye_plans, patient_modifiers, patient_metadata=None):
@@ -41,7 +39,14 @@ def hc_engine_with_inter_eye_tomography(extracted, age, eye_plans, patient_modif
     return result
 
 
-core.hc_engine = hc_engine_with_inter_eye_tomography
-bootstrap.hc_engine = hc_engine_with_inter_eye_tomography
-core._hc_inter_eye_tomography_policy_installed = True
-app = bootstrap.app
+def install(core, *, compatibility_owner=None) -> None:
+    """Attach inter-eye context explicitly and at most once."""
+    global _previous_hc_engine
+
+    if getattr(core, "_hc_inter_eye_tomography_policy_installed", False):
+        return
+    _previous_hc_engine = core.hc_engine
+    core.hc_engine = hc_engine_with_inter_eye_tomography
+    if compatibility_owner is not None:
+        compatibility_owner.hc_engine = hc_engine_with_inter_eye_tomography
+    core._hc_inter_eye_tomography_policy_installed = True

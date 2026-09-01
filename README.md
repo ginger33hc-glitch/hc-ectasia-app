@@ -213,8 +213,8 @@ do not independently determine clearance.
 `canonical_engine.py` remains the single production composition root. Independent
 `nice_scoring.py` and `nice_policy.py` add a restrictive-only final NICE disposition;
 ERSS/BAD calculations and the isolated `clean_engine` are unchanged. NICE points are
-never added to ERSS. LASIK and PRK use total 4: no NICE escalation, 5–8: CAUTION /
-STOP-DEFER, >=9: HARD STOP. A stronger existing stop always wins.
+never added to ERSS. LASIK and PRK use total 4: no NICE escalation, 5–8: CAUTION
+without automatic defer, and >=9: STOP-DEFER hard stop. A stronger existing stop always wins.
 
 The report labels this as **CER-AI-adapted NICE**, documents all four components and
 provenance, and cites DOI 10.2147/OPTH.S464217. The approved posterior bands are

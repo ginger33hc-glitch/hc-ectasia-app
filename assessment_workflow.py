@@ -299,6 +299,9 @@ def export_payload(payload):
 
 
 def install(core):
+    if getattr(core, "_hc_readiness_installed", False):
+        return
+
     @core.app.post("/assessment/complete")
     def complete_assessment(payload: dict = Body(...)):
         return complete(core, payload)

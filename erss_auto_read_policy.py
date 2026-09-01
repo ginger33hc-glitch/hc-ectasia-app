@@ -5,10 +5,8 @@ They must never be requested because NICE is incomplete. Surgeon confirmation is
 reserved for genuinely unresolved ERSS morphology after the dedicated anterior-
 curvature read.
 """
-import bootstrap
 
-core = bootstrap.core
-_previous_hc_engine = core.hc_engine
+_previous_hc_engine = None
 
 
 def _is_unresolved_erss(result):
@@ -54,5 +52,12 @@ def hc_engine_with_erss_auto_read(extracted, age, eye_plans, patient_modifiers, 
     return decision
 
 
-core.hc_engine = hc_engine_with_erss_auto_read
-core._erss_auto_read_policy_installed = True
+def install(core) -> None:
+    """Attach ERSS missing-field cleanup explicitly and at most once."""
+    global _previous_hc_engine
+
+    if getattr(core, "_erss_auto_read_policy_installed", False):
+        return
+    _previous_hc_engine = core.hc_engine
+    core.hc_engine = hc_engine_with_erss_auto_read
+    core._erss_auto_read_policy_installed = True
