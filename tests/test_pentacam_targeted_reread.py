@@ -12,6 +12,25 @@ import assessment_workflow
 import pentacam_targeted_reread as targeted
 
 
+def test_completion_requests_only_manifest_when_intended_is_wholly_blank():
+    missing = [
+        ("OD", "preoperative manifest sphere for LASIK ERSS MRSE"),
+        ("OD", "preoperative manifest cylinder magnitude for LASIK ERSS MRSE"),
+        ("OD", "intended sphere"),
+        ("OD", "intended cylinder magnitude"),
+    ]
+    plans = {"OD": {
+        "manifest_entered_sphere_D": None,
+        "manifest_cylinder_signed_D": None,
+        "intended_entered_sphere_D": None,
+        "intended_cylinder_signed_D": None,
+    }}
+    assert assessment_workflow.completion_items(missing, plans) == missing[:2]
+
+    plans["OD"]["intended_entered_sphere_D"] = -2.0
+    assert assessment_workflow.completion_items(missing, plans) == missing
+
+
 class Core:
     MODEL = "gpt-5.6-terra"
 

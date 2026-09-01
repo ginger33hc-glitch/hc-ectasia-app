@@ -52,6 +52,28 @@ def missing_items(decision):
     return list(dict.fromkeys(items))
 
 
+def completion_items(items, plans):
+    """Ask only for manifest when a wholly blank intended role will default to it."""
+    result = []
+    for eye, message in items:
+        plan = plans.get(eye, {}) if eye in {"OD", "OS"} else {}
+        intended_supplied = any(plan.get(field) is not None for field in (
+            "intended_entered_sphere_D", "intended_cylinder_signed_D",
+            "intended_sphere_D", "intended_cylinder_magnitude_D",
+        ))
+        eye_messages = [str(text).lower() for item_eye, text in items if item_eye == eye]
+        manifest_requested = any("preoperative manifest" in text for text in eye_messages)
+        if (
+            eye in {"OD", "OS"}
+            and not intended_supplied
+            and manifest_requested
+            and str(message).lower().startswith("intended ")
+        ):
+            continue
+        result.append((eye, message))
+    return result
+
+
 def _region_hint(extracted, eye, key):
     if eye == "PATIENT" and key == "age":
         direct = (extracted.get("document_context") or {}).get("targeted_unreadable_age_region")
@@ -192,7 +214,7 @@ def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
             eye.setdefault("morphology_evidence", []).append("Category explicitly confirmed by surgeon during input completion.")
     effective = core.apply_extracted_corrections(deepcopy(extracted), deepcopy(plans))
     decision = core.hc_engine(deepcopy(extracted), age, effective, modifiers, metadata)
-    missing = missing_items(decision)
+    missing = completion_items(missing_items(decision), plans)
     response = {"assessment_token": token, "extracted": extracted, "effective_eye_plans": effective,
                 "workflow_status": "NEEDS_INPUT" if missing else "READY", "missing": [],
                 "input_requests": [], "report_token": None}

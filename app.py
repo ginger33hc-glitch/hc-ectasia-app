@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="CER-AI v0.7.61")
+app = FastAPI(title="CER-AI v0.7.62")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -1281,11 +1281,46 @@ def apply_extracted_corrections(
     Each complete manually supplied role-specific pair takes priority. A partial manual pair is never
     mixed with extracted values, and conflicting cards never produce an automatic treatment plan.
     """
-    effective = {
-        eye: normalize_signed_refraction_plan(eye_plans.get(eye, {}))
-        if isinstance(eye_plans.get(eye, {}), dict) else {}
-        for eye in EYES
-    }
+    def manifest_default(raw_plan: Dict[str, Any]) -> Dict[str, Any]:
+        """Default a wholly blank intended role from one complete manifest role.
+
+        This is a data-entry default, not a clinical inference.  Any intended
+        value supplied by the surgeon disables the default for that role.
+        """
+        plan = dict(raw_plan or {})
+        intended_fields = (
+            "intended_entered_sphere_D", "intended_cylinder_signed_D",
+            "intended_sphere_D", "intended_cylinder_magnitude_D",
+        )
+        if any(plan.get(field) is not None for field in intended_fields):
+            return plan
+        if all(is_number(plan.get(field)) for field in (
+            "manifest_entered_sphere_D", "manifest_cylinder_signed_D",
+        )):
+            plan["intended_entered_sphere_D"] = plan["manifest_entered_sphere_D"]
+            plan["intended_cylinder_signed_D"] = plan["manifest_cylinder_signed_D"]
+        elif all(is_number(plan.get(field)) for field in (
+            "manifest_sphere_D", "manifest_cylinder_magnitude_D",
+        )):
+            plan["intended_sphere_D"] = plan["manifest_sphere_D"]
+            plan["intended_cylinder_magnitude_D"] = plan["manifest_cylinder_magnitude_D"]
+        else:
+            return plan
+        plan["intended_default_source"] = "SURGEON_MANIFEST"
+        return plan
+
+    effective = {}
+    for eye in EYES:
+        raw_plan = eye_plans.get(eye, {})
+        if not isinstance(raw_plan, dict):
+            effective[eye] = {}
+            continue
+        effective[eye] = normalize_signed_refraction_plan(manifest_default(raw_plan))
+        if effective[eye].get("intended_default_source") == "SURGEON_MANIFEST":
+            effective[eye]["correction_source"] = "Surgeon-entered manifest — intended default"
+            effective[eye].setdefault("correction_warnings", []).append(
+                f"{eye} intended correction initially defaults to the surgeon-entered manifest refraction; the surgeon may explicitly change intended treatment values."
+            )
     grouped: Dict[str, List[Dict[str, Any]]] = {eye: [] for eye in EYES}
     for correction in extracted.get("treatment_corrections", []):
         if not isinstance(correction, dict):
@@ -1474,7 +1509,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.61 / source set 2026-08-25 plus binding CER-AI amendments",
+        "version": "software v0.7.62 / source set 2026-08-25 plus binding CER-AI amendments",
     }
 
 

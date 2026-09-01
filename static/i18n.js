@@ -89,6 +89,7 @@
     "REVIEW — NOT CLEARED":"DEĞERLENDİR — ONAYLANMADI","DATA INSUFFICIENT":"VERİ YETERSİZ","ERROR":"HATA","ANALYZING...":"ANALİZ EDİLİYOR...",
     "Required information — no report has been generated":"Gerekli bilgiler — henüz rapor oluşturulmadı",
     "PATIENT":"Hasta","Patient age (years)":"Hasta yaşı (yıl)",
+    "Intended treatment initially follows manifest refraction. Edit intended values only when the planned treatment differs.":"Hedeflenen tedavi başlangıçta manifest refraksiyonu izler. Yalnızca planlanan tedavi farklıysa hedeflenen değerleri değiştirin.",
     "Complete all items below, then continue. Existing inputs and image readings are retained. No calculation is required from the surgeon.":"Aşağıdaki tüm alanları tamamlayıp devam edin. Mevcut girdiler ve görüntü okumaları korunur. Cerrahın hesaplama yapması gerekmez.",
     "Continue with completed information":"Tamamlanan bilgilerle devam et","Preparing...":"Hazırlanıyor...",
     "Loading unread Pentacam region...":"Pentacam'da okunamayan bölge yükleniyor...",

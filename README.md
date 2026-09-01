@@ -2,7 +2,12 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.61 implements
+## What v0.7.62 implements
+
+- A confident Excimer Laser Takip Kartı `Düzeltme Miktarı` remains the initial source for both
+  manifest and intended refraction. If the card is unreadable, readiness requests only manifest;
+  intended initially follows the completed manifest values and remains independently editable by
+  the surgeon. An explicit intended entry always overrides this default.
 
 - `runtime_composition.py` is the single ordered production assembly point. Clinical policy,
   Pentacam extraction, reporting/readiness, and access/persistence are owned by explicit phases;

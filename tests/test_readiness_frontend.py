@@ -46,6 +46,37 @@ def test_hidden_reports_stay_hidden_when_printing_and_after_edits():
     assert "f.addEventListener('change',()=>{reportCard.hidden=true;lastReport=null;})" in html
 
 
+def test_manifest_defaults_intended_until_surgeon_edits_intended():
+    if not shutil.which('node'):
+        pytest.skip('Node is not available')
+    script = r'''
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const html=fs.readFileSync('static/index.html','utf8');
+class Field{
+  constructor(){this.value='';this.listeners={};}
+  addEventListener(type,fn){(this.listeners[type]??=[]).push(fn);}
+  dispatchEvent(event){for(const fn of this.listeners[event.type]||[])fn(event);}
+}
+const fields={};
+for(const eye of ['od','os'])for(const suffix of ['manifest_sphere','manifest_cylinder','sphere','cylinder'])fields[`${eye}_${suffix}`]=new Field();
+const context={document:{getElementById:id=>fields[id]},Event:class{constructor(type){this.type=type;}}};
+vm.createContext(context);
+const start=html.indexOf('// Manifest is the surgeon');
+const end=html.indexOf('const clinicalReviewState',start);
+vm.runInContext(html.slice(start,end),context);
+fields.od_manifest_sphere.value='-3.25';fields.od_manifest_sphere.dispatchEvent(new context.Event('input'));
+assert.equal(fields.od_sphere.value,'-3.25');
+fields.od_manifest_cylinder.value='-1.50';fields.od_manifest_cylinder.dispatchEvent(new context.Event('input'));
+assert.equal(fields.od_cylinder.value,'-1.50');
+fields.od_sphere.value='-2.75';fields.od_sphere.dispatchEvent(new context.Event('input'));
+fields.od_manifest_sphere.value='-4.00';fields.od_manifest_sphere.dispatchEvent(new context.Event('input'));
+assert.equal(fields.od_sphere.value,'-2.75');
+fields.od_manifest_cylinder.value='-2.00';fields.od_manifest_cylinder.dispatchEvent(new context.Event('input'));
+assert.equal(fields.od_cylinder.value,'-2.00');
+'''
+    subprocess.run(['node', '-e', script], cwd=ROOT, check=True, capture_output=True, text=True)
+
+
 def test_patient_age_completion_uses_one_shared_field():
     workflow = (ROOT / 'assessment_workflow.py').read_text()
     readiness = (ROOT / 'static/assessment-readiness.js').read_text()

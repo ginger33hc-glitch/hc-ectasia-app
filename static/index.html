@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>CER-AI v0.7.61</title>
+  <title>CER-AI v0.7.62</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=9">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=8">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=8">
@@ -42,7 +42,7 @@
   <style>@media print{.report-card[hidden]{display:none!important}}</style>
 </head>
 <body>
-<header class="app-header"><div class="brand-lockup"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Corneal Ectasia Risk Analysis Intelligence"><span class="brand-version">v0.7.61</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI v0.7.61</h1></header>
+<header class="app-header"><div class="brand-lockup"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Corneal Ectasia Risk Analysis Intelligence"><span class="brand-version">v0.7.62</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI v0.7.62</h1></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -106,7 +106,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">CER-AI Clinical Decision Support</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.7.61</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.7.62</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <p class="report-liability-notice">The final surgical decision and all associated responsibility and liability rest with the surgeon. This application is a clinical decision-support aid only.</p>
       <table class="meta-table"><tbody>
@@ -158,6 +158,7 @@ const eyeTemplate = (eye) => `
   <div class="row"><label>Preoperative manifest cylinder (D; + or −)</label><div class="signed-number"><input id="${eye}_manifest_cylinder" type="text" inputmode="decimal" autocomplete="off" data-min="-15" data-max="15"><button type="button" class="sign-button" data-positive-target="${eye}_manifest_cylinder" aria-label="Make manifest cylinder positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_manifest_cylinder" aria-label="Make manifest cylinder negative">−</button></div></div>
   <div class="row"><label>Intended treatment sphere (D)</label><div class="signed-number sphere"><input id="${eye}_sphere" type="text" inputmode="decimal" autocomplete="off" data-min="-30" data-max="20"><button type="button" class="sign-button" data-positive-target="${eye}_sphere" aria-label="Make intended sphere positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_sphere" aria-label="Make intended sphere negative">−</button></div></div>
   <div class="row"><label>Intended treatment cylinder (D; + or −)</label><div class="signed-number"><input id="${eye}_cylinder" type="text" inputmode="decimal" autocomplete="off" data-min="-15" data-max="15"><button type="button" class="sign-button" data-positive-target="${eye}_cylinder" aria-label="Make intended cylinder positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_cylinder" aria-label="Make intended cylinder negative">−</button></div></div>
+  <p class="note">Intended treatment initially follows manifest refraction. Edit intended values only when the planned treatment differs.</p>
   <div class="row"><label>Cylinder axis (degrees)</label><input id="${eye}_axis" type="number" step="1" min="0" max="180"></div>
   <div class="row"><label>Actual maximum ablation (µm)</label><input id="${eye}_ablation" type="number" step=".1" min="0"></div>
   <div class="row"><label>Laser platform</label><input id="${eye}_platform" type="text" value="Alcon EX500" readonly aria-readonly="true"></div>
@@ -212,6 +213,33 @@ document.querySelectorAll("[data-positive-target]").forEach(button=>button.addEv
   const input=document.getElementById(button.dataset.positiveTarget);
   applySign(input,"+");
 }));
+
+// Manifest is the surgeon's required fallback when the treatment card is unreadable.
+// Intended follows it only until the surgeon explicitly edits the intended field.
+const refractionDefaultState={};
+const refractionDefaultWrite=new Set();
+for(const eye of ["od","os"]){
+  refractionDefaultState[eye]={};
+  for(const [role,manifestSuffix,intendedSuffix] of [
+    ["sphere","manifest_sphere","sphere"],
+    ["cylinder","manifest_cylinder","cylinder"],
+  ]){
+    const manifest=document.getElementById(`${eye}_${manifestSuffix}`);
+    const intended=document.getElementById(`${eye}_${intendedSuffix}`);
+    const key=`${eye}:${role}`;
+    refractionDefaultState[eye][role]=!intended.value.trim();
+    intended.addEventListener("input",()=>{
+      if(!refractionDefaultWrite.has(key))refractionDefaultState[eye][role]=false;
+    });
+    manifest.addEventListener("input",()=>{
+      if(!refractionDefaultState[eye][role])return;
+      refractionDefaultWrite.add(key);
+      intended.value=manifest.value;
+      intended.dispatchEvent(new Event("input",{bubbles:true}));
+      refractionDefaultWrite.delete(key);
+    });
+  }
+}
 
 const clinicalReviewState={od:false,os:false};
 for(const eye of ["od","os"]){

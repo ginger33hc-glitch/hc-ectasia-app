@@ -871,6 +871,34 @@ class TestScoringAndCompleteness(unittest.TestCase):
 
 
 class TestTreatmentCardTransfer(unittest.TestCase):
+    def test_surgeon_manifest_defaults_blank_intended_but_never_overwrites_it(self):
+        entered = plan(sphere=None, cylinder=None)
+        entered.update({
+            "manifest_entered_sphere_D": -3.25,
+            "manifest_cylinder_signed_D": -1.5,
+            "entered_axis_deg": 80,
+        })
+        effective = app.apply_extracted_corrections(
+            {"treatment_corrections": []}, {"OD": entered}
+        )["OD"]
+        self.assertEqual(effective["intended_entered_sphere_D"], -3.25)
+        self.assertEqual(effective["intended_cylinder_signed_D"], -1.5)
+        self.assertEqual(effective["intended_sphere_D"], -3.25)
+        self.assertEqual(effective["intended_cylinder_magnitude_D"], 1.5)
+        self.assertEqual(effective["correction_axis_deg"], 80)
+        self.assertEqual(effective["intended_default_source"], "SURGEON_MANIFEST")
+
+        entered.update({
+            "intended_entered_sphere_D": -2.75,
+            "intended_cylinder_signed_D": -1.0,
+        })
+        changed = app.apply_extracted_corrections(
+            {"treatment_corrections": []}, {"OD": entered}
+        )["OD"]
+        self.assertEqual(changed["intended_entered_sphere_D"], -2.75)
+        self.assertEqual(changed["intended_cylinder_signed_D"], -1.0)
+        self.assertNotIn("intended_default_source", changed)
+
     def test_confident_card_fills_empty_plan_and_drives_zone_specific_ablation(self):
         extracted = {
             "eyes": [normal_eye()],
