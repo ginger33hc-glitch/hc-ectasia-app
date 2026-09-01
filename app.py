@@ -1031,6 +1031,29 @@ def assess_eye(
     morphology = derived_morphology["category"]
     tomo = tomography_review(eye)
     surgeon_attention: List[str] = []
+    prk_mitomycin_c_guidance: List[str] = []
+
+    if procedure == "PRK":
+        if intended_pattern["category"] in {"HYPEROPIC", "SIMPLE_HYPEROPIC_ASTIGMATISM"}:
+            prk_mitomycin_c_guidance.append(
+                "Mitomycin-C use is REQUIRED for hyperopic PRK."
+            )
+        elif intended_pattern["category"] in {"MYOPIC", "SIMPLE_MYOPIC_ASTIGMATISM"}:
+            if intended_mrse is not None and abs(float(intended_mrse)) >= 4.0:
+                prk_mitomycin_c_guidance.append(
+                    "Mitomycin-C use is REQUIRED for myopic PRK with intended MRSE magnitude 4.00 D or greater "
+                    "(for example, -4.00 D or -5.00 D)."
+                )
+            elif intended_mrse is not None:
+                prk_mitomycin_c_guidance.append(
+                    "Mitomycin-C use is RECOMMENDED for myopic PRK with intended MRSE magnitude below 4.00 D "
+                    "(for example, -3.99 D)."
+                )
+        elif intended_pattern["category"] == "MIXED_ASTIGMATISM":
+            prk_mitomycin_c_guidance.append(
+                "The myopic and hyperopic PRK Mitomycin-C rules do not classify mixed astigmatism; "
+                "surgeon review is required."
+            )
 
     if hyperopic_or_mixed:
         surgeon_attention.extend([
@@ -1233,6 +1256,7 @@ def assess_eye(
         "warnings": list(dict.fromkeys(warnings)),
         "clinical_modifiers": modifiers,
         "surgeon_attention": list(dict.fromkeys(surgeon_attention)),
+        "prk_mitomycin_c_guidance": prk_mitomycin_c_guidance,
         "surgical_load_flags": surgical_load_flags,
         "instrument": (
             "LASIK ERSS components displayed; hyperopic/mixed applicability is not validated"

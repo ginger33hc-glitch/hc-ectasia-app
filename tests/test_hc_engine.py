@@ -594,6 +594,47 @@ class TestBoundaries(unittest.TestCase):
         html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
         self.assertIn("Surgeon attention — hyperopic/mixed pathway", html)
 
+    def test_prk_mitomycin_c_guidance_uses_myopia_magnitude_boundary(self):
+        required_boundary = app.assess_eye(
+            normal_eye(), plan("PRK", sphere=-4.0, cylinder=0.0, ablation=60), 35, MODIFIERS
+        )
+        required_greater_myopia = app.assess_eye(
+            normal_eye(), plan("PRK", sphere=-5.0, cylinder=0.0, ablation=60), 35, MODIFIERS
+        )
+        recommended_lower_myopia = app.assess_eye(
+            normal_eye(), plan("PRK", sphere=-3.99, cylinder=0.0, ablation=60), 35, MODIFIERS
+        )
+
+        self.assertIn("REQUIRED", required_boundary["prk_mitomycin_c_guidance"][0])
+        self.assertIn("-4.00 D or -5.00 D", required_boundary["prk_mitomycin_c_guidance"][0])
+        self.assertIn("REQUIRED", required_greater_myopia["prk_mitomycin_c_guidance"][0])
+        self.assertIn("RECOMMENDED", recommended_lower_myopia["prk_mitomycin_c_guidance"][0])
+
+    def test_prk_mitomycin_c_guidance_requires_hyperopic_use_and_does_not_affect_lasik(self):
+        hyperopic_prk = app.assess_eye(
+            normal_eye(), plan("PRK", sphere=2.0, cylinder=0.0, ablation=40), 35, MODIFIERS
+        )
+        myopic_lasik = app.assess_eye(
+            normal_eye(), plan("LASIK", sphere=-5.0, cylinder=0.0, ablation=70, flap=100), 35, MODIFIERS
+        )
+
+        self.assertEqual(
+            hyperopic_prk["prk_mitomycin_c_guidance"],
+            ["Mitomycin-C use is REQUIRED for hyperopic PRK."],
+        )
+        self.assertEqual(myopic_lasik["prk_mitomycin_c_guidance"], [])
+
+    def test_prk_mitomycin_c_guidance_is_routed_to_all_report_formats(self):
+        result = app.assess_eye(
+            normal_eye(), plan("PRK", sphere=-4.0, cylinder=0.0, ablation=60), 35, MODIFIERS
+        )
+        findings = dict(reports._findings(result))
+        self.assertIn("PRK Mitomycin-C guidance", findings)
+        self.assertIn("REQUIRED", findings["PRK Mitomycin-C guidance"][0])
+
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn('listBlock("PRK Mitomycin-C guidance",r.prk_mitomycin_c_guidance)', html)
+
 
 class TestScoringAndCompleteness(unittest.TestCase):
     def test_extraction_contract_prioritizes_labeled_pentacam_numeric_fields(self):
