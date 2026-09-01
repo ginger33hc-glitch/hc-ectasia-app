@@ -121,6 +121,18 @@ def test_conflicting_nice_readings_require_confirmation_and_keep_source():
     assert result["input_sources"]["posterior_elevation"]=="SURGEON_CONFIRMED"
 
 
+def test_central_pachy_accepts_only_pupil_center_plus_and_never_conflicts():
+    eye = normal_eye()
+    invalid = {**eye["nice_candidates"][0], "central_pachy_um": 520,
+               "central_landmark": "OTHER"}
+    valid_later = {**eye["nice_candidates"][0], "central_pachy_um": 570}
+    eye["nice_candidates"] = [invalid, eye["nice_candidates"][0], valid_later]
+    result = evaluate(eye, plan())
+    assert result["values"]["central_pachy_um"] == 565
+    assert result["input_sources"]["central_pachy"] == "PENTACAM_PRINTED"
+    assert len(result["evidence"]["central_pachy"]) == 1
+
+
 def test_dedicated_readings_laterality_and_schema():
     extracted,plans=scenario()
     reading={**normal_eye()["nice_candidates"][0],"eye":"OD"}
@@ -128,6 +140,7 @@ def test_dedicated_readings_laterality_and_schema():
     assert len(extracted["eyes"][0]["nice_candidates"])==1
     assert extracted["eyes"][1]["nice_candidates"]==[]
     assert "nice_readings" in core.SCHEMA["required"]
+    assert "central_landmark" in core.SCHEMA["properties"]["nice_readings"]["items"]["required"]
     assert core.lasik_topography_points.__module__=="app"
     assert runtime.runtime_invariants()
 

@@ -131,7 +131,12 @@ def test_only_null_fields_are_requested_and_non_pentacam_is_ignored():
 
 def test_landmark_labels_and_existing_central_reading_control_targets():
     assert targeted.label_supports_field("pachy_thinnest_um", "Thinnest Locat.")
+    assert not targeted.label_supports_field("pachy_thinnest_um", "Pachy Vertex N.")
+    assert not targeted.label_supports_field("pachy_thinnest_um", "Corneal Thickness 521")
     assert targeted.label_supports_field("central_pachy_um", "Pupil Center +")
+    assert not targeted.label_supports_field("central_pachy_um", "Pachy Vertex N.")
+    assert targeted.label_supports_field("Kmax_D", "KMax")
+    assert targeted.label_supports_field("ARTmax_um", "ARTmax")
     assert targeted.label_supports_field("corneal_diameter_mm", "HWTW")
     assert not targeted.label_supports_field("corneal_diameter_mm", "HTWT")
 
@@ -139,6 +144,7 @@ def test_landmark_labels_and_existing_central_reading_control_targets():
     assert "central_pachy_um" in targeted.missing_targets_by_eye(result)["OD"]
     result["nice_readings"] = [{
         "eye": "OD", "central_pachy_um": 542, "central_status": "CONFIDENT",
+        "central_landmark": "PUPIL_CENTER_PLUS",
     }]
     assert "central_pachy_um" not in targeted.missing_targets_by_eye(result)["OD"]
 
@@ -328,6 +334,7 @@ def test_pupil_center_reread_feeds_nice_and_unreadable_region_reaches_form():
     targeted.apply_targeted_readings(Core, result, confident, requested, "od.png")
     assert result["nice_readings"][-1]["central_pachy_um"] == 548
     assert result["nice_readings"][-1]["central_status"] == "CONFIDENT"
+    assert result["nice_readings"][-1]["central_landmark"] == "PUPIL_CENTER_PLUS"
     assert result["eyes"][0]["central_pachy_um"] is None
 
     unreadable = pentacam_result()
@@ -360,6 +367,7 @@ def test_lower_right_elevation_back_maximum_feeds_only_nice_posterior_input():
     assert nice["posterior_pupil_max_um"] == 23
     assert nice["posterior_status"] == "CONFIDENT"
     assert nice["central_pachy_um"] is None
+    assert nice["central_landmark"] == "UNREADABLE"
     assert result["eyes"][0]["central_pachy_um"] is None
     assert result["eyes"][0]["targeted_reread_evidence"]["posterior_pupil_max_um"][0]["source"] == (
         "TARGETED_NICE_POSTERIOR_MAP_REREAD"
@@ -433,7 +441,7 @@ def test_unreadable_posterior_map_region_is_shown_beside_surgeon_input():
     assert item["form_id"] == "od_nice_pe"
 
 
-def test_circle_marked_thinnest_location_is_retained_as_map_fallback():
+def test_circle_marked_thinnest_location_is_retained_as_labeled_row():
     result = pentacam_result()
     reread = {
         "screen_family": "PACHYMETRY",
@@ -447,8 +455,8 @@ def test_circle_marked_thinnest_location_is_retained_as_map_fallback():
     )
     eye = result["eyes"][0]
     assert eye["pachy_thinnest_um"] == 501
-    assert "pachy_thinnest_um" in eye["map_fallback_numeric_fields"]
-    assert "pachy_thinnest_um" not in eye["table_verified_numeric_fields"]
+    assert "pachy_thinnest_um" in eye["table_verified_numeric_fields"]
+    assert "pachy_thinnest_um" not in eye.get("map_fallback_numeric_fields", [])
 
 
 def test_source_region_renderer_returns_tight_png_crop():

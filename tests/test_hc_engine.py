@@ -20,6 +20,7 @@ def normal_eye(eye="OD", pachy=560, morphology="NORMAL_SYMMETRIC"):
     return {
         "eye": eye,
         "nice_candidates": [{"central_pachy_um": 565, "central_status": "CONFIDENT",
+                             "central_landmark": "PUPIL_CENTER_PLUS",
                              "posterior_pupil_max_um": 8, "posterior_status": "CONFIDENT",
                              "posterior_reference": "BFS_FLOAT", "bfs_diameter_mm": 8,
                              "pupil_boundary_visible": True, "evidence": "Synthetic central 565; pupil posterior +8"}],
@@ -742,14 +743,15 @@ class TestScoringAndCompleteness(unittest.TestCase):
         merged = app.merge_extractions([{"eyes": [eye], "global_warnings": []}])
         self.assertEqual(merged["eyes"][0]["K2_D"], 46.8)
 
-    def test_same_measurement_local_map_fallback_is_accepted_when_table_is_unreadable(self):
+    def test_thinnest_map_number_is_rejected_when_labeled_row_is_unreadable(self):
         eye = normal_eye(pachy=566)
         eye["table_verified_numeric_fields"].remove("pachy_thinnest_um")
         eye["map_fallback_numeric_fields"] = ["pachy_thinnest_um"]
         merged = app.merge_extractions([{"eyes": [eye], "global_warnings": []}])
         extracted = merged["eyes"][0]
-        self.assertEqual(extracted["pachy_thinnest_um"], 566)
-        self.assertEqual(extracted["map_fallback_numeric_fields"], ["pachy_thinnest_um"])
+        self.assertIsNone(extracted["pachy_thinnest_um"])
+        self.assertEqual(extracted["map_fallback_numeric_fields"], [])
+        self.assertIn("pachy_thinnest_um", extracted["missing_or_unreadable"])
 
     def test_map_spot_cannot_substitute_for_k2_even_when_model_labels_it_as_fallback(self):
         eye = normal_eye()
@@ -761,7 +763,7 @@ class TestScoringAndCompleteness(unittest.TestCase):
         self.assertIsNone(extracted["K2_D"])
         self.assertNotIn("K2_D", extracted["map_fallback_numeric_fields"])
 
-    def test_explicit_local_kmax_and_rmin_are_permitted_only_when_edge_boxes_are_unreadable(self):
+    def test_local_kmax_is_rejected_but_explicit_local_rmin_remains_permitted(self):
         eye = normal_eye()
         for field in ("Kmax_D", "Rmin_mm"):
             eye["table_verified_numeric_fields"].remove(field)
@@ -769,11 +771,11 @@ class TestScoringAndCompleteness(unittest.TestCase):
         eye["Rmin_mm"] = 7.09
         eye["map_fallback_numeric_fields"] = ["Kmax_D", "Rmin_mm"]
         extracted = app.merge_extractions([{"eyes": [eye], "global_warnings": []}])["eyes"][0]
-        self.assertEqual(extracted["Kmax_D"], 47.6)
+        self.assertIsNone(extracted["Kmax_D"])
         self.assertEqual(extracted["Rmin_mm"], 7.09)
-        self.assertEqual(extracted["map_fallback_numeric_fields"], ["Kmax_D", "Rmin_mm"])
+        self.assertEqual(extracted["map_fallback_numeric_fields"], ["Rmin_mm"])
 
-    def test_multiple_permitted_local_values_do_not_create_unresolved_conflict(self):
+    def test_multiple_local_rmin_values_do_not_create_unresolved_conflict(self):
         first = normal_eye()
         second = normal_eye()
         for eye in (first, second):
@@ -786,9 +788,8 @@ class TestScoringAndCompleteness(unittest.TestCase):
             [{"eyes": [first], "global_warnings": []}, {"eyes": [second], "global_warnings": []}]
         )
         extracted = merged["eyes"][0]
-        self.assertEqual(extracted["Kmax_D"], 48.1)
+        self.assertIsNone(extracted["Kmax_D"])
         self.assertEqual(extracted["Rmin_mm"], 7.03)
-        self.assertFalse(any("Kmax_D" in item for item in extracted["data_conflicts"]))
         self.assertFalse(any("Rmin_mm" in item for item in extracted["data_conflicts"]))
 
     def test_labeled_edge_box_overrides_explicit_local_kmax_without_conflict(self):

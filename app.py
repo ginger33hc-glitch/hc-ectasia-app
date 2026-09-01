@@ -11,10 +11,11 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 
+from pentacam_field_registry import EXCLUSIVE_LABELED_BOX_FIELDS
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.67")
+app = FastAPI(title="CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.68")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -45,9 +46,7 @@ MAP_FALLBACK_NUMERIC_FIELDS = (
     # These directly labeled local map values can represent the same named measurement when the
     # corresponding edge/side box is unreadable. Calculated indices such as K1/K2, BAD, PPI,
     # ARTmax, and topometric indices cannot be reconstructed from unlabeled map spots.
-    "Kmax_D",
     "Rmin_mm",
-    "pachy_thinnest_um",
     "anterior_elevation_thinnest_um",
     "posterior_elevation_thinnest_um",
 )
@@ -269,12 +268,20 @@ If and only if the corresponding side/summary-table field is absent, obscured, o
 map number may be used as a second-priority fallback when it directly represents the same named
 measurement and that field is allowed by MAP_FALLBACK_NUMERIC_FIELDS. Record it in
 map_fallback_numeric_fields and not in table_verified_numeric_fields. The marker/location and map
-type must make the identity unambiguous. The Pentacam thinnest pachymetry is the pachymetry value
-identified by the circular marker next to the printed "Thinnest Locat." label; do not confuse it
-with the adjacent X/Y location coordinates. This fallback is limited to an explicitly labeled local Kmax
-or Rmin measurement, that explicitly circle-marked thinnest pachymetry, and the anterior/posterior elevation
+type must make the identity unambiguous. This fallback is limited to an explicitly labeled local Rmin
+measurement and the anterior/posterior elevation
 at that same marked thinnest point. A generic curvature-map spot is not Kmax or Rmin. If the identity
 or location is uncertain, return null.
+
+EXCLUSIVE LABELED-BOX SOURCE LOCK:
+- Kmax_D: use only the numeric value in the explicitly printed "KMax"/"Kmax" row.
+- ARTmax_um: use only the numeric value in the explicitly printed "ARTmax" row beneath the
+  Progression Index panel.
+- pachy_thinnest_um: use only the pachymetry value in the circle-marked printed
+  "Thinnest Locat." row. Never use Pachy Vertex N., Pupil Center, or a thickness-map number.
+These are single authoritative labeled-box readings. Never compare them with a map value,
+neighboring number, calculated value, or another Pentacam screen to create a conflict. If the
+authoritative row is unreadable, return null for that field.
 
 Never substitute a generic map spot value, color-scale value, axis label, neighboring parameter,
 calculated value, average, or visual estimate for K1, K2, their axes, horizontal white-to-white
@@ -308,8 +315,8 @@ measurement. Never use a vertical diameter, an unlabeled caliper distance, a map
 average of diameters, or a value calculated from another measurement. If the horizontal identity
 or printed value is uncertain, return corneal_diameter_mm=null and do not add it to
 table_verified_numeric_fields.
-Kmax_D and Rmin_mm may use the restricted, explicitly labeled local fallback described above only
-when their edge/side boxes are unreadable. Never use an ordinary numeric spot label printed inside a
+Rmin_mm may use the restricted, explicitly labeled local fallback described above only
+when its edge/side box is unreadable. Never use an ordinary numeric spot label printed inside a
 curvature map as K1, K2, Kmax, or Rmin. Classify morphology only when an axial,
 sagittal, tangential, or Placido curvature/topography map is actually visible. A BAD display without
 such a curvature map does not support a morphology classification; use UNCERTAIN for morphology,
@@ -785,11 +792,6 @@ def required_tomography_missing(eye: Dict[str, Any]) -> List[str]:
         float(ppi_min) <= float(ppi_avg) <= float(ppi_max)
     ):
         missing.append("internally consistent PPI minimum/average/maximum")
-    artmax, pachy = eye.get("ARTmax_um"), eye.get("pachy_thinnest_um")
-    if all(is_number(value) for value in (artmax, pachy, ppi_max)) and float(ppi_max) > 0:
-        expected = float(pachy) / float(ppi_max)
-        if abs(float(artmax) - expected) > max(20.0, expected * 0.10):
-            missing.append("ARTmax consistency with thinnest pachymetry / PPImax")
     # Defensive compatibility filter: legacy/cached extraction payloads may still contain
     # conflicts for descriptive, non-decision fields. They must never prohibit PASS.
     non_decision_conflict_fields = {
@@ -1511,7 +1513,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.67 / source set 2026-08-25 plus binding CER-AI amendments",
+        "version": "software v0.7.68 / source set 2026-08-25 plus binding CER-AI amendments",
     }
 
 
@@ -1522,9 +1524,9 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
     by_eye: Dict[str, Dict[str, Any]] = {}
     conservative = {
-        "pachy_thinnest_um": "min", "BAD_D": "max", "Df": "max", "Db": "max",
-        "Dp": "max", "Dt": "max", "Da": "max", "ARTmax_um": "min", "PPI_max": "max",
-        "PPI_avg": "max", "PPI_min": "max", "Kmax_D": "max", "ISV": "max", "IVA": "max",
+        "BAD_D": "max", "Df": "max", "Db": "max",
+        "Dp": "max", "Dt": "max", "Da": "max", "PPI_max": "max",
+        "PPI_avg": "max", "PPI_min": "max", "ISV": "max", "IVA": "max",
         "KI": "max", "CKI": "max", "IHD": "max", "I_S": "max", "KISA": "max",
         "IHA": "max", "Rmin_mm": "min", "anterior_elevation_thinnest_um": "max",
         "posterior_elevation_thinnest_um": "max", "RMS_HOA_um": "max", "vertical_coma_um": "max",
@@ -1537,7 +1539,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     quality_rank = {"INADEQUATE": 0, "LIMITED": 1, "ADEQUATE": 2}
     posterior_rank = {"UNREADABLE": 0, "REASSURING": 1, "BORDERLINE": 2, "ABNORMAL": 3}
     numeric_tolerance = {
-        "K1_D": 0.25, "K2_D": 0.25, "Kmax_D": 0.25,
+        "K1_D": 0.25, "K2_D": 0.25,
         "K1_axis_deg": 2.0, "K2_axis_deg": 2.0, "corneal_diameter_mm": 0.10,
     }
     # Descriptive values that do not drive a CER-AI decision must never become unresolved conflicts
@@ -1652,6 +1654,12 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             target.setdefault("quality_by_source", {}).update(eye.get("quality_by_source", {}))
             target.setdefault("field_provenance", {})
             for field, records in eye.get("field_provenance", {}).items():
+                if (
+                    field in EXCLUSIVE_LABELED_BOX_FIELDS
+                    and field in target_table_sources
+                    and target.get(field) is not None
+                ):
+                    continue
                 combined_records = target["field_provenance"].setdefault(field, []) + records
                 target["field_provenance"][field] = [
                     dict(item) for item in {
@@ -1718,6 +1726,16 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     target[key] = value
                     continue
                 if value is None or old == value:
+                    continue
+
+                if (
+                    key in EXCLUSIVE_LABELED_BOX_FIELDS
+                    and key in target_table_sources
+                    and key in incoming_table_sources
+                ):
+                    # This field is owned by its explicitly labeled Pentacam box. Retain the
+                    # first valid same-eye box transcription; duplicate screens are not a
+                    # consensus source and must not manufacture a conflict.
                     continue
 
                 if key in TABLE_NUMERIC_FIELDS:

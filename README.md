@@ -2,7 +2,11 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.67 implements
+## What v0.7.68 implements
+
+- Locks KMax, ARTmax, circle-marked `Thinnest Locat.`, and plus-marked `Pupil Center` to their own
+  explicitly labeled Pentacam boxes/rows. These fields are never reconstructed from maps or
+  compared across Pentacam screens to manufacture extraction conflicts.
 
 - Readiness now converts unresolved anterior/posterior pattern conflicts into a surgeon-selectable
   field and shows every same-eye conflicting map beside it. A completed selection clears both the
