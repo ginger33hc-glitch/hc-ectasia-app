@@ -20,6 +20,7 @@ from typing import Any, Callable
 from PIL import Image, ImageOps
 from nice_policy import POSTERIOR_PUPIL_EXTRACTION_RULE, posterior_candidate_is_acceptable
 from pentacam_field_registry import TARGET_FIELDS
+from pentacam_source_regions import record_unreadable_region
 
 PENTACAM_SCREEN_FAMILIES = {
     "BAD_DISPLAY",
@@ -463,12 +464,12 @@ def apply_targeted_readings(
             if reading.get("status") in {"UNCERTAIN", "UNREADABLE"}:
                 eye = eyes.get(eye_id)
                 if eye is not None:
-                    eye.setdefault("targeted_unreadable_regions", {})[field] = {
-                        "file": filename,
-                        "tile": reading.get("source_tile"),
-                        "source_box": reading.get("source_box"),
-                        "printed_label": reading.get("printed_label"),
-                    }
+                    record_unreadable_region(
+                        eye, field, filename=filename,
+                        tile=reading.get("source_tile"),
+                        source_box=reading.get("source_box"),
+                        printed_label=reading.get("printed_label"),
+                    )
             continue
         candidates[(eye_id, field)].append(reading)
 
@@ -512,6 +513,7 @@ def apply_targeted_readings(
         eye["missing_or_unreadable"] = [
             item for item in eye.get("missing_or_unreadable") or [] if item != field
         ]
+        eye.get("unreadable_source_regions", {}).pop(field, None)
         evidence = eye.setdefault("targeted_reread_evidence", {}).setdefault(field, [])
         best = readings[0]
         evidence.append({
@@ -552,12 +554,11 @@ def apply_targeted_readings(
         if localized and reading.get("status") in {"CONFIDENT", "UNCERTAIN", "UNREADABLE"}:
             eye = eyes.get(eye_id)
             if eye is not None:
-                eye.setdefault("targeted_unreadable_regions", {})["posterior_pupil_max_um"] = {
-                    "file": filename,
-                    "tile": "LOWER_RIGHT",
-                    "source_box": reading.get("source_box"),
-                    "printed_label": reading.get("map_title") or "Elevation (Back)",
-                }
+                record_unreadable_region(
+                    eye, "posterior_pupil_max_um", filename=filename,
+                    tile="LOWER_RIGHT", source_box=reading.get("source_box"),
+                    printed_label=reading.get("map_title") or "Elevation (Back)",
+                )
         if reading.get("status") == "CONFIDENT" and reading.get("value") is not None:
             result.setdefault("global_warnings", []).append(
                 f"Targeted NICE posterior reread rejected {eye_id} in {filename}: "
@@ -602,7 +603,7 @@ def apply_targeted_readings(
                 "group_label": "central dashed pupil boundary",
                 "value": retained,
             })
-            eye.get("targeted_unreadable_regions", {}).pop("posterior_pupil_max_um", None)
+            eye.get("unreadable_source_regions", {}).pop("posterior_pupil_max_um", None)
 
     if patient_age_requested:
         context = result.setdefault("document_context", {})

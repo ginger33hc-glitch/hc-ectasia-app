@@ -306,7 +306,7 @@ def test_unreadable_labeled_field_records_localized_completion_region():
     }
     targeted.apply_targeted_readings(Core, result, reread, requested, "od.png")
     assert result["eyes"][0]["PPI_max"] is None
-    assert result["eyes"][0]["targeted_unreadable_regions"]["PPI_max"] == {
+    assert result["eyes"][0]["unreadable_source_regions"]["PPI_max"] == {
         "file": "od.png",
         "tile": "LOWER_RIGHT",
         "source_box": [100, 200, 700, 500],
@@ -421,7 +421,7 @@ def test_unreadable_posterior_map_region_is_shown_beside_surgeon_input():
     targeted.apply_targeted_readings(
         Core, result, reread, {}, "od.png", posterior_requested=["OD"]
     )
-    region = result["eyes"][0]["targeted_unreadable_regions"]["posterior_pupil_max_um"]
+    region = result["eyes"][0]["unreadable_source_regions"]["posterior_pupil_max_um"]
     assert region == {
         "file": "od.png",
         "tile": "LOWER_RIGHT",
@@ -465,7 +465,7 @@ def test_source_region_renderer_returns_tight_png_crop():
 def test_source_region_endpoint_uses_opaque_post_body_and_no_store_cache():
     token = "synthetic-source-region-session"
     extracted = pentacam_result()
-    extracted["eyes"][0]["targeted_unreadable_regions"] = {
+    extracted["eyes"][0]["unreadable_source_regions"] = {
         "PPI_max": {
             "file": "od.png",
             "tile": "LOWER_RIGHT",

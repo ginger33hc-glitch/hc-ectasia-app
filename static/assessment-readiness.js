@@ -7,7 +7,7 @@ window.HCReadiness = class {
   }
   async loadSourceRegion(container,item) {
     const tr=value=>window.CERAI_I18N?.translate(value)??value;
-    const status=document.createElement('span');status.textContent=tr('Loading unread Pentacam region...');container.append(status);
+    const status=document.createElement('span');status.textContent=tr('Loading unread Pentacam/topography region...');container.append(status);
     try{
       const request=window.ceraiFetch||window.fetch.bind(window);
       const response=await request('/assessment/source-region',{
@@ -16,9 +16,9 @@ window.HCReadiness = class {
       });
       if(!response.ok)throw new Error('source region unavailable');
       const url=URL.createObjectURL(await response.blob());this.regionUrls.push(url);
-      const image=document.createElement('img');image.src=url;image.alt=tr('Pentacam region the application could not read');
+      const image=document.createElement('img');image.src=url;image.alt=tr('Pentacam/topography region the application could not read');
       image.addEventListener('load',()=>status.remove());container.prepend(image);
-    }catch(error){status.textContent=tr('The unread source region could not be displayed. Enter the value from the original Pentacam image.');}
+    }catch(error){status.textContent=tr('The unread source region could not be displayed. Enter the value from the original Pentacam/topography image.');}
   }
   collect() {
     for(const input of this.panel.querySelectorAll('[data-measurement]')) {
