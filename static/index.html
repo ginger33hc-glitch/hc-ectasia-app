@@ -286,8 +286,9 @@ function renderSelectedFiles(files){
   selectedFileUrls=[];
   selectedFiles.replaceChildren();
   [...files].forEach((file,index)=>{
-    const url=URL.createObjectURL(file);
-    selectedFileUrls.push(url);
+    const isBlob=file instanceof Blob;
+    const url=isBlob?URL.createObjectURL(file):(file.previewUrl||file.url||"");
+    if(isBlob)selectedFileUrls.push(url);
     const link=document.createElement("a");
     link.className="selected-file";
     link.href=url;
@@ -302,6 +303,7 @@ window.addEventListener("beforeunload",()=>selectedFileUrls.forEach(url=>URL.rev
 let lastReport = null;
 const readiness=new HCReadiness(document.getElementById('readinessPanel'));
 let sharedImages = [];
+const SHARED_IMAGE_CACHE="hc-ectasia-shared-images-v1";
 const value = (id) => document.querySelector(`#${id}`).value;
 const normalizeNumericText = (raw) => String(raw??"").trim().replace(/\s+/g,"").replace(/[−–—﹣－]/g,"-").replace(/[＋﹢]/g,"+").replace(",",".");
 const parsedClinicalNumber = (id) => {
@@ -373,7 +375,7 @@ async function loadSharedImages(){
   if(!token)return;
   try{
     if(!window.caches)throw new Error("Shared-image storage is unavailable.");
-    const cache=await caches.open("hc-ectasia-shared-images-v1");
+    const cache=await caches.open(SHARED_IMAGE_CACHE);
     const metaUrl=`/__hc_share__/${encodeURIComponent(token)}/meta`;
     const metaResponse=await cache.match(metaUrl);
     if(!metaResponse)throw new Error("The shared images could not be found. Please share them again.");
@@ -381,23 +383,17 @@ async function loadSharedImages(){
     for(const item of meta.files||[]){
       const response=await cache.match(item.url);
       if(!response)continue;
-      const blob=await response.blob();
-      loaded.push(new File([blob],item.name||"shared-image.jpg",{type:item.type||blob.type||"image/jpeg",lastModified:item.lastModified||Date.now()}));
-      await cache.delete(item.url);
+      loaded.push({...item,name:item.name||"shared-image.jpg",size:Number(item.size)||null,previewUrl:item.url});
     }
-    await cache.delete(metaUrl);
     if(!loaded.length)throw new Error("No readable image was received. Please share the photos again.");
     sharedImages=loaded;
     resetAgeAcquisition();
     renderSelectedFiles(loaded);
     imageInput.required=false;
-    try{
-      const transfer=new DataTransfer();
-      loaded.forEach(file=>transfer.items.add(file));
-      imageInput.files=transfer.files;
-    }catch(_error){/* FormData fallback below handles browsers that block assignment. */}
     sharedImageNotice.hidden=false;
-    sharedImageNotice.innerHTML=`<strong>${loaded.length} shared image${loaded.length===1?"":"s"} received.</strong> Complete the clinical fields, then run the CER-AI assessment.`;
+    const knownBytes=loaded.reduce((total,item)=>total+(item.size||0),0);
+    const sizeText=knownBytes?` (${(knownBytes/1024/1024).toFixed(1)} MB total)`:"";
+    sharedImageNotice.innerHTML=`<strong>${loaded.length} shared image${loaded.length===1?"":"s"} received${sizeText}.</strong> Complete the clinical fields, then run the CER-AI assessment.`;
   }catch(error){
     sharedImageNotice.hidden=false;
     sharedImageNotice.innerHTML=`<strong>Shared images were not loaded.</strong> ${safe(error.message||error)}`;
@@ -405,6 +401,32 @@ async function loadSharedImages(){
     history.replaceState({},document.title,window.location.pathname);
   }
 }
+
+async function appendSharedImages(fd,images){
+  const cache=await caches.open(SHARED_IMAGE_CACHE);
+  for(let index=0;index<images.length;index+=1){
+    const item=images[index];
+    showFormMessage(`Preparing shared Pentacam image ${index+1} of ${images.length}...`);
+    await allowLoadingStateToPaint();
+    const response=await cache.match(item.url);
+    if(!response)throw new Error(`Shared image ${index+1} is no longer available. Share the five Pentacam images again.`);
+    const blob=await response.blob();
+    fd.append("images",blob,item.name||`shared-image-${index+1}.jpg`);
+  }
+  showFormMessage(`Uploading and assessing ${images.length} Pentacam images... Please wait.`);
+  await allowLoadingStateToPaint();
+}
+
+const NETWORK_RECOVERY_DELAY_MS=1500;
+const isFetchConnectionError=error=>error instanceof TypeError||error?.name==="NetworkError";
+const assessmentRequestId=()=>{
+  if(crypto.randomUUID)return crypto.randomUUID();
+  const bytes=crypto.getRandomValues(new Uint8Array(16));
+  bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
+  const hex=[...bytes].map(value=>value.toString(16).padStart(2,"0")).join("");
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+};
+const wait=milliseconds=>new Promise(resolve=>setTimeout(resolve,milliseconds));
 
 imageInput.addEventListener("change",()=>{
   readiness.reset();reportCard.hidden=true;lastReport=null;
@@ -692,16 +714,37 @@ f.addEventListener("submit", async (e) => {
   reportCard.hidden=true;lastReport=null;eyeResults.innerHTML=""; decisionBox.textContent=""; extractBox.textContent=""; overallNote.textContent="";qualityWarning.hidden=true;qualityWarning.innerHTML="";cardTransferNote.textContent="";
   try{
     await allowLoadingStateToPaint();
-    const fd=new FormData(f);
-    fd.delete("images");
-    images.forEach(file=>fd.append("images",file,file.name));
-    fd.set("eye_plans",JSON.stringify({OD:plan("od"),OS:plan("os")}));
-    fd.set("patient_modifiers",JSON.stringify(modifiers));
-    fd.set("patient_metadata",JSON.stringify(patientPayload()));
+    const requestId=assessmentRequestId();
+    const buildAnalyzeFormData=async()=>{
+      const fd=new FormData(f);
+      fd.delete("images");
+      if(manualImages.length){
+        manualImages.forEach(file=>fd.append("images",file,file.name));
+      }else{
+        await appendSharedImages(fd,sharedImages);
+      }
+      fd.set("eye_plans",JSON.stringify({OD:plan("od"),OS:plan("os")}));
+      fd.set("patient_modifiers",JSON.stringify(modifiers));
+      fd.set("patient_metadata",JSON.stringify(patientPayload()));
+      fd.set("assessment_request_id",requestId);
+      return fd;
+    };
     const clinicalOverrides=readiness.collect();
-    const r=readiness.token
-      ?await ceraiFetch('/assessment/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assessment_token:readiness.token,age:numberOrNull('age'),eye_plans:{OD:plan('od'),OS:plan('os')},patient_modifiers:modifiers,patient_metadata:patientPayload(),clinical_overrides:clinicalOverrides})})
-      :await ceraiFetch("/analyze",{method:"POST",body:fd}); const text=await r.text();
+    let r;
+    if(readiness.token){
+      r=await ceraiFetch('/assessment/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assessment_token:readiness.token,age:numberOrNull('age'),eye_plans:{OD:plan('od'),OS:plan('os')},patient_modifiers:modifiers,patient_metadata:patientPayload(),clinical_overrides:clinicalOverrides})});
+    }else{
+      const sendAssessment=async()=>ceraiFetch("/analyze",{method:"POST",body:await buildAnalyzeFormData()});
+      try{
+        r=await sendAssessment();
+      }catch(error){
+        if(!isFetchConnectionError(error))throw error;
+        showFormMessage("The mobile connection was interrupted. CER-AI is restoring this assessment automatically; please wait.");
+        await wait(NETWORK_RECOVERY_DELAY_MS);
+        r=await sendAssessment();
+      }
+    }
+    const text=await r.text();
     let j; try{j=JSON.parse(text)}catch{throw new Error("Server returned a non-JSON response: "+text.slice(0,200))}
     if(!r.ok){if(r.status===410)readiness.reset();throw new Error(j.detail||"Request failed");}
     const extractedAge=j.extracted?.derived_age_years;
@@ -749,7 +792,10 @@ f.addEventListener("submit", async (e) => {
     }
   }catch(err){
     statusBox.textContent="ERROR";statusBox.className="status fail";decisionBox.textContent=String(err);
-    showFormMessage(`Assessment failed: ${err.message||String(err)}`);
+    const networkHint=isFetchConnectionError(err)
+      ?" The mobile connection could not be restored automatically. The five images remain available."
+      :"";
+    showFormMessage(`Assessment failed: ${err.message||String(err)}${networkHint}`);
   }finally{
     const sourceBlocked=Boolean(readiness.token&&!readiness.hasCompletableInputs);
     assessBtn.disabled=sourceBlocked;

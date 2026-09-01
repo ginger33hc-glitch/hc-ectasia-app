@@ -4,7 +4,7 @@ import unittest
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import canonical_engine
 import reports
@@ -1085,6 +1085,38 @@ class TestApiIntegration(unittest.TestCase):
         self.assertEqual(payload["effective_eye_plans"]["OD"]["intended_sphere_D"], -4.5)
         self.assertEqual(payload["effective_eye_plans"]["OD"]["correction_axis_deg"], 170.0)
 
+    def test_analyze_retry_reuses_same_inflight_or_completed_assessment(self):
+        extraction = {
+            "eyes": [normal_eye()],
+            "treatment_corrections": [card_correction()],
+            "global_warnings": [],
+        }
+        fake_response = SimpleNamespace(
+            output_text=json.dumps(extraction), status="completed", incomplete_details=None
+        )
+        create = Mock(return_value=fake_response)
+        fake_client = SimpleNamespace(responses=SimpleNamespace(create=create))
+        client = TestClient(app.app)
+        request_id = "c5946726-b4fd-4dd8-b47d-e8b44d00cf12"
+        request = {
+            "files": {"images": ("od.png", b"synthetic-image-bytes", "image/png")},
+            "data": {
+                "age": "35",
+                "eye_plans": json.dumps({"OD": plan(sphere=None, cylinder=None, ablation=None)}),
+                "patient_modifiers": json.dumps(MODIFIERS),
+                "assessment_request_id": request_id,
+            },
+        }
+        with patch.object(app, "openai_client", return_value=fake_client):
+            first = client.post("/analyze", **request)
+            calls_after_first_request = create.call_count
+            second = client.post("/analyze", **request)
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(first.json()["assessment_token"], second.json()["assessment_token"])
+        self.assertGreater(calls_after_first_request, 0)
+        self.assertEqual(create.call_count, calls_after_first_request)
+
     def test_professional_pdf_and_word_exports_are_valid(self):
         extracted = {"eyes": [normal_eye(), normal_eye("OS")], "global_warnings": []}
         decision = app.hc_engine(extracted, 35, {"OD": plan()}, MODIFIERS)
@@ -1510,8 +1542,21 @@ class TestPwaShareTarget(unittest.TestCase):
         html = (static_dir / "index.html").read_text()
         self.assertIn('id="imageInput" name="images"', html)
         self.assertIn('params.get("share_token")', html)
-        self.assertIn('images.forEach(file=>fd.append("images",file,file.name))', html)
+        self.assertIn('await appendSharedImages(fd,sharedImages)', html)
+        self.assertIn('fd.append("images",blob,item.name', html)
+        self.assertNotIn("new DataTransfer()", html)
+        self.assertNotIn("new File([blob]", html)
         self.assertIn('navigator.serviceWorker.register("/sw.js",{scope:"/"})', html)
+
+    def test_share_cache_retains_originals_for_preview_and_retry(self):
+        static_dir = Path(__file__).resolve().parents[1] / "static"
+        worker = (static_dir / "sw.js").read_text()
+        html = (static_dir / "index.html").read_text()
+        self.assertIn("size:file.size", worker)
+        self.assertIn("url.pathname.startsWith(SHARE_STORAGE_PATH)", worker)
+        self.assertIn("previewUrl:item.url", html)
+        self.assertNotIn("await cache.delete(item.url)", html)
+        self.assertNotIn("await cache.delete(metaUrl)", html)
 
 
 class TestAnalyzeLoadingStateUi(unittest.TestCase):
@@ -1526,6 +1571,13 @@ class TestAnalyzeLoadingStateUi(unittest.TestCase):
         self.assertLess(html.index("await allowLoadingStateToPaint()"), html.index('ceraiFetch("/analyze"'))
         self.assertIn("f.reportValidity()", html)
         self.assertIn('showFormMessage(`Assessment failed:', html)
+
+    def test_mobile_fetch_failure_is_recovered_once_without_duplicate_assessment(self):
+        html = (Path(__file__).resolve().parents[1] / "static" / "index.html").read_text()
+        self.assertIn('fd.set("assessment_request_id",requestId)', html)
+        self.assertIn('if(!isFetchConnectionError(error))throw error;', html)
+        self.assertEqual(html.count('r=await sendAssessment();'), 2)
+        self.assertIn("CER-AI is restoring this assessment automatically", html)
 
 
 class TestPatientModifierUi(unittest.TestCase):
