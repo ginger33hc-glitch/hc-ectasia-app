@@ -29,6 +29,20 @@ def _keratometry(eye: Dict[str, Any]) -> Tuple[Optional[float], Optional[float],
     return k1, k2, None
 
 
+def _horizontal_wtw(eye: Dict[str, Any]) -> Optional[float]:
+    """Return only a labeled Pentacam horizontal white-to-white value.
+
+    The extraction contract defines ``corneal_diameter_mm`` as HWTW.  Requiring
+    labeled-table provenance here provides a second, runtime boundary so a raw,
+    legacy, calculated, vertical, or visually estimated diameter cannot drive
+    the ML7 ring nomogram.
+    """
+    verified = eye.get("table_verified_numeric_fields")
+    if not isinstance(verified, (list, tuple, set)) or "corneal_diameter_mm" not in verified:
+        return None
+    return _number(eye.get("corneal_diameter_mm"))
+
+
 def _planning_record(result: Dict[str, Any], eye: Dict[str, Any], plan: Dict[str, Any]) -> Dict[str, Any]:
     values = result.get("values") or {}
     steep, flat, steep_axis = _keratometry(eye)
@@ -45,7 +59,7 @@ def _planning_record(result: Dict[str, Any], eye: Dict[str, Any], plan: Dict[str
         steepest_k_d=steep,
         flattest_k_d=flat,
         steep_axis_deg=steep_axis,
-        w2w_mm=_number(eye.get("corneal_diameter_mm")),
+        w2w_mm=_horizontal_wtw(eye),
         pachy_um=_number(values.get("pachy_thinnest_um")),
         t_zone_mm=_number(values.get("transition_zone_mm")),
         hyperopic=hyperopic,
@@ -86,4 +100,3 @@ def hc_engine_with_microkeratome_planning(
 
 core.hc_engine = hc_engine_with_microkeratome_planning
 core._hc_microkeratome_planning_installed = True
-
