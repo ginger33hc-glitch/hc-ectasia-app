@@ -2,7 +2,16 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.63 implements
+## What v0.7.64 implements
+
+- NICE `posterior_pupil_max_um` now has a dedicated targeted reread of only the lower-right
+  `Elevation (Back)` map on a Pentacam 4 Maps Refractive screen. It accepts only the highest
+  positive printed elevation inside the central dashed boundary when BFS/Float and Dia 8.00 mm
+  are independently visible; it cannot substitute anterior elevation, pachymetry, colour-scale,
+  thinnest-point, or out-of-boundary values.
+- When that bounded posterior field remains unreadable, its localized lower-right map crop is
+  retained beside the single surgeon correction field. Other NICE parameters keep their own
+  previously defined sources and are not read from this map.
 
 - Pentacam landmark reading now recognizes the circle-marked `Thinnest Locat.` pachymetry and
   the plus-marked `Pupil Center` central pachymetry while keeping the two measurements separate.

@@ -5,6 +5,28 @@ The canonical ERSS/BAD scorers, their input rules, and LASIK fallback planner re
 from nice_scoring import score_nice, finite
 
 
+POSTERIOR_PUPIL_EXTRACTION_RULE = """posterior_pupil_max_um is one dedicated NICE input only.
+Use only the LOWER-RIGHT map explicitly titled 'Elevation (Back)' on a Pentacam 4 Maps
+Refractive screen. Identify the central dashed pupil boundary, inspect every explicitly printed
+signed elevation measurement whose measurement point lies inside that dashed boundary, and return
+the highest positive printed value in micrometres. Do not use the upper-right Elevation (Front)
+map, Corneal Thickness map, colour scale, a value outside the dashed boundary, elevation at the
+thinnest point, or any other NICE/Pentacam parameter. The map must state BFS/Float with Dia 8.00 mm.
+Never estimate from colour or interpolate an unprinted value."""
+
+
+def posterior_candidate_is_acceptable(candidate):
+    """Canonical source/geometry gate shared by NICE extraction passes."""
+    return (
+        candidate.get("posterior_status") == "CONFIDENT"
+        and finite(candidate.get("posterior_pupil_max_um"))
+        and candidate.get("posterior_pupil_max_um") > 0
+        and candidate.get("posterior_reference") == "BFS_FLOAT"
+        and candidate.get("bfs_diameter_mm") == 8
+        and candidate.get("pupil_boundary_visible") is True
+    )
+
+
 def install_schema(core):
     props = {
         "eye": {"type": "string", "enum": ["OD", "OS", "UNKNOWN"]},
@@ -21,7 +43,7 @@ def install_schema(core):
         "type": "array", "items": {"type": "object", "additionalProperties": False,
         "properties": props, "required": list(props)}}
     core.SCHEMA["required"].append("nice_readings")
-    core.PROMPT += """
+    core.PROMPT += f"""
 NICE SEPARATE INPUT READING (do not calculate scores):
 Return nice_readings only for Pentacam images with unambiguous OD/OS; otherwise [].
 central_pachy_um: read the printed pachymetry value identified as 'Pupil Center' by the
@@ -29,10 +51,7 @@ plus-shaped (+) marker next to it. 'Pachy Vertex N.' remains acceptable when exp
 as the central/vertex pachymetry on that Pentacam screen. NEVER use 'Thinnest Locat.' or the
 circle-marked thinnest value as central pachymetry. If the Pupil Center/central label, plus marker,
 or digits are unreadable, use null and UNREADABLE.
-posterior_pupil_max_um: on 'Elevation (Back)' identify the dashed pupil boundary and
-read the highest explicitly PRINTED positive number whose measurement point lies inside
-that pupil. Do not use a number outside the pupil, anterior elevation, a colour scale,
-BAD enhanced/difference map, or elevation at the thinnest point as a surrogate.
+{POSTERIOR_PUPIL_EXTRACTION_RULE}
 Read the printed BFS/Float reference and diameter separately. Do not estimate any
 number from colour or interpolate unprinted values. If the pupil boundary, sign,
 measurement location or digits are ambiguous, return null and UNREADABLE.
@@ -69,11 +88,7 @@ def _read(eye, plan, key, manual, status):
     for candidate in eye.get("nice_candidates") or []:
         if candidate.get(status) != "CONFIDENT" or not finite(candidate.get(key)):
             continue
-        if key == "posterior_pupil_max_um" and not (
-            candidate.get("posterior_reference") == "BFS_FLOAT"
-            and candidate.get("bfs_diameter_mm") == 8
-            and candidate.get("pupil_boundary_visible") is True
-        ):
+        if key == "posterior_pupil_max_um" and not posterior_candidate_is_acceptable(candidate):
             continue
         candidates.append(candidate)
     distinct = {candidate[key] for candidate in candidates}

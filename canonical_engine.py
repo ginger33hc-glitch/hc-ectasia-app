@@ -7,7 +7,7 @@ import runtime_composition as composition
 
 core = composition.core
 app = composition.app
-CANONICAL_VERSION = "0.7.63"
+CANONICAL_VERSION = "0.7.64"
 _archive_runtime = composition.compose(CANONICAL_VERSION)
 
 

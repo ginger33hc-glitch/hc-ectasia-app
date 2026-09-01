@@ -18,6 +18,7 @@ import re
 from typing import Any, Callable
 
 from PIL import Image, ImageOps
+from nice_policy import POSTERIOR_PUPIL_EXTRACTION_RULE, posterior_candidate_is_acceptable
 from pentacam_field_registry import TARGET_FIELDS
 
 PENTACAM_SCREEN_FAMILIES = {
@@ -100,9 +101,55 @@ REREAD_SCHEMA = {
             },
             "required": ["value", "status", "printed_label", "source_tile", "source_box"],
         },
+        "posterior_pupil_readings": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "eye": {"type": "string", "enum": ["OD", "OS", "UNKNOWN"]},
+                    "value": {"type": ["number", "null"]},
+                    "status": {
+                        "type": "string",
+                        "enum": ["CONFIDENT", "UNCERTAIN", "UNREADABLE", "NOT_SHOWN"],
+                    },
+                    "map_title": {"type": ["string", "null"]},
+                    "map_location": {
+                        "type": "string", "enum": ["LOWER_RIGHT", "OTHER", "UNREADABLE"]
+                    },
+                    "posterior_reference": {
+                        "type": "string", "enum": ["BFS_FLOAT", "BFTE", "OTHER", "UNREADABLE"]
+                    },
+                    "bfs_diameter_mm": {"type": ["number", "null"]},
+                    "pupil_boundary_visible": {"type": "boolean"},
+                    "maximum_rule_applied": {"type": "boolean"},
+                    "evidence": {"type": "string"},
+                    "source_tile": {"type": "string", "enum": list(SOURCE_TILES)},
+                    "source_box": {
+                        "anyOf": [
+                            {
+                                "type": "array",
+                                "items": {"type": "integer", "minimum": 0, "maximum": 999},
+                                "minItems": 4,
+                                "maxItems": 4,
+                            },
+                            {"type": "null"},
+                        ]
+                    },
+                },
+                "required": [
+                    "eye", "value", "status", "map_title", "map_location",
+                    "posterior_reference", "bfs_diameter_mm", "pupil_boundary_visible",
+                    "maximum_rule_applied", "evidence", "source_tile", "source_box",
+                ],
+            },
+        },
         "warnings": {"type": "array", "items": {"type": "string"}},
     },
-    "required": ["screen_family", "readings", "patient_age_reading", "warnings"],
+    "required": [
+        "screen_family", "readings", "patient_age_reading",
+        "posterior_pupil_readings", "warnings",
+    ],
 }
 
 REREAD_PROMPT = """You are ONLY a targeted Pentacam labeled-numeric-field transcriber.
@@ -117,7 +164,8 @@ tiles appear to disagree, return one UNCERTAIN reading with value=null rather th
 Never calculate or reconstruct a missing value. In particular, do not calculate ARTmax from
 pachymetry/PPImax, do not back-calculate PPImax from ARTmax, and do not derive BAD components,
 topometric indices, K values, axes, HWTW, elevation, or pachymetry from colors or neighboring
-numbers. A map spot or color scale is not a labeled table value. Cornea Diameter/W2W is acceptable
+numbers. Except for the dedicated posterior_pupil_max_um instruction below, a map spot or color
+scale is not a labeled table value. Cornea Diameter/W2W is acceptable
 for corneal_diameter_mm only when it is the Pentacam horizontal white-to-white output. I_S is only
 the printed IS or I-S field, not ISV, IVA, IHD, IHA, or KISA.
 
@@ -148,6 +196,18 @@ age label or digits are unclear, return value=null with the appropriate status.
 
 REQUESTED FIELDS BY EYE:
 {targets}
+
+DEDICATED NICE POSTERIOR MAP TARGETS:
+{posterior_targets}
+{posterior_rule}
+Only perform this map reading for the requested eyes. Confirm the map title, lower-right location,
+BFS/Float reference, Dia 8.00 mm and visible central dashed boundary independently. Compare all
+printed signed measurement labels whose points are inside that boundary; do not stop at the first
+positive number. Set maximum_rule_applied=true only after comparing the complete bounded field.
+source_tile must be LOWER_RIGHT. source_box must enclose the dashed analysis field and its printed
+measurements so an unreadable result can be shown beside the surgeon correction input. If any
+required landmark, sign or digit is ambiguous, return value=null and UNREADABLE/UNCERTAIN. Return
+an empty posterior_pupil_readings array when no posterior target is requested or the map is absent.
 """
 
 
@@ -199,6 +259,25 @@ def patient_age_is_missing(result: dict[str, Any]) -> bool:
         return False
     context = result.get("document_context") or {}
     return context.get("patient_age_years") is None
+
+
+def missing_posterior_targets(result: dict[str, Any]) -> list[str]:
+    """Return eyes still lacking a canonically acceptable NICE posterior-map reading."""
+    if not _looks_like_pentacam(result):
+        return []
+    targets = []
+    for eye in result.get("eyes") or []:
+        eye_id = eye.get("eye")
+        if eye_id not in {"OD", "OS"}:
+            continue
+        present = any(
+            reading.get("eye") == eye_id and posterior_candidate_is_acceptable(reading)
+            for reading in result.get("nice_readings") or []
+            if isinstance(reading, dict)
+        )
+        if not present:
+            targets.append(eye_id)
+    return targets
 
 
 def build_overlapping_tiles(raw: bytes, *, include_top_header: bool = False) -> list[tuple[str, bytes]]:
@@ -360,6 +439,7 @@ def apply_targeted_readings(
     requested: dict[str, list[str]],
     filename: str,
     patient_age_requested: bool = False,
+    posterior_requested: list[str] | None = None,
 ) -> dict[str, Any]:
     """Fill only null requested fields from one conflict-free confident reread."""
     if reread.get("screen_family") not in PENTACAM_SCREEN_FAMILIES:
@@ -443,6 +523,87 @@ def apply_targeted_readings(
             "value": retained,
         })
 
+    posterior_requested = posterior_requested or []
+    posterior_candidates: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for reading in reread.get("posterior_pupil_readings") or []:
+        if not isinstance(reading, dict) or reading.get("eye") not in posterior_requested:
+            continue
+        eye_id = reading["eye"]
+        localized = (
+            reading.get("source_tile") == "LOWER_RIGHT"
+            and reading.get("source_box") is not None
+        )
+        valid = (
+            reread.get("screen_family") == "FOUR_MAPS_REFRACTIVE"
+            and reading.get("status") == "CONFIDENT"
+            and core.is_number(reading.get("value"))
+            and 0 < float(reading["value"]) <= 300
+            and _normalize_label(reading.get("map_title")) == "elevationback"
+            and reading.get("map_location") == "LOWER_RIGHT"
+            and reading.get("posterior_reference") == "BFS_FLOAT"
+            and reading.get("bfs_diameter_mm") == 8
+            and reading.get("pupil_boundary_visible") is True
+            and reading.get("maximum_rule_applied") is True
+            and reading.get("source_tile") == "LOWER_RIGHT"
+        )
+        if valid:
+            posterior_candidates[eye_id].append(reading)
+            continue
+        if localized and reading.get("status") in {"CONFIDENT", "UNCERTAIN", "UNREADABLE"}:
+            eye = eyes.get(eye_id)
+            if eye is not None:
+                eye.setdefault("targeted_unreadable_regions", {})["posterior_pupil_max_um"] = {
+                    "file": filename,
+                    "tile": "LOWER_RIGHT",
+                    "source_box": reading.get("source_box"),
+                    "printed_label": reading.get("map_title") or "Elevation (Back)",
+                }
+        if reading.get("status") == "CONFIDENT" and reading.get("value") is not None:
+            result.setdefault("global_warnings", []).append(
+                f"Targeted NICE posterior reread rejected {eye_id} in {filename}: "
+                "the lower-right Elevation (Back), dashed boundary, BFS Float Dia 8.00, "
+                "or complete maximum rule was not verified."
+            )
+
+    for eye_id, readings in posterior_candidates.items():
+        values = [float(reading["value"]) for reading in readings]
+        if not _same_number(values):
+            result.setdefault("global_warnings", []).append(
+                f"Targeted NICE posterior reread conflict for {eye_id} in {filename}; "
+                "no posterior_pupil_max_um value was used."
+            )
+            continue
+        best = readings[0]
+        retained = values[0]
+        result.setdefault("nice_readings", []).append({
+            "eye": eye_id,
+            "central_pachy_um": None,
+            "central_status": "NOT_SHOWN",
+            "posterior_pupil_max_um": retained,
+            "posterior_status": "CONFIDENT",
+            "posterior_reference": "BFS_FLOAT",
+            "bfs_diameter_mm": 8,
+            "pupil_boundary_visible": True,
+            "evidence": (
+                "Targeted lower-right Elevation (Back) reread: highest positive printed "
+                f"value inside the central dashed boundary = {retained:g} µm. "
+                f"{best.get('evidence') or ''}"
+            ).strip(),
+        })
+        eye = eyes.get(eye_id)
+        if eye is not None:
+            eye.setdefault("targeted_reread_evidence", {}).setdefault(
+                "posterior_pupil_max_um", []
+            ).append({
+                "file": filename,
+                "source": "TARGETED_NICE_POSTERIOR_MAP_REREAD",
+                "tile": "LOWER_RIGHT",
+                "printed_label": best.get("map_title"),
+                "group_label": "central dashed pupil boundary",
+                "value": retained,
+            })
+            eye.get("targeted_unreadable_regions", {}).pop("posterior_pupil_max_um", None)
+
     if patient_age_requested:
         context = result.setdefault("document_context", {})
         age_reading = reread.get("patient_age_reading") or {}
@@ -498,6 +659,7 @@ def targeted_reread(
     filename: str,
     requested: dict[str, list[str]],
     patient_age_requested: bool = False,
+    posterior_requested: list[str] | None = None,
 ) -> dict[str, Any]:
     age_target = (
         "PATIENT: patient_age_years is requested."
@@ -510,6 +672,11 @@ def targeted_reread(
             "text": REREAD_PROMPT.format(
                 targets=_target_summary(requested) or "No eye-level numeric fields requested.",
                 age_target=age_target,
+                posterior_targets=(
+                    ", ".join(posterior_requested or [])
+                    or "No posterior_pupil_max_um map reading requested."
+                ),
+                posterior_rule=POSTERIOR_PUPIL_EXTRACTION_RULE,
             ),
         },
         {"type": "input_text", "text": "ORIGINAL complete screen:"},
@@ -547,14 +714,16 @@ def make_targeted_extractor(core: Any, previous: Callable[[bytes, str], dict[str
         result = previous(raw, filename)
         requested = missing_targets_by_eye(result)
         patient_age_requested = patient_age_is_missing(result)
-        if not _enabled() or (not requested and not patient_age_requested):
+        posterior_requested = missing_posterior_targets(result)
+        if not _enabled() or (not requested and not patient_age_requested and not posterior_requested):
             return result
         try:
             reread = targeted_reread(
-                core, raw, filename, requested, patient_age_requested
+                core, raw, filename, requested, patient_age_requested, posterior_requested
             )
             return apply_targeted_readings(
-                core, result, reread, requested, filename, patient_age_requested
+                core, result, reread, requested, filename, patient_age_requested,
+                posterior_requested,
             )
         except Exception as exc:
             result.setdefault("global_warnings", []).append(
