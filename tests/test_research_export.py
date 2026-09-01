@@ -30,7 +30,7 @@ def assessment(*, patient_id="P-123", patient_name="Şule Işık", report_date="
             "eyes": [
                 {
                     "eye": "OS",
-                    "status": "PASS WITH CAUTION",
+                    "status": "PASS",
                     "values": {
                         "procedure": "LASIK",
                         "laser_platform": "Alcon WaveLight EX500",
@@ -215,13 +215,13 @@ def test_latest_only_excludes_superseded_revision_of_same_case():
         archive,
         case_id,
         "9" * 24,
-        assessment(overall="DO NOT PROCEED"),
+        assessment(overall="STOP-DEFER"),
         "2026-08-31T12:00:00+00:00",
     )
     latest = research_export.build_rows(archive, RESEARCH_KEY, latest_only=True)
     all_rows = research_export.build_rows(archive, RESEARCH_KEY, latest_only=False)
     assert len(latest) == 2
-    assert {row["overall_status"] for row in latest} == {"DO NOT PROCEED"}
+    assert {row["overall_status"] for row in latest} == {"STOP-DEFER"}
     assert len(all_rows) == 4
 
 

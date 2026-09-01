@@ -22,13 +22,13 @@ def case(**changes):
 def test_migration_seam_returns_complete_clean_assessment():
     out = run_clean_assessment(case())
     assert isinstance(out, CleanAssessment)
-    assert out.result.status == "PASS WITH CAUTION"
+    assert out.result.status == "PASS"
     assert out.report.status == out.result.status
 
 
 def test_migration_seam_preserves_adverse_and_incomplete_states():
     stopped = run_clean_assessment(case(pachy_thinnest_um=479))
-    assert stopped.result.status == "DO NOT PROCEED"
+    assert stopped.result.status == "STOP-DEFER"
     assert "PACHYMETRY_LT_480" in stopped.result.hard_stops
 
     incomplete = run_clean_assessment(case(bad_d=None))

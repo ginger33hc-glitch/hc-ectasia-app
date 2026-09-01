@@ -2,7 +2,11 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.70 implements
+## What v0.7.71 implements
+
+- Clinical dispositions now use one centralized three-category contract: `PASS`, `CAUTION`, and
+  `STOP-DEFER`. NICE 5–8 produces `CAUTION` without automatic defer; NICE ≥9 remains a
+  `STOP-DEFER` hard stop. Incomplete-data and post-refractive routing states remain separate.
 
 - Pentacam acquisition quality and literal QS remain faithfully recorded but no longer suppress a
   report when the decision-critical clinical measurements are readable. A non-OK, unreadable, or
@@ -145,14 +149,15 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Required clinical modifiers and treatment-plan inputs; missing/unreadable critical data prohibit PASS.
 - One multi-select clinical-eligibility control records eye rubbing/ocular trauma, family history, inter-eye asymmetry, pregnancy/nursing, collagen/connective-tissue disease, medication, dry eye, and systemic disease. These create separate defer/review dispositions without invented ectasia-score points.
 - Contact-lens type and washout are documented. The supplied source-study acquisition criterion (soft ≥14 days; rigid ≥21 days) is an imaging-data gate, not an ectasia score or universal safety cutoff.
-- Binding CAUTION action: STOP/DEFER, repeat relevant screening, and reassess after at least 6 months.
+- CAUTION requires explicit surgeon review but does not automatically defer surgery. STOP-DEFER
+  retains all true hard-stop and explicit defer actions.
 - Formal clinical report with patient/reviewer metadata, restrained decision colors (PASS green,
   CAUTION amber, FAIL red, NOT ASSESSED gray), print layout, and validated PDF and DOCX exports.
 - The patient name is repeated in large bold uppercase immediately above the overall disposition
   box in the browser, print, PDF, and DOCX reports.
 - Complete machine-readable extraction and decision records remain available for audit.
 - A status-independent post-assessment ML7 planning module runs only after favorable LASIK results
-  (`PASS` or `PASS WITH CAUTION`). It extracts labeled K1/K2 axes and the Pentacam horizontal
+  (`PASS` or `CAUTION`). It extracts labeled K1/K2 axes and the Pentacam horizontal
   white-to-white (HWTW) value when available, applies the active Turkish ML7 vacuum-ring/blade
   reference, and applies the CER-AI
   `steep K − flat K >4.00 D` hinge rule. The perpendicular-to-steep-axis hinge is primary; a
@@ -202,7 +207,7 @@ Never place GitHub passwords, tokens, API keys, or other credentials in this rep
 Final BAD-D policy is now boundary-locked to the Pentacam abnormal display threshold:
 `<=1.60` normal, `>1.60 to <2.60` suspicious, and `>=2.60` abnormal. Final
 BAD-D `>=2.60` is an inclusive CER-AI operational hard stop and produces
-`DO NOT PROCEED`. Individual Df/Db/Dp/Dt/Da components remain contextual and
+`STOP-DEFER`. Individual Df/Db/Dp/Dt/Da components remain contextual and
 do not independently determine clearance.
 
 `canonical_engine.py` remains the single production composition root. Independent

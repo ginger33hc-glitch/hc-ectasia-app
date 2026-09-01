@@ -198,8 +198,8 @@ class TestSafetyGates(unittest.TestCase):
         steep = app.assess_eye(steep_eye, plan(sphere=6.0, cylinder=0.0), 35, MODIFIERS)
         self.assertAlmostEqual(flat["values"]["estimated_final_Kmean_D"], 35.9)
         self.assertAlmostEqual(steep["values"]["estimated_final_Kmean_D"], 48.1)
-        self.assertEqual(flat["status"], "DO NOT PROCEED")
-        self.assertEqual(steep["status"], "DO NOT PROCEED")
+        self.assertEqual(flat["status"], "STOP-DEFER")
+        self.assertEqual(steep["status"], "STOP-DEFER")
         self.assertTrue(any("<36.00" in item for item in flat["hard_stops"]))
         self.assertTrue(any(">48.00" in item for item in steep["hard_stops"]))
 
@@ -369,7 +369,7 @@ class TestSafetyGates(unittest.TestCase):
     def test_clinical_eligibility_modifier_blocks_pass_without_score_points(self):
         modifiers = dict(MODIFIERS, pregnancy_nursing="yes")
         result = app.assess_eye(normal_eye(), plan(), 35, modifiers)
-        self.assertEqual(result["status"], "CAUTION — STOP/DEFER")
+        self.assertEqual(result["status"], "STOP-DEFER")
         self.assertEqual(result["score"]["total"], 0)
 
 
@@ -386,14 +386,14 @@ class TestBoundaries(unittest.TestCase):
         result = app.assess_eye(normal_eye(pachy=480), plan(ablation=120), 35, MODIFIERS)
         self.assertEqual(result["values"]["PRK_RST_um"], 310)
         self.assertEqual(result["score"]["total"], 3)
-        self.assertEqual(result["status"], "CAUTION — STOP/DEFER")
+        self.assertEqual(result["status"], "STOP-DEFER")
         self.assertEqual(result["hard_stops"], [])
 
     def test_prk_cct_479_is_hard_stop_even_with_other_missing_data(self):
         eye = normal_eye(pachy=479)
         eye["BAD_D"] = None
         result = app.assess_eye(eye, plan(), 35, MODIFIERS)
-        self.assertEqual(result["status"], "DO NOT PROCEED")
+        self.assertEqual(result["status"], "STOP-DEFER")
         self.assertTrue(any("<480" in item for item in result["hard_stops"]))
         self.assertIn("BAD_D", result["missing"])
 
@@ -405,7 +405,7 @@ class TestBoundaries(unittest.TestCase):
 
     def test_prk_rst_below_310_is_hard_stop(self):
         result = app.assess_eye(normal_eye(pachy=520), plan(ablation=161), 35, MODIFIERS)
-        self.assertEqual(result["status"], "DO NOT PROCEED")
+        self.assertEqual(result["status"], "STOP-DEFER")
         self.assertTrue(any("RST <310" in item for item in result["hard_stops"]))
 
     def test_lasik_rsb_failure_triggers_automatic_safe_fallback(self):
@@ -417,7 +417,7 @@ class TestBoundaries(unittest.TestCase):
         )
         self.assertEqual(allowed["lasik_planning_sequence"][0]["LASIK_RSB_um"], 300)
         self.assertEqual(stopped["lasik_planning_sequence"][0]["LASIK_RSB_um"], 299)
-        self.assertEqual(stopped["lasik_planning_sequence"][0]["status"], "DO NOT PROCEED")
+        self.assertEqual(stopped["lasik_planning_sequence"][0]["status"], "STOP-DEFER")
         self.assertEqual(allowed["lasik_selected_plan"], "Plan B")
         self.assertEqual(stopped["lasik_selected_plan"], "Plan B")
         self.assertGreaterEqual(allowed["values"]["LASIK_RSB_um"], 300)
@@ -438,7 +438,7 @@ class TestBoundaries(unittest.TestCase):
         )
         self.assertEqual(result["topography_classification"]["scoring_category"], "ABNORMAL_ECTATIC")
         self.assertEqual(result["score"]["rows"]["topography"], 4)
-        self.assertEqual(result["status"], "DO NOT PROCEED")
+        self.assertEqual(result["status"], "STOP-DEFER")
         self.assertFalse(any("Definite KC" in item for item in result["hard_stops"]))
 
     def test_srax_20_degrees_uses_published_erss_sra_category(self):
@@ -450,7 +450,7 @@ class TestBoundaries(unittest.TestCase):
         )
         self.assertEqual(result["topography_classification"]["scoring_category"], "INFERIOR_STEEPENING_SRA")
         self.assertEqual(result["score"]["rows"]["topography"], 3)
-        self.assertEqual(result["status"], "CAUTION — STOP/DEFER")
+        self.assertEqual(result["status"], "STOP-DEFER")
 
     def test_minimal_axis_deviation_is_not_scored_as_srax(self):
         eye = normal_eye()
@@ -508,7 +508,7 @@ class TestBoundaries(unittest.TestCase):
             eye, plan("LASIK", sphere=-3, ablation=100, flap=100), 35, MODIFIERS
         )
         self.assertEqual(result["topography_classification"]["scoring_category"], "ABNORMAL_ECTATIC")
-        self.assertEqual(result["status"], "DO NOT PROCEED")
+        self.assertEqual(result["status"], "STOP-DEFER")
 
     def test_ablation_estimate_uses_zone_specific_ex500_conventions(self):
         zone_6 = plan(ablation=None)
@@ -534,7 +534,7 @@ class TestBoundaries(unittest.TestCase):
         actual = app.assess_eye(normal_eye(), plan(sphere=2.0, cylinder=0.0, ablation=40), 35, MODIFIERS)
         self.assertIsNone(estimated["values"]["max_ablation_um"])
         self.assertNotEqual(estimated["status"], "PASS")
-        self.assertEqual(actual["status"], "REVIEW — NOT CLEARED")
+        self.assertEqual(actual["status"], "CAUTION")
         self.assertFalse(any("treatment cutoff" in item for item in actual["hard_stops"]))
 
     def test_hyperopic_report_is_populated_and_contains_case_specific_surgeon_attention(self):
@@ -557,7 +557,7 @@ class TestBoundaries(unittest.TestCase):
         self.assertEqual(result["values"]["intended_MRSE_D"], 0.0)
         self.assertIsNone(result["values"]["estimated_final_Kmean_D"])
         self.assertIsNotNone(result["values"]["LASIK_RSB_um"])
-        self.assertEqual(result["status"], "REVIEW — NOT CLEARED")
+        self.assertEqual(result["status"], "DATA INSUFFICIENT")
         self.assertTrue(any("near-zero MRSE" in item for item in result["surgeon_attention"]))
         self.assertTrue(any("meridional K" in item for item in result["surgeon_attention"]))
 
@@ -621,7 +621,7 @@ class TestScoringAndCompleteness(unittest.TestCase):
             eye, treatment, 28, MODIFIERS
         )
         self.assertEqual(result["score"]["total"], 2)
-        self.assertEqual(result["status"], "PASS WITH CAUTION")
+        self.assertEqual(result["status"], "PASS")
 
     def test_missing_critical_tomography_prohibits_pass(self):
         eye = normal_eye()
@@ -634,7 +634,7 @@ class TestScoringAndCompleteness(unittest.TestCase):
         result = app.assess_eye(normal_eye(pachy=560), plan(ablation=150), 35, MODIFIERS)
         self.assertGreater(result["values"]["PRK_PTA_percent"], 35.28)
         self.assertTrue(any("evidence-gap" in item for item in result["surgical_load_flags"]))
-        self.assertEqual(result["status"], "REVIEW — NOT CLEARED")
+        self.assertEqual(result["status"], "CAUTION")
 
     def test_concordant_cross_sectional_tomography_flags_prohibit_pass(self):
         eye = normal_eye(pachy=530)
@@ -642,7 +642,7 @@ class TestScoringAndCompleteness(unittest.TestCase):
         result = app.assess_eye(eye, plan(), 35, MODIFIERS)
         self.assertEqual(result["tomography_review"]["status"], "CONCERN FLAGS")
         self.assertEqual(len(result["tomography_review"]["cross_sectional_flags"]), 4)
-        self.assertEqual(result["status"], "REVIEW — NOT CLEARED")
+        self.assertEqual(result["status"], "CAUTION")
 
     def test_limited_image_quality_allows_pass_with_warning(self):
         eye = normal_eye()
@@ -708,7 +708,7 @@ class TestScoringAndCompleteness(unittest.TestCase):
             drug_usage="yes",
         )
         result = app.assess_eye(normal_eye(), plan(), 35, modifiers)
-        self.assertEqual(result["status"], "CAUTION — STOP/DEFER")
+        self.assertEqual(result["status"], "STOP-DEFER")
         self.assertTrue(any("Pregnancy or nursing" in item for item in result["clinical_modifiers"]))
         self.assertTrue(any("Collagen/connective-tissue" in item for item in result["clinical_modifiers"]))
         self.assertTrue(any("medication/drug" in item for item in result["clinical_modifiers"]))
@@ -901,8 +901,8 @@ class TestScoringAndCompleteness(unittest.TestCase):
         )
         self.assertEqual([r["eye"] for r in decision["eyes"]], ["OD", "OS"])
         self.assertEqual(decision["eyes"][0]["status"], "PASS")
-        self.assertEqual(decision["eyes"][1]["status"], "DO NOT PROCEED")
-        self.assertEqual(decision["status"], "DO NOT PROCEED")
+        self.assertEqual(decision["eyes"][1]["status"], "STOP-DEFER")
+        self.assertEqual(decision["status"], "STOP-DEFER")
 
     def test_merge_clears_missing_when_later_image_supplies_value(self):
         first = normal_eye()

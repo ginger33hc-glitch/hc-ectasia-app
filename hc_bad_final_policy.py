@@ -5,9 +5,9 @@ isolated suspicious/abnormal component does not determine the CER-AI BAD status.
 Final BAD-D:
 - <=1.6: NORMAL
 - >1.6 and <2.6: SUSPICIOUS, contextual under the canonical final-decision hierarchy
-- >=2.6: ABNORMAL CORNEA -> DO NOT PROCEED hard stop
+- >=2.6: ABNORMAL CORNEA -> STOP-DEFER hard stop
 
-Final PASS WITH CAUTION versus Randleman/ERSS adverse classification belongs only
+Final PASS/CAUTION versus Randleman/ERSS adverse classification belongs only
 to hc_final_decision_policy.py; this module must not independently escalate a
 SUSPICIOUS Final BAD-D to REVIEW/DEFER.
 """
@@ -75,8 +75,8 @@ def assess_eye_with_final_bad_cutoff(eye, plan, age, patient_modifiers):
             hard_stops.append(hard_stop)
         if hard_stop not in reasons:
             reasons.append(hard_stop)
-        result["status"] = "DO NOT PROCEED"
-        result["action"] = "DO NOT PROCEED — ABNORMAL CORNEA. Final BAD-D is >=2.60 and meets the CER-AI abnormal cutoff."
+        result["status"] = "STOP-DEFER"
+        result["action"] = "STOP-DEFER — ABNORMAL CORNEA. Final BAD-D is >=2.60 and meets the CER-AI abnormal cutoff."
     # SUSPICIOUS Final BAD-D is intentionally not decision-changing here.
     # hc_final_decision_policy.py is the sole final hierarchy authority.
     return result

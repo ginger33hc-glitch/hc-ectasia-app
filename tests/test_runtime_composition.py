@@ -27,7 +27,7 @@ def test_canonical_engine_has_one_composition_dependency():
 def test_policy_leaf_modules_do_not_hide_install_order():
     assert _local_imports("critical_score_highlight.py") == {"bootstrap", "reports"}
     assert _local_imports("pachymetry_policy.py") == {"bootstrap"}
-    assert _local_imports("hc_final_decision_policy.py") == {"bootstrap"}
+    assert _local_imports("hc_final_decision_policy.py") == {"bootstrap", "clinical_disposition"}
 
 
 def test_every_runtime_topic_is_owned_by_one_phase():

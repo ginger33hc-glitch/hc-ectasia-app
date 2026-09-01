@@ -47,7 +47,7 @@ GRAY = "52616D"
 GRAY_FILL = "EEF2F5"
 LINE = "D7E0E7"
 INK = "17212B"
-APP_VERSION = "0.7.70"
+APP_VERSION = "0.7.71"
 PROGRAM_NAME = "Cornea Ectasia Risk Assessment Intelligence"
 LIABILITY_NOTICE = (
     "The final surgical decision and all associated responsibility and liability rest with the surgeon. "
@@ -116,9 +116,9 @@ def _ascii(value: Any, fallback: str = "Not documented") -> str:
 def _status_palette(status: str) -> tuple[str, str]:
     if status == "PASS":
         return GREEN, GREEN_FILL
-    if status == "DO NOT PROCEED":
+    if status == "STOP-DEFER":
         return RED, RED_FILL
-    if status.startswith("CAUTION") or status.startswith("REVIEW"):
+    if status == "CAUTION":
         return AMBER, AMBER_FILL
     return GRAY, GRAY_FILL
 
@@ -204,6 +204,7 @@ def _eye_metrics(eye: Dict[str, Any], locale: str = "en") -> List[tuple[str, str
         ("Maximum ablation", _fmt(values.get("max_ablation_um"), 1, " um")),
         ("Laser platform", _text(values.get("laser_platform"))),
         ("PRK epithelium", _fmt(values.get("PRK_epithelium_um"), 0, " um")),
+        ("Selected LASIK plan", _text(eye.get("lasik_selected_plan") or values.get("LASIK_selected_plan"))),
         ("Optical / transition zone", f"{_fmt(values.get('optical_zone_mm'), 1, ' mm')} / {transition}"),
         ("Enhancement anticipated", _text(values.get("enhancement_anticipated"))),
         ("PRK RST / PTA", f"{_fmt(values.get('PRK_RST_um'), 0, ' um')} / {_fmt(values.get('PRK_PTA_percent'), 1, '%')}"),
@@ -495,7 +496,8 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     story.append(Paragraph(tr("Interpretation note"), styles["Section"]))
     story.append(Paragraph(
         tr("This report is generated under the CER-AI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. "
-           "CAUTION is a STOP/DEFER decision requiring repeat ectasia/tomographic assessment after at least 6 months. "
+           "CAUTION requires explicit surgeon review but does not automatically defer surgery. "
+           "STOP-DEFER means surgery must not proceed unless the stated stop/defer condition is resolved. "
            "DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review."),
         styles["Tiny"],
     ))
@@ -802,7 +804,8 @@ def build_docx(payload: Dict[str, Any]) -> bytes:
     _add_heading(document, tr("Interpretation note"), 1)
     note = document.add_paragraph(
         tr("This report is generated under the CER-AI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. "
-           "CAUTION is a STOP/DEFER decision requiring repeat ectasia/tomographic assessment after at least 6 months. "
+           "CAUTION requires explicit surgeon review but does not automatically defer surgery. "
+           "STOP-DEFER means surgery must not proceed unless the stated stop/defer condition is resolved. "
            "DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review.")
     )
     note.style = document.styles["Normal"]

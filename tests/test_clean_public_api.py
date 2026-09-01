@@ -31,7 +31,7 @@ def test_public_entrypoint_returns_typed_result():
         laser_platform="EX500",
     ))
     assert isinstance(result, clean_engine.AssessmentResult)
-    assert result.status == "PASS WITH CAUTION"
+    assert result.status == "PASS"
 
 
 def test_clean_engine_exposes_reconciled_service_boundary():
@@ -56,7 +56,7 @@ def test_clean_engine_exposes_reconciled_service_boundary():
         laser_platform="EX500",
     ))
     assert isinstance(out, clean_engine.CleanAssessment)
-    assert out.result.status == "PASS WITH CAUTION"
+    assert out.result.status == "PASS"
     assert out.report.status == out.result.status
 
 

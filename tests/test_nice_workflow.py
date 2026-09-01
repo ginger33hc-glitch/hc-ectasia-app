@@ -78,7 +78,7 @@ def test_malformed_completion_nested_override_fails_closed():
 
 
 @pytest.mark.parametrize("procedure", ["LASIK","PRK"])
-@pytest.mark.parametrize("pe,k2,central,total,status", [(8,43,565,4,None),(16,43,565,5,"CAUTION"),(18,46,510,8,"CAUTION"),(18,46,490,9,"DO NOT PROCEED")])
+@pytest.mark.parametrize("pe,k2,central,total,status", [(8,43,565,4,None),(16,43,565,5,"CAUTION"),(18,46,510,8,"CAUTION"),(18,46,490,9,"STOP-DEFER")])
 def test_runtime_4_5_8_9_and_no_duplicate_erss(procedure,pe,k2,central,total,status):
     extracted,plans=scenario(procedure)
     eye=extracted["eyes"][0]
@@ -93,19 +93,22 @@ def test_runtime_4_5_8_9_and_no_duplicate_erss(procedure,pe,k2,central,total,sta
     assert before["tomography_review"]==after["tomography_review"]
     if status: assert after["status"].startswith(status)
     else: assert after["status"]==before["status"]
-    if total>=5: assert "microkeratome_planning" not in after
+    if total>=9:
+        assert "microkeratome_planning" not in after
+    elif procedure == "LASIK":
+        assert "microkeratome_planning" in after
 
 
 def test_nice_cannot_reduce_bad_hard_stop_or_rescue_with_flap_change():
     extracted,plans=scenario()
     extracted["eyes"][0]["BAD_D"]=3.1
-    assert core.hc_engine(extracted,35,plans,MODIFIERS)["eyes"][0]["status"]=="DO NOT PROCEED"
+    assert core.hc_engine(extracted,35,plans,MODIFIERS)["eyes"][0]["status"]=="STOP-DEFER"
     extracted["eyes"][0]["BAD_D"]=1
     extracted["eyes"][0]["K2_D"]=48
     extracted["eyes"][0]["nice_candidates"][0].update(central_pachy_um=490,B_Ele_Th_um=18)
     for flap in (90,100,120):
         plans["OD"]["flap_um"]=flap
-        assert core.hc_engine(extracted,35,plans,MODIFIERS)["eyes"][0]["status"]=="DO NOT PROCEED"
+        assert core.hc_engine(extracted,35,plans,MODIFIERS)["eyes"][0]["status"]=="STOP-DEFER"
 
 
 @pytest.mark.parametrize("key,value", [("b_ele_th_landmark","OTHER"),("b_ele_th_status","UNREADABLE"),("b_ele_th_page","OTHER")])

@@ -93,8 +93,8 @@ def test_prk_category_consumes_shared_score_policy():
 
 
 def test_lasik_decision_consumes_shared_defer_boundary():
-    assert decide(DecisionInput("PASS", "NORMAL", 2)).status == "PASS WITH CAUTION"
-    assert decide(DecisionInput("PASS", "NORMAL", 3)).status == "CAUTION — DEFER"
+    assert decide(DecisionInput("PASS", "NORMAL", 2)).status == "PASS"
+    assert decide(DecisionInput("PASS", "NORMAL", 3)).status == "STOP-DEFER"
     # Score >=4 is converted to an independent hard stop by the clean engine;
     # the pure decision layer still preserves the shared score escalation semantics.
-    assert decide(DecisionInput("PASS", "NORMAL", 4)).status == "CAUTION — DEFER"
+    assert decide(DecisionInput("PASS", "NORMAL", 4)).status == "STOP-DEFER"

@@ -11,15 +11,15 @@ def base(**kw):
     return MicrokeratomePlanningInput(**data)
 
 
-def test_module_is_post_pass_only():
-    assert not plan_microkeratome(base(assessment_status="CAUTION")).applicable
+def test_module_is_available_after_pass_or_non_deferring_caution():
+    assert plan_microkeratome(base(assessment_status="CAUTION")).applicable
     assert not plan_microkeratome(base(procedure="PRK")).applicable
 
 
-def test_pass_with_caution_is_the_active_favorable_gate():
-    plan = plan_microkeratome(base(assessment_status="PASS WITH CAUTION"))
+def test_pass_is_an_active_favorable_gate():
+    plan = plan_microkeratome(base(assessment_status="PASS"))
     assert plan.applicable
-    assert plan.assessment_gate == "PASS WITH CAUTION"
+    assert plan.assessment_gate == "PASS"
 
 
 def test_nomogram_mid_range_small_cornea():

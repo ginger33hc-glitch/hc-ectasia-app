@@ -68,10 +68,10 @@ def test_manual_modifier_is_neutralized_and_status_is_unchanged(monkeypatch):
     def upstream(extracted, age, eye_plans, modifiers, patient_metadata=None):
         captured.update(modifiers)
         return {
-            "status": "PASS WITH CAUTION",
+            "status": "PASS",
             "eyes": [
-                {"eye": "OD", "status": "PASS WITH CAUTION", "tomography_review": {"cross_sectional_flags": []}},
-                {"eye": "OS", "status": "PASS WITH CAUTION", "tomography_review": {"cross_sectional_flags": []}},
+                {"eye": "OD", "status": "PASS", "tomography_review": {"cross_sectional_flags": []}},
+                {"eye": "OS", "status": "PASS", "tomography_review": {"cross_sectional_flags": []}},
             ],
         }
 
@@ -85,9 +85,9 @@ def test_manual_modifier_is_neutralized_and_status_is_unchanged(monkeypatch):
         {},
     )
     assert captured["inter_eye_asymmetry"] == "no"
-    assert out["status"] == "PASS WITH CAUTION"
+    assert out["status"] == "PASS"
     assert out["inter_eye_tomography_concern"]["status"] == "POSITIVE"
-    assert all(result["status"] == "PASS WITH CAUTION" for result in out["eyes"])
+    assert all(result["status"] == "PASS" for result in out["eyes"])
     assert all(
         any("Inter-eye tomography concern: POSITIVE" in flag for flag in result["tomography_review"]["cross_sectional_flags"])
         for result in out["eyes"]

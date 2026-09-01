@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.70</title>
+  <title>CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.71</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=9">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=8">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=8">
@@ -42,7 +42,7 @@
   <style>@media print{.report-card[hidden]{display:none!important}}</style>
 </head>
 <body>
-<header class="app-header"><div class="brand-lockup"><div class="brand-logo-frame"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Cornea Ectasia Risk Assessment Intelligence"></div><div class="brand-subtitle">Cornea Ectasia Risk <span class="brand-initial">A</span>ssessment <span class="brand-initial">I</span>ntelligence</div><span class="brand-version">v0.7.70</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.70</h1></header>
+<header class="app-header"><div class="brand-lockup"><div class="brand-logo-frame"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Cornea Ectasia Risk Assessment Intelligence"></div><div class="brand-subtitle">Cornea Ectasia Risk <span class="brand-initial">A</span>ssessment <span class="brand-initial">I</span>ntelligence</div><span class="brand-version">v0.7.71</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.71</h1></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -106,7 +106,7 @@
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">CER-AI Clinical Decision Support</div><div class="note">Cornea Ectasia Risk Assessment Intelligence</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.7.70</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v0.7.71</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <p class="report-liability-notice">The final surgical decision and all associated responsibility and liability rest with the surgeon. This application is a clinical decision-support aid only.</p>
       <table class="meta-table"><tbody>
@@ -121,7 +121,7 @@
       <div id="identityWarning" class="identity-alert" hidden></div>
       <div id="eye-results"></div>
       <div id="qualityWarning" class="quality-alert" hidden></div>
-      <p class="report-footer-note">Generated under the CER-AI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. CAUTION is a STOP/DEFER decision requiring repeat ectasia/tomographic assessment after at least 6 months. DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review.</p>
+      <p class="report-footer-note">Generated under the CER-AI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. CAUTION requires explicit surgeon review but does not automatically defer surgery. STOP-DEFER means surgery must not proceed unless the stated stop/defer condition is resolved. DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review.</p>
       <p class="report-legal-footer">Developed by Hüseyin Cengiz, MD. All rights reserved. Final responsibility rests with the surgeon at all times and under all circumstances.</p>
     </article>
     <details class="no-print"><summary>Automatically extracted source data</summary><pre id="extract">—</pre></details>
@@ -467,10 +467,9 @@ function plan(prefix){return {
 }}
 
 function statusClass(s){
-  if(s === "PASS" || s === "PASS WITH CAUTION") return "pass";
-  if(s === "DO NOT PROCEED") return "fail";
-  if(s.startsWith("CAUTION")) return "caution";
-  if(s.startsWith("REVIEW")) return "review";
+  if(s === "PASS") return "pass";
+  if(s === "CAUTION") return "caution";
+  if(s === "STOP-DEFER") return "fail";
   return "insufficient";
 }
 const fmt = (x, digits=1) => x === null || x === undefined ? "—" : Number(x).toFixed(digits);
@@ -509,7 +508,7 @@ function applyEffectivePlans(plans){
   cardTransferNote.textContent=transferred.length?`Card values transferred: ${transferred.join("; ")}`:"";
 }
 function listBlock(title, items){if(!items || !items.length)return "";return `<div class="finding-group"><h4>${safe(i18n.translate(title))}</h4><ul>${items.map(x=>`<li>${safe(i18n.clinical(x))}</li>`).join("")}</ul></div>`}
-function lasikPlanHeadline(r){ const v=r.values||{}; if(!["PASS","PASS WITH CAUTION"].includes(r.status)||v.procedure!=="LASIK")return ""; const selected=r.lasik_selected_plan||v.LASIK_selected_plan; if(!selected)return ""; const parts=[selected]; if(v.LASIK_flap_um!=null)parts.push(`FLAP ${fmt(v.LASIK_flap_um,0)} µm`); if(v.optical_zone_mm!=null)parts.push(`OPTICAL ZONE ${fmt(v.optical_zone_mm,1)} mm`); if(v.transition_zone_mm!=null)parts.push(`TRANSITION ZONE ${fmt(v.transition_zone_mm,1)} mm`); return parts.join(" • "); }
+function lasikPlanHeadline(r){ const v=r.values||{}; if(!["PASS","CAUTION"].includes(r.status)||v.procedure!=="LASIK")return ""; const selected=r.lasik_selected_plan||v.LASIK_selected_plan; if(!selected)return ""; const parts=[selected]; if(v.LASIK_flap_um!=null)parts.push(`FLAP ${fmt(v.LASIK_flap_um,0)} µm`); if(v.optical_zone_mm!=null)parts.push(`OPTICAL ZONE ${fmt(v.optical_zone_mm,1)} mm`); if(v.transition_zone_mm!=null)parts.push(`TRANSITION ZONE ${fmt(v.transition_zone_mm,1)} mm`); return parts.join(" • "); }
 function statusHeadline(r){ const selected=lasikPlanHeadline(r); return selected?`${i18n.clinical(r.status)} — ${selected}`:i18n.clinical(r.status); }
 function microkeratomeBlock(r){
   const p=r.microkeratome_planning;

@@ -22,7 +22,7 @@ def case(**changes):
 def test_service_composes_reconciled_input_assessment_and_report():
     out = assess_reconciled(case())
     assert isinstance(out, CleanAssessment)
-    assert out.result.status == "PASS WITH CAUTION"
+    assert out.result.status == "PASS"
     assert out.report.status == out.result.status
     assert out.report.calculations is out.result.calculations
     assert out.report.lasik_scores is out.result.scores
@@ -30,7 +30,7 @@ def test_service_composes_reconciled_input_assessment_and_report():
 
 def test_service_preserves_hard_stop_and_missing_precedence():
     stopped = assess_reconciled(case(pachy_thinnest_um=479))
-    assert stopped.result.status == "DO NOT PROCEED"
+    assert stopped.result.status == "STOP-DEFER"
     assert "PACHYMETRY_LT_480" in stopped.report.hard_stops
 
     missing = assess_reconciled(case(bad_d=None))
@@ -44,8 +44,8 @@ def test_service_preserves_prk_score_policy():
         pachy_thinnest_um=520, morphology="NORMAL_SYMMETRIC",
     ))
     assert caution.result.prk_scores.total == 3
-    assert caution.result.status == "CAUTION — STOP/DEFER"
-    assert caution.report.presentation_class == "caution"
+    assert caution.result.status == "STOP-DEFER"
+    assert caution.report.presentation_class == "fail"
 
 
 def test_service_output_is_immutable():

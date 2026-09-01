@@ -26,6 +26,16 @@ as separate layers. No rule in one layer is silently presented as a validated ru
   for BAD-D, Kmax, elevation, PPI, and other supported ectasia indices. Larger differences remain
   unresolved conflicts.
 
+## Clinical disposition contract
+
+- Completed assessments use exactly three clinical results: `PASS`, `CAUTION`, and `STOP-DEFER`.
+- `CAUTION` requires explicit surgeon review but does not automatically defer surgery. NICE 5–8
+  uses this category.
+- `STOP-DEFER` means surgery must not proceed unless the stated stop/defer condition is resolved.
+  NICE ≥9, independent hard stops, and explicit defer rules use this category.
+- `DATA INSUFFICIENT` and `POST-REFRACTIVE PATHWAY REQUIRED` remain workflow states, not additional
+  clinical result categories.
+
 ## Pathway gate
 
 - `prior PRK/LASIK/SMILE = yes` exits the virgin-cornea engine immediately and returns
@@ -51,7 +61,7 @@ as separate layers. No rule in one layer is silently presented as a validated ru
   structural calculations, missing plan data, and known hard stops remain visible.
 - Actual laser-plan maximum stromal ablation is mandatory. The CER-AI linear myopic EX500 µm/D
   convention is not applied to hyperopic annular or mixed bitoric profiles.
-- Hyperopic/mixed cases receive `REVIEW — NOT CLEARED` because the supplied procedure-specific
+- Hyperopic/mixed cases receive `CAUTION` because the supplied procedure-specific
   ectasia scoring evidence is predominantly myopic. No new weighted ectasia score is invented.
 - Mixed astigmatism is present when the two intended principal meridians have opposite signs.
   Near-zero MRSE is not treated as low surgical load.
@@ -91,7 +101,7 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 ## Published/provisional instruments
 
 - LASIK uses the published five-component ERSS: Placido topography, RSB, age, pachymetry, and
-  manifest MRSE. Score 0–2 is low, 3 is moderate/STOP-DEFER, and ≥4 is high/DO NOT PROCEED.
+  manifest MRSE. Score 0–2 is low, 3 is moderate/STOP-DEFER, and ≥4 is high/STOP-DEFER.
 - PRK-EWSS v1.0 is an CER-AI provisional triage score and is not validated. It does not produce a risk
   probability.
 - A single numeric Placido criterion may support the published ERSS topography category but is not
@@ -103,11 +113,11 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 
 ## Clinical eligibility layer
 
-- Instability or documented progression: `CAUTION — STOP/DEFER`, repeat relevant assessment and
+- Instability or documented progression: `STOP-DEFER`, repeat relevant assessment and
   reassess after at least six months.
-- Pregnancy/nursing: `CAUTION — STOP/DEFER`.
+- Pregnancy/nursing: `STOP-DEFER`.
 - Unexplained CDVA below 20/20, inter-eye asymmetry, collagen/connective-tissue disease, relevant
-  medication, dry eye, or other systemic disease: `REVIEW — NOT CLEARED` until resolved.
+  medication, dry eye, or other systemic disease: `CAUTION` with explicit surgeon review.
 - These modifiers do not add invented ectasia-score points.
 - Soft contact lens ≥14 days and rigid/RGP ≥21 days are supplied source-study imaging criteria, not
   universal ectasia cutoffs. Insufficient documentation prohibits automatic PASS.

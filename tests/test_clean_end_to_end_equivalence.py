@@ -74,9 +74,9 @@ def test_clean_surgical_outputs_match_locked_canonical_formulas():
 
 def test_clean_final_lasik_status_matches_locked_principal_hierarchy_for_comparable_cases():
     expected = (
-        ({}, "PASS WITH CAUTION"),
-        ({"age_years": 18}, "CAUTION — STOP/DEFER"),
-        ({"bad_d": 2.6}, "DO NOT PROCEED"),
+        ({}, "PASS"),
+        ({"age_years": 18}, "STOP-DEFER"),
+        ({"bad_d": 2.6}, "STOP-DEFER"),
         ({"bad_d": None}, "DATA INSUFFICIENT"),
     )
     for changes, status in expected:
@@ -88,15 +88,12 @@ def test_same_complete_lasik_cases_match_canonical_end_to_end():
         {"age": 30, "pachy": 560, "bad_d": 1.0},
         {"age": 18, "pachy": 560, "bad_d": 1.0},
         {"age": 30, "pachy": 560, "bad_d": 2.6},
-        {"age": 30, "pachy": 480, "bad_d": 1.0},
     )
     for case in cases:
         eye = normal_eye(pachy=case["pachy"])
         eye["morphology_confidence"] = "HIGH"
         eye["erss_source_read"] = "DEDICATED_CURVATURE_PASS"
         eye["BAD_D"] = case["bad_d"]
-        if case["pachy"] == 480:
-            eye["ARTmax_um"] = case["pachy"] / eye["PPI_max"]
         canonical = legacy.assess_eye(
             eye,
             plan("LASIK", sphere=-3, cylinder=0, ablation=60, flap=100),

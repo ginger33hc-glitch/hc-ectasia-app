@@ -5,7 +5,7 @@ If Plan A fails OR LASIK PTA is >=40%, and there is no independent CER-AI hard-s
 Plan B: flap 100 µm, optical zone 6.0 mm, transition zone 8.5 mm.
 If Plan B also fails or has PTA >=40%, re-evaluate with Plan C: flap 90 µm, optical zone
 6.0 mm, transition zone 8.5 mm. If Plan C PTA remains >=40%, the final disposition is
-DO NOT PROCEED.
+STOP-DEFER.
 
 Earlier failed plans remain visible in the final result. A favorable fallback plan never erases
 or hides the fact that a preceding plan failed. Independent hard-stops are never bypassed by
@@ -39,6 +39,19 @@ def _independent_hard_stop(result: Dict[str, Any]) -> bool:
 def _pta_cutoff(result: Dict[str, Any]) -> bool:
     pta = (result.get("values") or {}).get("LASIK_PTA_percent")
     return isinstance(pta, (int, float)) and not isinstance(pta, bool) and float(pta) >= LASIK_PTA_CUTOFF_PERCENT
+
+
+def _plan_responsive_failure(result: Dict[str, Any]) -> bool:
+    """Return only failures that changing flap/zone parameters may resolve.
+
+    STOP-DEFER is a final clinical category and deliberately combines several
+    causes.  It must not, by itself, trigger LASIK fallback: instability,
+    pregnancy, and an ERSS score of 3 are not corrected by changing the flap.
+    The legacy fallback trigger was a plan hard stop or ERSS HIGH result.
+    """
+    if result.get("hard_stops"):
+        return True
+    return (result.get("score") or {}).get("category") == "HIGH"
 
 
 def _plan_payload(base_plan: Dict[str, Any], plan_spec: Dict[str, Any], first: bool) -> Dict[str, Any]:
@@ -87,7 +100,7 @@ def install(core: Any) -> None:
             result = original_assess_eye(eye, planned, age, patient_modifiers)
             evaluated.append(result); sequence.append(_summary(spec, result))
             pta_fail = _pta_cutoff(result)
-            ordinary_fail = result.get("status") == "DO NOT PROCEED"
+            ordinary_fail = _plan_responsive_failure(result)
             if not ordinary_fail and not pta_fail: break
             if _independent_hard_stop(result): break
             if idx == len(LASIK_PLANS) - 1: break
@@ -95,8 +108,8 @@ def install(core: Any) -> None:
         final_result = deepcopy(evaluated[-1])
         final_pta_fail = _pta_cutoff(final_result)
         if final_pta_fail:
-            final_result["status"] = "DO NOT PROCEED"
-            final_result["action"] = "DO NOT PROCEED with elective corneal refractive surgery."
+            final_result["status"] = "STOP-DEFER"
+            final_result["action"] = "STOP-DEFER; do not proceed with elective corneal refractive surgery."
             hard_stops = list(final_result.get("hard_stops") or [])
             hard_stops.append("CER-AI operational LASIK PTA hard stop: PTA >=40.0%.")
             final_result["hard_stops"] = list(dict.fromkeys(hard_stops))
