@@ -215,6 +215,22 @@ document.querySelectorAll("[data-positive-target]").forEach(button=>button.addEv
   applySign(input,"+");
 }));
 
+// LASIK flap thickness is procedure-specific. PRK must never retain or submit
+// the default 100 µm LASIK value.
+function syncProcedureSpecificInputs(eye){
+  const procedure=document.getElementById(`${eye}_procedure`);
+  const flap=document.getElementById(`${eye}_flap`);
+  const isPRK=procedure.value==="PRK";
+  if(isPRK)flap.value="";
+  else if(procedure.value==="LASIK"&&!flap.value)flap.value="100";
+  flap.options[0].textContent=i18n.translate(isPRK?"None":"Select");
+  flap.disabled=isPRK;
+}
+for(const eye of ["od","os"]){
+  document.getElementById(`${eye}_procedure`).addEventListener("change",()=>syncProcedureSpecificInputs(eye));
+  syncProcedureSpecificInputs(eye);
+}
+
 // Manifest is the surgeon's required fallback when the treatment card is unreadable.
 // Intended follows it only until the surgeon explicitly edits the intended field.
 const refractionDefaultState={};
@@ -473,12 +489,14 @@ function patientModifiers(){
   return result;
 }
 
-function plan(prefix){return {
-  prior:value(`${prefix}_prior`), procedure:value(`${prefix}_procedure`),
+function plan(prefix){
+  const procedure=value(`${prefix}_procedure`);
+  return {
+  prior:value(`${prefix}_prior`), procedure,
   manifest_entered_sphere_D:numberOrNull(`${prefix}_manifest_sphere`), manifest_cylinder_signed_D:numberOrNull(`${prefix}_manifest_cylinder`),
   intended_entered_sphere_D:numberOrNull(`${prefix}_sphere`), intended_cylinder_signed_D:numberOrNull(`${prefix}_cylinder`),
   entered_axis_deg:numberOrNull(`${prefix}_axis`),
-  ablation_um:numberOrNull(`${prefix}_ablation`), flap_um:numberOrNull(`${prefix}_flap`),
+  ablation_um:numberOrNull(`${prefix}_ablation`), flap_um:procedure==="PRK"?null:numberOrNull(`${prefix}_flap`),
   epithelium_um:50,
   laser_platform:"Alcon EX500", optical_zone_mm:numberOrNull(`${prefix}_optical`),
   transition_zone_mm:numberOrNull(`${prefix}_transition`), transition_zone_not_applicable:"no",
