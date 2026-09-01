@@ -24,8 +24,11 @@ def install_schema(core):
     core.PROMPT += """
 NICE SEPARATE INPUT READING (do not calculate scores):
 Return nice_readings only for Pentacam images with unambiguous OD/OS; otherwise [].
-central_pachy_um: read only the labeled central 'Pachy Vertex N.' field. NEVER use
-'Thinnest Local', or substitute Pupil Center. If unreadable use null and UNREADABLE.
+central_pachy_um: read the printed pachymetry value identified as 'Pupil Center' by the
+plus-shaped (+) marker next to it. 'Pachy Vertex N.' remains acceptable when explicitly labeled
+as the central/vertex pachymetry on that Pentacam screen. NEVER use 'Thinnest Locat.' or the
+circle-marked thinnest value as central pachymetry. If the Pupil Center/central label, plus marker,
+or digits are unreadable, use null and UNREADABLE.
 posterior_pupil_max_um: on 'Elevation (Back)' identify the dashed pupil boundary and
 read the highest explicitly PRINTED positive number whose measurement point lies inside
 that pupil. Do not use a number outside the pupil, anterior elevation, a colour scale,

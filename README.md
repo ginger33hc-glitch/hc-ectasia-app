@@ -2,7 +2,14 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.62 implements
+## What v0.7.63 implements
+
+- Pentacam landmark reading now recognizes the circle-marked `Thinnest Locat.` pachymetry and
+  the plus-marked `Pupil Center` central pachymetry while keeping the two measurements separate.
+  Horizontal corneal diameter remains locked to the correctly labeled `HWTW` output.
+- Unreadable NICE central pachymetry and I-S fields now resolve their form keys back to the
+  corresponding Pentacam source-region keys, so the localized unread crop can appear beside the
+  surgeon-entry field instead of producing an instruction without a visible source box.
 
 - A confident Excimer Laser Takip Kartı `Düzeltme Miktarı` remains the initial source for both
   manifest and intended refraction. If the card is unreadable, readiness requests only manifest;
