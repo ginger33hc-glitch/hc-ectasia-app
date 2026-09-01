@@ -85,9 +85,14 @@ def _region_hint(extracted, eye, key):
             if context.get("targeted_unreadable_age_region")
         ]
         return hints[0] if len(hints) == 1 else None
+    source_key = {
+        "surgeon_nice_central_um": "central_pachy_um",
+        "surgeon_nice_pe_um": "posterior_pupil_max_um",
+        "surgeon_I_S_D": "I_S",
+    }.get(key, key)
     for candidate in extracted.get("eyes") or []:
         if candidate.get("eye") == eye:
-            return (candidate.get("targeted_unreadable_regions") or {}).get(key)
+            return (candidate.get("targeted_unreadable_regions") or {}).get(source_key)
     return None
 
 

@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="CER-AI v0.7.62")
+app = FastAPI(title="CER-AI v0.7.63")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -269,8 +269,10 @@ If and only if the corresponding side/summary-table field is absent, obscured, o
 map number may be used as a second-priority fallback when it directly represents the same named
 measurement and that field is allowed by MAP_FALLBACK_NUMERIC_FIELDS. Record it in
 map_fallback_numeric_fields and not in table_verified_numeric_fields. The marker/location and map
-type must make the identity unambiguous. This fallback is limited to an explicitly labeled local Kmax
-or Rmin measurement, the explicitly marked thinnest pachymetry, and the anterior/posterior elevation
+type must make the identity unambiguous. The Pentacam thinnest pachymetry is the pachymetry value
+identified by the circular marker next to the printed "Thinnest Locat." label; do not confuse it
+with the adjacent X/Y location coordinates. This fallback is limited to an explicitly labeled local Kmax
+or Rmin measurement, that explicitly circle-marked thinnest pachymetry, and the anterior/posterior elevation
 at that same marked thinnest point. A generic curvature-map spot is not Kmax or Rmin. If the identity
 or location is uncertain, return null.
 
@@ -1509,7 +1511,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.62 / source set 2026-08-25 plus binding CER-AI amendments",
+        "version": "software v0.7.63 / source set 2026-08-25 plus binding CER-AI amendments",
     }
 
 

@@ -106,6 +106,20 @@ def test_only_null_fields_are_requested_and_non_pentacam_is_ignored():
     assert targeted.missing_targets_by_eye(result) == {}
 
 
+def test_landmark_labels_and_existing_central_reading_control_targets():
+    assert targeted.label_supports_field("pachy_thinnest_um", "Thinnest Locat.")
+    assert targeted.label_supports_field("central_pachy_um", "Pupil Center +")
+    assert targeted.label_supports_field("corneal_diameter_mm", "HWTW")
+    assert not targeted.label_supports_field("corneal_diameter_mm", "HTWT")
+
+    result = pentacam_result()
+    assert "central_pachy_um" in targeted.missing_targets_by_eye(result)["OD"]
+    result["nice_readings"] = [{
+        "eye": "OD", "central_pachy_um": 542, "central_status": "CONFIDENT",
+    }]
+    assert "central_pachy_um" not in targeted.missing_targets_by_eye(result)["OD"]
+
+
 def test_patient_age_request_is_patient_level_and_only_for_pentacam():
     result = pentacam_result()
     result["document_context"]["patient_age_years"] = None
@@ -259,6 +273,55 @@ def test_unreadable_labeled_field_records_localized_completion_region():
         "source_box": [100, 200, 700, 500],
         "printed_label": "PPI Max",
     }
+
+
+def test_pupil_center_reread_feeds_nice_and_unreadable_region_reaches_form():
+    result = pentacam_result()
+    requested = {"OD": ["central_pachy_um"]}
+    confident = {
+        "screen_family": "PACHYMETRY",
+        "readings": [reading(
+            "central_pachy_um", 548, "Pupil Center +", tile="UPPER_RIGHT",
+            source_box=[100, 200, 650, 480],
+        )],
+        "warnings": [],
+    }
+    targeted.apply_targeted_readings(Core, result, confident, requested, "od.png")
+    assert result["nice_readings"][-1]["central_pachy_um"] == 548
+    assert result["nice_readings"][-1]["central_status"] == "CONFIDENT"
+    assert result["eyes"][0]["central_pachy_um"] is None
+
+    unreadable = pentacam_result()
+    reread = {
+        "screen_family": "PACHYMETRY",
+        "readings": [reading(
+            "central_pachy_um", None, "Pupil Center +", status="UNREADABLE",
+            tile="UPPER_RIGHT", source_box=[100, 200, 650, 480],
+        )],
+        "warnings": [],
+    }
+    targeted.apply_targeted_readings(Core, unreadable, reread, requested, "od.png")
+    item = assessment_workflow._request("OD", "NICE: central_pachy_um", unreadable)
+    assert item["source_region"] is True
+    assert item["form_id"] == "od_nice_central"
+
+
+def test_circle_marked_thinnest_location_is_retained_as_map_fallback():
+    result = pentacam_result()
+    reread = {
+        "screen_family": "PACHYMETRY",
+        "readings": [reading(
+            "pachy_thinnest_um", 501, "Thinnest Locat.", tile="LOWER_RIGHT",
+        )],
+        "warnings": [],
+    }
+    targeted.apply_targeted_readings(
+        Core, result, reread, {"OD": ["pachy_thinnest_um"]}, "od.png"
+    )
+    eye = result["eyes"][0]
+    assert eye["pachy_thinnest_um"] == 501
+    assert "pachy_thinnest_um" in eye["map_fallback_numeric_fields"]
+    assert "pachy_thinnest_um" not in eye["table_verified_numeric_fields"]
 
 
 def test_source_region_renderer_returns_tight_png_crop():

@@ -121,6 +121,13 @@ numbers. A map spot or color scale is not a labeled table value. Cornea Diameter
 for corneal_diameter_mm only when it is the Pentacam horizontal white-to-white output. I_S is only
 the printed IS or I-S field, not ISV, IVA, IHD, IHA, or KISA.
 
+PENTACAM LANDMARK LABELS:
+- pachy_thinnest_um is the pachymetry number identified by the CIRCULAR marker beside the printed
+  "Thinnest Locat." label. Do not return the adjacent X/Y location coordinates as pachymetry.
+- central_pachy_um is the pachymetry number identified as "Pupil Center" by the PLUS-SHAPED (+)
+  marker beside it. It is not the circle-marked Thinnest Locat. value.
+- corneal_diameter_mm is only the explicitly printed HWTW/horizontal white-to-white value.
+
 The printed_label response must contain the visible row/field label associated with the value. If
 that label is only Min, Avg/Ave, Max, X, or Y beneath a shared heading, copy the visible shared
 heading into group_label; otherwise use group_label=null. source_tile must identify the clearest
@@ -169,7 +176,18 @@ def missing_targets_by_eye(result: dict[str, Any]) -> dict[str, list[str]]:
         eye_id = eye.get("eye")
         if eye_id not in {"OD", "OS"}:
             continue
-        missing = [field for field in TARGET_FIELDS if eye.get(field) is None]
+        central_present = any(
+            reading.get("eye") == eye_id
+            and reading.get("central_status") == "CONFIDENT"
+            and reading.get("central_pachy_um") is not None
+            for reading in result.get("nice_readings") or []
+            if isinstance(reading, dict)
+        )
+        missing = [
+            field for field in TARGET_FIELDS
+            if not (field == "central_pachy_um" and central_present)
+            and eye.get(field) is None
+        ]
         if missing:
             targets[eye_id] = missing
     return targets
@@ -307,7 +325,8 @@ def label_supports_field(field: str, printed_label: Any, group_label: Any = None
         return label in exact[field]
     requirements = {
         "corneal_diameter_mm": (("hwtw", "horizontalwhitetowhite", "horizontalwtw", "corneadiameter", "w2w"),),
-        "pachy_thinnest_um": (("thinnest", "pachythin", "thinnestpachy", "thinnestlocation"),),
+        "pachy_thinnest_um": (("thinnest", "pachythin", "thinnestpachy", "thinnestlocat", "thinnestlocation"),),
+        "central_pachy_um": (("pupilcenter", "pachyvertexn", "centralpachy", "centralpachymetry"),),
         "ARTmax_um": (("artmax", "ambrosiorelationalthicknessmax"),),
         "anterior_elevation_thinnest_um": (("anteriorelevation", "frontelevation"), ("thin", "thinnest")),
         "posterior_elevation_thinnest_um": (("posteriorelevation", "backelevation"), ("thin", "thinnest")),
@@ -375,7 +394,7 @@ def apply_targeted_readings(
 
     for (eye_id, field), readings in candidates.items():
         eye = eyes.get(eye_id)
-        if eye is None or eye.get(field) is not None:
+        if eye is None or (field != "central_pachy_um" and eye.get(field) is not None):
             continue
         values = [float(item["value"]) for item in readings]
         if not _same_number(values):
@@ -385,10 +404,31 @@ def apply_targeted_readings(
             )
             continue
         retained = values[0]
-        eye[field] = retained
-        verified = set(eye.get("table_verified_numeric_fields") or [])
-        verified.add(field)
-        eye["table_verified_numeric_fields"] = sorted(verified)
+        if field == "central_pachy_um":
+            result.setdefault("nice_readings", []).append({
+                "eye": eye_id,
+                "central_pachy_um": retained,
+                "central_status": "CONFIDENT",
+                "posterior_pupil_max_um": None,
+                "posterior_status": "NOT_SHOWN",
+                "posterior_reference": "UNREADABLE",
+                "bfs_diameter_mm": None,
+                "pupil_boundary_visible": False,
+                "evidence": (
+                    f"Targeted Pupil Center plus-marker reread: {readings[0].get('printed_label')}"
+                ),
+            })
+        else:
+            eye[field] = retained
+            label = _normalize_label(readings[0].get("printed_label"))
+            if field == "pachy_thinnest_um" and "thinnestlocat" in label:
+                fallback = set(eye.get("map_fallback_numeric_fields") or [])
+                fallback.add(field)
+                eye["map_fallback_numeric_fields"] = sorted(fallback)
+            else:
+                verified = set(eye.get("table_verified_numeric_fields") or [])
+                verified.add(field)
+                eye["table_verified_numeric_fields"] = sorted(verified)
         eye["missing_or_unreadable"] = [
             item for item in eye.get("missing_or_unreadable") or [] if item != field
         ]
