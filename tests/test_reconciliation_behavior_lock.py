@@ -7,6 +7,7 @@ core = canonical_engine.core
 
 def _numeric_result(filename, field, value, provenance="table"):
     e = eye(True, "NORMAL_SYMMETRIC", filename)
+    e["keratometry_source"] = "SHOW_2_EXAMS_TOPOMETRIC_CORNEA_FRONT"
     e[field] = value
     e["field_provenance"] = {field: [filename]}
     e["table_verified_numeric_fields"] = [field] if provenance == "table" else []
@@ -14,24 +15,25 @@ def _numeric_result(filename, field, value, provenance="table"):
     return result(e, filename)
 
 
-def test_44_5_vs_44_6_same_provenance_uses_higher():
+def test_duplicate_authoritative_cornea_front_k1_retains_first_without_conflict():
     merged = core.merge_extractions([
         _numeric_result("a.jpg", "K1_D", 44.5),
         _numeric_result("b.jpg", "K1_D", 44.6),
     ])
     od = merged["eyes"][0]
-    assert od["K1_D"] == 44.6
+    assert od["K1_D"] == 44.5
     assert not any("K1_D" in str(x) for x in od.get("data_conflicts", []))
+    assert "K1_D" not in od.get("numeric_reconciliation", {})
 
 
-def test_exactly_one_percent_full_spread_is_accepted_and_higher_retained():
+def test_exactly_one_percent_non_keratometry_spread_is_accepted_and_higher_retained():
     merged = core.merge_extractions([
-        _numeric_result("a.jpg", "K1_D", 49.5),
-        _numeric_result("b.jpg", "K1_D", 50.0),
+        _numeric_result("a.jpg", "PPI_avg", 0.99),
+        _numeric_result("b.jpg", "PPI_avg", 1.0),
     ])
     od = merged["eyes"][0]
-    assert od["K1_D"] == 50.0
-    assert not any("K1_D" in str(x) for x in od.get("data_conflicts", []))
+    assert od["PPI_avg"] == 1.0
+    assert not any("PPI_avg" in str(x) for x in od.get("data_conflicts", []))
 
 
 def test_lower_is_retained_for_safety_limiting_fields_within_one_percent():
@@ -71,25 +73,25 @@ def test_labeled_table_has_priority_over_map_fallback():
     assert od["K1_D"] == 44.5
 
 
-def test_three_values_with_full_spread_within_one_percent_use_highest():
+def test_three_non_keratometry_values_with_full_spread_within_one_percent_use_highest():
     merged = core.merge_extractions([
-        _numeric_result("a.jpg", "K1_D", 44.50),
-        _numeric_result("b.jpg", "K1_D", 44.70),
-        _numeric_result("c.jpg", "K1_D", 44.90),
+        _numeric_result("a.jpg", "PPI_avg", 0.990),
+        _numeric_result("b.jpg", "PPI_avg", 0.995),
+        _numeric_result("c.jpg", "PPI_avg", 1.000),
     ])
     od = merged["eyes"][0]
-    assert od["K1_D"] == 44.90
-    assert not any("K1_D" in str(x) for x in od.get("data_conflicts", []))
+    assert od["PPI_avg"] == 1.0
+    assert not any("PPI_avg" in str(x) for x in od.get("data_conflicts", []))
 
 
-def test_full_spread_over_one_percent_is_not_reconciled_even_if_adjacent_pairs_are_close():
+def test_non_keratometry_full_spread_over_one_percent_is_not_reconciled():
     merged = core.merge_extractions([
-        _numeric_result("a.jpg", "K1_D", 44.0),
-        _numeric_result("b.jpg", "K1_D", 44.3),
-        _numeric_result("c.jpg", "K1_D", 44.6),
+        _numeric_result("a.jpg", "PPI_avg", 0.98),
+        _numeric_result("b.jpg", "PPI_avg", 0.99),
+        _numeric_result("c.jpg", "PPI_avg", 1.00),
     ])
     od = merged["eyes"][0]
-    assert any("K1_D" in str(x) for x in od.get("data_conflicts", [])) or any(
-        "K1_D" in str(x) and "conflict" in str(x).lower()
+    assert any("PPI_avg" in str(x) for x in od.get("data_conflicts", [])) or any(
+        "PPI_avg" in str(x) and "conflict" in str(x).lower()
         for x in merged.get("critical_input_issues", [])
     )

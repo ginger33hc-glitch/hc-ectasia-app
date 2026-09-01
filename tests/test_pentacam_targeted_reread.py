@@ -54,6 +54,7 @@ def pentacam_result(**values):
     eye = {
         "eye": "OD",
         "screen_types": ["PENTACAM_BAD_DISPLAY"],
+        "keratometry_source": "NOT_SHOWN",
         "table_verified_numeric_fields": [],
         "missing_or_unreadable": list(targeted.TARGET_FIELDS),
     }
@@ -107,6 +108,18 @@ def test_only_null_fields_are_requested_and_non_pentacam_is_ignored():
     assert targeted.missing_targets_by_eye(result) == {}
 
 
+def test_targeted_reread_does_not_seek_keratometry_on_other_pentacam_screens():
+    result = pentacam_result()
+    missing = targeted.missing_targets_by_eye(result)["OD"]
+    assert not set(targeted.CORNEA_FRONT_KERATOMETRY_FIELDS) & set(missing)
+
+    result["eyes"][0]["keratometry_source"] = (
+        "SHOW_2_EXAMS_TOPOMETRIC_CORNEA_FRONT"
+    )
+    missing = targeted.missing_targets_by_eye(result)["OD"]
+    assert set(targeted.CORNEA_FRONT_KERATOMETRY_FIELDS) <= set(missing)
+
+
 def test_landmark_labels_and_existing_central_reading_control_targets():
     assert targeted.label_supports_field("pachy_thinnest_um", "Thinnest Locat.")
     assert not targeted.label_supports_field("pachy_thinnest_um", "Pachy Vertex N.")
@@ -114,6 +127,7 @@ def test_landmark_labels_and_existing_central_reading_control_targets():
     assert targeted.label_supports_field("central_pachy_um", "Pupil Center +")
     assert not targeted.label_supports_field("central_pachy_um", "Pachy Vertex N.")
     assert targeted.label_supports_field("Kmax_D", "KMax")
+    assert targeted.label_supports_field("Kmean_D", "Km")
     assert targeted.label_supports_field("ARTmax_um", "ARTmax")
     assert targeted.label_supports_field("B_Ele_Th_um", "B. Ele.Th")
     assert not targeted.label_supports_field("B_Ele_Th_um", "Elevation (Back)")
@@ -127,6 +141,40 @@ def test_landmark_labels_and_existing_central_reading_control_targets():
         "central_landmark": "PUPIL_CENTER_PLUS",
     }]
     assert "central_pachy_um" not in targeted.missing_targets_by_eye(result)["OD"]
+
+
+def test_targeted_keratometry_requires_show2_screen_and_cornea_front_group():
+    result = pentacam_result()
+    requested = {"OD": ["K1_D", "Kmean_D"]}
+    wrong_screen = {
+        "screen_family": "TOPOMETRIC_KC",
+        "readings": [reading("K1_D", 49.0, "K1", group="Cornea Front")],
+        "warnings": [],
+    }
+    targeted.apply_targeted_readings(Core, result, wrong_screen, requested, "other.jpg")
+    assert result["eyes"][0]["K1_D"] is None
+
+    wrong_panel = {
+        "screen_family": "SHOW_2_EXAMS_TOPOMETRIC",
+        "readings": [reading("K1_D", 48.0, "K1", group="True Net Power")],
+        "warnings": [],
+    }
+    targeted.apply_targeted_readings(Core, result, wrong_panel, requested, "show2.jpg")
+    assert result["eyes"][0]["K1_D"] is None
+
+    canonical = {
+        "screen_family": "SHOW_2_EXAMS_TOPOMETRIC",
+        "readings": [
+            reading("K1_D", 42.1, "K1", group="Cornea Front"),
+            reading("Kmean_D", 42.4, "Km", group="Cornea Front"),
+        ],
+        "warnings": [],
+    }
+    targeted.apply_targeted_readings(Core, result, canonical, requested, "show2.jpg")
+    eye = result["eyes"][0]
+    assert eye["K1_D"] == 42.1
+    assert eye["Kmean_D"] == 42.4
+    assert eye["keratometry_source"] == "SHOW_2_EXAMS_TOPOMETRIC_CORNEA_FRONT"
 
 
 def test_only_canonical_b_ele_th_reading_suppresses_targeted_reread():

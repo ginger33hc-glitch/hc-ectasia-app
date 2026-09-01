@@ -16,7 +16,12 @@ from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 
 from clinical_disposition import combine_status as combine_clinical_status
-from pentacam_field_registry import EXCLUSIVE_LABELED_BOX_FIELDS
+from pentacam_field_registry import (
+    CORNEA_FRONT_KERATOMETRY_FIELDS,
+    CORNEA_FRONT_KERATOMETRY_SOURCE,
+    EXCLUSIVE_LABELED_BOX_FIELDS,
+    KERATOMETRY_SOURCE_VALUES,
+)
 from pentacam_quality_policy import is_quality_only_issue, warnings_for_extracted
 from reports import build_docx, build_pdf
 
@@ -136,6 +141,10 @@ SCHEMA = {
                         "type": "array",
                         "items": {"type": "string", "enum": list(MAP_FALLBACK_NUMERIC_FIELDS)},
                     },
+                    "keratometry_source": {
+                        "type": "string",
+                        "enum": list(KERATOMETRY_SOURCE_VALUES),
+                    },
                     "K1_D": {"type": ["number", "null"]},
                     "K1_axis_deg": {"type": ["number", "null"]},
                     "K2_D": {"type": ["number", "null"]},
@@ -189,7 +198,8 @@ SCHEMA = {
                 },
                 "required": [
                     "eye", "screen_types", "quality", "missing_or_unreadable",
-                    "table_verified_numeric_fields", "map_fallback_numeric_fields", "K1_D", "K1_axis_deg",
+                    "table_verified_numeric_fields", "map_fallback_numeric_fields", "keratometry_source",
+                    "K1_D", "K1_axis_deg",
                     "K2_D", "K2_axis_deg", "Kmax_D", "corneal_diameter_mm", "pachy_thinnest_um",
                     "BAD_D", "Df", "Db", "Dp", "Dt", "Da",
                     "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI", "CKI", "IHD",
@@ -302,6 +312,15 @@ at that same marked thinnest point. A generic curvature-map spot is not Kmax or 
 or location is uncertain, return null.
 
 EXCLUSIVE LABELED-BOX SOURCE LOCK:
+- K1_D, K1_axis_deg, K2_D, K2_axis_deg, and Kmean_D have exactly one accepted source:
+  the upper parameter panel explicitly headed "Cornea Front" for the corresponding eye on a
+  screen whose visible title is "Show 2 Exams Topometric". Set keratometry_source to
+  SHOW_2_EXAMS_TOPOMETRIC_CORNEA_FRONT only when both that screen title and the Cornea Front panel
+  heading are visible. In that panel, Kmean_D is the value printed in the Km row; never calculate
+  it from K1 and K2. On every other Pentacam page or panel, return all five fields as null, do not
+  add them to table_verified_numeric_fields, and set keratometry_source to OTHER_PENTACAM_SOURCE,
+  UNREADABLE, or NOT_SHOWN. Never use Cornea Back, True Net Power, Total Corneal Refractive Power,
+  another map/display, a color-map number, Kmax, or another K/Km-like field for these outputs.
 - Kmax_D: use only the numeric value in the explicitly printed "KMax"/"Kmax" row.
 - ARTmax_um: use only the numeric value in the explicitly printed "ARTmax" row beneath the
   Progression Index panel.
@@ -309,7 +328,7 @@ EXCLUSIVE LABELED-BOX SOURCE LOCK:
   "Thinnest Locat." row. Never use Pachy Vertex N., Pupil Center, or a thickness-map number.
 These are single authoritative labeled-box readings. Never compare them with a map value,
 neighboring number, calculated value, or another Pentacam screen to create a conflict. If the
-authoritative row is unreadable, return null for that field.
+authoritative row/panel is unreadable, return null for that field.
 
 Never substitute a generic map spot value, color-scale value, axis label, neighboring parameter,
 calculated value, average, or visual estimate for K1, K2, their axes, horizontal white-to-white
@@ -333,9 +352,10 @@ thinnest-point location, pachymetric-progression, topometric, corneal-volume, an
 when they are printed; otherwise return null. Classify both visible anterior and posterior maps as
 REASSURING, BORDERLINE, ABNORMAL, or UNREADABLE. ABNORMAL_ECTATIC is reserved for a clearly visible keratoconus,
 forme-fruste keratoconus, pellucid/ectatic pattern; do not infer it from one isolated index.
-In particular, extract K1_D/K1_axis_deg and K2_D/K2_axis_deg only from the explicitly labeled K1
-and K2 summary-table fields. The axis must be printed as part of the corresponding K row; never use
-the refractive cylinder axis as a keratometric axis. corneal_diameter_mm means horizontal
+In particular, extract K1_D/K1_axis_deg, K2_D/K2_axis_deg, and Kmean_D only from the locked
+Show 2 Exams Topometric > Cornea Front source defined above. The axis must be printed as part of
+the corresponding K row; never use the refractive cylinder axis as a keratometric axis.
+corneal_diameter_mm means horizontal
 white-to-white (HWTW) only. Extract it only from the Pentacam's explicitly labeled HWTW,
 horizontal WTW, horizontal white-to-white, WTW/white-to-white, or Cornea Diameter/W2W field.
 The Pentacam Cornea Diameter/W2W output is used here solely as its horizontal white-to-white
@@ -1576,6 +1596,13 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         verified = eye.get("table_verified_numeric_fields")
         if isinstance(verified, list):
             verified_set = set(verified)
+            if eye.get("keratometry_source") != CORNEA_FRONT_KERATOMETRY_SOURCE:
+                missing = list(eye.get("missing_or_unreadable", []))
+                for field in CORNEA_FRONT_KERATOMETRY_FIELDS:
+                    missing.append(field)
+                    eye[field] = None
+                verified_set -= CORNEA_FRONT_KERATOMETRY_FIELDS
+                eye["missing_or_unreadable"] = list(dict.fromkeys(missing))
             fallback_set = set(eye.get("map_fallback_numeric_fields", []))
             fallback_set &= set(MAP_FALLBACK_NUMERIC_FIELDS)
             fallback_set -= verified_set  # A readable labeled table value always has priority.
@@ -1657,8 +1684,13 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 for field in eye.get("table_verified_numeric_fields", []):
                     if eye.get(field) is not None:
                         targeted = list((eye.get("targeted_reread_evidence") or {}).get(field) or [])
+                        source = (
+                            CORNEA_FRONT_KERATOMETRY_SOURCE
+                            if field in CORNEA_FRONT_KERATOMETRY_FIELDS
+                            else "LABELED_TABLE"
+                        )
                         eye["field_provenance"][field] = targeted or [
-                            {"file": source_filename, "source": "LABELED_TABLE"}
+                            {"file": source_filename, "source": source}
                         ]
                 for field in eye.get("map_fallback_numeric_fields", []):
                     if eye.get(field) is not None:
@@ -1703,6 +1735,10 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 )
                 - set(target["table_verified_numeric_fields"])
             )
+            if eye.get("keratometry_source") == CORNEA_FRONT_KERATOMETRY_SOURCE:
+                target["keratometry_source"] = CORNEA_FRONT_KERATOMETRY_SOURCE
+            elif not target.get("keratometry_source"):
+                target["keratometry_source"] = eye.get("keratometry_source")
             target["morphology_evidence"] = list(
                 dict.fromkeys(target.get("morphology_evidence", []) + eye.get("morphology_evidence", []))
             )
@@ -1740,6 +1776,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 if key in (
                     "eye", "screen_types", "quality", "missing_or_unreadable",
                     "table_verified_numeric_fields", "map_fallback_numeric_fields",
+                    "keratometry_source",
                     "morphology_evidence", "source_files", "quality_by_source", "_source_filename",
                     "_pentacam_qs", "pentacam_qs", "scoring_morphology", "field_provenance",
                     "planning_data_issues", "targeted_reread_evidence",
