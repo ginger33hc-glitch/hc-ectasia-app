@@ -9,7 +9,7 @@ from threading import RLock
 from time import monotonic
 import secrets
 
-from fastapi import HTTPException, Body
+from fastapi import HTTPException, Body, Response
 from nice_scoring import finite
 
 _lock = RLock()
@@ -59,7 +59,31 @@ def missing_items(decision):
     return list(dict.fromkeys(items))
 
 
-def _request(eye, message):
+def _region_hint(extracted, eye, key):
+    if eye == "PATIENT" and key == "age":
+        direct = (extracted.get("document_context") or {}).get("targeted_unreadable_age_region")
+        if direct:
+            return direct
+        hints = [
+            context.get("targeted_unreadable_age_region")
+            for context in extracted.get("document_contexts") or []
+            if context.get("targeted_unreadable_age_region")
+        ]
+        return hints[0] if len(hints) == 1 else None
+    for candidate in extracted.get("eyes") or []:
+        if candidate.get("eye") == eye:
+            return (candidate.get("targeted_unreadable_regions") or {}).get(key)
+    return None
+
+
+def _with_region(item, extracted):
+    hint = _region_hint(extracted, item.get("eye"), item.get("key"))
+    if hint and hint.get("file") and hint.get("tile"):
+        return {**item, "source_region": True}
+    return item
+
+
+def _request(eye, message, extracted):
     if eye == "GLOBAL" and message[:2] in {"OD", "OS"}:
         eye = message[:2]
     prefix = eye.lower()
@@ -72,10 +96,10 @@ def _request(eye, message):
     }
     if message in exact:
         key, label, suffix = exact[message]
-        return {**item, "key": key, "label": label, "kind": "form", "form_id": f"{prefix}_{suffix}"}
+        return _with_region({**item, "key": key, "label": label, "kind": "form", "form_id": f"{prefix}_{suffix}"}, extracted)
     text = message.lower()
     if "i-s" in text or "i_s" in text:
-        return {**item, "kind": "form", "form_id": f"{prefix}_surgeon_i_s"}
+        return _with_region({**item, "kind": "form", "form_id": f"{prefix}_surgeon_i_s"}, extracted)
     if "topograph" in text and ("category" in text or "morphology" in text):
         return {**item, "kind": "form", "form_id": f"{prefix}_surgeon_topography"}
     for term, suffix in (("manifest sphere", "manifest_sphere"), ("manifest cylinder magnitude", "manifest_cylinder"),
@@ -87,13 +111,14 @@ def _request(eye, message):
         if term in text:
             return {**item, "kind": "form", "form_id": f"{prefix}_{suffix}"}
     if "age" == text or "age within" in text or "age conflicts" in text:
-        return {
+        return _with_region({
             **item,
             "eye": "PATIENT" if eye != "GLOBAL" else eye,
+            "key": "age",
             "label": "Patient age (years)",
             "kind": "form",
             "form_id": "age",
-        }
+        }, extracted)
     if "contact lens" in text or "contact-lens" in text:
         return {**item, "kind": "form", "form_id": "contact_lens_days" if "discontinued" in text else "contact_lens_type"}
     if "preoperative kmean" in text:
@@ -105,7 +130,7 @@ def _request(eye, message):
         fields = ["K2_D"]
     if len(fields) == 1 and eye in {"OD", "OS"}:
         key = fields[0]
-        return {**item, "kind": "number", "key": key, "destination": "measurement", "label": NUMERIC_FIELDS[key] + " — " + item["label"]}
+        return _with_region({**item, "kind": "number", "key": key, "destination": "measurement", "label": NUMERIC_FIELDS[key] + " — " + item["label"]}, extracted)
     for key in PATTERNS:
         if message == "readable " + key.replace("_", " "):
             return {**item, "kind": "select", "key": key, "destination": "measurement", "options": PATTERNS[key]}
@@ -181,20 +206,25 @@ def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
     session["ready"] = None
     if missing:
         response["missing"] = [{"eye": eye, "message": message} for eye, message in missing]
-        response["input_requests"] = [_request(eye, message) for eye, message in missing]
+        response["input_requests"] = [_request(eye, message, extracted) for eye, message in missing]
         response["message"] = "Complete all required information below before any clinical report can be produced."
     else:
         report_token = secrets.token_urlsafe(32)
         session["ready"] = {"report_token": report_token, "patient": deepcopy(metadata),
                             "decision": deepcopy(decision), "extracted": deepcopy(extracted)}
         response.update({"decision": decision, "report_token": report_token})
+    session["region_requests"] = {
+        (item.get("eye"), item.get("key"))
+        for item in response["input_requests"]
+        if item.get("source_region")
+    }
     # Preserve corrections across resume attempts, but never overwrite the original image values silently.
     session["extracted"] = extracted
     session["expires"] = monotonic() + TTL_SECONDS
     return response
 
 
-def begin(core, extracted, age, plans, modifiers, metadata):
+def begin(core, extracted, age, plans, modifiers, metadata, source_images=None):
     with _lock:
         _prune()
         if len(_sessions) >= MAX_SESSIONS:
@@ -204,7 +234,12 @@ def begin(core, extracted, age, plans, modifiers, metadata):
                 headers={"Retry-After": "60"},
             )
         token = secrets.token_urlsafe(32)
-        session = {"extracted": deepcopy(extracted), "expires": monotonic() + TTL_SECONDS, "ready": None}
+        session = {
+            "extracted": deepcopy(extracted),
+            "expires": monotonic() + TTL_SECONDS,
+            "ready": None,
+            "source_images": list(source_images or []),
+        }
         _sessions[token] = session
         return _respond(core, token, session, age, plans, modifiers, metadata, {})
 
@@ -237,4 +272,34 @@ def install(core):
     @core.app.post("/assessment/complete")
     def complete_assessment(payload: dict = Body(...)):
         return complete(core, payload)
+
+    @core.app.post("/assessment/source-region")
+    def assessment_source_region(payload: dict = Body(...)):
+        eye = payload.get("eye")
+        key = payload.get("key")
+        if eye not in {"OD", "OS", "PATIENT"} or not isinstance(key, str):
+            raise HTTPException(422, "Invalid source-region request.")
+        with _lock:
+            session = _session(payload.get("assessment_token"))
+            if (eye, key) not in session.get("region_requests", set()):
+                raise HTTPException(404, "No unresolved localized source region is available.")
+            hint = deepcopy(_region_hint(session["extracted"], eye, key))
+            matches = [
+                raw for raw, filename in session.get("source_images") or []
+                if hint and filename == hint.get("file")
+            ]
+        if not hint:
+            raise HTTPException(404, "No localized unread source region is available.")
+        if len(matches) != 1:
+            raise HTTPException(404, "The localized source image is unavailable or ambiguous.")
+        from pentacam_targeted_reread import render_source_region
+        try:
+            content = render_source_region(matches[0], hint.get("tile"), hint.get("source_box"))
+        except (OSError, ValueError) as exc:
+            raise HTTPException(422, "The localized source region could not be rendered.") from exc
+        return Response(
+            content=content,
+            media_type="image/png",
+            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+        )
     core._hc_readiness_installed = True

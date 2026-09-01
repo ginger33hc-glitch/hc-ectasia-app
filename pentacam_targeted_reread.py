@@ -68,10 +68,21 @@ REREAD_SCHEMA = {
                     "printed_label": {"type": ["string", "null"]},
                     "group_label": {"type": ["string", "null"]},
                     "source_tile": {"type": "string", "enum": list(SOURCE_TILES)},
+                    "source_box": {
+                        "anyOf": [
+                            {
+                                "type": "array",
+                                "items": {"type": "integer", "minimum": 0, "maximum": 999},
+                                "minItems": 4,
+                                "maxItems": 4,
+                            },
+                            {"type": "null"},
+                        ]
+                    },
                 },
                 "required": [
                     "eye", "field", "value", "status", "printed_label", "group_label",
-                    "source_tile",
+                    "source_tile", "source_box",
                 ],
             },
         },
@@ -86,8 +97,19 @@ REREAD_SCHEMA = {
                 },
                 "printed_label": {"type": ["string", "null"]},
                 "source_tile": {"type": "string", "enum": list(SOURCE_TILES)},
+                "source_box": {
+                    "anyOf": [
+                        {
+                            "type": "array",
+                            "items": {"type": "integer", "minimum": 0, "maximum": 999},
+                            "minItems": 4,
+                            "maxItems": 4,
+                        },
+                        {"type": "null"},
+                    ]
+                },
             },
-            "required": ["value", "status", "printed_label", "source_tile"],
+            "required": ["value", "status", "printed_label", "source_tile", "source_box"],
         },
         "warnings": {"type": "array", "items": {"type": "string"}},
     },
@@ -113,8 +135,12 @@ the printed IS or I-S field, not ISV, IVA, IHD, IHA, or KISA.
 The printed_label response must contain the visible row/field label associated with the value. If
 that label is only Min, Avg/Ave, Max, X, or Y beneath a shared heading, copy the visible shared
 heading into group_label; otherwise use group_label=null. source_tile must identify the clearest
-image containing the heading/label and digits. Do not include unrequested fields. Do not make any
-clinical interpretation or recommendation.
+image containing the heading/label and digits. When the requested label is visible, source_box must
+tightly enclose that label and its attached value area within source_tile, using
+[x_min,y_min,x_max,y_max] coordinates normalized to 0..999 from the tile's top-left corner. This
+applies even when the digits are unreadable. Use source_box=null only when the field is not shown or
+cannot be localized. Do not include unrequested fields. Do not make any clinical interpretation or
+recommendation.
 
 PATIENT-LEVEL AGE RULE:
 {age_target}
@@ -199,6 +225,51 @@ def build_overlapping_tiles(raw: bytes, *, include_top_header: bool = False) -> 
         crop.save(output, format="PNG", optimize=True)
         tiles.append((name, output.getvalue()))
     return tiles
+
+
+def render_source_region(raw: bytes, tile_name: str, source_box: Any = None) -> bytes:
+    """Return a temporary display crop for one unresolved labeled field."""
+    if tile_name not in SOURCE_TILES:
+        raise ValueError("unknown Pentacam source tile")
+    with Image.open(BytesIO(raw)) as opened:
+        width, height = opened.size
+        if width <= 0 or height <= 0 or width * height > MAX_SOURCE_PIXELS:
+            raise ValueError("image dimensions are outside the source-region safety limit")
+        image = ImageOps.exif_transpose(opened)
+        image.load()
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+    width, height = image.size
+    boxes = {
+        "ORIGINAL": (0, 0, width, height),
+        "TOP_HEADER": (0, 0, width, max(1, round(height * 0.36))),
+        "UPPER_LEFT": (0, 0, max(1, round(width * 0.58)), max(1, round(height * 0.58))),
+        "UPPER_RIGHT": (min(width - 1, round(width * 0.42)), 0, width, max(1, round(height * 0.58))),
+        "LOWER_LEFT": (0, min(height - 1, round(height * 0.42)), max(1, round(width * 0.58)), height),
+        "LOWER_RIGHT": (min(width - 1, round(width * 0.42)), min(height - 1, round(height * 0.42)), width, height),
+    }
+    tile = image.crop(boxes[tile_name])
+    if isinstance(source_box, (list, tuple)) and len(source_box) == 4:
+        try:
+            x1, y1, x2, y2 = (int(value) for value in source_box)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("invalid normalized source box") from exc
+        if not (0 <= x1 < x2 <= 999 and 0 <= y1 < y2 <= 999):
+            raise ValueError("invalid normalized source box")
+        tile_width, tile_height = tile.size
+        left = round(tile_width * x1 / 999)
+        top = round(tile_height * y1 / 999)
+        right = max(left + 1, round(tile_width * x2 / 999))
+        bottom = max(top + 1, round(tile_height * y2 / 999))
+        pad_x = max(12, round((right - left) * 0.18))
+        pad_y = max(8, round((bottom - top) * 0.35))
+        tile = tile.crop((
+            max(0, left - pad_x), max(0, top - pad_y),
+            min(tile_width, right + pad_x), min(tile_height, bottom + pad_y),
+        ))
+    output = BytesIO()
+    tile.save(output, format="PNG", optimize=True)
+    return output.getvalue()
 
 
 def _normalize_label(value: Any) -> str:
@@ -293,13 +364,23 @@ def apply_targeted_readings(
         eye_id, field = reading.get("eye"), reading.get("field")
         if eye_id not in requested or field not in requested.get(eye_id, []):
             continue
-        if reading.get("status") != "CONFIDENT" or not core.is_number(reading.get("value")):
-            continue
         if not label_supports_field(field, reading.get("printed_label"), reading.get("group_label")):
-            result.setdefault("global_warnings", []).append(
-                f"Targeted Pentacam reread rejected {eye_id} {field} in {filename}: "
-                "the returned printed label did not identify that field unambiguously."
-            )
+            if reading.get("status") == "CONFIDENT" and core.is_number(reading.get("value")):
+                result.setdefault("global_warnings", []).append(
+                    f"Targeted Pentacam reread rejected {eye_id} {field} in {filename}: "
+                    "the returned printed label did not identify that field unambiguously."
+                )
+            continue
+        if reading.get("status") != "CONFIDENT" or not core.is_number(reading.get("value")):
+            if reading.get("status") in {"UNCERTAIN", "UNREADABLE"}:
+                eye = eyes.get(eye_id)
+                if eye is not None:
+                    eye.setdefault("targeted_unreadable_regions", {})[field] = {
+                        "file": filename,
+                        "tile": reading.get("source_tile"),
+                        "source_box": reading.get("source_box"),
+                        "printed_label": reading.get("printed_label"),
+                    }
             continue
         candidates[(eye_id, field)].append(reading)
 
@@ -365,6 +446,16 @@ def apply_targeted_readings(
                 f"Targeted Pentacam age reread rejected in {filename}: "
                 "the printed age label or adult completed-year value was not unambiguous."
             )
+        elif (
+            age_reading.get("status") in {"UNCERTAIN", "UNREADABLE"}
+            and label_supports_patient_age(age_reading.get("printed_label"))
+        ):
+            context["targeted_unreadable_age_region"] = {
+                "file": filename,
+                "tile": age_reading.get("source_tile"),
+                "source_box": age_reading.get("source_box"),
+                "printed_label": age_reading.get("printed_label"),
+            }
     return result
 
 

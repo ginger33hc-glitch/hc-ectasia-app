@@ -688,10 +688,13 @@ def install(core: Any, *, runtime: Optional[CaseArchiveRuntime] = None) -> CaseA
             response["archive"] = {"status": "UNAVAILABLE"}
         return response
 
-    def begin_archived(core_arg, extracted, age, plans, modifiers, metadata):
+    def begin_archived(core_arg, extracted, age, plans, modifiers, metadata, source_images=None):
         pending = runtime._pending.get()
         runtime._pending.set(None)
-        response = original_begin(core_arg, extracted, age, plans, modifiers, metadata)
+        response = original_begin(
+            core_arg, extracted, age, plans, modifiers, metadata,
+            source_images=source_images,
+        )
         token = str(response.get("assessment_token") or "")
         if pending and token:
             case_id = str(pending["case_id"])

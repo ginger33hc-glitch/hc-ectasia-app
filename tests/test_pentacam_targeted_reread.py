@@ -2,9 +2,13 @@ import base64
 from io import BytesIO
 import json
 from types import SimpleNamespace
+from time import monotonic
 
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from PIL import Image
 
+import assessment_workflow
 import pentacam_targeted_reread as targeted
 
 
@@ -44,6 +48,7 @@ def pentacam_result(**values):
 
 def reading(
     field, value, label, *, eye="OD", status="CONFIDENT", tile="LOWER_RIGHT", group=None,
+    source_box=None,
 ):
     return {
         "eye": eye,
@@ -53,6 +58,7 @@ def reading(
         "printed_label": label,
         "group_label": group,
         "source_tile": tile,
+        "source_box": source_box,
     }
 
 
@@ -213,6 +219,72 @@ def test_conflicting_confident_rereads_leave_field_empty():
     targeted.apply_targeted_readings(Core, result, reread, requested, "od.png")
     assert result["eyes"][0]["PPI_max"] is None
     assert any("reread conflict" in warning for warning in result["global_warnings"])
+
+
+def test_unreadable_labeled_field_records_localized_completion_region():
+    result = pentacam_result()
+    requested = {"OD": ["PPI_max"]}
+    reread = {
+        "screen_family": "BAD_DISPLAY",
+        "readings": [reading(
+            "PPI_max", None, "PPI Max", status="UNREADABLE",
+            source_box=[100, 200, 700, 500],
+        )],
+        "warnings": [],
+    }
+    targeted.apply_targeted_readings(Core, result, reread, requested, "od.png")
+    assert result["eyes"][0]["PPI_max"] is None
+    assert result["eyes"][0]["targeted_unreadable_regions"]["PPI_max"] == {
+        "file": "od.png",
+        "tile": "LOWER_RIGHT",
+        "source_box": [100, 200, 700, 500],
+        "printed_label": "PPI Max",
+    }
+
+
+def test_source_region_renderer_returns_tight_png_crop():
+    raw = image_bytes(1000, 800)
+    rendered = targeted.render_source_region(
+        raw, "LOWER_RIGHT", [100, 200, 700, 500]
+    )
+    with Image.open(BytesIO(rendered)) as region:
+        assert region.format == "PNG"
+        assert region.width < 580
+        assert region.height < 464
+
+
+def test_source_region_endpoint_uses_opaque_post_body_and_no_store_cache():
+    token = "synthetic-source-region-session"
+    extracted = pentacam_result()
+    extracted["eyes"][0]["targeted_unreadable_regions"] = {
+        "PPI_max": {
+            "file": "od.png",
+            "tile": "LOWER_RIGHT",
+            "source_box": [100, 200, 700, 500],
+            "printed_label": "PPI Max",
+        }
+    }
+    assessment_workflow._sessions[token] = {
+        "extracted": extracted,
+        "expires": monotonic() + 60,
+        "ready": None,
+        "source_images": [(image_bytes(), "od.png")],
+        "region_requests": {("OD", "PPI_max")},
+    }
+    core = SimpleNamespace(app=FastAPI())
+    assessment_workflow.install(core)
+    try:
+        response = TestClient(core.app).post(
+            "/assessment/source-region",
+            json={"assessment_token": token, "eye": "OD", "key": "PPI_max"},
+        )
+    finally:
+        assessment_workflow._sessions.pop(token, None)
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert response.headers["cache-control"] == "no-store"
+    with Image.open(BytesIO(response.content)) as region:
+        assert region.format == "PNG"
 
 
 def test_grouped_progression_heading_supports_plain_max_label_but_not_plain_max_alone():

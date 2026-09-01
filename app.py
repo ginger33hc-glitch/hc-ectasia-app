@@ -14,7 +14,7 @@ from openai import OpenAI
 from reports import build_docx, build_pdf
 
 
-app = FastAPI(title="CER-AI v0.7.59")
+app = FastAPI(title="CER-AI v0.7.60")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 client: Optional[OpenAI] = None
 MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-terra")
@@ -1474,7 +1474,7 @@ def hc_engine(
         "critical_input_issues": sorted(set(global_issues)),
         "document_contexts": extracted.get("document_contexts", []),
         "protocol": "CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery",
-        "version": "software v0.7.59 / source set 2026-08-25 plus binding CER-AI amendments",
+        "version": "software v0.7.60 / source set 2026-08-25 plus binding CER-AI amendments",
     }
 
 
@@ -1643,6 +1643,9 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                         json.dumps(record, sort_keys=True): record for record in combined
                     }.values()
                 ]
+            target.setdefault("targeted_unreadable_regions", {})
+            for field, region in (eye.get("targeted_unreadable_regions") or {}).items():
+                target["targeted_unreadable_regions"].setdefault(field, dict(region))
             if quality_rank.get(eye.get("quality"), 0) > quality_rank.get(target.get("quality"), 0):
                 target["quality"] = eye.get("quality")
             if any(value in ("LIMITED", "INADEQUATE") for value in target["quality_by_source"].values()):
@@ -1662,6 +1665,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     "morphology_evidence", "source_files", "quality_by_source", "_source_filename",
                     "_pentacam_qs", "pentacam_qs", "scoring_morphology", "field_provenance",
                     "planning_data_issues", "targeted_reread_evidence",
+                    "targeted_unreadable_regions",
                 ):
                     continue
                 old = target.get(key)
@@ -2032,4 +2036,7 @@ async def analyze(
     from assessment_workflow import begin
     import sys
     extracted = attach_readings(merge_extractions(extraction_results), extraction_results)
-    return begin(sys.modules[__name__], extracted, age, plans, modifiers, metadata)
+    return begin(
+        sys.modules[__name__], extracted, age, plans, modifiers, metadata,
+        source_images=image_payloads,
+    )
