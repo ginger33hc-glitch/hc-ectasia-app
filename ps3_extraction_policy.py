@@ -9,6 +9,8 @@ pachymetry, I-S, KISA, B.Ele.Th, PPI, or ARTmax fields.
 
 from math import isfinite
 
+import exam_date_reconciliation_policy
+
 
 PS3_EXTRA_FIELDS = {
     "topographic_astig_D": {"type": ["number", "null"]},
@@ -54,7 +56,6 @@ def _equivalent(field, left, right):
     left = float(left)
     right = float(right)
     if field == "topographic_steep_axis_deg":
-        # Astigmatism axes are circular modulo 180 degrees.
         a = left % 180.0
         b = right % 180.0
         diff = abs(a - b)
@@ -63,17 +64,12 @@ def _equivalent(field, left, right):
 
 
 def merge_extractions_with_new_fields(results):
-    """Preserve only the four new labeled-box fields through legacy merge.
-
-    The legacy merge iterates core.TABLE_NUMERIC_FIELDS. We intentionally do
-    not expand that behavior-locked tuple. Instead, this narrow outer adapter
-    carries the four new fields after the ERSS source-aware merge and fails
-    closed on conflicts.
-    """
+    """Preserve the four new fields and reconcile equivalent Pentacam exam dates."""
     if _previous_merge_extractions is None:
         raise RuntimeError("PS3/new-field merge adapter was not initialized")
 
     merged = _previous_merge_extractions(results)
+    merged = exam_date_reconciliation_policy.reconcile_merged_exam_date_conflict(merged, results)
     merged_by_eye = {
         item.get("eye"): item
         for item in merged.get("eyes", [])
@@ -120,7 +116,6 @@ def merge_extractions_with_new_fields(results):
 
 
 def _install_new_field_merge(core):
-    """Install the outer new-field merge adapter exactly once."""
     global _previous_merge_extractions
 
     if not hasattr(core, "merge_extractions") or getattr(core, "_cerai_ps3_merge_installed", False):
@@ -143,8 +138,6 @@ def install(core):
         if name not in required:
             required.append(name)
 
-    # Allow the extractor to identify only these four as explicitly read new
-    # values without expanding core.TABLE_NUMERIC_FIELDS (behavior-locked).
     table_enum = properties["table_verified_numeric_fields"]["items"]["enum"]
     for name in PS3_EXTRA_FIELDS:
         if name not in table_enum:
