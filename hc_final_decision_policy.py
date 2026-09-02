@@ -8,9 +8,19 @@ _previous_assess_eye = core.assess_eye
 def _decision_critical_incomplete(result):
     if result.get("missing"):
         return True
-    # Preserve explicit data-insufficiency states produced by upstream safety logic.
     status = str(result.get("status") or "").upper()
     return "DATA INSUFFICIENT" in status or "NOT ASSESSED" in status
+
+
+def _prk_caution_was_auto_deferred(result):
+    """Identify the legacy PRK-EWSS CAUTION->STOP escalation so it can be corrected centrally."""
+    values = result.get("values") or {}
+    score = result.get("score") or {}
+    return (
+        str(values.get("procedure") or "").upper() == "PRK"
+        and score.get("category") == "CAUTION"
+        and not result.get("hard_stops")
+    )
 
 
 def assess_eye_with_hc_final_hierarchy(eye, plan, age, patient_modifiers):
@@ -18,6 +28,20 @@ def assess_eye_with_hc_final_hierarchy(eye, plan, age, patient_modifiers):
 
     if result.get("status") not in STATUS_RANK:
         raise ValueError(f"Non-canonical CER-AI disposition escaped the clinical engine: {result.get('status')!r}")
+
+    # Legacy PRK-EWSS code converted score 2-3 CAUTION directly to STOP-DEFER.
+    # CER-AI's canonical three-state contract does not allow CAUTION alone to defer surgery.
+    # Independent hard stops remain untouched and continue to win below.
+    if _prk_caution_was_auto_deferred(result):
+        result["status"] = CAUTION
+        result["action"] = "CAUTION — surgeon review is required; this category does not automatically defer surgery."
+        result["reasons"] = [
+            reason for reason in result.get("reasons", [])
+            if "PRK-EWSS v1.0 provisional caution category" not in str(reason)
+        ]
+        reason = "CER-AI final hierarchy: PRK-EWSS provisional CAUTION does not automatically defer surgery."
+        if reason not in result.setdefault("reasons", []):
+            result["reasons"].append(reason)
 
     if result.get("hard_stops") or result.get("status") == STOP_DEFER:
         result["status"] = STOP_DEFER
@@ -30,12 +54,16 @@ def assess_eye_with_hc_final_hierarchy(eye, plan, age, patient_modifiers):
     erss = result.get("randleman_erss") or {}
     erss_total = erss.get("total")
 
-    # The hierarchy requires both principal pathways to be actually available.
+    # PRK uses its separate provisional score; the LASIK ERSS principal hierarchy below
+    # must not reinterpret a PRK case merely because LASIK ERSS is unavailable.
+    if str((result.get("values") or {}).get("procedure") or "").upper() == "PRK":
+        result["status"] = CAUTION if result.get("status") == CAUTION else PASS
+        return result
+
     if bad_status in {"UNAVAILABLE", "UNREADABLE", None} or not core.is_number(erss_total):
         return result
 
     if bad_status == "ABNORMAL":
-        # Normally enforced upstream; retain a defensive guard here.
         stop = "CER-AI operational hard stop: Final BAD-D abnormal (>=2.60); cornea classified ABNORMAL by the CER-AI BAD-D gate."
         if stop not in result.setdefault("hard_stops", []):
             result["hard_stops"].append(stop)
@@ -64,8 +92,6 @@ def assess_eye_with_hc_final_hierarchy(eye, plan, age, patient_modifiers):
             result["reasons"].append(reason)
         return result
 
-    # Preserve a truly reassuring upstream PASS. Contextual review findings become
-    # CAUTION without an automatic defer instruction.
     result["status"] = CAUTION if result.get("status") == CAUTION else PASS
     result["action"] = (
         "CAUTION — surgeon review is required; this category does not automatically defer surgery."
