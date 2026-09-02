@@ -28,10 +28,10 @@ class TestERSSCanonicalEngine(unittest.TestCase):
         self.assertFalse(any("morphology_confidence" in str(x) for x in od.get("data_conflicts",[])))
         self.assertFalse(any("morphology_confidence" in str(x) for x in merged.get("critical_input_issues",[])))
     def test_i_s_abt_category_reaches_randleman_when_derived_srax_below_20(self):
-        maps=eye(True,"ASYMMETRIC_BOWTIE","4maps.jpg");maps["erss_source_read"]="DEDICATED_CURVATURE_PASS";maps["I_S"]=0.8;maps["KISA"]=5.0;maps["Kmax_D"]=47.0;maps["topographic_astig_D"]=1.0;maps["table_verified_numeric_fields"]=["I_S"];od=core.merge_extractions([result(maps,"4maps.jpg")])["eyes"][0];od["_erss_i_s_gate_required"]=True;scored=core.scoring_morphology(od)
+        maps=eye(True,"ASYMMETRIC_BOWTIE","4maps.jpg");maps["erss_source_read"]="DEDICATED_CURVATURE_PASS";maps["I_S"]=0.8;maps["KISA"]=5.0;maps["Kmax_D"]=47.0;maps["topographic_astig_D"]=1.0;maps["table_verified_numeric_fields"]=["I_S","topographic_astig_D"];od=core.merge_extractions([result(maps,"4maps.jpg")])["eyes"][0];od["_erss_i_s_gate_required"]=True;scored=core.scoring_morphology(od)
         self.assertEqual(scored["category"],"ASYMMETRIC_BOWTIE");self.assertEqual(core.lasik_topography_points(scored["category"]),1);self.assertLess(scored["derived_srax_deg"],20)
     def test_derived_srax_at_or_above_20_reaches_randleman_sra_points(self):
-        maps=eye(True,"NORMAL_SYMMETRIC","4maps.jpg");maps["erss_source_read"]="DEDICATED_CURVATURE_PASS";maps["I_S"]=0.5;maps["KISA"]=10.0;maps["Kmax_D"]=47.0;maps["topographic_astig_D"]=1.0;maps["table_verified_numeric_fields"]=["I_S"];od=core.merge_extractions([result(maps,"4maps.jpg")])["eyes"][0];od["_erss_i_s_gate_required"]=True;scored=core.scoring_morphology(od)
+        maps=eye(True,"NORMAL_SYMMETRIC","4maps.jpg");maps["erss_source_read"]="DEDICATED_CURVATURE_PASS";maps["I_S"]=0.5;maps["KISA"]=10.0;maps["Kmax_D"]=47.0;maps["topographic_astig_D"]=1.0;maps["table_verified_numeric_fields"]=["I_S","topographic_astig_D"];od=core.merge_extractions([result(maps,"4maps.jpg")])["eyes"][0];od["_erss_i_s_gate_required"]=True;scored=core.scoring_morphology(od)
         self.assertGreaterEqual(scored["derived_srax_deg"],20);self.assertEqual(scored["category"],"INFERIOR_STEEPENING_SRA");self.assertEqual(core.lasik_topography_points(scored["category"]),3)
 
     def test_high_confidence_visual_category_without_i_s_is_scored(self):
