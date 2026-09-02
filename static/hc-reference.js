@@ -21,11 +21,17 @@
   function installStaticPolicyUI() {
     document.title = "CER-AI — Corneal Ectasia Risk Assessment Intelligence v0.7.71";
     const brandSubtitle = document.querySelector(".brand-subtitle");
-    if (brandSubtitle) brandSubtitle.innerHTML = 'Corneal Ectasia Risk <span class="brand-initial">A</span>ssessment <span class="brand-initial">I</span>ntelligence';
+    if (brandSubtitle && (brandSubtitle.textContent || "").trim() !== "Corneal Ectasia Risk Assessment Intelligence") {
+      brandSubtitle.innerHTML = 'Corneal Ectasia Risk <span class="brand-initial">A</span>ssessment <span class="brand-initial">I</span>ntelligence';
+    }
     const brandLogo = document.querySelector(".brand-logo");
-    if (brandLogo) brandLogo.alt = "CER-AI — Corneal Ectasia Risk Assessment Intelligence";
+    if (brandLogo && brandLogo.alt !== "CER-AI — Corneal Ectasia Risk Assessment Intelligence") {
+      brandLogo.alt = "CER-AI — Corneal Ectasia Risk Assessment Intelligence";
+    }
     const heading = document.querySelector("body > header h1");
-    if (heading) heading.textContent = "CER-AI — Corneal Ectasia Risk Assessment Intelligence v0.7.71";
+    if (heading && heading.textContent !== "CER-AI — Corneal Ectasia Risk Assessment Intelligence v0.7.71") {
+      heading.textContent = "CER-AI — Corneal Ectasia Risk Assessment Intelligence v0.7.71";
+    }
 
     document.querySelectorAll('[data-erss-reference="surgeon"]').forEach(container => {
       if (!container.children.length) container.innerHTML = topographyReferenceHtml();
