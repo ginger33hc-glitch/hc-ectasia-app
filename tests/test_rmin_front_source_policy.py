@@ -74,9 +74,15 @@ def test_install_removes_rmin_map_fallback_and_appends_source_lock():
     c = core()
     c.extract_one_image = lambda raw, filename: source_result("OTHER_PENTACAM")
     targeted = SimpleNamespace(targeted_reread=lambda *args, **kwargs: {})
-    policy._previous_extract_one_image = None
-    policy.extract_one_image_with_front_rmin = None
-    policy.install(c, targeted)
-    assert "Rmin_mm" not in c.MAP_FALLBACK_NUMERIC_FIELDS
-    assert "CER-AI RMIN SOURCE LOCK" in c.PROMPT
-    assert c._cerai_rmin_front_source_installed is True
+    old_previous = policy._previous_extract_one_image
+    old_front = policy.extract_one_image_with_front_rmin
+    try:
+        policy._previous_extract_one_image = None
+        policy.extract_one_image_with_front_rmin = None
+        policy.install(c, targeted)
+        assert "Rmin_mm" not in c.MAP_FALLBACK_NUMERIC_FIELDS
+        assert "CER-AI RMIN SOURCE LOCK" in c.PROMPT
+        assert c._cerai_rmin_front_source_installed is True
+    finally:
+        policy._previous_extract_one_image = old_previous
+        policy.extract_one_image_with_front_rmin = old_front
