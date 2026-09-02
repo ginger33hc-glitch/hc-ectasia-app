@@ -9,16 +9,14 @@ import pytest
 os.environ.setdefault("CERAI_REQUIRE_ACCESS_KEY", "0")
 
 
-_CANONICAL_TEST_BASELINE = None
-
-
 def _runtime_state_baseline():
-    """Capture the composed canonical callable surface once per pytest process.
+    """Capture the composed canonical callable surface before test collection.
 
-    Several legacy policy tests intentionally install or monkeypatch wrappers.
-    Those mutations must not leak into later test files when the complete suite
-    runs in one Python process. This is test isolation only; production runtime
-    composition is unchanged.
+    Several legacy policy test modules perform wrapper installation or other
+    module-level mutations during pytest collection. Capturing the baseline only
+    when the first test starts is therefore too late. This snapshot is taken as
+    conftest is imported, before pytest imports the test modules themselves.
+    Production runtime composition is unchanged.
     """
     import canonical_engine
     import runtime_composition
@@ -39,12 +37,16 @@ def _runtime_state_baseline():
     return snapshots
 
 
+# Critical: capture before pytest collection imports test modules.
+_CANONICAL_TEST_BASELINE = _runtime_state_baseline()
+
+
 @pytest.fixture(autouse=True)
 def _restore_canonical_runtime_state_between_tests():
     """Prevent legacy wrapper/global state from leaking between test cases."""
-    global _CANONICAL_TEST_BASELINE
-    if _CANONICAL_TEST_BASELINE is None:
-        _CANONICAL_TEST_BASELINE = _runtime_state_baseline()
+    for module, state in _CANONICAL_TEST_BASELINE.values():
+        for name, value in state.items():
+            setattr(module, name, value)
 
     yield
 
