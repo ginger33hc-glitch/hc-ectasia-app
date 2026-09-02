@@ -55,13 +55,20 @@ def runtime_invariants():
         erss = composition.erss_topography_guard
         erss_evidence = composition.erss_topography_evidence_policy
         targeted = composition.pentacam_targeted_reread
+        rmin = composition.rmin_front_source_policy
         new_fields = composition.ps3_extraction_policy
-        if core.extract_one_image is not targeted.extract_one_image_with_targeted_reread:
-            errors.append("Targeted Pentacam numeric reread is not active")
+        if core.extract_one_image is not rmin.extract_one_image_with_front_rmin:
+            errors.append("Cornea Front Rmin source lock is not the active extraction layer")
+        if rmin._previous_extract_one_image is not targeted.extract_one_image_with_targeted_reread:
+            errors.append("Targeted Pentacam reread is not preserved immediately below Rmin source lock")
         if targeted._previous_extract_one_image is not erss.extract_one_image_with_erss:
             errors.append(
                 "Dedicated ERSS reader is not preserved immediately below the targeted numeric reread"
             )
+        if "Rmin_mm" in getattr(core, "MAP_FALLBACK_NUMERIC_FIELDS", ()):
+            errors.append("Rmin map fallback is still enabled")
+        if not getattr(core, "_cerai_rmin_front_source_installed", False):
+            errors.append("Cornea Front Rmin source lock is not marked active")
         if core.merge_extractions is not new_fields.merge_extractions_with_new_fields:
             errors.append("New Pentacam labeled-field merge adapter is not the active merge layer")
         if new_fields._previous_merge_extractions is not erss.merge_extractions_with_erss_source_guard:
@@ -81,7 +88,7 @@ def runtime_invariants():
                 "Dedicated ERSS morphology reader is not preserved immediately below the I-S/SRAX evidence gate"
             )
     except Exception as exc:
-        errors.append(f"ERSS source-isolation module unavailable: {type(exc).__name__}")
+        errors.append(f"ERSS/source-isolation module unavailable: {type(exc).__name__}")
 
     if not getattr(core, "_erss_visual_morphology_policy_installed", False):
         errors.append("Improved ERSS visual morphology policy is not active")
