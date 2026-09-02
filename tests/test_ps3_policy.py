@@ -118,8 +118,8 @@ def test_bfs_hyperopic_mixed_thresholds_are_inclusive():
 
 def test_inter_eye_score_four_is_moderate_and_five_is_high():
     score4 = normal_inter_eye(
-        os_anterior_km_d=43.3,
-        os_posterior_km_d=-6.1,
+        os_anterior_km_d=43.31,
+        os_posterior_km_d=-6.11,
         os_thinnest_um=532.0,
         os_front_elevation_thinnest_um=4.0,
     )
@@ -136,7 +136,7 @@ def test_inter_eye_score_four_is_moderate_and_five_is_high():
 
 
 def test_inter_eye_equal_to_limit_counts_as_exceeded_because_normal_requires_less_than_limit():
-    result = evaluate_ps3(normal_eye(), normal_inter_eye(os_anterior_km_d=43.3))
+    result = evaluate_ps3(normal_eye(), normal_inter_eye(os_thinnest_um=532.0))
     assert result.inter_eye_score == 1
 
 
