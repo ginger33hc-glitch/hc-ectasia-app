@@ -112,7 +112,13 @@ def compose(version: str):
     critical_score_highlight.install(core, reports)
     ps3_report_policy.install(reports)
     erss_visual_morphology_policy.install(erss_topography_guard)
-    erss_topography_evidence_policy.install(core)
+    # The composition root explicitly injects the immutable base assessor used
+    # for the prior-refractive-surgery short circuit. Leaf policies must not
+    # import bootstrap or infer this dependency from wrapper order.
+    erss_topography_evidence_policy.install(
+        core,
+        prior_assess_eye=bootstrap._original_assess_eye,
+    )
     inter_eye_tomography_policy.install(core, compatibility_owner=bootstrap)
     microkeratome_planning_policy.install(core)
     nice_policy.install(core)
