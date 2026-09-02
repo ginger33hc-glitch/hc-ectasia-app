@@ -17,42 +17,43 @@ TARGET_FIELDS = (
     "total_RMS_um", "spherical_aberration_um",
 )
 
+# Legacy K1/K2/Km source contract remains unchanged.
 CORNEA_FRONT_KERATOMETRY_SOURCE = "SHOW_2_EXAMS_TOPOMETRIC_CORNEA_FRONT"
-CORNEA_BACK_KERATOMETRY_SOURCE = "SHOW_2_EXAMS_TOPOMETRIC_CORNEA_BACK"
-PS3_TOPOGRAPHIC_INDEX_SOURCE = "SHOW_2_EXAMS_TOPOMETRIC_INDEX_BLOCK"
-BAD_THINNEST_ELEVATION_SOURCE = "BAD_DISPLAY_THINNEST_ELEVATION_BOXES"
-BAD_PROGRESSION_INDEX_SOURCE = "BAD_DISPLAY_PROGRESSION_INDEX"
-
 CORNEA_FRONT_KERATOMETRY_FIELDS = frozenset({
     "K1_D",
     "K1_axis_deg",
     "K2_D",
     "K2_axis_deg",
     "Kmean_D",
-    "topographic_astig_D",
-    "topographic_steep_axis_deg",
 })
-CORNEA_BACK_KERATOMETRY_FIELDS = frozenset({"posterior_Kmean_D"})
 KERATOMETRY_SOURCE_VALUES = (
     CORNEA_FRONT_KERATOMETRY_SOURCE,
-    CORNEA_BACK_KERATOMETRY_SOURCE,
     "OTHER_PENTACAM_SOURCE",
     "UNREADABLE",
     "NOT_SHOWN",
 )
 
-# Preserve the pre-existing reconciliation semantics for established fields
-# such as PPI_avg, I_S, and KISA. Only values with one authoritative printed
-# source are exclusive here; PS3 does not change how existing fields reconcile.
+# PS3-specific source groups are descriptive only. They must not change the
+# established keratometry-source gate above.
+PS3_CORNEA_FRONT_FIELDS = frozenset({"topographic_astig_D", "topographic_steep_axis_deg"})
+PS3_CORNEA_BACK_FIELDS = frozenset({"posterior_Kmean_D"})
+PS3_TOPOGRAPHIC_INDEX_FIELDS = frozenset({"I_S", "KISA"})
+PS3_BAD_THINNEST_FIELDS = frozenset({"F_Ele_Th_um", "B_Ele_Th_um"})
+PS3_BAD_PROGRESSION_FIELDS = frozenset({"PPI_avg", "ARTmax_um"})
+
+# Preserve reconciliation semantics for all established fields. Only newly
+# introduced PS3 fields with a single authoritative printed source are added.
 EXCLUSIVE_LABELED_BOX_FIELDS = frozenset({
     *CORNEA_FRONT_KERATOMETRY_FIELDS,
-    *CORNEA_BACK_KERATOMETRY_FIELDS,
     "Kmax_D",
     "ARTmax_um",
     "pachy_thinnest_um",
     "central_pachy_um",
-    "F_Ele_Th_um",
     "B_Ele_Th_um",
+    "topographic_astig_D",
+    "topographic_steep_axis_deg",
+    "posterior_Kmean_D",
+    "F_Ele_Th_um",
 })
 
 COMPLETION_NUMERIC_FIELDS = {
