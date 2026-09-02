@@ -79,18 +79,27 @@ def dates_are_semantically_consistent(extractions):
     return len(common) == 1
 
 
+def reconcile_merged_exam_date_conflict(merged, extractions):
+    """Remove only a false raw-string date conflict from an already merged result."""
+    if not dates_are_semantically_consistent(extractions):
+        return merged
+    reconciled = deepcopy(merged)
+    reconciled["critical_input_issues"] = [
+        issue for issue in reconciled.get("critical_input_issues") or []
+        if str(issue) != _CONFLICT
+    ]
+    return reconciled
+
+
 def merge_extractions_with_exam_date_reconciliation(extractions):
-    merged = _previous_merge_extractions(extractions)
-    if dates_are_semantically_consistent(extractions):
-        merged = deepcopy(merged)
-        merged["critical_input_issues"] = [
-            issue for issue in merged.get("critical_input_issues") or []
-            if str(issue) != _CONFLICT
-        ]
-    return merged
+    """Compatibility wrapper for isolated tests; production composes this inside PS3 merge."""
+    if _previous_merge_extractions is None:
+        raise RuntimeError("Exam-date reconciliation wrapper was not initialized")
+    return reconcile_merged_exam_date_conflict(_previous_merge_extractions(extractions), extractions)
 
 
 def install(runtime_core):
+    """Compatibility installer only; production must not stack this outside the canonical merge adapter."""
     global _previous_merge_extractions
     if getattr(runtime_core, "_exam_date_reconciliation_policy_installed", False):
         return
