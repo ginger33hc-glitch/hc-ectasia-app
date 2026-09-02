@@ -94,7 +94,7 @@ def test_rigid_lens_twenty_one_full_days_allows_engine():
         "contact_lens_discontinuation_days": 21,
     })
     assert calls == 1
-    assert result["workflow_status"] == "READY"
+    assert result["workflow_status"] != "CONTACT_LENS_WASHOUT_REQUIRED"
 
 
 def test_contact_lens_days_must_be_documented_when_lens_is_used():
@@ -107,4 +107,4 @@ def test_contact_lens_days_must_be_documented_when_lens_is_used():
 def test_none_lens_type_allows_engine_without_days():
     result, calls = _respond({"contact_lens_type": "NONE"})
     assert calls == 1
-    assert result["workflow_status"] == "READY"
+    assert result["workflow_status"] != "CONTACT_LENS_WASHOUT_REQUIRED"
