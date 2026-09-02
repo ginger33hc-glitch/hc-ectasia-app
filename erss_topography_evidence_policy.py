@@ -6,7 +6,6 @@ CER-AI derived SRAX are numeric Randleman inputs; the existing point mapper
 remains the sole scoring authority.
 """
 
-import bootstrap
 from derived_srax import derive_srax_deg
 
 core = None
@@ -94,13 +93,12 @@ def _i_s_category(eye):
 
 
 def _derived_srax(eye):
-    value = derive_srax_deg(
+    return derive_srax_deg(
         kisa_percent=eye.get("KISA"),
         kmax_d=eye.get("Kmax_D"),
         i_s_d=eye.get("I_S"),
         astig_d=eye.get("topographic_astig_D"),
     )
-    return value
 
 
 def _high_confidence_map_category(eye):
@@ -118,9 +116,11 @@ def _high_confidence_map_category(eye):
 def scoring_morphology_with_i_s_evidence_gate(eye):
     """Return one mutually exclusive Randleman topography category.
 
-    Numeric candidates are signed I-S and derived SRAX. Derived SRAX >=20° is
-    the ERSS SRA criterion (3-point category). The highest applicable category
-    wins; categories are never added together.
+    All independently valid evidence is considered together: signed I-S,
+    derived SRAX, a HIGH-confidence dedicated anterior-map category, and an
+    explicit surgeon-confirmed category. The highest applicable category wins;
+    categories are never added together. This prevents reassuring numeric data
+    from downgrading stronger definite ectatic morphology evidence.
     """
     if not eye.get("_erss_i_s_gate_required"):
         return _previous_scoring_morphology(eye)
@@ -143,31 +143,19 @@ def scoring_morphology_with_i_s_evidence_gate(eye):
             candidates.append(("INFERIOR_STEEPENING_SRA", "DERIVED_SRAX"))
             evidence.append("ERSS SRA criterion met: derived SRAX >=20°.")
 
-    if candidates:
-        category, source = max(candidates, key=lambda item: _CATEGORY_RANK[item[0]])
-        evidence.append(
-            "Highest applicable numeric Randleman topography category selected; I-S and SRAX categories are never added together."
-        )
-        return {
-            "category": category,
-            "category_source": source,
-            "derived_srax_deg": derived,
-            "evidence": list(dict.fromkeys(evidence)),
-        }
-
     map_category = _high_confidence_map_category(eye)
-    surgeon_category = eye.get("surgeon_topography_category")
-    fallback = []
     if map_category:
-        fallback.append((map_category, "AUTOMATIC_HIGH_CONFIDENCE_MAP_EVIDENCE"))
+        candidates.append((map_category, "AUTOMATIC_HIGH_CONFIDENCE_MAP_EVIDENCE"))
         evidence.append(
             "Dedicated reader found a HIGH-confidence category on the complete anterior curvature map; no BAD/BAD-D field was used."
         )
+
+    surgeon_category = eye.get("surgeon_topography_category")
     if surgeon_category in VALID_CATEGORIES:
-        fallback.append((surgeon_category, "SURGEON_CONFIRMED"))
+        candidates.append((surgeon_category, "SURGEON_CONFIRMED"))
         evidence.append("Randleman anterior-topography category was explicitly confirmed by the surgeon.")
 
-    if not fallback:
+    if not candidates:
         confidence = eye.get("morphology_confidence") or "UNSPECIFIED"
         evidence.append(
             f"Randleman topography remains unscored: no usable I-S/SRAX numeric criterion, HIGH-confidence dedicated map category, or surgeon-confirmed category is available (map confidence: {confidence})."
@@ -181,8 +169,10 @@ def scoring_morphology_with_i_s_evidence_gate(eye):
             "evidence": list(dict.fromkeys(evidence)),
         }
 
-    category, source = max(fallback, key=lambda item: _CATEGORY_RANK[item[0]])
-    evidence.append("Fallback evidence selected one highest Randleman topography category; categories are never added together.")
+    category, source = max(candidates, key=lambda item: _CATEGORY_RANK[item[0]])
+    evidence.append(
+        "Highest applicable single Randleman topography category selected across numeric, map, and surgeon-confirmed evidence; categories are never added together."
+    )
     return {
         "category": category,
         "category_source": source,
@@ -202,8 +192,11 @@ def required_tomography_missing_with_i_s(eye):
 
 
 def assess_eye_with_i_s_evidence(eye, plan, age, patient_modifiers):
+    # The previously composed clinical chain retains the base prior-surgery
+    # short circuit. Keeping this leaf policy dependent only on its immediate
+    # predecessor avoids a hidden bootstrap/runtime-assembly dependency.
     if core.tri((plan or {}).get("prior")) == "yes":
-        return bootstrap._original_assess_eye(eye, plan, age, patient_modifiers)
+        return _previous_assess_eye(eye, plan, age, patient_modifiers)
 
     if (plan or {}).get("procedure") != "LASIK":
         return _previous_assess_eye(eye, plan, age, patient_modifiers)
@@ -222,7 +215,7 @@ def assess_eye_with_i_s_evidence(eye, plan, age, patient_modifiers):
         "image_category_confidence": working_eye.get("morphology_confidence", "UNSPECIFIED"),
         "validated_category": validated.get("category", "UNCERTAIN"),
         "category_source": validated.get("category_source", "UNRESOLVED"),
-        "single_category_rule": "Highest applicable Randleman topography category only; I-S and SRAX points are never added.",
+        "single_category_rule": "Highest applicable Randleman topography category only; evidence categories are never added.",
         "needs_surgeon_I_S": False,
         "needs_surgeon_category": validated.get("category") == "UNCERTAIN",
     }
