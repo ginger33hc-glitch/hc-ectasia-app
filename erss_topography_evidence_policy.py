@@ -12,6 +12,7 @@ core = None
 _previous_scoring_morphology = None
 _previous_required_tomography_missing = None
 _previous_assess_eye = None
+_prior_assess_eye = None
 
 VALID_CATEGORIES = {
     "NORMAL_SYMMETRIC",
@@ -192,11 +193,11 @@ def required_tomography_missing_with_i_s(eye):
 
 
 def assess_eye_with_i_s_evidence(eye, plan, age, patient_modifiers):
-    # The previously composed clinical chain retains the base prior-surgery
-    # short circuit. Keeping this leaf policy dependent only on its immediate
-    # predecessor avoids a hidden bootstrap/runtime-assembly dependency.
+    # Prior refractive surgery must use the immutable base assessor supplied by
+    # the composition root; wrapper order must never re-enter the virgin engine.
     if core.tri((plan or {}).get("prior")) == "yes":
-        return _previous_assess_eye(eye, plan, age, patient_modifiers)
+        assessor = _prior_assess_eye or _previous_assess_eye
+        return assessor(eye, plan, age, patient_modifiers)
 
     if (plan or {}).get("procedure") != "LASIK":
         return _previous_assess_eye(eye, plan, age, patient_modifiers)
@@ -235,12 +236,13 @@ def assess_eye_with_i_s_evidence(eye, plan, age, patient_modifiers):
     return result
 
 
-def install(runtime_core) -> None:
+def install(runtime_core, prior_assess_eye=None) -> None:
     """Attach ERSS evidence gates explicitly and at most once."""
     global core
     global _previous_scoring_morphology
     global _previous_required_tomography_missing
     global _previous_assess_eye
+    global _prior_assess_eye
 
     if getattr(runtime_core, "_erss_topography_evidence_policy_installed", False):
         return
@@ -248,6 +250,7 @@ def install(runtime_core) -> None:
     _previous_scoring_morphology = runtime_core.scoring_morphology
     _previous_required_tomography_missing = runtime_core.required_tomography_missing
     _previous_assess_eye = runtime_core.assess_eye
+    _prior_assess_eye = prior_assess_eye
     runtime_core.scoring_morphology = scoring_morphology_with_i_s_evidence_gate
     runtime_core.required_tomography_missing = required_tomography_missing_with_i_s
     runtime_core.assess_eye = assess_eye_with_i_s_evidence
