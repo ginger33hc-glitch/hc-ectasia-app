@@ -45,12 +45,21 @@ def assess_eye_with_hc_final_hierarchy(eye, plan, age, patient_modifiers):
         result["action"] = "STOP-DEFER — ABNORMAL CORNEA. Final BAD-D is >=2.60 and meets the CER-AI abnormal cutoff."
         return result
 
-    if float(erss_total) >= 3:
-        # Do not weaken the existing ERSS adverse pathway. If an upstream layer happened
-        # to leave PASS, enforce the CER-AI threshold explicitly.
+    if float(erss_total) >= 4:
         result["status"] = STOP_DEFER
-        result["action"] = "STOP-DEFER. Randleman/ERSS score is 3 or greater."
-        reason = f"CER-AI final hierarchy: Randleman/ERSS total {float(erss_total):g} is >=3."
+        result["action"] = "STOP-DEFER. Randleman/ERSS score is 4 or greater."
+        reason = f"CER-AI final hierarchy: Randleman/ERSS total {float(erss_total):g} is >=4."
+        if reason not in result.setdefault("reasons", []):
+            result["reasons"].append(reason)
+        return result
+
+    if float(erss_total) == 3:
+        result["status"] = CAUTION
+        result["action"] = (
+            "CAUTION — Randleman/ERSS score 3 is moderate risk; explicit surgeon review "
+            "is required without automatic defer."
+        )
+        reason = "CER-AI final hierarchy: Randleman/ERSS total 3 is moderate risk (CAUTION)."
         if reason not in result.setdefault("reasons", []):
             result["reasons"].append(reason)
         return result
@@ -66,7 +75,7 @@ def assess_eye_with_hc_final_hierarchy(eye, plan, age, patient_modifiers):
     result["hc_final_decision_hierarchy"] = {
         "final_BAD_D_status": bad_status,
         "randleman_erss_total": float(erss_total),
-        "rule": "FINAL_BAD_D_NOT_ABNORMAL_AND_ERSS_LT_3_PRESERVE_PASS_OR_CAUTION",
+        "rule": "FINAL_BAD_D_NOT_ABNORMAL_AND_ERSS_0_TO_2_PRESERVE_PASS_OR_CAUTION",
     }
     return result
 

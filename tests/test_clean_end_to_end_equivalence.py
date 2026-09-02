@@ -75,7 +75,7 @@ def test_clean_surgical_outputs_match_locked_canonical_formulas():
 def test_clean_final_lasik_status_matches_locked_principal_hierarchy_for_comparable_cases():
     expected = (
         ({}, "PASS"),
-        ({"age_years": 18}, "STOP-DEFER"),
+        ({"age_years": 18}, "CAUTION"),
         ({"bad_d": 2.6}, "STOP-DEFER"),
         ({"bad_d": None}, "DATA INSUFFICIENT"),
     )

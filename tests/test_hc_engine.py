@@ -451,7 +451,8 @@ class TestBoundaries(unittest.TestCase):
         )
         self.assertEqual(result["topography_classification"]["scoring_category"], "INFERIOR_STEEPENING_SRA")
         self.assertEqual(result["score"]["rows"]["topography"], 3)
-        self.assertEqual(result["status"], "STOP-DEFER")
+        self.assertEqual(result["score"]["total"], 3)
+        self.assertEqual(result["status"], "CAUTION")
 
     def test_minimal_axis_deviation_is_not_scored_as_srax(self):
         eye = normal_eye()

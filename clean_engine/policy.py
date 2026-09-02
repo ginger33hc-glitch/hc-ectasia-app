@@ -19,7 +19,7 @@ class HCPolicy:
     prk_rst_hard_stop_um: float = 310.0
     bad_d_normal_max: float = 1.6
     bad_d_abnormal_min: float = 2.6
-    score_defer: int = 3
+    score_caution: int = 3
     score_stop: int = 4
 
 
@@ -29,15 +29,15 @@ POLICY = HCPolicy()
 def score_decision_band(score: Optional[float]) -> Optional[str]:
     """Unified CER-AI score disposition used by LASIK and PRK.
 
-    0-2: no score escalation; 3: defer; >=4: stop.
+    0-2: no score escalation; 3: caution; >=4: stop.
     """
     if not isinstance(score, (int, float)) or isinstance(score, bool):
         return None
     value = float(score)
     if value >= POLICY.score_stop:
         return "STOP"
-    if value >= POLICY.score_defer:
-        return "DEFER"
+    if value >= POLICY.score_caution:
+        return "CAUTION"
     return "NO_SCORE_ESCALATION"
 
 

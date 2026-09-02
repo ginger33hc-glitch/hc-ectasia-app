@@ -35,6 +35,8 @@ def decide(inp: DecisionInput) -> DecisionOutput:
     if inp.bad_d_status == "ABNORMAL":
         return DecisionOutput(STOP_DEFER, "FINAL_BAD_D_ABNORMAL")
     score_band = score_decision_band(inp.erss_total)
-    if score_band in {"DEFER", "STOP"}:
-        return DecisionOutput(STOP_DEFER, "ERSS_GE_3")
-    return DecisionOutput(CAUTION if status_upper == CAUTION else PASS, "FINAL_BAD_D_NOT_ABNORMAL_AND_ERSS_LT_3")
+    if score_band == "STOP":
+        return DecisionOutput(STOP_DEFER, "ERSS_GE_4")
+    if score_band == "CAUTION":
+        return DecisionOutput(CAUTION, "ERSS_EQ_3_CAUTION")
+    return DecisionOutput(CAUTION if status_upper == CAUTION else PASS, "FINAL_BAD_D_NOT_ABNORMAL_AND_ERSS_0_TO_2")

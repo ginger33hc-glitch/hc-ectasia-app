@@ -105,7 +105,8 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 ## Published/provisional instruments
 
 - LASIK uses the published five-component ERSS: Placido topography, RSB, age, pachymetry, and
-  manifest MRSE. Score 0–2 is low, 3 is moderate/STOP-DEFER, and ≥4 is high/STOP-DEFER.
+  manifest MRSE. Score 0–2 is PASS if no other concern is present, 3 is CAUTION without automatic
+  defer, and ≥4 is STOP-DEFER.
 - PRK-EWSS v1.0 is an CER-AI provisional triage score and is not validated. It does not produce a risk
   probability.
 - A single numeric Placido criterion may support the published ERSS topography category but is not

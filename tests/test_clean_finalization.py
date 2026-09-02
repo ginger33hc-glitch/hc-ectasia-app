@@ -30,8 +30,8 @@ def test_missing_principal_input_never_passes():
     assert out.status == "DATA INSUFFICIENT"
 
 
-def test_lasik_score_three_defers_while_score_four_is_expected_to_arrive_as_hard_stop():
-    assert finalize(inp(lasik_erss_total=3)).status == "STOP-DEFER"
+def test_lasik_score_three_cautions_while_score_four_is_expected_to_arrive_as_hard_stop():
+    assert finalize(inp(lasik_erss_total=3)).status == "CAUTION"
     score4 = finalize(inp(lasik_erss_total=4, hard_stops=("ERSS_GE_4",)))
     assert score4.status == "STOP-DEFER"
 

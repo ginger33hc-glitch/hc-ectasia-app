@@ -103,7 +103,7 @@ def build_pdf(payload):
             active_erss_block=KeepTogether([
                 Paragraph(tr('Active CER-AI Randleman / ERSS points'),sec),
                 erss,
-                Paragraph(tr('Randleman/ERSS is calculated from five independent LASIK inputs. BAD-D and NICE remain separate pathways. Overall ERSS: 0-2 low, 3 moderate, >=4 high; CER-AI does not clear totals >=3.'),tiny),
+                Paragraph(tr('Randleman/ERSS is calculated from five independent LASIK inputs. BAD-D and NICE remain separate pathways. Overall ERSS disposition: 0-2 PASS if no other concern is present, 3 CAUTION without automatic defer, >=4 STOP-DEFER.'),tiny),
             ])
             appendix=[Paragraph(tr('CER-AI BAD-D reference points'),sec),bad,Paragraph(tr('BAD-D is read from the Pentacam BAD display and is independent of Randleman/ERSS anterior-topography scoring.'),tiny),topography_block,active_erss_block,Spacer(1,8)]
             story[idx:idx]=appendix
@@ -151,7 +151,7 @@ def build_docx(payload):
                     c=e.add_row().cells
                     for j,x in enumerate(row):c[j].text=tr(x)
                 reports._style_doc_table(e,[1.65,3.5,.7],header=True)
-                p=document.add_paragraph(tr('Randleman/ERSS is calculated from five independent LASIK inputs. BAD-D and NICE remain separate pathways. Overall ERSS: 0-2 low, 3 moderate, >=4 high; CER-AI does not clear totals >=3.'));p.runs[0].font.size=Pt(8)
+                p=document.add_paragraph(tr('Randleman/ERSS is calculated from five independent LASIK inputs. BAD-D and NICE remain separate pathways. Overall ERSS disposition: 0-2 PASS if no other concern is present, 3 CAUTION without automatic defer, >=4 STOP-DEFER.'));p.runs[0].font.size=Pt(8)
             return orig_heading(document,text,level)
         reports._add_heading=patched_heading
         reports._add_bullet=patched_bullet

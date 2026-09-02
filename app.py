@@ -1169,9 +1169,9 @@ def assess_eye(
                 status = combine_status(status, "STOP-DEFER")
                 reasons.append("Validated LASIK ERSS high-risk category (score >=4).")
             elif category == "MODERATE":
-                status = combine_status(status, "STOP-DEFER")
+                status = combine_status(status, "CAUTION")
                 reasons.append(
-                    "Validated LASIK ERSS moderate-risk category (score 3): defer and re-evaluate after >=6 months."
+                    "Validated LASIK ERSS moderate-risk category (score 3): CAUTION; explicit surgeon review required without automatic defer."
                 )
     elif procedure == "PRK":
         score_rows = {

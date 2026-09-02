@@ -44,7 +44,7 @@
     "18 / 19–20 / ≥21 years":"18 / 19–20 / ≥21 yaş",
     "Preop corneal thickness — active CER-AI policy":"Preoperatif kornea kalınlığı — aktif CER-AI politikası",
     "Hard stop / 2 / 1 / 0":"Kesin durdurma / 2 / 1 / 0",
-    "Randleman/ERSS is calculated from five independent LASIK inputs. BAD-D and NICE remain separate pathways. Overall ERSS: 0–2 low, 3 moderate, ≥4 high; CER-AI does not clear totals ≥3.":"Randleman/ERSS beş bağımsız LASIK girdisinden hesaplanır. BAD-D ve NICE ayrı değerlendirme yollarıdır. ERSS toplamı: 0–2 düşük, 3 orta, ≥4 yüksek; CER-AI toplam ≥3 olduğunda cerrahi onay vermez.",
+    "Randleman/ERSS is calculated from five independent LASIK inputs. BAD-D and NICE remain separate pathways. Overall ERSS disposition: 0–2 PASS if no other concern is present, 3 CAUTION without automatic defer, ≥4 STOP-DEFER.":"Randleman/ERSS beş bağımsız LASIK girdisinden hesaplanır. BAD-D ve NICE ayrı değerlendirme yollarıdır. Genel ERSS kararı: başka bir risk yoksa 0–2 UYGUN, 3 otomatik erteleme olmadan DİKKAT, ≥4 DURDUR-ERTELE.",
     "Source:":"Kaynak:",
     "Leave blank for image reading. Enter only when requested or to explicitly correct a reading. Central pachymetry is read only from Pupil Center (+). NICE posterior elevation is read only from the B. Ele.Th box on the BAD Display page.":"Görüntüden okuma için boş bırakın. Yalnızca istendiğinde veya bir okumayı açıkça düzeltmek için girin. Santral pakimetri yalnızca Pupil Center (+) alanından okunur. NICE posterior elevasyonu yalnızca BAD Display sayfasındaki B. Ele.Th kutusundan okunur.",
     "Surgeon-confirmed I-S (D)":"Cerrah tarafından doğrulanan I-S (D)",
