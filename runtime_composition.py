@@ -34,6 +34,7 @@ import erss_topography_evidence_policy  # noqa: E402
 import ps3_extraction_policy  # noqa: E402
 import ps3_runtime_policy  # noqa: E402
 import ps3_report_policy  # noqa: E402
+import exam_date_reconciliation_policy  # noqa: E402
 
 # Explicitly installed clinical workflow and operational services.
 import nice_policy  # noqa: E402
@@ -72,6 +73,7 @@ COMPOSITION_PHASES = {
     "pentacam_extraction": (
         "merge_policy_base",
         "extraction_guard",
+        "exam_date_reconciliation_policy",
         "erss_topography_guard",
         "erss_visual_morphology_policy",
         "erss_topography_evidence_policy",
@@ -123,6 +125,7 @@ def compose(version: str):
     microkeratome_planning_policy.install(core)
     nice_policy.install(core)
     ps3_extraction_policy.install(core)
+    exam_date_reconciliation_policy.install(core)
     # PS3 wraps the fully installed NICE-aware clinical engine and may only
     # restrict the selected procedure; it never rewrites NICE/Randleman/BAD-D.
     ps3_runtime_policy.install(core)
