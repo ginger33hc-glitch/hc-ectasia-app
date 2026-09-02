@@ -24,6 +24,12 @@ NUMERIC_FIELDS = COMPLETION_NUMERIC_FIELDS
 PATTERNS = {"anterior_pattern": ["REASSURING", "BORDERLINE", "ABNORMAL"],
             "posterior_pattern": ["REASSURING", "BORDERLINE", "ABNORMAL"]}
 
+SOFT_CONTACT_LENS_WASHOUT_DAYS = 10
+RIGID_CONTACT_LENS_WASHOUT_DAYS = 21
+_LEGACY_SOFT_CONTACT_LENS_MESSAGE = (
+    "source-study imaging criterion: soft contact lens discontinued for at least 14 days"
+)
+
 
 def _prune():
     now = monotonic()
@@ -37,6 +43,61 @@ def _session(token):
     if not isinstance(token, str) or token not in _sessions:
         raise HTTPException(410, "Assessment session expired or restarted. Upload the images again; entered form values can be retained.")
     return _sessions[token]
+
+
+def _contact_lens_washout(modifiers):
+    """Return a blocking readiness result before any clinical score is computed."""
+    lens_type = str((modifiers or {}).get("contact_lens_type") or "UNKNOWN").upper()
+    days = (modifiers or {}).get("contact_lens_discontinuation_days")
+    if lens_type == "NONE":
+        return None
+    if lens_type not in {"SOFT", "RIGID"}:
+        return {
+            "type": lens_type,
+            "days": days,
+            "required_days": None,
+            "message": "Contact-lens type must be documented before CER-AI can proceed.",
+            "form_id": "contact_lens_type",
+        }
+    required = SOFT_CONTACT_LENS_WASHOUT_DAYS if lens_type == "SOFT" else RIGID_CONTACT_LENS_WASHOUT_DAYS
+    if not finite(days) or isinstance(days, bool) or int(days) != days:
+        return {
+            "type": lens_type,
+            "days": days,
+            "required_days": required,
+            "message": f"Document the number of full days {lens_type.lower()} contact lenses were discontinued before Pentacam. Required washout: at least {required} days.",
+            "form_id": "contact_lens_days",
+        }
+    days = int(days)
+    if days < required:
+        remaining = required - days
+        lens_name = "soft contact lenses" if lens_type == "SOFT" else "rigid / RGP contact lenses"
+        return {
+            "type": lens_type,
+            "days": days,
+            "required_days": required,
+            "remaining_days": remaining,
+            "message": (
+                f"Do not proceed with CER-AI assessment. The patient used {lens_name} and stopped only {days} day(s) before Pentacam. "
+                f"Wait until at least {required} full days off lenses have elapsed, then repeat Pentacam and reassess."
+            ),
+            "form_id": "contact_lens_days",
+        }
+    return None
+
+
+def _remove_superseded_contact_lens_missing(decision, modifiers):
+    """The readiness gate supersedes the legacy 14-day soft-lens criterion in app.py."""
+    lens_type = str((modifiers or {}).get("contact_lens_type") or "UNKNOWN").upper()
+    days = (modifiers or {}).get("contact_lens_discontinuation_days")
+    if lens_type != "SOFT" or not finite(days) or float(days) < SOFT_CONTACT_LENS_WASHOUT_DAYS:
+        return decision
+    for eye in decision.get("eyes") or []:
+        eye["missing"] = [
+            item for item in eye.get("missing") or []
+            if str(item) != _LEGACY_SOFT_CONTACT_LENS_MESSAGE
+        ]
+    return decision
 
 
 def missing_items(decision):
@@ -216,6 +277,32 @@ def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
     overrides = deepcopy(overrides)
     if not isinstance(overrides, dict) or any(not isinstance(value, dict) for value in overrides.values()):
         raise HTTPException(422, "Clinical overrides must be an object.")
+
+    lens_block = _contact_lens_washout(modifiers)
+    if lens_block:
+        session["ready"] = None
+        session["expires"] = monotonic() + TTL_SECONDS
+        request = {
+            "eye": "PATIENT",
+            "label": lens_block["message"],
+            "kind": "form",
+            "key": "contact_lens_discontinuation_days" if lens_block["form_id"] == "contact_lens_days" else "contact_lens_type",
+            "destination": "source",
+            "form_id": lens_block["form_id"],
+            "help": "Complete the required contact-lens washout and repeat Pentacam before CER-AI assessment.",
+        }
+        return {
+            "assessment_token": token,
+            "extracted": deepcopy(session["extracted"]),
+            "effective_eye_plans": {},
+            "workflow_status": "CONTACT_LENS_WASHOUT_REQUIRED",
+            "missing": [{"eye": "PATIENT", "message": lens_block["message"]}],
+            "input_requests": [request],
+            "report_token": None,
+            "contact_lens_washout": lens_block,
+            "message": lens_block["message"],
+        }
+
     # A surgeon-confirmed I-S resolves the same source conflict for BOTH ERSS and NICE.
     for eye, plan in plans.items():
         if plan.get("surgeon_I_S_D") is not None:
@@ -229,6 +316,7 @@ def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
             eye.setdefault("morphology_evidence", []).append("Category explicitly confirmed by surgeon during input completion.")
     effective = core.apply_extracted_corrections(deepcopy(extracted), deepcopy(plans))
     decision = core.hc_engine(deepcopy(extracted), age, effective, modifiers, metadata)
+    decision = _remove_superseded_contact_lens_missing(decision, modifiers)
     missing = completion_items(missing_items(decision), plans)
     response = {"assessment_token": token, "extracted": extracted, "effective_eye_plans": effective,
                 "workflow_status": "NEEDS_INPUT" if missing else "READY", "missing": [],
