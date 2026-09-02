@@ -41,6 +41,7 @@ import nice_policy  # noqa: E402
 import assessment_workflow  # noqa: E402
 import user_access  # noqa: E402
 import operational_security  # noqa: E402
+import public_site  # noqa: E402
 import case_archive  # noqa: E402
 import audit_log  # noqa: E402
 import case_catalog  # noqa: E402
@@ -89,6 +90,7 @@ COMPOSITION_PHASES = {
     "access_and_persistence": (
         "user_access",
         "operational_security",
+        "public_site",
         "case_archive",
         "audit_log",
         "case_catalog",
@@ -126,6 +128,7 @@ def compose(version: str):
     assessment_workflow.install(core)
     user_access.install(core)
     operational_security.install(core)
+    public_site.install(core)
 
     archive_required = os.getenv("CERAI_ARCHIVE_REQUIRED", "0").strip() == "1"
     archive_enabled = os.getenv("CERAI_ARCHIVE_ENABLED", "0").strip() == "1" or archive_required
