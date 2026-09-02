@@ -12,8 +12,33 @@ def _decision_critical_incomplete(result):
     return "DATA INSUFFICIENT" in status or "NOT ASSESSED" in status
 
 
+def _apply_locked_i_s_normal_band(eye):
+    """Use the labeled Pentacam I-S value as the canonical normal-band morphology gate.
+
+    Current CER-AI policy defines -0.50 through +0.50 D as NORMAL.  A visual
+    ASYMMETRIC_BOWTIE label must not override a confident labeled I-S inside that band.
+    Other I-S bands are intentionally left to their existing explicit rules here.
+    """
+    working = dict(eye)
+    i_s = working.get("I_S")
+    verified = "I_S" in set(working.get("table_verified_numeric_fields") or [])
+    status = working.get("I_S_status")
+    surgeon_confirmed = status == "SURGEON_CONFIRMED"
+    if core.is_number(i_s) and (verified or surgeon_confirmed) and -0.50 <= float(i_s) <= 0.50:
+        working["morphology"] = "NORMAL_SYMMETRIC"
+        working["asymmetric_bow_tie"] = "NO"
+        working["srax"] = "NO"
+        working["srax_deg"] = None
+        working["inferior_opposite_steepening_D"] = None
+        evidence = list(working.get("morphology_evidence") or [])
+        evidence.append(
+            f"CER-AI signed I-S rule: labeled/confirmed I-S {float(i_s):+.2f} D is within -0.50 to +0.50 D; topography scoring category NORMAL_SYMMETRIC."
+        )
+        working["morphology_evidence"] = list(dict.fromkeys(evidence))
+    return working
+
+
 def _prk_caution_was_auto_deferred(result):
-    """Identify the legacy PRK-EWSS CAUTION->STOP escalation so it can be corrected centrally."""
     values = result.get("values") or {}
     score = result.get("score") or {}
     return (
@@ -24,14 +49,12 @@ def _prk_caution_was_auto_deferred(result):
 
 
 def assess_eye_with_hc_final_hierarchy(eye, plan, age, patient_modifiers):
+    eye = _apply_locked_i_s_normal_band(eye)
     result = _previous_assess_eye(eye, plan, age, patient_modifiers)
 
     if result.get("status") not in STATUS_RANK:
         raise ValueError(f"Non-canonical CER-AI disposition escaped the clinical engine: {result.get('status')!r}")
 
-    # Legacy PRK-EWSS code converted score 2-3 CAUTION directly to STOP-DEFER.
-    # CER-AI's canonical three-state contract does not allow CAUTION alone to defer surgery.
-    # Independent hard stops remain untouched and continue to win below.
     if _prk_caution_was_auto_deferred(result):
         result["status"] = CAUTION
         result["action"] = "CAUTION — surgeon review is required; this category does not automatically defer surgery."
@@ -54,8 +77,6 @@ def assess_eye_with_hc_final_hierarchy(eye, plan, age, patient_modifiers):
     erss = result.get("randleman_erss") or {}
     erss_total = erss.get("total")
 
-    # PRK uses its separate provisional score; the LASIK ERSS principal hierarchy below
-    # must not reinterpret a PRK case merely because LASIK ERSS is unavailable.
     if str((result.get("values") or {}).get("procedure") or "").upper() == "PRK":
         result["status"] = CAUTION if result.get("status") == CAUTION else PASS
         return result
