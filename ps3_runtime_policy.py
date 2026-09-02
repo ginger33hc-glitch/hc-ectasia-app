@@ -1,12 +1,17 @@
 """Production adapter for the independent PS3 policy.
 
-PS3 remains a separate result channel.  It never rewrites Randleman, BAD-D, or
-NICE scores.  It may only restrict the currently selected procedure according
+PS3 remains a separate result channel. It never rewrites Randleman, BAD-D, or
+NICE scores. It may only restrict the currently selected procedure according
 to the PS3 decision matrix.
 """
 from dataclasses import asdict
 
 from ps3_policy import DEFER, PS3EyeInput, PS3InterEyeInput, evaluate_ps3
+
+
+_previous_hc_engine = None
+_installed_hc_engine = None
+_runtime_core = None
 
 
 def _finite(value):
@@ -22,8 +27,6 @@ def _first_number(mapping, *keys):
 
 
 def _manifest_axis(plan):
-    # Current UI uses one entered cylinder-axis field for manifest/intended
-    # notation. Compatibility names are retained without inferring a value.
     return _first_number(
         plan,
         "manifest_axis_deg",
@@ -104,65 +107,73 @@ def _procedure_summary(result):
     )
 
 
+def hc_engine_with_ps3(extracted, age, eye_plans, patient_modifiers, patient_metadata=None):
+    if _previous_hc_engine is None or _runtime_core is None:
+        raise RuntimeError("PS3 runtime adapter was not initialized")
+
+    decision = _previous_hc_engine(extracted, age, eye_plans, patient_modifiers, patient_metadata)
+    source = {
+        item.get("eye"): item
+        for item in extracted.get("eyes", [])
+        if item.get("eye") in {"OD", "OS"}
+    }
+    bilateral = _inter_eye(source)
+
+    for eye_result in decision.get("eyes", []):
+        eye_name = eye_result.get("eye")
+        eye = source.get(eye_name)
+        plan = eye_plans.get(eye_name, {})
+        if not eye or eye_result.get("status") == "POST-REFRACTIVE PATHWAY REQUIRED" or plan.get("prior") != "no":
+            eye_result["ps3"] = {
+                "applicable": False,
+                "reason": "PS3 virgin-cornea pathway not applicable.",
+            }
+            continue
+
+        ps3 = evaluate_ps3(_eye_input(eye, plan), bilateral)
+        payload = asdict(ps3)
+        payload["applicable"] = True
+        payload["derived_srax_label"] = "DERIVED SRAX — not directly reported by Pentacam"
+        eye_result["ps3"] = payload
+
+        eye_result.setdefault("reasons", []).append(
+            f"PS3: {ps3.moderate_count} moderate, {ps3.high_count} high risk factor(s); "
+            f"{_procedure_summary(ps3)}."
+        )
+        eye_result.setdefault("warnings", []).extend(
+            f"PS3 surgeon review required: {note}" for note in ps3.review_notes
+        )
+
+        selected = _selected_procedure_disposition(ps3, plan.get("procedure"))
+        if selected == DEFER:
+            reason = (
+                f"PS3 DEFER for selected {str(plan.get('procedure') or '').upper()}: "
+                f"{ps3.moderate_count} moderate, {ps3.high_count} high risk factor(s)."
+            )
+            eye_result.setdefault("hard_stops", []).append(reason)
+            eye_result.setdefault("reasons", []).append(reason)
+            eye_result["status"] = _runtime_core.combine_status(eye_result["status"], "STOP-DEFER")
+            eye_result["action"] = "STOP-DEFER — selected procedure is not allowed by PS3."
+
+        decision["status"] = _runtime_core.combine_status(decision["status"], eye_result["status"])
+
+    decision["ps3_method_note"] = (
+        "PS3 is reported independently. Corneal Thickness Map morphology, Relative Thickness Map, "
+        "and PTI/CTSP profile morphology are not automatically evaluated and require surgeon review."
+    )
+    return decision
+
+
 def install(core):
+    global _previous_hc_engine
+    global _installed_hc_engine
+    global _runtime_core
+
     if getattr(core, "_cerai_ps3_runtime_installed", False):
         return
-    previous = core.hc_engine
 
-    def hc_engine_with_ps3(extracted, age, eye_plans, patient_modifiers, patient_metadata=None):
-        decision = previous(extracted, age, eye_plans, patient_modifiers, patient_metadata)
-        source = {
-            item.get("eye"): item
-            for item in extracted.get("eyes", [])
-            if item.get("eye") in {"OD", "OS"}
-        }
-        bilateral = _inter_eye(source)
-
-        for eye_result in decision.get("eyes", []):
-            eye_name = eye_result.get("eye")
-            eye = source.get(eye_name)
-            plan = eye_plans.get(eye_name, {})
-            if not eye or eye_result.get("status") == "POST-REFRACTIVE PATHWAY REQUIRED" or plan.get("prior") != "no":
-                eye_result["ps3"] = {
-                    "applicable": False,
-                    "reason": "PS3 virgin-cornea pathway not applicable.",
-                }
-                continue
-
-            ps3 = evaluate_ps3(_eye_input(eye, plan), bilateral)
-            payload = asdict(ps3)
-            payload["applicable"] = True
-            payload["derived_srax_label"] = "DERIVED SRAX — not directly reported by Pentacam"
-            eye_result["ps3"] = payload
-
-            # Existing Evaluation UI already renders Reasons and Warnings.
-            # Reuse those stable presentation seams instead of duplicating UI logic.
-            eye_result.setdefault("reasons", []).append(
-                f"PS3: {ps3.moderate_count} moderate, {ps3.high_count} high risk factor(s); "
-                f"{_procedure_summary(ps3)}."
-            )
-            eye_result.setdefault("warnings", []).extend(
-                f"PS3 surgeon review required: {note}" for note in ps3.review_notes
-            )
-
-            selected = _selected_procedure_disposition(ps3, plan.get("procedure"))
-            if selected == DEFER:
-                reason = (
-                    f"PS3 DEFER for selected {str(plan.get('procedure') or '').upper()}: "
-                    f"{ps3.moderate_count} moderate, {ps3.high_count} high risk factor(s)."
-                )
-                eye_result.setdefault("hard_stops", []).append(reason)
-                eye_result.setdefault("reasons", []).append(reason)
-                eye_result["status"] = core.combine_status(eye_result["status"], "STOP-DEFER")
-                eye_result["action"] = "STOP-DEFER — selected procedure is not allowed by PS3."
-
-            decision["status"] = core.combine_status(decision["status"], eye_result["status"])
-
-        decision["ps3_method_note"] = (
-            "PS3 is reported independently. Corneal Thickness Map morphology, Relative Thickness Map, "
-            "and PTI/CTSP profile morphology are not automatically evaluated and require surgeon review."
-        )
-        return decision
-
+    _runtime_core = core
+    _previous_hc_engine = core.hc_engine
+    _installed_hc_engine = hc_engine_with_ps3
     core.hc_engine = hc_engine_with_ps3
     core._cerai_ps3_runtime_installed = True
