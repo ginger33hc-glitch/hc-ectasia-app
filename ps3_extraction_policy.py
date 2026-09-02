@@ -39,6 +39,9 @@ morphology in this extraction pass.
 """
 
 
+_previous_merge_extractions = None
+
+
 def _number(value):
     return (
         isinstance(value, (int, float))
@@ -59,65 +62,72 @@ def _equivalent(field, left, right):
     return abs(left - right) <= 1e-6
 
 
-def _install_new_field_merge(core):
+def merge_extractions_with_new_fields(results):
     """Preserve only the four new labeled-box fields through legacy merge.
 
     The legacy merge iterates core.TABLE_NUMERIC_FIELDS. We intentionally do
-    not expand that behavior-locked tuple. Instead, this narrow adapter carries
-    the four new fields after the legacy merge and fails closed on conflicts.
+    not expand that behavior-locked tuple. Instead, this narrow outer adapter
+    carries the four new fields after the ERSS source-aware merge and fails
+    closed on conflicts.
     """
+    if _previous_merge_extractions is None:
+        raise RuntimeError("PS3/new-field merge adapter was not initialized")
+
+    merged = _previous_merge_extractions(results)
+    merged_by_eye = {
+        item.get("eye"): item
+        for item in merged.get("eyes", [])
+        if item.get("eye") in {"OD", "OS"}
+    }
+
+    for eye_name, target in merged_by_eye.items():
+        verified_target = list(target.get("table_verified_numeric_fields") or [])
+        conflicts = list(target.get("data_conflicts") or [])
+
+        for field in PS3_EXTRA_FIELDS:
+            candidates = []
+            for result in results:
+                for source_eye in result.get("eyes", []) or []:
+                    if source_eye.get("eye") != eye_name:
+                        continue
+                    value = source_eye.get(field)
+                    verified = field in set(source_eye.get("table_verified_numeric_fields") or [])
+                    if verified and _number(value):
+                        candidates.append(float(value))
+
+            unique = []
+            for value in candidates:
+                if not any(_equivalent(field, value, seen) for seen in unique):
+                    unique.append(value)
+
+            if len(unique) == 1:
+                target[field] = unique[0]
+                if field not in verified_target:
+                    verified_target.append(field)
+            elif len(unique) > 1:
+                target[field] = None
+                verified_target = [name for name in verified_target if name != field]
+                conflict = f"{field}: " + " vs ".join(f"{value:g}" for value in unique)
+                if conflict not in conflicts:
+                    conflicts.append(conflict)
+            elif field not in target:
+                target[field] = None
+
+        target["table_verified_numeric_fields"] = verified_target
+        target["data_conflicts"] = conflicts
+
+    return merged
+
+
+def _install_new_field_merge(core):
+    """Install the outer new-field merge adapter exactly once."""
+    global _previous_merge_extractions
+
     if not hasattr(core, "merge_extractions") or getattr(core, "_cerai_ps3_merge_installed", False):
         return
 
-    previous_merge = core.merge_extractions
-
-    def merge_with_new_fields(results):
-        merged = previous_merge(results)
-        merged_by_eye = {
-            item.get("eye"): item
-            for item in merged.get("eyes", [])
-            if item.get("eye") in {"OD", "OS"}
-        }
-
-        for eye_name, target in merged_by_eye.items():
-            verified_target = list(target.get("table_verified_numeric_fields") or [])
-            conflicts = list(target.get("data_conflicts") or [])
-
-            for field in PS3_EXTRA_FIELDS:
-                candidates = []
-                for result in results:
-                    for source_eye in result.get("eyes", []) or []:
-                        if source_eye.get("eye") != eye_name:
-                            continue
-                        value = source_eye.get(field)
-                        verified = field in set(source_eye.get("table_verified_numeric_fields") or [])
-                        if verified and _number(value):
-                            candidates.append(float(value))
-
-                unique = []
-                for value in candidates:
-                    if not any(_equivalent(field, value, seen) for seen in unique):
-                        unique.append(value)
-
-                if len(unique) == 1:
-                    target[field] = unique[0]
-                    if field not in verified_target:
-                        verified_target.append(field)
-                elif len(unique) > 1:
-                    target[field] = None
-                    verified_target = [name for name in verified_target if name != field]
-                    conflict = f"{field}: " + " vs ".join(f"{value:g}" for value in unique)
-                    if conflict not in conflicts:
-                        conflicts.append(conflict)
-                elif field not in target:
-                    target[field] = None
-
-            target["table_verified_numeric_fields"] = verified_target
-            target["data_conflicts"] = conflicts
-
-        return merged
-
-    core.merge_extractions = merge_with_new_fields
+    _previous_merge_extractions = core.merge_extractions
+    core.merge_extractions = merge_extractions_with_new_fields
     core._cerai_ps3_merge_installed = True
 
 
