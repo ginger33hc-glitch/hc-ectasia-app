@@ -1,7 +1,7 @@
 """Single registry for Pentacam fields used by reread and surgeon completion.
 
 Extraction schemas remain in their owning adapters, while canonical field names
-and user-facing completion labels live here.  No clinical threshold or score is
+and user-facing completion labels live here. No clinical threshold or score is
 defined in this module.
 """
 
@@ -17,7 +17,6 @@ TARGET_FIELDS = (
     "total_RMS_um", "spherical_aberration_um",
 )
 
-# Legacy K1/K2/Km source contract remains unchanged.
 CORNEA_FRONT_KERATOMETRY_SOURCE = "SHOW_2_EXAMS_TOPOMETRIC_CORNEA_FRONT"
 CORNEA_FRONT_KERATOMETRY_FIELDS = frozenset({
     "K1_D",
@@ -33,16 +32,8 @@ KERATOMETRY_SOURCE_VALUES = (
     "NOT_SHOWN",
 )
 
-# PS3-specific source groups are descriptive only. They must not change the
-# established keratometry-source gate above.
-PS3_CORNEA_FRONT_FIELDS = frozenset({"topographic_astig_D", "topographic_steep_axis_deg"})
-PS3_CORNEA_BACK_FIELDS = frozenset({"posterior_Kmean_D"})
-PS3_TOPOGRAPHIC_INDEX_FIELDS = frozenset({"I_S", "KISA"})
-PS3_BAD_THINNEST_FIELDS = frozenset({"F_Ele_Th_um", "B_Ele_Th_um"})
-PS3_BAD_PROGRESSION_FIELDS = frozenset({"PPI_avg", "ARTmax_um"})
-
-# Preserve reconciliation semantics for all established fields. Only newly
-# introduced PS3 fields with a single authoritative printed source are added.
+# Existing canonical fields keep their original ownership/reconciliation rules.
+# Only the four genuinely new PS3 fields are added to the exclusive labeled-box set.
 EXCLUSIVE_LABELED_BOX_FIELDS = frozenset({
     *CORNEA_FRONT_KERATOMETRY_FIELDS,
     "Kmax_D",
@@ -64,24 +55,22 @@ COMPLETION_NUMERIC_FIELDS = {
     "Dp": "BAD Dp",
     "Dt": "BAD Dt",
     "Da": "BAD Da",
-    "F_Ele_Th_um": "F. Ele.Th (µm; BAD Display labeled box)",
-    "B_Ele_Th_um": "B. Ele.Th (µm; BAD Display labeled box)",
     "ARTmax_um": "ARTmax (µm)",
     "PPI_min": "PPI minimum",
     "PPI_avg": "PPI average",
     "PPI_max": "PPI maximum",
     "K1_D": "K1 (D)",
     "K2_D": "K2 (D; not Kmax)",
-    "Kmean_D": "Anterior Kmean/Km (D; Cornea Front)",
-    "posterior_Kmean_D": "Posterior Kmean/Km (D; Cornea Back)",
-    "topographic_astig_D": "Topographic Astig. (D; Cornea Front)",
-    "topographic_steep_axis_deg": "Topographic Axis (steep) (degrees; Cornea Front)",
+    "Kmean_D": "Preoperative Kmean (D)",
     "Kmax_D": "Kmax (D)",
-    "KISA": "KISA (%)",
     "srax_deg": "SRAX (degrees)",
     "inferior_opposite_steepening_D": "Inferior-opposite steepening (D)",
     "Rmin_mm": "Rmin (mm)",
     "I_S": "Signed I-S (D; not ISV/IVA)",
+    "topographic_astig_D": "Topographic Astig. (D; Cornea Front)",
+    "topographic_steep_axis_deg": "Topographic Axis (steep) (degrees; Cornea Front)",
+    "posterior_Kmean_D": "Posterior Km (D; Cornea Back)",
+    "F_Ele_Th_um": "F. Ele.Th (µm; BAD Display labeled box)",
 }
 
 
