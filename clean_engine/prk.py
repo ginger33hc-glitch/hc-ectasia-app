@@ -45,7 +45,7 @@ def prk_score_category(score: Optional[int]) -> Optional[str]:
     band = score_decision_band(score)
     return {
         "NO_SCORE_ESCALATION": "NO_SCORE_ESCALATION",
-        "DEFER": "CAUTION",
+        "CAUTION": "CAUTION",
         "STOP": "HIGH_CONCERN",
     }.get(band)
 

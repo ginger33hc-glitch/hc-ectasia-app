@@ -167,8 +167,8 @@ def test_lasik_score_two_has_no_score_escalation():
     assert out.status == "PASS"
 
 
-def test_lasik_score_three_defers_and_four_stops():
-    score3 = assess(base(age_years=18, pachy_thinnest_um=520)); assert score3.scores.erss_total == 3 and score3.status == "STOP-DEFER"
+def test_lasik_score_three_cautions_and_four_stops():
+    score3 = assess(base(age_years=18, pachy_thinnest_um=520)); assert score3.scores.erss_total == 3 and score3.status == "CAUTION"
     score4 = assess(base(age_years=18, pachy_thinnest_um=500)); assert score4.scores.erss_total == 4 and score4.status == "STOP-DEFER"
 
 

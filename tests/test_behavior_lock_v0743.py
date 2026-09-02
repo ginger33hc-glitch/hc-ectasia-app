@@ -75,9 +75,9 @@ def test_final_hierarchy_preserves_caution_when_principal_scores_are_below_3(mon
             assert out["status"] == "CAUTION"
 
 
-def test_final_hierarchy_erss_3_is_adverse(monkeypatch):
+def test_final_hierarchy_erss_3_is_caution(monkeypatch):
     out = _run_final_policy(monkeypatch, {"status": "PASS"}, "NORMAL", 3)
-    assert out["status"] == "STOP-DEFER"
+    assert out["status"] == "CAUTION"
 
 
 def test_final_hierarchy_preserves_upstream_erss_4_hard_stop(monkeypatch):

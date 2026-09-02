@@ -65,13 +65,13 @@ def test_clean_constants_equal_locked_runtime_constants():
 
 
 def test_unified_score_policy_has_one_locked_2_3_4_boundary():
-    assert policy.POLICY.score_defer == 3
+    assert policy.POLICY.score_caution == 3
     assert policy.POLICY.score_stop == 4
     expected = {
         0: "NO_SCORE_ESCALATION",
         1: "NO_SCORE_ESCALATION",
         2: "NO_SCORE_ESCALATION",
-        3: "DEFER",
+        3: "CAUTION",
         4: "STOP",
         5: "STOP",
     }
@@ -88,13 +88,13 @@ def test_prk_category_consumes_shared_score_policy():
     for score, category in expected.items():
         assert prk.prk_score_category(score) == category
         assert policy.score_decision_band(score) in {
-            "NO_SCORE_ESCALATION", "DEFER", "STOP"
+            "NO_SCORE_ESCALATION", "CAUTION", "STOP"
         }
 
 
-def test_lasik_decision_consumes_shared_defer_boundary():
+def test_lasik_decision_consumes_shared_caution_and_stop_boundaries():
     assert decide(DecisionInput("PASS", "NORMAL", 2)).status == "PASS"
-    assert decide(DecisionInput("PASS", "NORMAL", 3)).status == "STOP-DEFER"
+    assert decide(DecisionInput("PASS", "NORMAL", 3)).status == "CAUTION"
     # Score >=4 is converted to an independent hard stop by the clean engine;
     # the pure decision layer still preserves the shared score escalation semantics.
     assert decide(DecisionInput("PASS", "NORMAL", 4)).status == "STOP-DEFER"

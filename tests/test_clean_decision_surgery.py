@@ -11,7 +11,7 @@ def test_clean_final_hierarchy_matrix():
         for erss in (0, 1, 2):
             out = decide(DecisionInput("CAUTION", bad, erss))
             assert out.status == "CAUTION"
-    assert decide(DecisionInput("PASS", "NORMAL", 3)).status == "STOP-DEFER"
+    assert decide(DecisionInput("PASS", "NORMAL", 3)).status == "CAUTION"
     assert decide(DecisionInput("PASS", "ABNORMAL", 0)).status == "STOP-DEFER"
     assert decide(DecisionInput("STOP-DEFER", "NORMAL", 0, has_hard_stop=True)).status == "STOP-DEFER"
     assert decide(DecisionInput("DATA INSUFFICIENT", "NORMAL", 0, decision_critical_incomplete=True)).status == "DATA INSUFFICIENT"

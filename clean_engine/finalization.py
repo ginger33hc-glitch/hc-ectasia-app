@@ -39,7 +39,7 @@ def finalize(inp: FinalizationInput) -> FinalizationOutput:
             upstream = combine_status(upstream, CAUTION)
     elif procedure == "LASIK" and not inp.hard_stops and not inp.missing:
         if inp.lasik_erss_total == 3:
-            upstream = combine_status(upstream, STOP_DEFER)
+            upstream = combine_status(upstream, CAUTION)
 
     decision: DecisionOutput = decide(DecisionInput(
         upstream_status=upstream,
