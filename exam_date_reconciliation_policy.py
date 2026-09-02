@@ -3,6 +3,9 @@
 The extractor preserves the printed date string. This policy only decides whether
 multiple Pentacam sources refer to the same calendar date; it never rewrites the
 source strings or invents a date.
+
+Binding CER-AI rule: the Show 2 Exams Topometric page is not an authoritative
+exam-date source and is excluded entirely from cross-image date reconciliation.
 """
 from copy import deepcopy
 from datetime import date
@@ -20,12 +23,7 @@ def _valid_iso(year, month, day):
 
 
 def possible_calendar_dates(value):
-    """Return all calendar dates compatible with a printed date string.
-
-    Ambiguous numeric day/month strings deliberately return both valid
-    interpretations. A conflict is suppressed only when every Pentacam source
-    shares exactly one possible calendar date.
-    """
+    """Return all calendar dates compatible with a printed date string."""
     if value is None:
         return set()
     text = " ".join(str(value).strip().split())
@@ -55,11 +53,25 @@ def possible_calendar_dates(value):
     }
 
 
+def _is_show_2_exams_topometric(extraction):
+    """True when this source is the non-authoritative Show 2 Exams Topometric page."""
+    for eye in (extraction or {}).get("eyes") or []:
+        for screen_type in eye.get("screen_types") or []:
+            normalized = re.sub(r"[^A-Z0-9]+", "_", str(screen_type).upper()).strip("_")
+            if "SHOW_2_EXAMS_TOPOMETRIC" in normalized:
+                return True
+            if "SHOW_2_EXAMS" in normalized and "TOPOMETRIC" in normalized:
+                return True
+    return False
+
+
 def _pentacam_date_possibilities(extractions):
     values = []
     for extraction in extractions or []:
         context = (extraction or {}).get("document_context") or {}
         if context.get("document_type") != "PENTACAM_TOPOGRAPHY":
+            continue
+        if _is_show_2_exams_topometric(extraction):
             continue
         raw = context.get("exam_date")
         if raw in (None, ""):
@@ -80,8 +92,19 @@ def dates_are_semantically_consistent(extractions):
 
 
 def reconcile_merged_exam_date_conflict(merged, extractions):
-    """Remove only a false raw-string date conflict from an already merged result."""
-    if not dates_are_semantically_consistent(extractions):
+    """Remove only a false/non-authoritative exam-date conflict."""
+    # If the only raw-string disagreement came from excluded Show 2 Exams pages,
+    # compare the remaining authoritative Pentacam dates. One remaining date is
+    # sufficient: there is then no authoritative source disagreement.
+    authoritative = _pentacam_date_possibilities(extractions)
+    if authoritative is None or not authoritative:
+        return merged
+    if len(authoritative) == 1:
+        consistent = True
+    else:
+        common = set.intersection(*authoritative)
+        consistent = len(common) == 1
+    if not consistent:
         return merged
     reconciled = deepcopy(merged)
     reconciled["critical_input_issues"] = [

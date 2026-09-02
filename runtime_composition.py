@@ -47,15 +47,13 @@ import historical_report  # noqa: E402
 import research_export  # noqa: E402
 import named_user_ui  # noqa: E402
 import pentacam_targeted_reread  # noqa: E402
+import rmin_front_source_policy  # noqa: E402
 import erss_auto_read_policy  # noqa: E402
 
 
 core = bootstrap.core
 app = bootstrap.app
 
-# Public architecture manifest: each concern has one composition phase.  This
-# is intentionally data, not executable discovery, so production startup never
-# depends on filesystem scanning or import-name conventions.
 COMPOSITION_PHASES = {
     "clinical_policy": (
         "hc_age_policy",
@@ -77,6 +75,7 @@ COMPOSITION_PHASES = {
         "erss_topography_evidence_policy",
         "ps3_extraction_policy",
         "pentacam_targeted_reread",
+        "rmin_front_source_policy",
         "erss_auto_read_policy",
     ),
     "reporting_and_readiness": (
@@ -112,9 +111,6 @@ def compose(version: str):
     critical_score_highlight.install(core, reports)
     ps3_report_policy.install(reports)
     erss_visual_morphology_policy.install(erss_topography_guard)
-    # The composition root explicitly injects the immutable base assessor used
-    # for the prior-refractive-surgery short circuit. Leaf policies must not
-    # import bootstrap or infer this dependency from wrapper order.
     erss_topography_evidence_policy.install(
         core,
         prior_assess_eye=bootstrap._original_assess_eye,
@@ -123,15 +119,11 @@ def compose(version: str):
     microkeratome_planning_policy.install(core)
     nice_policy.install(core)
     ps3_extraction_policy.install(core)
-    # PS3 wraps the fully installed NICE-aware clinical engine and may only
-    # restrict the selected procedure; it never rewrites NICE/Randleman/BAD-D.
     ps3_runtime_policy.install(core)
     assessment_workflow.install(core)
     user_access.install(core)
     operational_security.install(core)
 
-    # Archive provisioning remains inert until the complete credential set is
-    # configured. REQUIRED=1 deliberately fails closed.
     archive_required = os.getenv("CERAI_ARCHIVE_REQUIRED", "0").strip() == "1"
     archive_enabled = os.getenv("CERAI_ARCHIVE_ENABLED", "0").strip() == "1" or archive_required
     if archive_enabled:
@@ -148,6 +140,7 @@ def compose(version: str):
     research_export.install(core, archive_runtime)
     named_user_ui.install(core)
     pentacam_targeted_reread.install(core)
+    rmin_front_source_policy.install(core, pentacam_targeted_reread)
     # This cleanup must remain outside the fully installed NICE engine.
     erss_auto_read_policy.install(core)
 
