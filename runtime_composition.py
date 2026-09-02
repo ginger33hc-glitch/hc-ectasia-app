@@ -34,6 +34,7 @@ import erss_topography_evidence_policy  # noqa: E402
 import ps3_extraction_policy  # noqa: E402
 import ps3_runtime_policy  # noqa: E402
 import ps3_report_policy  # noqa: E402
+import microkeratome_report_policy  # noqa: E402
 
 # Explicitly installed clinical workflow and operational services.
 import nice_policy  # noqa: E402
@@ -82,6 +83,7 @@ COMPOSITION_PHASES = {
         "report_export_guard",
         "critical_score_highlight",
         "ps3_report_policy",
+        "microkeratome_report_policy",
         "assessment_workflow",
     ),
     "access_and_persistence": (
@@ -110,6 +112,7 @@ def compose(version: str):
     status_rank_policy.install(core)
     critical_score_highlight.install(core, reports)
     ps3_report_policy.install(reports)
+    microkeratome_report_policy.install(reports)
     erss_visual_morphology_policy.install(erss_topography_guard)
     erss_topography_evidence_policy.install(
         core,
