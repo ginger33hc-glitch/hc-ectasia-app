@@ -1,13 +1,14 @@
 """Single registry for Pentacam fields used by reread and surgeon completion.
 
 Extraction schemas remain in their owning adapters, while canonical field names
-and user-facing completion labels live here.  No clinical threshold or score is
+and user-facing completion labels live here. No clinical threshold or score is
 defined in this module.
 """
 
 TARGET_FIELDS = (
     "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmax_D",
-    "corneal_diameter_mm", "pachy_thinnest_um", "central_pachy_um", "B_Ele_Th_um", "BAD_D", "Df", "Db",
+    "topographic_astig_D", "topographic_steep_axis_deg", "posterior_Kmean_D",
+    "corneal_diameter_mm", "pachy_thinnest_um", "central_pachy_um", "F_Ele_Th_um", "B_Ele_Th_um", "BAD_D", "Df", "Db",
     "Dp", "Dt", "Da", "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um",
     "ISV", "IVA", "KI", "CKI", "IHD", "I_S", "KISA", "IHA",
     "Rmin_mm", "anterior_elevation_thinnest_um",
@@ -31,9 +32,8 @@ KERATOMETRY_SOURCE_VALUES = (
     "NOT_SHOWN",
 )
 
-# These values have one authoritative printed Pentacam box/row. They are not
-# cross-image consensus fields and must never be reconstructed from a map or a
-# neighboring value. The first valid same-eye labeled-box transcription is retained.
+# Existing canonical fields keep their original ownership/reconciliation rules.
+# Only the four genuinely new PS3 fields are added to the exclusive labeled-box set.
 EXCLUSIVE_LABELED_BOX_FIELDS = frozenset({
     *CORNEA_FRONT_KERATOMETRY_FIELDS,
     "Kmax_D",
@@ -41,6 +41,10 @@ EXCLUSIVE_LABELED_BOX_FIELDS = frozenset({
     "pachy_thinnest_um",
     "central_pachy_um",
     "B_Ele_Th_um",
+    "topographic_astig_D",
+    "topographic_steep_axis_deg",
+    "posterior_Kmean_D",
+    "F_Ele_Th_um",
 })
 
 COMPLETION_NUMERIC_FIELDS = {
@@ -63,6 +67,10 @@ COMPLETION_NUMERIC_FIELDS = {
     "inferior_opposite_steepening_D": "Inferior-opposite steepening (D)",
     "Rmin_mm": "Rmin (mm)",
     "I_S": "Signed I-S (D; not ISV/IVA)",
+    "topographic_astig_D": "Topographic Astig. (D; Cornea Front)",
+    "topographic_steep_axis_deg": "Topographic Axis (steep) (degrees; Cornea Front)",
+    "posterior_Kmean_D": "Posterior Km (D; Cornea Back)",
+    "F_Ele_Th_um": "F. Ele.Th (µm; BAD Display labeled box)",
 }
 
 

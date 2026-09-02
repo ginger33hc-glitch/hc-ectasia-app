@@ -133,14 +133,15 @@ def test_dedicated_and_general_same_image_i_s_conflict_requires_confirmation(mon
     assert any(str(item).startswith("I_S:") for item in extracted["eyes"][0]["data_conflicts"])
 
 
-def test_lower_surgeon_category_does_not_downgrade_stronger_validated_abt_evidence():
+def test_canonical_i_s_normal_band_overrides_legacy_abt_and_lower_surgeon_category():
     eye = normal_eye(morphology="ASYMMETRIC_BOWTIE")
     eye.update({"I_S": 0.5, "inferior_opposite_steepening_D": 0.75, "asymmetric_bow_tie": "YES"})
     p = lasik_plan()
     p["surgeon_topography_category"] = "NORMAL_SYMMETRIC"
     result = core.assess_eye(eye, p, 30, MODIFIERS)
-    assert result["erss_topography_evidence"]["validated_category"] == "ASYMMETRIC_BOWTIE"
-    assert result["randleman_erss"]["rows"]["topography"] == 1
+    assert result["erss_topography_evidence"]["validated_category"] == "NORMAL_SYMMETRIC"
+    assert result["erss_topography_evidence"]["category_source"] == "CANONICAL_SIGNED_I_S"
+    assert result["randleman_erss"]["rows"]["topography"] == 0
 
 
 def test_manual_confirmation_survives_existing_effective_plan_normalization():
@@ -151,7 +152,7 @@ def test_manual_confirmation_survives_existing_effective_plan_normalization():
     assert effective["OD"]["surgeon_topography_category"] == "NORMAL_SYMMETRIC"
 
 
-def test_inferior_steepening_takes_one_three_point_category_not_abt_plus_three():
+def test_canonical_i_s_abt_band_is_not_upgraded_by_legacy_srax_or_opposite_region_fields():
     eye = normal_eye(morphology="ASYMMETRIC_BOWTIE")
     eye.update({
         "I_S": 0.8,
@@ -162,8 +163,9 @@ def test_inferior_steepening_takes_one_three_point_category_not_abt_plus_three()
         "erss_source_read": "DEDICATED_CURVATURE_PASS",
     })
     result = core.assess_eye(eye, lasik_plan(), 30, MODIFIERS)
-    assert result["erss_topography_evidence"]["validated_category"] == "INFERIOR_STEEPENING_SRA"
-    assert result["randleman_erss"]["rows"]["topography"] == 3
+    assert result["erss_topography_evidence"]["validated_category"] == "ASYMMETRIC_BOWTIE"
+    assert result["erss_topography_evidence"]["category_source"] == "CANONICAL_SIGNED_I_S"
+    assert result["randleman_erss"]["rows"]["topography"] == 1
 
 
 def test_surgeon_confirmation_enters_existing_scorer_without_new_point_path():

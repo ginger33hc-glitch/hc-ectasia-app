@@ -13,18 +13,25 @@ def _decision_critical_incomplete(result):
 
 
 def _apply_locked_i_s_normal_band(eye):
-    """Use the labeled Pentacam I-S value as the canonical normal-band morphology gate.
+    """Use labeled Pentacam I-S for the normal-band Randleman morphology gate.
 
-    Current CER-AI policy defines -0.50 through +0.50 D as NORMAL.  A visual
-    ASYMMETRIC_BOWTIE label must not override a confident labeled I-S inside that band.
-    Other I-S bands are intentionally left to their existing explicit rules here.
+    -0.50 through +0.50 D is the CER-AI normal I-S band. A visual ABT label must
+    not override a confident labeled I-S inside that band. However, an already
+    definite ABNORMAL_ECTATIC morphology is a separate safety override and must
+    never be downgraded to normal by the I-S normalization step.
     """
     working = dict(eye)
     i_s = working.get("I_S")
     verified = "I_S" in set(working.get("table_verified_numeric_fields") or [])
     status = working.get("I_S_status")
     surgeon_confirmed = status == "SURGEON_CONFIRMED"
-    if core.is_number(i_s) and (verified or surgeon_confirmed) and -0.50 <= float(i_s) <= 0.50:
+    definite_ectatic = working.get("morphology") == "ABNORMAL_ECTATIC"
+    if (
+        not definite_ectatic
+        and core.is_number(i_s)
+        and (verified or surgeon_confirmed)
+        and -0.50 <= float(i_s) <= 0.50
+    ):
         working["morphology"] = "NORMAL_SYMMETRIC"
         working["asymmetric_bow_tie"] = "NO"
         working["srax"] = "NO"
@@ -32,7 +39,7 @@ def _apply_locked_i_s_normal_band(eye):
         working["inferior_opposite_steepening_D"] = None
         evidence = list(working.get("morphology_evidence") or [])
         evidence.append(
-            f"CER-AI signed I-S rule: labeled/confirmed I-S {float(i_s):+.2f} D is within -0.50 to +0.50 D; topography scoring category NORMAL_SYMMETRIC."
+            f"CER-AI signed I-S rule: labeled/confirmed I-S {float(i_s):+.2f} D is within -0.50 to +0.50 D; Randleman I-S category NORMAL_SYMMETRIC."
         )
         working["morphology_evidence"] = list(dict.fromkeys(evidence))
     return working

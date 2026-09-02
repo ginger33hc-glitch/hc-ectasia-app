@@ -68,7 +68,7 @@ def test_policy_leaf_modules_do_not_hide_install_order():
     assert _local_imports("status_rank_policy.py") == {"clinical_disposition"}
     assert _local_imports("erss_visual_morphology_policy.py") == set()
     assert _local_imports("erss_auto_read_policy.py") == set()
-    assert _local_imports("erss_topography_evidence_policy.py") == set()
+    assert _local_imports("erss_topography_evidence_policy.py") == {"derived_srax"}
     assert _local_imports("microkeratome_planning_policy.py") == {
         "planning.microkeratome",
         "typing",

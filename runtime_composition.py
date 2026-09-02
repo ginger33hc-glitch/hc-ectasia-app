@@ -31,6 +31,9 @@ import status_rank_policy  # noqa: E402
 import inter_eye_tomography_policy  # noqa: E402
 import microkeratome_planning_policy  # noqa: E402
 import erss_topography_evidence_policy  # noqa: E402
+import ps3_extraction_policy  # noqa: E402
+import ps3_runtime_policy  # noqa: E402
+import ps3_report_policy  # noqa: E402
 
 # Explicitly installed clinical workflow and operational services.
 import nice_policy  # noqa: E402
@@ -64,6 +67,7 @@ COMPOSITION_PHASES = {
         "inter_eye_tomography_policy",
         "microkeratome_planning_policy",
         "nice_policy",
+        "ps3_runtime_policy",
     ),
     "pentacam_extraction": (
         "merge_policy_base",
@@ -71,12 +75,14 @@ COMPOSITION_PHASES = {
         "erss_topography_guard",
         "erss_visual_morphology_policy",
         "erss_topography_evidence_policy",
+        "ps3_extraction_policy",
         "pentacam_targeted_reread",
         "erss_auto_read_policy",
     ),
     "reporting_and_readiness": (
         "report_export_guard",
         "critical_score_highlight",
+        "ps3_report_policy",
         "assessment_workflow",
     ),
     "access_and_persistence": (
@@ -104,11 +110,22 @@ def compose(version: str):
     hc_age_policy.install(core, score_audit_owner=bootstrap)
     status_rank_policy.install(core)
     critical_score_highlight.install(core, reports)
+    ps3_report_policy.install(reports)
     erss_visual_morphology_policy.install(erss_topography_guard)
-    erss_topography_evidence_policy.install(core)
+    # The composition root explicitly injects the immutable base assessor used
+    # for the prior-refractive-surgery short circuit. Leaf policies must not
+    # import bootstrap or infer this dependency from wrapper order.
+    erss_topography_evidence_policy.install(
+        core,
+        prior_assess_eye=bootstrap._original_assess_eye,
+    )
     inter_eye_tomography_policy.install(core, compatibility_owner=bootstrap)
     microkeratome_planning_policy.install(core)
     nice_policy.install(core)
+    ps3_extraction_policy.install(core)
+    # PS3 wraps the fully installed NICE-aware clinical engine and may only
+    # restrict the selected procedure; it never rewrites NICE/Randleman/BAD-D.
+    ps3_runtime_policy.install(core)
     assessment_workflow.install(core)
     user_access.install(core)
     operational_security.install(core)
