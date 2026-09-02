@@ -22,8 +22,24 @@ def _first_number(mapping, *keys):
 
 
 def _manifest_axis(plan):
-    # Compatibility across current/legacy form naming. No value is inferred.
-    return _first_number(plan, "manifest_axis_deg", "manifest_cylinder_axis_deg", "cylinder_axis_deg", "axis_deg")
+    # Current UI uses one entered cylinder-axis field for manifest/intended
+    # notation. Compatibility names are retained without inferring a value.
+    return _first_number(
+        plan,
+        "manifest_axis_deg",
+        "manifest_cylinder_axis_deg",
+        "entered_axis_deg",
+        "cylinder_axis_deg",
+        "axis_deg",
+    )
+
+
+def _manifest_astig(plan):
+    magnitude = _first_number(plan, "manifest_cylinder_magnitude_D")
+    if magnitude is not None:
+        return abs(magnitude)
+    signed = _first_number(plan, "manifest_cylinder_signed_D")
+    return abs(signed) if signed is not None else None
 
 
 def _refractive_group(plan):
@@ -57,7 +73,7 @@ def _eye_input(eye, plan):
         thinnest_um=eye.get("pachy_thinnest_um"),
         topographic_astig_d=eye.get("topographic_astig_D"),
         topographic_steep_axis_deg=eye.get("topographic_steep_axis_deg"),
-        manifest_astig_d=plan.get("manifest_cylinder_magnitude_D"),
+        manifest_astig_d=_manifest_astig(plan),
         manifest_axis_deg=_manifest_axis(plan),
         ppi_avg=eye.get("PPI_avg"),
         kmax_d=eye.get("Kmax_D"),
@@ -79,6 +95,13 @@ def _selected_procedure_disposition(result, procedure):
     if procedure == "LASIK":
         return result.disposition.lasik
     return None
+
+
+def _procedure_summary(result):
+    return (
+        f"PRK {result.disposition.prk}; SMILE {result.disposition.smile}; "
+        f"LASIK {result.disposition.lasik}"
+    )
 
 
 def install(core):
@@ -111,6 +134,16 @@ def install(core):
             payload["applicable"] = True
             payload["derived_srax_label"] = "DERIVED SRAX — not directly reported by Pentacam"
             eye_result["ps3"] = payload
+
+            # Existing Evaluation UI already renders Reasons and Warnings.
+            # Reuse those stable presentation seams instead of duplicating UI logic.
+            eye_result.setdefault("reasons", []).append(
+                f"PS3: {ps3.moderate_count} moderate, {ps3.high_count} high risk factor(s); "
+                f"{_procedure_summary(ps3)}."
+            )
+            eye_result.setdefault("warnings", []).extend(
+                f"PS3 surgeon review required: {note}" for note in ps3.review_notes
+            )
 
             selected = _selected_procedure_disposition(ps3, plan.get("procedure"))
             if selected == DEFER:
