@@ -30,6 +30,12 @@ jobs:
               'HC Ectasia Assessment',
               'Corneal Refractive Analysis Intelligence',
           )
+          # Historical product names are permitted only where the public website
+          # explicitly documents the project's evolution, plus its regression test.
+          historical_branding_paths = {
+              Path('static/public-home.html'),
+              Path('tests/test_public_site.py'),
+          }
           # Preserve this pre-existing wire-protocol header until all deployed clients have moved
           # to named-user sessions. It is a technical compatibility identifier, not product branding.
           technical_compatibility_identifiers = (
@@ -46,13 +52,16 @@ jobs:
                   text = path.read_text(encoding='utf-8')
               except UnicodeDecodeError:
                   continue
+
+              allows_history = path in historical_branding_paths
               for phrase in forbidden:
-                  if phrase in text:
+                  if phrase in text and not (allows_history and phrase in {'HC Ectasia App'}):
                       failures.append(f'{path}: {phrase}')
+
               brand_text = text
               for identifier in technical_compatibility_identifiers:
                   brand_text = brand_text.replace(identifier, '')
-              if re.search(r'CERAI(?!_)', brand_text):
+              if not allows_history and re.search(r'CERAI(?!_)', brand_text):
                   failures.append(f'{path}: legacy CERAI spelling')
 
           if failures:
