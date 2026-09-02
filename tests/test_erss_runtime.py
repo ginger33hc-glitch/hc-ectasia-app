@@ -46,5 +46,21 @@ class TestERSSCanonicalEngine(unittest.TestCase):
     def test_conflicting_dedicated_morphologies_become_uncertain(self):
         a=eye(True,"NORMAL_SYMMETRIC","a.jpg");b=eye(True,"ASYMMETRIC_BOWTIE","b.jpg");a["erss_source_read"]=b["erss_source_read"]="DEDICATED_CURVATURE_PASS";od=core.merge_extractions([result(a,"a.jpg"),result(b,"b.jpg")])["eyes"][0]
         self.assertEqual(od["morphology"],"UNCERTAIN")
+        self.assertEqual(
+            {source["morphology"] for source in od["erss_topography_sources"]},
+            {"NORMAL_SYMMETRIC", "ASYMMETRIC_BOWTIE"},
+        )
+        self.assertFalse(any(
+            str(conflict).split(":", 1)[0] in {
+                "morphology", "asymmetric_bow_tie", "srax", "srax_deg",
+                "inferior_opposite_steepening_D",
+            }
+            for conflict in od.get("data_conflicts", [])
+        ))
+        self.assertFalse(any(
+            "unresolved multi-image conflict: morphology" in issue
+            or "unresolved multi-image conflict: asymmetric_bow_tie" in issue
+            for issue in od["extraction_validation"]["issues"]
+        ))
 
 if __name__=="__main__": unittest.main()
