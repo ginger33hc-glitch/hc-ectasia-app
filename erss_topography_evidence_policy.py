@@ -86,8 +86,8 @@ def _i_s_category(eye):
         return "INFERIOR_STEEPENING_SRA", f"Canonical signed I-S {value:+.2f} D is > +1.00 and < +1.40 D."
     if 0.50 < value <= 1.00:
         return "ASYMMETRIC_BOWTIE", f"Canonical signed I-S {value:+.2f} D is > +0.50 and <= +1.00 D."
-    if -1.00 <= value < -0.50:
-        return "ASYMMETRIC_BOWTIE", f"Canonical signed I-S {value:+.2f} D is >= -1.00 and < -0.50 D."
+    if value < -0.50:
+        return "ASYMMETRIC_BOWTIE", f"Canonical signed I-S {value:+.2f} D is < -0.50 D; negative ABT has no lower limit."
     if -0.50 <= value <= 0.50:
         return "NORMAL_SYMMETRIC", f"Canonical signed I-S {value:+.2f} D is within -0.50 to +0.50 D."
     return None, f"Canonical signed I-S {value:+.2f} D lies outside the currently defined CER-AI I-S bands."
