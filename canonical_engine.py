@@ -55,6 +55,7 @@ def runtime_invariants():
         erss = composition.erss_topography_guard
         erss_evidence = composition.erss_topography_evidence_policy
         targeted = composition.pentacam_targeted_reread
+        new_fields = composition.ps3_extraction_policy
         if (
             core.extract_one_image
             is not targeted.extract_one_image_with_targeted_reread
@@ -64,10 +65,17 @@ def runtime_invariants():
             errors.append(
                 "Dedicated ERSS reader is not preserved immediately below the targeted numeric reread"
             )
-        if core.merge_extractions is not erss.merge_extractions_with_erss_source_guard:
+        if core.merge_extractions is not new_fields.merge_extractions_with_new_fields:
+            errors.append("New Pentacam labeled-field merge adapter is not the active merge layer")
+        if (
+            new_fields._previous_merge_extractions
+            is not erss.merge_extractions_with_erss_source_guard
+        ):
             errors.append(
-                "ERSS source-aware multi-image merge is not the active merge layer"
+                "ERSS source-aware multi-image merge is not preserved immediately below the new-field merge adapter"
             )
+        if not getattr(core, "_cerai_ps3_merge_installed", False):
+            errors.append("New Pentacam labeled-field merge adapter is not marked active")
         if (
             core.scoring_morphology
             is not erss_evidence.scoring_morphology_with_i_s_evidence_gate
