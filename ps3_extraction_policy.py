@@ -1,7 +1,8 @@
 """Narrow extraction-schema extension for PS3 labeled Pentacam fields.
 
 This module only declares where PS3 inputs are read. It contains no clinical
-thresholds and does not alter Randleman/BAD-D/NICE scoring.
+thresholds and does not alter Randleman/BAD-D/NICE scoring or the legacy
+TABLE_NUMERIC_FIELDS contract.
 """
 
 PS3_EXTRA_FIELDS = {
@@ -50,12 +51,13 @@ def install(core):
         if name not in required:
             required.append(name)
 
+    # Allow the extractor to identify these as explicitly read labeled values,
+    # without expanding core.TABLE_NUMERIC_FIELDS (a behavior-locked legacy tuple).
     table_enum = properties["table_verified_numeric_fields"]["items"]["enum"]
     for name in PS3_EXTRA_FIELDS:
         if name not in table_enum:
             table_enum.append(name)
 
-    core.TABLE_NUMERIC_FIELDS = tuple(dict.fromkeys((*core.TABLE_NUMERIC_FIELDS, *PS3_EXTRA_FIELDS)))
     if "PS3 ADDITIONAL LABELED-BOX READINGS" not in core.PROMPT:
         core.PROMPT += "\n" + PS3_SOURCE_PROMPT
 
