@@ -31,7 +31,7 @@ def _plan(procedure="PRK"):
         "prior": "no",
         "procedure": procedure,
         "manifest_cylinder_magnitude_D": 1.0,
-        "manifest_axis_deg": 0.0,
+        "entered_axis_deg": 0.0,
     }
 
 
@@ -44,6 +44,7 @@ def _base_engine(extracted, age, eye_plans, modifiers, metadata=None):
                 "status": "PASS",
                 "hard_stops": [],
                 "reasons": [],
+                "warnings": [],
                 "action": "Proceed",
             }
             for eye in extracted["eyes"]
@@ -63,6 +64,7 @@ def test_extraction_install_adds_only_ps3_transcription_fields_and_is_idempotent
         TABLE_NUMERIC_FIELDS=("Kmax_D",),
         PROMPT="base",
     )
+    original_table_fields = core.TABLE_NUMERIC_FIELDS
     ps3_extraction_policy.install(core)
     ps3_extraction_policy.install(core)
 
@@ -70,6 +72,7 @@ def test_extraction_install_adds_only_ps3_transcription_fields_and_is_idempotent
         assert field in eye_schema["properties"]
         assert eye_schema["required"].count(field) == 1
         assert eye_schema["properties"]["table_verified_numeric_fields"]["items"]["enum"].count(field) == 1
+    assert core.TABLE_NUMERIC_FIELDS == original_table_fields
     assert core.PROMPT.count("PS3 ADDITIONAL LABELED-BOX READINGS") == 1
 
 
@@ -86,6 +89,8 @@ def test_ps3_runtime_keeps_single_moderate_prk_allowed_without_rewriting_upstrea
     assert od["ps3"]["disposition"]["lasik"] == "DEFER"
     assert od["status"] == "PASS"
     assert od["hard_stops"] == []
+    assert any(reason.startswith("PS3:") for reason in od["reasons"])
+    assert len([warning for warning in od["warnings"] if warning.startswith("PS3 surgeon review required:")]) == 3
 
 
 def test_ps3_runtime_single_moderate_defers_lasik_only():
