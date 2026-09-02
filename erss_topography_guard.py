@@ -22,10 +22,16 @@ lower-right Elevation (Back) are not Randleman sources. Never require BAD to rec
 """
 
 QUALIFYING={"AXIAL_SAGITTAL_FRONT","AXIAL","SAGITTAL","TANGENTIAL","PLACIDO","OTHER_CURVATURE"}
-# These are source-role outputs owned by this dedicated anterior-curvature adapter. A page without
-# an anterior map legitimately reports UNREADABLE confidence while the 4-Maps source reports HIGH;
-# that is complementary source coverage, not a clinical multi-image conflict.
-ROLE_FIELDS={"anterior_curvature_map_visible","anterior_curvature_map_type","anterior_curvature_map_location","morphology_confidence"}
+# These outputs are owned by this dedicated anterior-curvature adapter.  The generic extractor may
+# also emit them, but its per-image values must not enter the generic multi-image conflict pathway:
+# this adapter reconciles all qualifying anterior maps below.  If dedicated maps disagree, the
+# canonical result is deliberately left UNCERTAIN for surgeon confirmation rather than producing
+# duplicate morphology/asymmetric-bow-tie conflicts that incorrectly demand replacement images.
+ROLE_FIELDS={
+    "anterior_curvature_map_visible","anterior_curvature_map_type","anterior_curvature_map_location",
+    "morphology","morphology_confidence","asymmetric_bow_tie","srax","srax_deg",
+    "inferior_opposite_steepening_D",
+}
 def _qualifies(e): return e.get("anterior_curvature_map_visible")=="YES" and e.get("anterior_curvature_map_type") in QUALIFYING
 
 ERSS_SCHEMA={
