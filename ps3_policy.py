@@ -1,17 +1,19 @@
 """Practical Subjective Scoring System (PS3) policy for CER-AI.
 
 This module is intentionally pure and independent of the canonical Randleman,
-BAD-D, NICE, and clean-engine pipelines.  It consumes already-read clinical
+BAD-D, NICE, and clean-engine pipelines. It consumes already-read clinical
 values and returns PS3-specific findings and procedure permissions only.
 
 Source of thresholds: the current PS3 examination form supplied for the CER-AI
-project, with explicitly agreed operational mappings.  Morphologic items that
+project, with explicitly agreed operational mappings. Morphologic items that
 cannot be read reliably are reported as NOT_EVALUATED and are never silently
 counted as normal.
 """
 from dataclasses import dataclass, field
 from math import isfinite
 from typing import Optional, Tuple
+
+from derived_srax import derive_srax_deg
 
 
 NORMAL = "NORMAL"
@@ -99,32 +101,6 @@ def _axis_difference_deg(a, b) -> Optional[float]:
     b %= 180.0
     diff = abs(a - b)
     return min(diff, 180.0 - diff)
-
-
-def derive_srax_deg(*, kisa_percent, kmax_d, i_s_d, astig_d) -> Optional[float]:
-    """Operational CER-AI derived SRAX agreed for PS3 support.
-
-    Pentacam does not directly expose SRAX in the current workflow.  The
-    project-approved conservative derivation uses displayed KISA%, Kmax, I-S,
-    and topographic astigmatism.  This value must be labelled DERIVED SRAX in
-    UI/reporting; it is not a directly reported Pentacam measurement.
-    """
-    kisa = _num(kisa_percent)
-    kmax = _num(kmax_d)
-    i_s = _num(i_s_d)
-    astig = _num(astig_d)
-    if None in (kisa, kmax, i_s, astig):
-        return None
-    k_index = max(1.0, kmax - 47.2)
-    is_index = max(1.0, abs(i_s))
-    astig_index = max(1.0, abs(astig))
-    denominator = k_index * is_index * astig_index
-    if denominator <= 0:
-        return None
-    value = (kisa * 3.0) / denominator
-    if not isfinite(value) or value < 0 or value > 180:
-        return None
-    return value
 
 
 def _inter_eye_score(inp: Optional[PS3InterEyeInput]) -> Tuple[Optional[int], PS3Finding]:
