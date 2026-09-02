@@ -42,6 +42,7 @@ jobs:
           OPENAI_API_KEY: test-key-for-import-only
         run: python -m pytest -q
       - name: Test files are independent of import order
+        if: always()
         env:
           OPENAI_API_KEY: test-key-for-import-only
         shell: bash
