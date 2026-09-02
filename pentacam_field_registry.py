@@ -41,9 +41,9 @@ KERATOMETRY_SOURCE_VALUES = (
     "NOT_SHOWN",
 )
 
-# These values have one authoritative printed Pentacam box/row. They are not
-# cross-image consensus fields and must never be reconstructed from a map or a
-# neighboring value. The first valid same-eye labeled-box transcription is retained.
+# Preserve the pre-existing reconciliation semantics for established fields
+# such as PPI_avg, I_S, and KISA. Only values with one authoritative printed
+# source are exclusive here; PS3 does not change how existing fields reconcile.
 EXCLUSIVE_LABELED_BOX_FIELDS = frozenset({
     *CORNEA_FRONT_KERATOMETRY_FIELDS,
     *CORNEA_BACK_KERATOMETRY_FIELDS,
@@ -53,9 +53,6 @@ EXCLUSIVE_LABELED_BOX_FIELDS = frozenset({
     "central_pachy_um",
     "F_Ele_Th_um",
     "B_Ele_Th_um",
-    "PPI_avg",
-    "I_S",
-    "KISA",
 })
 
 COMPLETION_NUMERIC_FIELDS = {
