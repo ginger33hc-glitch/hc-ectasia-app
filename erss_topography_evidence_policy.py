@@ -1,10 +1,12 @@
 """Evidence gate for the existing Randleman/ERSS topography scorer.
 
-This module deliberately owns no point table and calculates no ERSS total.  It only
+This module deliberately owns no point table and calculates no ERSS total. It only
 validates the anterior-topography evidence passed to the canonical
-``scoring_morphology`` function.  The existing ``lasik_topography_points`` mapping and
+``scoring_morphology`` function. The existing ``lasik_topography_points`` mapping and
 the BAD-independent five-row ERSS calculator remain the sole scoring authorities.
 """
+
+import bootstrap
 
 core = None
 _previous_scoring_morphology = None
@@ -33,8 +35,6 @@ def _i_s_status(eye):
     explicit = eye.get("I_S_status")
     if explicit in {"CONFIDENT", "SURGEON_CONFIRMED", "CONFLICT", "UNREADABLE", "NOT_SHOWN"}:
         return explicit
-    # Backward-compatible provenance for the existing strict extraction schema:
-    # a numeric I-S is usable only when it came from its labeled Pentacam table.
     if core.is_number(eye.get("I_S")) and "I_S" in set(eye.get("table_verified_numeric_fields") or []):
         return "CONFIDENT"
     return "UNREADABLE" if eye.get("I_S") is not None else "NOT_SHOWN"
@@ -78,36 +78,28 @@ _CATEGORY_RANK = {
 
 
 def _numeric_category(eye):
-    """Return a category only when a published numeric pattern criterion is usable."""
-    i_s = eye.get("I_S")
-    i_s_usable = core.is_number(i_s) and _i_s_status(eye) in VALID_I_S_STATUSES
-    srax = eye.get("srax_deg")
-    opposite = eye.get("inferior_opposite_steepening_D")
+    """Map the canonical signed Pentacam I-S value to one Randleman category.
 
-    if i_s_usable and float(i_s) >= 1.4:
-        return "ABNORMAL_ECTATIC", "Labeled/confirmed I-S is >=1.4 D."
-    if core.is_number(srax) and float(srax) >= 20.0:
-        return "INFERIOR_STEEPENING_SRA", "Documented SRA/SRAX is >=20 degrees."
-    if (
-        core.is_number(opposite)
-        and float(opposite) >= 1.0
-        and i_s_usable
-        and float(i_s) < 1.4
-    ):
-        return (
-            "INFERIOR_STEEPENING_SRA",
-            "Documented inferior-versus-opposite steepening is >=1.0 D with I-S <1.4 D.",
-        )
-    if (
-        core.is_number(opposite)
-        and 0.5 < float(opposite) < 1.0
-        and not (core.is_number(srax) and float(srax) >= 20.0)
-    ):
-        return (
-            "ASYMMETRIC_BOWTIE",
-            "Documented opposite-region asymmetry is >0.5 D and <1.0 D without qualifying SRA/SRAX.",
-        )
-    return None, None
+    Current CER-AI policy makes the labeled/surgeon-confirmed signed I-S value the
+    authoritative numeric topography pathway. Legacy SRAX/opposite-region fields do
+    not independently create Randleman points.
+    """
+    i_s = eye.get("I_S")
+    if not (core.is_number(i_s) and _i_s_status(eye) in VALID_I_S_STATUSES):
+        return None, None
+
+    value = float(i_s)
+    if value >= 1.40:
+        return "ABNORMAL_ECTATIC", f"Canonical signed I-S {value:+.2f} D is >= +1.40 D."
+    if 1.00 < value < 1.40:
+        return "INFERIOR_STEEPENING_SRA", f"Canonical signed I-S {value:+.2f} D is > +1.00 and < +1.40 D."
+    if 0.50 < value <= 1.00:
+        return "ASYMMETRIC_BOWTIE", f"Canonical signed I-S {value:+.2f} D is > +0.50 and <= +1.00 D."
+    if -1.00 <= value < -0.50:
+        return "ASYMMETRIC_BOWTIE", f"Canonical signed I-S {value:+.2f} D is >= -1.00 and < -0.50 D."
+    if -0.50 <= value <= 0.50:
+        return "NORMAL_SYMMETRIC", f"Canonical signed I-S {value:+.2f} D is within -0.50 to +0.50 D."
+    return None, f"Canonical signed I-S {value:+.2f} D lies outside the currently defined CER-AI scoring bands."
 
 
 def _high_confidence_map_category(eye):
@@ -125,20 +117,27 @@ def _high_confidence_map_category(eye):
 def scoring_morphology_with_i_s_evidence_gate(eye):
     """Return one validated category to the existing point mapper.
 
-    Categories are mutually exclusive.  No points are assigned here.
+    A usable signed I-S value is authoritative. Visual/surgeon category evidence is
+    a fallback only when canonical I-S is unavailable or outside a defined band.
     """
     if not eye.get("_erss_i_s_gate_required"):
         return _previous_scoring_morphology(eye)
 
     evidence = list(eye.get("morphology_evidence") or [])
     numeric_category, numeric_evidence = _numeric_category(eye)
+    if numeric_evidence:
+        evidence.append(numeric_evidence)
+    if numeric_category:
+        evidence.append("Canonical signed I-S pathway selected; legacy SRAX/opposite-region fields do not add or override Randleman points.")
+        return {
+            "category": numeric_category,
+            "category_source": "CANONICAL_SIGNED_I_S",
+            "evidence": list(dict.fromkeys(evidence)),
+        }
+
     map_category = _high_confidence_map_category(eye)
     surgeon_category = eye.get("surgeon_topography_category")
-
     candidates = []
-    if numeric_category:
-        candidates.append((numeric_category, "AUTOMATIC_NUMERIC_EVIDENCE"))
-        evidence.append(numeric_evidence)
     if map_category:
         candidates.append((map_category, "AUTOMATIC_HIGH_CONFIDENCE_MAP_EVIDENCE"))
         evidence.append(
@@ -151,16 +150,14 @@ def scoring_morphology_with_i_s_evidence_gate(eye):
     if not candidates:
         confidence = eye.get("morphology_confidence") or "UNSPECIFIED"
         evidence.append(
-            f"Randleman topography remains unscored: no qualifying numeric criterion, HIGH-confidence dedicated map category, or surgeon-confirmed category is available (map confidence: {confidence})."
+            f"Randleman topography remains unscored: no usable canonical signed I-S band, HIGH-confidence dedicated map category, or surgeon-confirmed category is available (map confidence: {confidence})."
         )
         if _i_s_status(eye) == "CONFLICT":
             evidence.append("Conflicting same-eye I-S readings were not used.")
         return {"category": "UNCERTAIN", "category_source": "UNRESOLVED", "evidence": list(dict.fromkeys(evidence))}
 
     category, source = max(candidates, key=lambda item: _CATEGORY_RANK[item[0]])
-    evidence.append(
-        "Highest applicable single Randleman topography category selected; ABT and inferior-steepening/SRA points are never added."
-    )
+    evidence.append("Fallback evidence selected one highest Randleman topography category; categories are never added together.")
     return {"category": category, "category_source": source, "evidence": list(dict.fromkeys(evidence))}
 
 
@@ -170,11 +167,17 @@ def required_tomography_missing_with_i_s(eye):
         return missing
     validated = scoring_morphology_with_i_s_evidence_gate(eye).get("category")
     if validated == "UNCERTAIN":
-        missing.append("surgeon-confirmed Randleman topography category when the dedicated anterior-map read is not HIGH confidence")
+        missing.append("surgeon-confirmed Randleman topography category when canonical signed I-S is unavailable and the dedicated anterior-map read is not HIGH confidence")
     return list(dict.fromkeys(missing))
 
 
 def assess_eye_with_i_s_evidence(eye, plan, age, patient_modifiers):
+    # Prior corneal refractive surgery must bypass every virgin-cornea wrapper.
+    # bootstrap._original_assess_eye is the immutable base function captured before
+    # policy composition and contains the canonical post-refractive short circuit.
+    if core.tri((plan or {}).get("prior")) == "yes":
+        return bootstrap._original_assess_eye(eye, plan, age, patient_modifiers)
+
     if (plan or {}).get("procedure") != "LASIK":
         return _previous_assess_eye(eye, plan, age, patient_modifiers)
     working_eye = _prepared_eye(eye, plan or {})
@@ -189,7 +192,7 @@ def assess_eye_with_i_s_evidence(eye, plan, age, patient_modifiers):
         "image_category_confidence": working_eye.get("morphology_confidence", "UNSPECIFIED"),
         "validated_category": validated.get("category", "UNCERTAIN"),
         "category_source": validated.get("category_source", "UNRESOLVED"),
-        "single_category_rule": "Highest applicable category only; ABT and inferior-steepening/SRA points are never added.",
+        "single_category_rule": "Canonical signed I-S is authoritative when usable; fallback categories are mutually exclusive.",
         "needs_surgeon_I_S": False,
         "needs_surgeon_category": validated.get("category") == "UNCERTAIN",
     }
