@@ -74,6 +74,9 @@ def test_extraction_install_adds_only_ps3_transcription_fields_and_is_idempotent
         assert eye_schema["properties"]["table_verified_numeric_fields"]["items"]["enum"].count(field) == 1
     assert core.TABLE_NUMERIC_FIELDS == original_table_fields
     assert core.PROMPT.count("PS3 ADDITIONAL LABELED-BOX READINGS") == 1
+    for canonical in ("Kmax_D", "I_S", "KISA", "pachy_thinnest_um", "B_Ele_Th_um", "PPI_avg", "ARTmax_um"):
+        assert f"- {canonical}:" not in core.PROMPT
+    assert "Read ONLY the four new fields" in core.PROMPT
 
 
 def test_ps3_runtime_keeps_single_moderate_prk_allowed_without_rewriting_upstream_scores():
