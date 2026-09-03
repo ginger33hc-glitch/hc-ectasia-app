@@ -111,14 +111,16 @@ def test_nice_install_is_idempotent_for_schema_prompt_and_engine_wrapper():
     assert core.PROMPT.count("NICE SEPARATE INPUT READING") == 1
 
 
-def test_status_rank_install_is_explicit_and_idempotent():
-    core = SimpleNamespace(combine_status=lambda current, new: current)
+def test_status_rank_install_preserves_native_aggregator_and_is_idempotent():
+    native = status_rank_policy.combine_status
+    core = SimpleNamespace(combine_status=native)
 
     status_rank_policy.install(core)
     installed_aggregator = core.combine_status
     status_rank_policy.install(core)
 
-    assert core.combine_status is installed_aggregator
+    assert core.combine_status is installed_aggregator is native
+    assert core._hc_status_rank_policy_installed is True
     assert core.combine_status("PASS", "CAUTION") == "CAUTION"
     assert core.combine_status("CAUTION", "STOP-DEFER") == "STOP-DEFER"
 
