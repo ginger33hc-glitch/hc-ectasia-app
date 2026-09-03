@@ -33,7 +33,7 @@ def test_missing_front_map_srax_blocks_report_and_asks_surgeon():
     assert result["report_token"] is None
     requests = [item for item in result["input_requests"] if item.get("eye") == "OD"]
     assert any(item.get("key") == "srax" for item in requests)
-    assert any("Randleman/ERSS" in item.get("label", "") for item in requests)
+    assert any("Randleman/ERSS" in item.get("message", "") for item in result["missing"])
 
 
 def test_surgeon_srax_confirmation_allows_randleman_completion():
