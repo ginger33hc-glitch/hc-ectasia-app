@@ -65,6 +65,9 @@ def test_enabled_route_uses_linear_pipeline_only_at_normalized_boundary():
     assert result["pipeline_order"][0] == "normalized_input"
 
 
-def test_runtime_composition_declares_phase3_cutover_seam():
+def test_runtime_composition_declares_phase3_cutover_seam_and_shadow_observer():
     runtime_composition = importlib.import_module("runtime_composition")
-    assert runtime_composition.COMPOSITION_PHASES["phase3_cutover"] == ("phase3_runtime_seam",)
+    assert runtime_composition.COMPOSITION_PHASES["phase3_cutover"] == (
+        "phase3_runtime_seam",
+        "phase3_workflow_shadow_observer",
+    )
