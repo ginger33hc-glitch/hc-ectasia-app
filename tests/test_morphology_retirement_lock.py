@@ -1,4 +1,4 @@
-"""Regression lock: visual morphology must never re-enter CER-AI completion workflow."""
+"""Regression lock: retired morphology stays retired while SRAX confirmation remains active."""
 
 import erss_auto_read_policy as policy
 
@@ -8,6 +8,7 @@ def _legacy_decision():
         "critical_input_issues": [
             "OD extraction validation: unresolved morphology",
             "OS Signed I-S (D) is unreadable",
+            "OD SRAX >20° confirmation from the Axial/Sagittal Curvature (Front) map",
         ],
         "eyes": [
             {
@@ -16,7 +17,7 @@ def _legacy_decision():
                     "Randleman topography category",
                     "morphology confirmation required",
                     "asymmetric bow-tie confirmation",
-                    "SRAX confirmation",
+                    "SRAX >20° confirmation from the Axial/Sagittal Curvature (Front) map",
                     "inferior steepening morphology",
                     "readable anterior pattern",
                     "readable posterior pattern",
@@ -31,7 +32,7 @@ def _legacy_decision():
     }
 
 
-def test_unresolved_erss_never_requests_visual_morphology(monkeypatch):
+def test_unresolved_erss_removes_retired_morphology_but_preserves_srax_and_i_s(monkeypatch):
     monkeypatch.setattr(
         policy,
         "_previous_hc_engine",
@@ -41,19 +42,25 @@ def test_unresolved_erss_never_requests_visual_morphology(monkeypatch):
     decision = policy.hc_engine_with_erss_auto_read({}, 30, {}, {}, {})
     eye = decision["eyes"][0]
 
-    assert eye["missing"] == ["Signed I-S (D) required"]
+    assert eye["missing"] == [
+        "SRAX >20° confirmation from the Axial/Sagittal Curvature (Front) map",
+        "Signed I-S (D) required",
+    ]
     assert eye["randleman_erss"]["missing_erss_inputs"] == []
-    assert decision["critical_input_issues"] == ["OS Signed I-S (D) is unreadable"]
+    assert decision["critical_input_issues"] == [
+        "OS Signed I-S (D) is unreadable",
+        "OD SRAX >20° confirmation from the Axial/Sagittal Curvature (Front) map",
+    ]
 
 
-def test_retired_terms_are_removed_while_signed_i_s_is_preserved():
+def test_retired_terms_are_removed_while_signed_i_s_and_srax_are_preserved():
     result = {
         "missing": [
             "morphology",
             "Randleman topography category",
             "topographic category",
             "asymmetric bow tie",
-            "SRAX",
+            "SRAX >20° confirmation from the Axial/Sagittal Curvature (Front) map",
             "inferior steepening morphology",
             "readable anterior pattern",
             "readable posterior pattern",
@@ -61,4 +68,7 @@ def test_retired_terms_are_removed_while_signed_i_s_is_preserved():
         ]
     }
     policy._clean_missing(result)
-    assert result["missing"] == ["Signed I-S (D) required"]
+    assert result["missing"] == [
+        "SRAX >20° confirmation from the Axial/Sagittal Curvature (Front) map",
+        "Signed I-S (D) required",
+    ]
