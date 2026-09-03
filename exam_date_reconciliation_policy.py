@@ -1,11 +1,12 @@
 """Semantic reconciliation for Pentacam examination dates.
 
 The extractor preserves the printed date string. This policy only decides whether
-multiple Pentacam sources refer to the same calendar date; it never rewrites the
-source strings or invents a date.
+the authoritative Pentacam sources refer to the same calendar date; it never
+rewrites the source strings or invents a date.
 
-Binding CER-AI rule: the Show 2 Exams Topometric page is not an authoritative
-exam-date source and is excluded entirely from cross-image date reconciliation.
+Binding CER-AI rule: ONLY Four Maps Refractive pages are authoritative for the
+exam date. Dates printed on BAD Display, Show 2 Exams Topometric, or any other
+uploaded Pentacam source are excluded entirely from exam-date reconciliation.
 """
 from copy import deepcopy
 from datetime import date
@@ -53,14 +54,14 @@ def possible_calendar_dates(value):
     }
 
 
-def _is_show_2_exams_topometric(extraction):
-    """True when this source is the non-authoritative Show 2 Exams Topometric page."""
+def _is_four_maps_refractive(extraction):
+    """True only for the authoritative Four Maps Refractive source page."""
     for eye in (extraction or {}).get("eyes") or []:
         for screen_type in eye.get("screen_types") or []:
             normalized = re.sub(r"[^A-Z0-9]+", "_", str(screen_type).upper()).strip("_")
-            if "SHOW_2_EXAMS_TOPOMETRIC" in normalized:
+            if "FOUR_MAPS_REFRACTIVE" in normalized:
                 return True
-            if "SHOW_2_EXAMS" in normalized and "TOPOMETRIC" in normalized:
+            if "FOUR_MAPS" in normalized and "REFRACTIVE" in normalized:
                 return True
     return False
 
@@ -71,7 +72,7 @@ def _pentacam_date_possibilities(extractions):
         context = (extraction or {}).get("document_context") or {}
         if context.get("document_type") != "PENTACAM_TOPOGRAPHY":
             continue
-        if _is_show_2_exams_topometric(extraction):
+        if not _is_four_maps_refractive(extraction):
             continue
         raw = context.get("exam_date")
         if raw in (None, ""):
@@ -92,10 +93,7 @@ def dates_are_semantically_consistent(extractions):
 
 
 def reconcile_merged_exam_date_conflict(merged, extractions):
-    """Remove only a false/non-authoritative exam-date conflict."""
-    # If the only raw-string disagreement came from excluded Show 2 Exams pages,
-    # compare the remaining authoritative Pentacam dates. One remaining date is
-    # sufficient: there is then no authoritative source disagreement.
+    """Remove a date conflict unless authoritative Four Maps pages disagree."""
     authoritative = _pentacam_date_possibilities(extractions)
     if authoritative is None or not authoritative:
         return merged
