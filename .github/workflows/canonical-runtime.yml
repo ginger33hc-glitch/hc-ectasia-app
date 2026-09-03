@@ -46,7 +46,7 @@ jobs:
       - name: Phase 4 cleanup contract
         env:
           OPENAI_API_KEY: test-key-for-import-only
-        run: python -m pytest -q tests/test_phase4_cleanup_contract.py
+        run: python -m pytest -q tests/test_phase4_cleanup_contract.py tests/test_phase4_status_rank_cleanup.py
       - name: Archive, Railway preflight, migration, catalog, audit, user, UI, historical-report, research security, and public site tests
         env:
           OPENAI_API_KEY: test-key-for-import-only
