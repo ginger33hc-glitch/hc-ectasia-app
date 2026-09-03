@@ -28,6 +28,7 @@ import hc_final_decision_policy  # noqa: F401,E402
 import status_rank_policy  # noqa: E402
 import inter_eye_tomography_policy  # noqa: E402
 import microkeratome_planning_policy  # noqa: E402
+import erss_numeric_extraction_policy  # noqa: E402
 import erss_topography_evidence_policy  # noqa: E402
 import ps3_extraction_policy  # noqa: E402
 import ps3_runtime_policy  # noqa: E402
@@ -71,6 +72,7 @@ COMPOSITION_PHASES = {
     "pentacam_extraction": (
         "merge_policy_base",
         "extraction_guard",
+        "erss_numeric_extraction_policy",
         "erss_topography_evidence_policy",
         "ps3_extraction_policy",
         "pentacam_targeted_reread",
@@ -113,6 +115,7 @@ def compose(version: str):
     critical_score_highlight.install(core, reports)
     ps3_report_policy.install(reports)
     microkeratome_report_policy.install(reports)
+    erss_numeric_extraction_policy.install(core)
     erss_topography_evidence_policy.install(
         core,
         prior_assess_eye=bootstrap._original_assess_eye,
