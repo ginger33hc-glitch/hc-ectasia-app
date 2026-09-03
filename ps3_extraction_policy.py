@@ -6,7 +6,8 @@ preserves them through the legacy merge seam.
 
 Elevation source ownership is strict:
 - F_Ele_Th_um comes only from the printed F. Ele.Th box on the BAD/Belin-Ambrosio Display.
-- B_Ele_Th_um comes only from the printed B. Ele.Th box on the BAD/Belin-Ambrosio Display.
+- B_Ele_Th_um is not re-read by PS3; it is consumed only from the dedicated
+  BAD-display B. Ele.Th reading already owned by the NICE extraction pathway.
 Generic anterior/posterior elevation-at-thinnest values and map spots must never
 substitute for these labeled BAD-display boxes.
 """
@@ -25,8 +26,9 @@ PS3_EXTRA_FIELDS = {
 
 PS3_SOURCE_PROMPT = r"""
 PS3 ADDITIONAL LABELED-BOX READINGS (transcription only; do not score):
-Read ONLY the fields below from their stated source. Existing canonical CER-AI
-fields must be left to their existing extraction/reconciliation pathways.
+Read ONLY the four new fields below from their stated source. Existing canonical
+CER-AI fields, including B_Ele_Th_um, must be left to their existing dedicated
+extraction/reconciliation pathways and must not be re-read for PS3.
 
 SHOW 2 EXAMS -> TOPOMETRIC:
 - topographic_astig_D: upper Cornea Front section, printed 'Astig.' box.
@@ -35,14 +37,12 @@ SHOW 2 EXAMS -> TOPOMETRIC:
 
 BAD / BELIN-AMBROSIO DISPLAY ONLY:
 - F_Ele_Th_um: printed 'F. Ele.Th' box in the central labeled area.
-- B_Ele_Th_um: printed 'B. Ele.Th' box in the central labeled area.
 
-For F. Ele.Th and B. Ele.Th, never use an Elevation Front/Back map value, BFS,
-Float, BFTE, colour scale, generic anterior/posterior elevation-at-thinnest
-field, or another Pentacam screen. If the stated label or attached digits are
-unreadable/not shown on the BAD Display, return null. Do not interpret PTI/CTSP
-morphology, Corneal Thickness Map morphology, or Relative Thickness Map
-morphology in this extraction pass.
+For F. Ele.Th, never use an Elevation Front map value, BFS, Float, BFTE, colour
+scale, generic anterior elevation-at-thinnest field, or another Pentacam screen.
+If the F. Ele.Th label or attached digits are unreadable/not shown on the BAD
+Display, return null. Do not interpret PTI/CTSP morphology, Corneal Thickness
+Map morphology, or Relative Thickness Map morphology in this extraction pass.
 """
 
 
@@ -97,10 +97,9 @@ def _bad_display_result(result):
 
 
 def _bad_b_ele_th_candidates(results, eye_name):
+    """Reuse the canonical NICE-owned B. Ele.Th reading; never re-read it for PS3."""
     values = []
     for result in results:
-        if not _bad_display_result(result):
-            continue
         for reading in result.get("nice_readings") or []:
             if reading.get("eye") != eye_name:
                 continue
@@ -161,9 +160,10 @@ def merge_extractions_with_new_fields(results):
                 target[field] = unique[0]
                 if field not in verified_target:
                     verified_target.append(field)
-                target.setdefault("field_provenance", {})[field] = [
-                    {"source": "BAD_DISPLAY_F_ELE_TH_LABELED_BOX"}
-                ] if field == "F_Ele_Th_um" else target.get("field_provenance", {}).get(field, [])
+                if field == "F_Ele_Th_um":
+                    target.setdefault("field_provenance", {})[field] = [
+                        {"source": "BAD_DISPLAY_F_ELE_TH_LABELED_BOX"}
+                    ]
             elif len(unique) > 1:
                 target[field] = None
                 verified_target = [name for name in verified_target if name != field]
@@ -181,6 +181,8 @@ def merge_extractions_with_new_fields(results):
             if not any(abs(value - seen) <= 1e-6 for seen in b_values):
                 b_values.append(value)
         if b_values:
+            # The NICE extractor owns this reading. PS3 merely consumes the
+            # source-locked value for its agreed inter-eye comparison.
             target["B_Ele_Th_um"] = b_values[0]
             target.setdefault("field_provenance", {})["B_Ele_Th_um"] = [
                 {"source": "BAD_DISPLAY_B_ELE_TH_LABELED_BOX"}
