@@ -25,7 +25,6 @@ import critical_score_highlight  # noqa: E402
 import pachymetry_policy  # noqa: F401,E402
 import randleman_bad_independence  # noqa: F401,E402
 import hc_final_decision_policy  # noqa: F401,E402
-import status_rank_policy  # noqa: E402
 import inter_eye_tomography_policy  # noqa: E402
 import microkeratome_planning_policy  # noqa: E402
 import erss_numeric_extraction_policy  # noqa: E402
@@ -66,7 +65,6 @@ COMPOSITION_PHASES = {
         "pachymetry_policy",
         "randleman_bad_independence",
         "hc_final_decision_policy",
-        "status_rank_policy",
         "inter_eye_tomography_policy",
         "microkeratome_planning_policy",
         "nice_policy",
@@ -119,7 +117,6 @@ def compose(version: str):
     reports.APP_VERSION = version
 
     hc_age_policy.install(core, score_audit_owner=bootstrap)
-    status_rank_policy.install(core)
     critical_score_highlight.install(core, reports)
     ps3_report_policy.install(reports)
     microkeratome_report_policy.install(reports)
