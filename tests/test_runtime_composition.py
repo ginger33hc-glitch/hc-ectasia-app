@@ -66,7 +66,8 @@ def test_policy_leaf_modules_do_not_hide_install_order():
     assert _local_imports("hc_age_policy.py") == set()
     assert _local_imports("erss_visual_morphology_policy.py") == set()
     assert _local_imports("erss_auto_read_policy.py") == set()
-    assert _local_imports("erss_topography_evidence_policy.py") == {"derived_srax"}
+    assert _local_imports("erss_topography_evidence_policy.py") == set()
+    assert _local_imports("srax_completion_policy.py") == set()
     assert _local_imports("microkeratome_planning_policy.py") == {
         "planning.microkeratome",
         "typing",
@@ -84,6 +85,7 @@ def test_every_runtime_topic_is_owned_by_one_phase():
             owners[module] = phase
     assert owners["pentacam_targeted_reread"] == "pentacam_extraction"
     assert owners["assessment_workflow"] == "reporting_and_readiness"
+    assert owners["srax_completion_policy"] == "reporting_and_readiness"
     assert owners["operational_security"] == "access_and_persistence"
     assert owners["hc_final_decision_policy"] == "clinical_policy"
 
