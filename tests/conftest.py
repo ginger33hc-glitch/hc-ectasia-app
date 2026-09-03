@@ -27,11 +27,6 @@ _RETIRED_LEGACY_TESTS = {
     "tests/test_hc_engine.py::TestScoringAndCompleteness::test_local_kmax_is_rejected_but_explicit_local_rmin_remains_permitted": "Rmin map fallback was explicitly removed; Rmin is source-locked to Four Maps Refractive > Cornea Front.",
     "tests/test_hc_engine.py::TestApiIntegration::test_analyze_endpoint_accepts_eye_specific_payload": "Production /analyze now requires the complete five-image mandatory Pentacam source set.",
     "tests/test_hc_engine.py::TestApiIntegration::test_analyze_retry_reuses_same_inflight_or_completed_assessment": "The legacy fixture supplies one image; retry behavior is tested separately from the mandatory five-image gate.",
-    "tests/test_i_s_normal_prk_caution_regression.py::test_labeled_i_s_minus_013_overrides_false_asymmetric_bow_tie": "Superseded private helper belonged to the retired visual-morphology compatibility layer.",
-    "tests/test_i_s_normal_prk_caution_regression.py::test_i_s_normal_band_boundaries_are_inclusive": "I-S normal-band boundaries are frozen in the launch-contract and numeric ERSS tests.",
-    "tests/test_i_s_normal_prk_caution_regression.py::test_unverified_i_s_does_not_override_morphology": "Visual morphology is no longer an ERSS scoring authority.",
-    "tests/test_i_s_normal_prk_caution_regression.py::test_prk_caution_without_hard_stop_is_recognized_as_non_defer": "Superseded helper belonged to the removed PRK-EWSS pathway.",
-    "tests/test_i_s_normal_prk_caution_regression.py::test_prk_caution_never_masks_independent_hard_stop": "Superseded helper belonged to the removed PRK-EWSS pathway; independent hard-stop preservation is covered by current behavior locks.",
 }
 
 
