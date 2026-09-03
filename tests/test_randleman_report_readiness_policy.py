@@ -1,79 +1,64 @@
-"""Report generation must fail closed when LASIK Randleman/ERSS is incomplete."""
+"""Fail-closed report readiness contract for incomplete LASIK Randleman/ERSS."""
 from copy import deepcopy
 
 import pytest
 from fastapi import HTTPException
 
 import canonical_engine as runtime
-import assessment_workflow as workflow
+import randleman_report_readiness_policy as policy
 from test_hc_engine import MODIFIERS, normal_eye, plan
 
 core = runtime.core
 
 
-def _scenario():
+def _decision(*, srax=None, srax_deg=0.0, surgeon_confirmed=False):
     extracted = {"eyes": [normal_eye("OD"), normal_eye("OS")], "critical_input_issues": []}
     for eye in extracted["eyes"]:
-        eye["srax"] = "NO"
-        eye["srax_deg"] = 0.0
         eye["morphology_confidence"] = "HIGH"
         eye["erss_source_read"] = "DEDICATED_CURVATURE_PASS"
+        eye["srax_deg"] = srax_deg
+        if srax is not None:
+            eye["srax"] = srax
+        elif srax_deg is None:
+            eye["srax"] = "UNCERTAIN"
+        else:
+            eye["srax"] = "YES" if float(srax_deg) > 20.0 else "NO"
+        if surgeon_confirmed:
+            eye["srax_deg"] = None
+            eye.setdefault("field_provenance", {})["srax"] = [{"source": "SURGEON_CONFIRMED"}]
     plans = {eye: plan("LASIK", flap=100) for eye in ("OD", "OS")}
-    return extracted, plans
+    return core.hc_engine(extracted, 35, plans, MODIFIERS)
 
 
-def test_missing_front_map_srax_blocks_report_and_asks_surgeon():
-    extracted, plans = _scenario()
-    extracted["eyes"][0]["srax"] = "UNCERTAIN"
-    extracted["eyes"][0]["srax_deg"] = None
+def test_missing_front_map_srax_makes_patient_erss_incomplete_and_actionable():
+    decision = _decision(srax="UNCERTAIN", srax_deg=None)
+    od = decision["eyes"][0]
 
-    result = workflow.begin(core, extracted, 35, plans, MODIFIERS, {})
-
-    assert result["workflow_status"] == "NEEDS_INPUT"
-    assert result["report_token"] is None
-    requests = [item for item in result["input_requests"] if item.get("eye") == "OD"]
-    assert any(item.get("key") == "srax" for item in requests)
-    assert any("Randleman/ERSS" in item.get("message", "") for item in result["missing"])
+    assert not policy._erss_complete(od)
+    messages = policy._component_requests(od)
+    assert any("SRAX >20° confirmation" in message for message in messages)
 
 
-def test_surgeon_srax_confirmation_allows_randleman_completion():
-    extracted, plans = _scenario()
-    extracted["eyes"][0]["srax"] = "UNCERTAIN"
-    extracted["eyes"][0]["srax_deg"] = None
-    result = workflow.begin(core, extracted, 35, plans, MODIFIERS, {})
+def test_surgeon_confirmed_srax_can_complete_patient_erss():
+    decision = _decision(srax="NO", srax_deg=None, surgeon_confirmed=True)
+    od = decision["eyes"][0]
 
-    ready = workflow.complete(core, {
-        "assessment_token": result["assessment_token"],
-        "age": 35,
-        "eye_plans": plans,
-        "patient_modifiers": MODIFIERS,
-        "clinical_overrides": {"OD": {"srax": "NO"}},
-    })
-
-    assert ready["workflow_status"] == "READY", ready
-    erss = ready["decision"]["eyes"][0]["randleman_erss"]
+    assert policy._erss_complete(od), od
+    erss = od["randleman_erss"]
     assert erss["total"] is not None
     assert erss["missing_erss_inputs"] == []
-    assert ready["report_token"]
+    assert od["erss_topography_evidence"]["SRAX_source"] == "SURGEON_CONFIRMED_FRONT_MAP_REVIEW"
 
 
-def test_incomplete_randleman_cannot_be_exported_even_with_stale_ready_snapshot():
-    extracted, plans = _scenario()
-    ready = workflow.begin(core, extracted, 35, plans, MODIFIERS, {})
-    assert ready["workflow_status"] == "READY", ready
-
-    token = ready["assessment_token"]
-    session = workflow._sessions[token]
-    forged = deepcopy(session["ready"])
-    forged["decision"]["eyes"][0]["randleman_erss"]["total"] = None
-    forged["decision"]["eyes"][0]["randleman_erss"]["rows"]["topography"] = None
-    forged["decision"]["eyes"][0]["randleman_erss"]["missing_erss_inputs"] = ["topography"]
-    session["ready"] = forged
+def test_export_validation_rejects_incomplete_patient_erss():
+    decision = _decision(srax_deg=0.0)
+    forged = deepcopy(decision)
+    od = forged["eyes"][0]
+    od["randleman_erss"]["total"] = None
+    od["randleman_erss"]["rows"]["topography"] = None
+    od["randleman_erss"]["missing_erss_inputs"] = ["topography"]
 
     with pytest.raises(HTTPException) as exc:
-        workflow.export_payload({
-            "assessment_token": token,
-            "report_token": forged["report_token"],
-        })
+        policy._validate_export_erss({"decision": forged})
     assert exc.value.status_code == 409
     assert "Randleman/ERSS is incomplete" in str(exc.value.detail)
