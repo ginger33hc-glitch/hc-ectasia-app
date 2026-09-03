@@ -30,6 +30,30 @@ def _authenticated_root_html(display_name: str) -> str:
   <a href="/archive-ui" style="font-weight:bold;color:#1f5e8c">Case Archive</a>
 </div>
 <script>
+(() => {{
+  const appHeader = document.querySelector(".app-header");
+  const brandLockup = document.querySelector(".app-header .brand-lockup");
+  const homeTarget = brandLockup || appHeader;
+  if (homeTarget) {{
+    homeTarget.setAttribute("role", "link");
+    homeTarget.setAttribute("tabindex", "0");
+    homeTarget.setAttribute("aria-label", "Return to CER-AI website");
+    homeTarget.setAttribute("title", "Return to CER-AI website");
+    homeTarget.style.cursor = "pointer";
+    const goHome = () => window.location.assign("/");
+    homeTarget.addEventListener("click", event => {{
+      if (event.target.closest("button, a, input, select, textarea")) return;
+      goHome();
+    }});
+    homeTarget.addEventListener("keydown", event => {{
+      if (event.key === "Enter" || event.key === " ") {{
+        event.preventDefault();
+        goHome();
+      }}
+    }});
+  }}
+}})();
+
 if (typeof ceraiFetch === "function") {{
   ceraiFetch = async function(url, options={{}}) {{
     const response = await fetch(url, options);
