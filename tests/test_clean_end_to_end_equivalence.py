@@ -34,23 +34,9 @@ def test_clean_lasik_score_components_match_canonical_primitives_across_matrix()
     for age, pachy, morphology, expected_rsb, mrse in cases:
         flap = 100
         ablation = pachy - flap - expected_rsb
-        out = clean_case(
-            age_years=age, pachy_thinnest_um=pachy, morphology=morphology,
-            flap_um=flap, ablation_um=ablation, manifest_mrse_d=mrse,
-            preop_kmean_d=44,
-        )
-        expected = (
-            legacy.age_points(age),
-            legacy.lasik_pachy_points(pachy),
-            legacy.lasik_topography_points(morphology),
-            legacy.lasik_rsb_points(expected_rsb),
-            legacy.lasik_mrse_points(mrse),
-        )
-        actual = (
-            out.scores.age_points, out.scores.pachymetry_points,
-            out.scores.topography_points, out.scores.rsb_points,
-            out.scores.mrse_points,
-        )
+        out = clean_case(age_years=age, pachy_thinnest_um=pachy, morphology=morphology, flap_um=flap, ablation_um=ablation, manifest_mrse_d=mrse, preop_kmean_d=44)
+        expected = (legacy.age_points(age), legacy.lasik_pachy_points(pachy), legacy.lasik_topography_points(morphology), legacy.lasik_rsb_points(expected_rsb), legacy.lasik_mrse_points(mrse))
+        actual = (out.scores.age_points, out.scores.pachymetry_points, out.scores.topography_points, out.scores.rsb_points, out.scores.mrse_points)
         assert actual == expected
         assert out.scores.erss_total == sum(expected)
 
@@ -66,50 +52,30 @@ def test_clean_surgical_outputs_match_locked_canonical_formulas():
     assert lasik.calculations.lasik_rsb_um == 520 - 100 - 60
     assert lasik.calculations.lasik_pta_percent == 100 * (100 + 60) / 520
     assert lasik.calculations.final_kmean_d == 44 + legacy.CORNEAL_EFFECT_PER_INTENDED_MRSE_D * -3
-
     prk = clean_case(procedure="PRK", flap_um=None, pachy_thinnest_um=520, ablation_um=60)
     assert prk.calculations.prk_rst_um == 520 - legacy.PRK_EPITHELIUM_UM - 60
     assert prk.calculations.prk_pta_percent == 100 * (legacy.PRK_EPITHELIUM_UM + 60) / 520
 
 
 def test_clean_final_lasik_status_matches_locked_principal_hierarchy_for_comparable_cases():
-    expected = (
-        ({}, "PASS"),
-        ({"age_years": 18}, "CAUTION"),
-        ({"bad_d": 2.6}, "STOP-DEFER"),
-        ({"bad_d": None}, "DATA INSUFFICIENT"),
-    )
+    expected = (({}, "PASS"), ({"age_years": 18}, "CAUTION"), ({"bad_d": 2.6}, "STOP-DEFER"), ({"bad_d": None}, "DATA INSUFFICIENT"))
     for changes, status in expected:
         assert clean_case(**changes).status == status
 
 
 def test_same_complete_lasik_cases_match_canonical_end_to_end():
-    cases = (
-        {"age": 30, "pachy": 560, "bad_d": 1.0},
-        {"age": 18, "pachy": 560, "bad_d": 1.0},
-        {"age": 30, "pachy": 560, "bad_d": 2.6},
-    )
+    cases = ({"age": 30, "pachy": 560, "bad_d": 1.0}, {"age": 18, "pachy": 560, "bad_d": 1.0}, {"age": 30, "pachy": 560, "bad_d": 2.6})
     for case in cases:
         eye = normal_eye(pachy=case["pachy"])
         eye["morphology_confidence"] = "HIGH"
         eye["erss_source_read"] = "DEDICATED_CURVATURE_PASS"
         eye["BAD_D"] = case["bad_d"]
-        canonical = legacy.assess_eye(
-            eye,
-            plan("LASIK", sphere=-3, cylinder=0, ablation=60, flap=100),
-            case["age"],
-            MODIFIERS,
-        )
-        clean = clean_case(
-            age_years=case["age"],
-            pachy_thinnest_um=case["pachy"],
-            bad_d=case["bad_d"],
-            preop_kmean_d=eye["Kmean_D"],
-            manifest_mrse_d=-3,
-            intended_mrse_d=-3,
-            intended_sphere_d=-3,
-            intended_cylinder_magnitude_d=0,
-        )
+        # A complete LASIK equivalence case must resolve both ERSS numeric channels.
+        # SRAX is now source-locked to the Axial/Sagittal Curvature (Front) map.
+        eye["srax_deg"] = 0.0
+        eye["srax"] = "NO"
+        canonical = legacy.assess_eye(eye, plan("LASIK", sphere=-3, cylinder=0, ablation=60, flap=100), case["age"], MODIFIERS)
+        clean = clean_case(age_years=case["age"], pachy_thinnest_um=case["pachy"], bad_d=case["bad_d"], preop_kmean_d=eye["Kmean_D"], manifest_mrse_d=-3, intended_mrse_d=-3, intended_sphere_d=-3, intended_cylinder_magnitude_d=0)
         assert clean.status == canonical["status"]
         assert bool(clean.hard_stops) == bool(canonical["hard_stops"])
         assert clean.scores.erss_total == canonical["randleman_erss"]["total"]
