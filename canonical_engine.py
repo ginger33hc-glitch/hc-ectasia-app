@@ -77,6 +77,10 @@ def runtime_invariants():
     except Exception as exc:
         errors.append(f"ERSS numeric evidence module unavailable: {type(exc).__name__}")
 
+    if not getattr(core, "_cerai_erss_numeric_extraction_installed", False):
+        errors.append("ERSS numeric-only extraction policy is not active")
+    if "ERSS VISUAL MORPHOLOGY DISABLED:" not in core.PROMPT:
+        errors.append("ERSS visual morphology extraction is still present in the production prompt")
     if not getattr(core, "_randleman_bad_independence_installed", False):
         errors.append("BAD-independent Randleman ERSS pathway is not active")
     if not getattr(core, "_hc_final_decision_hierarchy_installed", False):
