@@ -1,9 +1,8 @@
-"""Evidence gate for the existing Randleman/ERSS topography scorer.
+"""Numeric evidence gate for the canonical Randleman/ERSS topography scorer.
 
-This module owns no point table and calculates no ERSS total. It validates the
-numeric anterior-topography evidence passed to the canonical scorer. Signed I-S
-and CER-AI derived SRAX are the only ERSS topography scoring authorities;
-visual morphology is retained, when present, as non-scoring context only.
+Signed Topometric I-S and CER-AI derived SRAX are the only ERSS topography
+scoring authorities. Visual-map morphology is not evaluated, requested, or used
+by this policy.
 """
 
 from derived_srax import derive_srax_deg
@@ -14,12 +13,6 @@ _previous_required_tomography_missing = None
 _previous_assess_eye = None
 _prior_assess_eye = None
 
-VALID_CATEGORIES = {
-    "NORMAL_SYMMETRIC",
-    "ASYMMETRIC_BOWTIE",
-    "INFERIOR_STEEPENING_SRA",
-    "ABNORMAL_ECTATIC",
-}
 VALID_I_S_STATUSES = {"CONFIDENT", "SURGEON_CONFIRMED"}
 _CATEGORY_RANK = {
     "NORMAL_SYMMETRIC": 0,
@@ -103,13 +96,12 @@ def scoring_morphology_with_i_s_evidence_gate(eye):
     Only two scoring authorities are allowed: signed Topometric I-S and CER-AI
     derived SRAX. The original Randleman SRA/SRAX threshold is >=20 degrees.
     When both numeric channels are available, the higher-risk single category
-    wins; categories are never added together. Visual/map morphology and manual
-    visual-category labels do not contribute score points or hard-stop authority.
+    wins; categories are never added together.
     """
     if not eye.get("_erss_i_s_gate_required"):
         return _previous_scoring_morphology(eye)
 
-    evidence = list(eye.get("morphology_evidence") or [])
+    evidence = []
     candidates = []
 
     i_s_category, i_s_evidence = _i_s_category(eye)
@@ -126,16 +118,6 @@ def scoring_morphology_with_i_s_evidence_gate(eye):
         if derived >= 20.0:
             candidates.append(("INFERIOR_STEEPENING_SRA", "DERIVED_SRAX"))
             evidence.append("Original Randleman SRA/SRAX criterion met: derived SRAX >=20°.")
-
-    visual_category = eye.get("morphology")
-    if visual_category in VALID_CATEGORIES:
-        evidence.append(
-            f"Visual anterior-map morphology {visual_category} retained as context only; CER-AI does not use visual morphology for ERSS scoring."
-        )
-    if eye.get("surgeon_topography_category") in VALID_CATEGORIES:
-        evidence.append(
-            "Surgeon-entered visual topography category retained as context only; it is not an ERSS scoring authority."
-        )
 
     if not candidates:
         evidence.append(
@@ -163,7 +145,15 @@ def scoring_morphology_with_i_s_evidence_gate(eye):
 
 
 def required_tomography_missing_with_i_s(eye):
-    missing = list(_previous_required_tomography_missing(eye))
+    missing = [
+        item for item in _previous_required_tomography_missing(eye)
+        if not any(
+            token in str(item).lower()
+            for token in (
+                "morphology", "topography category", "asymmetric bow", "srax", "inferior steep"
+            )
+        )
+    ]
     if not eye.get("_erss_i_s_gate_required"):
         return missing
     validated = scoring_morphology_with_i_s_evidence_gate(eye).get("category")
@@ -183,6 +173,16 @@ def assess_eye_with_i_s_evidence(eye, plan, age, patient_modifiers):
         return _previous_assess_eye(eye, plan, age, patient_modifiers)
 
     working_eye = _prepared_eye(eye, plan or {})
+    # Neutralize legacy visual fields before entering the older assessor so they
+    # cannot create score points, hard stops, or additional review work.
+    working_eye["morphology"] = "UNCERTAIN"
+    working_eye["morphology_confidence"] = "UNREADABLE"
+    working_eye["morphology_evidence"] = []
+    working_eye["asymmetric_bow_tie"] = "UNCERTAIN"
+    working_eye["srax"] = "UNCERTAIN"
+    working_eye["srax_deg"] = None
+    working_eye["inferior_opposite_steepening_D"] = None
+
     result = _previous_assess_eye(working_eye, plan, age, patient_modifiers)
     validated = scoring_morphology_with_i_s_evidence_gate(working_eye)
     status = _i_s_status(working_eye)
@@ -192,14 +192,10 @@ def assess_eye_with_i_s_evidence(eye, plan, age, patient_modifiers):
         "I_S_source": _i_s_source(working_eye),
         "derived_SRAX_deg": validated.get("derived_srax_deg"),
         "derived_SRAX_source": "KISA_KMAX_IS_TOPOGRAPHIC_ASTIG" if validated.get("derived_srax_deg") is not None else None,
-        "image_category": working_eye.get("morphology", "UNCERTAIN"),
-        "image_category_confidence": working_eye.get("morphology_confidence", "UNSPECIFIED"),
-        "visual_morphology_scoring_authority": False,
         "validated_category": validated.get("category", "UNCERTAIN"),
         "category_source": validated.get("category_source", "UNRESOLVED_NUMERIC_EVIDENCE"),
         "single_category_rule": "Highest applicable category from signed I-S and derived SRAX only; categories are never added.",
         "needs_surgeon_I_S": validated.get("category") == "UNCERTAIN",
-        "needs_surgeon_category": False,
     }
     result["erss_topography_evidence"] = evidence_record
     result.setdefault("values", {}).update({
@@ -211,12 +207,20 @@ def assess_eye_with_i_s_evidence(eye, plan, age, patient_modifiers):
 
     if working_eye.get("_surgeon_I_S_invalid"):
         result.setdefault("missing", []).append("valid numeric surgeon-confirmed I-S value")
-    result["missing"] = list(dict.fromkeys(result.get("missing") or []))
+    result["missing"] = [
+        item for item in dict.fromkeys(result.get("missing") or [])
+        if not any(
+            token in str(item).lower()
+            for token in (
+                "morphology", "topography category", "asymmetric bow", "inferior steep"
+            )
+        )
+    ]
     return result
 
 
 def install(runtime_core, prior_assess_eye=None) -> None:
-    """Attach ERSS evidence gates explicitly and at most once."""
+    """Attach numeric-only ERSS evidence gates explicitly and at most once."""
     global core
     global _previous_scoring_morphology
     global _previous_required_tomography_missing
