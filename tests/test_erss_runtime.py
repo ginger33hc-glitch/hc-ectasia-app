@@ -6,6 +6,95 @@ import canonical_engine
 core = canonical_engine.core
 
 
+def eye(role_visible, morphology, source):
+    """Backward-compatible extraction fixture used by reconciliation tests.
+
+    Visual morphology fields remain in the schema for compatibility only and do
+    not participate in current ERSS scoring.
+    """
+    return {
+        "eye": "OD",
+        "screen_types": [source],
+        "quality": "ADEQUATE",
+        "missing_or_unreadable": [],
+        "table_verified_numeric_fields": [],
+        "map_fallback_numeric_fields": [],
+        "keratometry_source": "NOT_SHOWN",
+        "K1_D": None,
+        "K1_axis_deg": None,
+        "K2_D": None,
+        "K2_axis_deg": None,
+        "Kmax_D": None,
+        "pachy_thinnest_um": None,
+        "BAD_D": None,
+        "Df": None,
+        "Db": None,
+        "Dp": None,
+        "Dt": None,
+        "Da": None,
+        "PPI_avg": None,
+        "PPI_min": None,
+        "PPI_max": None,
+        "ARTmax_um": None,
+        "ISV": None,
+        "IVA": None,
+        "KI": None,
+        "CKI": None,
+        "IHD": None,
+        "I_S": None,
+        "KISA": None,
+        "IHA": None,
+        "Rmin_mm": None,
+        "corneal_diameter_mm": None,
+        "anterior_elevation_thinnest_um": None,
+        "posterior_elevation_thinnest_um": None,
+        "thinnest_x_mm": None,
+        "thinnest_y_mm": None,
+        "corneal_volume_mm3": None,
+        "RMS_HOA_um": None,
+        "vertical_coma_um": None,
+        "Kmean_D": None,
+        "total_RMS_um": None,
+        "spherical_aberration_um": None,
+        "topographic_astig_D": None,
+        "morphology": morphology,
+        "morphology_confidence": "HIGH" if role_visible else "UNREADABLE",
+        "morphology_evidence": [source],
+        "asymmetric_bow_tie": "YES" if morphology == "ASYMMETRIC_BOWTIE" else "NO",
+        "srax": "YES" if morphology == "INFERIOR_STEEPENING_SRA" else "NO",
+        "srax_deg": None,
+        "inferior_opposite_steepening_D": None,
+        "anterior_pattern": "UNREADABLE",
+        "posterior_pattern": "UNREADABLE",
+        "_source_filename": source,
+        "_pentacam_qs": "OK",
+    }
+
+
+def result(e, filename):
+    return {
+        "document_context": {
+            "document_type": "PENTACAM_TOPOGRAPHY",
+            "patient_id": "1",
+            "patient_last_name": "X",
+            "patient_first_name": "Y",
+            "patient_name": "Y X",
+            "patient_name_source": "PENTACAM_FIRST_LAST_NAME_FIELDS",
+            "patient_age_years": 30,
+            "exam_date": "2026-08-27",
+            "exam_time": "10:00",
+            "laterality": "OD",
+            "pentacam_qs": "OK",
+            "missing_or_unreadable": [],
+            "source_filename": filename,
+        },
+        "eyes": [e],
+        "treatment_corrections": [],
+        "laser_plans": [],
+        "global_warnings": [],
+    }
+
+
 def numeric_eye(i_s=None, kisa=None, kmax=None, astig=None):
     verified = []
     values = {
