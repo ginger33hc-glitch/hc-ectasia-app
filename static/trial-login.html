@@ -28,10 +28,10 @@
   </main>
 <script>
 (() => {
-  const allowedNext = new Set(["/", "/archive-ui"]);
+  const allowedNext = new Set(["/", "/app", "/clinical-app", "/archive-ui"]);
   const params = new URLSearchParams(window.location.search);
-  const requested = params.get("next") || "/";
-  const next = allowedNext.has(requested) ? requested : "/";
+  const requested = params.get("next") || "/app";
+  const next = allowedNext.has(requested) ? requested : "/app";
   const form = document.getElementById("loginForm");
   const button = document.getElementById("submitButton");
   const error = document.getElementById("error");
