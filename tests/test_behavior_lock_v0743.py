@@ -215,7 +215,8 @@ def test_required_runtime_layers_are_installed():
     assert core._erss_topography_evidence_policy_installed
     assert core._randleman_bad_independence_installed
     assert core._hc_final_decision_hierarchy_installed
-    assert core._hc_status_rank_policy_installed
+    assert core.combine_status("PASS", "CAUTION") == "CAUTION"
+    assert core.combine_status("CAUTION", "STOP-DEFER") == "STOP-DEFER"
     assert core._hc_inter_eye_tomography_policy_installed
     assert core._hc_lasik_fallback_installed
     assert "ERSS VISUAL MORPHOLOGY DISABLED:" in core.PROMPT
