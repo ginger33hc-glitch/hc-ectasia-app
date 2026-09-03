@@ -14,6 +14,7 @@ VALID_I_S_STATUSES={"CONFIDENT","SURGEON_CONFIRMED"}
 _CATEGORY_RANK={"NORMAL_SYMMETRIC":0,"ASYMMETRIC_BOWTIE":1,"INFERIOR_STEEPENING_SRA":3,"ABNORMAL_ECTATIC":4}
 _RANDLEMAN_ROWS=("topography","RSB","age","pachymetry","MRSE")
 _RETIRED_TOPOGRAPHY_REQUEST_TERMS=("morphology","topography category","asymmetric bow","inferior steep")
+_SRAX_COMPLETION_TEXT="SRAX >20° confirmation from the Axial/Sagittal Curvature (Front) map"
 
 def _field_conflict(eye,field):return any(str(item).split(":",1)[0].strip()==field for item in (eye.get("data_conflicts") or []))
 def _i_s_status(eye):
@@ -76,7 +77,7 @@ def required_tomography_missing_with_i_s(eye):
     if not eye.get("_erss_i_s_gate_required"):return missing
     if not(core.is_number(eye.get("I_S")) and _i_s_status(eye) in VALID_I_S_STATUSES):missing.append("usable signed I-S value for numeric Randleman topography scoring")
     ss,_,_,_=_front_map_srax(eye)
-    if ss is None:missing.append("SRAX >20° confirmation from the Axial/Sagittal Curvature (Front) map")
+    if ss is None:missing.append(_SRAX_COMPLETION_TEXT)
     return list(dict.fromkeys(missing))
 def _publish_validated_erss_topography(result,validated):
     category=validated.get("category")
@@ -93,7 +94,7 @@ def _publish_validated_erss_topography(result,validated):
         if all(core.is_number(rows.get(n)) for n in _RANDLEMAN_ROWS):total=sum(int(rows[n]) for n in _RANDLEMAN_ROWS);score["total"]=total;score["category"]=core.score_category("LASIK",total)
         result["score"]=score
 def _recover_status_after_topography_resolution(result):
-    """Remove only the stale DATA INSUFFICIENT state created by retired generic morphology inputs."""
+    """Remove only the stale DATA INSUFFICIENT state created by retired generic morphology/SRAX placeholders."""
     if result.get("status")!="DATA INSUFFICIENT" or result.get("missing"):return
     hard=list(result.get("hard_stops") or [])
     reasons=[r for r in (result.get("reasons") or []) if "Decision-critical or required clinical data are missing/unresolved" not in str(r)]
@@ -114,7 +115,7 @@ def assess_eye_with_i_s_evidence(eye,plan,age,patient_modifiers):
     rec={"I_S_D":working.get("I_S") if core.is_number(working.get("I_S")) else None,"I_S_status":ist,"I_S_source":_i_s_source(working),"SRAX_deg":validated.get("srax_deg"),"SRAX_status":ss or "UNRESOLVED","SRAX_source":validated.get("srax_source"),"validated_category":validated.get("category","UNCERTAIN"),"category_source":validated.get("category_source","UNRESOLVED_ERSS_TOPOGRAPHY_EVIDENCE"),"single_category_rule":"Highest applicable category from signed I-S and Front-map SRAX; categories are never added.","needs_surgeon_I_S":not(core.is_number(working.get("I_S")) and ist in VALID_I_S_STATUSES),"needs_surgeon_SRAX":ss is None}
     result["erss_topography_evidence"]=rec;result.setdefault("values",{}).update({"I_S_D":rec["I_S_D"],"I_S_status":rec["I_S_status"],"I_S_source":rec["I_S_source"],"SRAX_deg":rec["SRAX_deg"],"SRAX_status":rec["SRAX_status"],"SRAX_source":rec["SRAX_source"]})
     if working.get("_surgeon_I_S_invalid"):result.setdefault("missing",[]).append("valid numeric surgeon-confirmed I-S value")
-    result["missing"]=[i for i in dict.fromkeys(result.get("missing") or []) if not _is_retired_topography_request(i)]
+    result["missing"]=[i for i in dict.fromkeys(result.get("missing") or []) if not _is_retired_topography_request(i) and not (ss is not None and str(i)==_SRAX_COMPLETION_TEXT)]
     if validated.get("category")!="UNCERTAIN":_recover_status_after_topography_resolution(result)
     return result
 def install(runtime_core,prior_assess_eye=None):
