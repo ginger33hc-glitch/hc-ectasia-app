@@ -41,6 +41,7 @@ import assessment_workflow  # noqa: E402
 import user_access  # noqa: E402
 import operational_security  # noqa: E402
 import public_site  # noqa: E402
+import analysis_job_service  # noqa: E402
 import mobile_install_section  # noqa: E402
 import case_archive  # noqa: E402
 import audit_log  # noqa: E402
@@ -92,6 +93,7 @@ COMPOSITION_PHASES = {
         "user_access",
         "operational_security",
         "public_site",
+        "analysis_job_service",
         "mobile_install_section",
         "case_archive",
         "audit_log",
@@ -135,6 +137,7 @@ def compose(version: str):
     user_access.install(core)
     operational_security.install(core)
     public_site.install(core)
+    analysis_job_service.install(core)
     mobile_install_section.install(core)
 
     archive_required = os.getenv("CERAI_ARCHIVE_REQUIRED", "0").strip() == "1"
