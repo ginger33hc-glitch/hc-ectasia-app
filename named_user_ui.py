@@ -30,9 +30,10 @@ def _authenticated_root_html(display_name: str) -> str:
     linked_logo_frame = '<a href="/" class="brand-logo-frame" aria-label="Return to CER-AI website" title="Return to CER-AI website" style="display:block;cursor:pointer;text-decoration:none"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Cornea Ectasia Risk Assessment Intelligence"></a>'
     html = html.replace(logo_frame, linked_logo_frame, 1)
 
-    # ERSS is numeric-only. Remove the obsolete visual morphology selector and
-    # its visual-reference placeholder from the authenticated clinical UI while
-    # retaining the surgeon-confirmed signed I-S correction field.
+    # ERSS is numeric-only. Remove visual morphology from the doctor's visible
+    # workflow while preserving one hidden compatibility element because the
+    # legacy frontend JavaScript still queries this id during plan assembly and
+    # completion rendering. Its value is always blank and has no scoring authority.
     html = html.replace(
         '<summary>Randleman topography — surgeon confirmation required</summary>',
         '<summary>Randleman I-S — surgeon confirmation required</summary>',
@@ -42,7 +43,8 @@ def _authenticated_root_html(display_name: str) -> str:
         '<p class="note">ERSS topography uses signed Topometric I-S and derived SRAX only. Visual morphology is not evaluated.</p>',
     )
     visual_category_row = '<div class="row"><label>Surgeon-confirmed Randleman topography category</label><select id="${eye}_surgeon_topography"><option value="">Select only when requested</option><option value="NORMAL_SYMMETRIC">Normal / symmetric bow-tie</option><option value="ASYMMETRIC_BOWTIE">Asymmetric bow-tie</option><option value="INFERIOR_STEEPENING_SRA">Inferior steepening and/or SRA</option><option value="ABNORMAL_ECTATIC">Abnormal / ectatic pattern</option></select></div>'
-    html = html.replace(visual_category_row, "")
+    compatibility_field = '<select id="${eye}_surgeon_topography" hidden aria-hidden="true" tabindex="-1"><option value="" selected></option></select>'
+    html = html.replace(visual_category_row, compatibility_field)
 
     label = escape(display_name or "CER-AI user")
     injection = f"""
