@@ -1,21 +1,14 @@
 """Ordered production composition for the canonical CER-AI runtime.
 
-This is the only module that assembles production concerns.  Leaf modules own
+This is the only module that assembles production concerns. Leaf modules own
 one topic and may expose compatibility symbols for tests, but they must not
 decide installation order by importing unrelated policy modules.
-
-The order below is behavior-critical because the established runtime uses
-small wrappers around the legacy core.  Keeping that order explicit here makes
-the dependency chain reviewable and prevents accidental import-order changes.
 """
 import os
 
 import bootstrap
 import reports
 
-# Base clinical policies and extraction pipeline. Some legacy-compatible
-# modules still install narrowly scoped wrappers when imported; their order is
-# deliberately centralized here while they are migrated to explicit installers.
 import hc_age_policy  # noqa: E402
 import hc_bad_final_policy  # noqa: F401,E402
 import merge_policy_base  # noqa: F401,E402
@@ -35,9 +28,9 @@ import ps3_runtime_policy  # noqa: E402
 import ps3_report_policy  # noqa: E402
 import microkeratome_report_policy  # noqa: E402
 
-# Explicitly installed clinical workflow and operational services.
 import nice_policy  # noqa: E402
 import assessment_workflow  # noqa: E402
+import srax_completion_policy  # noqa: E402
 import user_access  # noqa: E402
 import operational_security  # noqa: E402
 import public_site  # noqa: E402
@@ -54,7 +47,6 @@ import rmin_front_source_policy  # noqa: E402
 import erss_auto_read_policy  # noqa: E402
 import phase3_runtime_seam  # noqa: E402
 import phase3_workflow_shadow_observer  # noqa: E402
-
 
 core = bootstrap.core
 app = bootstrap.app
@@ -88,6 +80,7 @@ COMPOSITION_PHASES = {
         "ps3_report_policy",
         "microkeratome_report_policy",
         "assessment_workflow",
+        "srax_completion_policy",
     ),
     "access_and_persistence": (
         "user_access",
@@ -134,6 +127,7 @@ def compose(version: str):
     mandatory_source_set_policy.install(core)
     ps3_runtime_policy.install(core)
     assessment_workflow.install(core)
+    srax_completion_policy.install(assessment_workflow)
     user_access.install(core)
     operational_security.install(core)
     public_site.install(core)
@@ -157,13 +151,8 @@ def compose(version: str):
     named_user_ui.install(core)
     pentacam_targeted_reread.install(core)
     rmin_front_source_policy.install(core, pentacam_targeted_reread)
-    # This cleanup remains outside the fully installed NICE engine and removes
-    # superseded legacy morphology completion requests.
     erss_auto_read_policy.install(core)
 
-    # Phase 3 introduces only guarded, non-authoritative infrastructure at this
-    # stage.  The routing seam and completed-assessment shadow observer must not
-    # replace clinical decisions, reports, archives, or extraction behavior.
     phase3_runtime_seam.install(core)
     phase3_workflow_shadow_observer.install(core)
 
