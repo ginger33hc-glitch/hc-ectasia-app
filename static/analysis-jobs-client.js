@@ -65,7 +65,7 @@
     return pollJob(payload.job_id,init.headers);
   };
 
-  window.CERAIAnalysisJobs={
+  window.CER_AI_AnalysisJobs={
     activeJob:()=>localStorage.getItem(ACTIVE_JOB_KEY),
     clear:()=>localStorage.removeItem(ACTIVE_JOB_KEY)
   };
