@@ -12,6 +12,12 @@ import os
 from typing import Any, Callable
 
 from clinical_core.pipeline import evaluate_normalized_case
+from phase3_shadow_diagnostics import (
+    ENV_FLAG as SHADOW_DIAGNOSTICS_ENV_FLAG,
+    diagnostics_snapshot,
+    observe_shadow_parity,
+    shadow_diagnostics_enabled,
+)
 from phase3_shadow_service import evaluate_shadow
 
 
@@ -59,4 +65,8 @@ def install(core: Any) -> None:
     core._cerai_linear_pipeline_env_flag = ENV_FLAG
     core._cerai_route_normalized_case = route_normalized_case
     core._cerai_shadow_compare_eye = shadow_compare_eye
+    core._cerai_shadow_diagnostics_enabled = shadow_diagnostics_enabled()
+    core._cerai_shadow_diagnostics_env_flag = SHADOW_DIAGNOSTICS_ENV_FLAG
+    core._cerai_observe_shadow_parity = observe_shadow_parity
+    core._cerai_shadow_diagnostics_snapshot = diagnostics_snapshot
     core._cerai_phase3_runtime_seam_installed = True
