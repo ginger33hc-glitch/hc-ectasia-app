@@ -19,7 +19,6 @@ import inter_eye_tomography_policy
 import microkeratome_planning_policy
 import nice_policy
 import runtime_composition
-import status_rank_policy
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -65,7 +64,6 @@ def test_policy_leaf_modules_do_not_hide_install_order():
     assert _local_imports("pachymetry_policy.py") == {"bootstrap"}
     assert _local_imports("hc_final_decision_policy.py") == {"bootstrap", "clinical_disposition"}
     assert _local_imports("hc_age_policy.py") == set()
-    assert _local_imports("status_rank_policy.py") == {"clinical_disposition"}
     assert _local_imports("erss_visual_morphology_policy.py") == set()
     assert _local_imports("erss_auto_read_policy.py") == set()
     assert _local_imports("erss_topography_evidence_policy.py") == {"derived_srax"}
@@ -109,20 +107,6 @@ def test_nice_install_is_idempotent_for_schema_prompt_and_engine_wrapper():
     assert core.hc_engine is installed_engine
     assert core.SCHEMA["required"].count("nice_readings") == 1
     assert core.PROMPT.count("NICE SEPARATE INPUT READING") == 1
-
-
-def test_status_rank_install_preserves_native_aggregator_and_is_idempotent():
-    native = status_rank_policy.combine_status
-    core = SimpleNamespace(combine_status=native)
-
-    status_rank_policy.install(core)
-    installed_aggregator = core.combine_status
-    status_rank_policy.install(core)
-
-    assert core.combine_status is installed_aggregator is native
-    assert core._hc_status_rank_policy_installed is True
-    assert core.combine_status("PASS", "CAUTION") == "CAUTION"
-    assert core.combine_status("CAUTION", "STOP-DEFER") == "STOP-DEFER"
 
 
 def test_age_policy_install_is_explicit_and_idempotent():
