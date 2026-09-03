@@ -97,6 +97,46 @@ def test_final_hierarchy_abnormal_bad_is_hard_stop(monkeypatch):
     assert any("Final BAD-D abnormal" in reason for reason in out["hard_stops"])
 
 
+def test_visual_morphology_is_neutralized_before_clinical_assessment(monkeypatch):
+    captured = {}
+
+    def upstream(eye, *args, **kwargs):
+        captured.update(eye)
+        return {
+            "status": "PASS",
+            "hard_stops": [],
+            "missing": [],
+            "reasons": [],
+            "values": {"procedure": "LASIK"},
+            "randleman_erss": {"total": 0},
+        }
+
+    monkeypatch.setattr(final_policy, "_previous_assess_eye", upstream)
+    monkeypatch.setattr(core, "bad_classification", lambda value, final=False: "NORMAL")
+    out = final_policy.assess_eye_with_hc_final_hierarchy(
+        {
+            "BAD_D": 1.0,
+            "morphology": "ABNORMAL_ECTATIC",
+            "morphology_confidence": "HIGH",
+            "asymmetric_bow_tie": "YES",
+            "srax": "YES",
+            "srax_deg": 35.0,
+            "inferior_opposite_steepening_D": 2.0,
+            "morphology_evidence": ["visual-map classification"],
+        },
+        {"procedure": "LASIK"},
+        30,
+        {},
+    )
+    assert captured["morphology"] == "UNCERTAIN"
+    assert captured["morphology_confidence"] == "UNREADABLE"
+    assert captured["asymmetric_bow_tie"] == "UNCERTAIN"
+    assert captured["srax"] == "UNCERTAIN"
+    assert captured["srax_deg"] is None
+    assert captured["inferior_opposite_steepening_D"] is None
+    assert out["status"] == "PASS"
+
+
 def test_final_hierarchy_never_overrides_missing_or_hard_stop(monkeypatch):
     missing = _run_final_policy(monkeypatch, {"status": "DATA INSUFFICIENT", "missing": ["BAD-D"]}, "NORMAL", 0)
     assert missing["status"] == "DATA INSUFFICIENT"
