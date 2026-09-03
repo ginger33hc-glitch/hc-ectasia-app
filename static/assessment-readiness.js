@@ -107,7 +107,7 @@
       :'If a source image is missing or unreadable, select only the new/replacement image. Existing patient information and selected images are retained.';
     wrapper.append(note);
   }
-  window.CERAISourceImageRetention={openPicker:()=>imageInput.click(),files:()=>[...retained]};
+  window.CER_AI_SourceImageRetention={openPicker:()=>imageInput.click(),files:()=>[...retained]};
 })();
 
 window.HCReadiness = class {
@@ -196,7 +196,7 @@ window.HCReadiness = class {
         const help=document.createElement('span');help.textContent=tr(item.help);row.append(help);
         const replace=document.createElement('button');replace.type='button';replace.className='secondary';
         replace.textContent=window.CERAI_I18N?.locale==='tr'?'Kaynak görüntü ekle/değiştir':'Add/replace source image';
-        replace.addEventListener('click',()=>window.CERAISourceImageRetention?.openPicker());
+        replace.addEventListener('click',()=>window.CER_AI_SourceImageRetention?.openPicker());
         row.append(replace);
       }
       this.panel.append(row);
