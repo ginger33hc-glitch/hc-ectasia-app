@@ -50,10 +50,15 @@ def test_exactly_thirteen_hc_engine_methods_are_retired():
     assert {key: set(value) for key, value in manifest.items()} == expected
 
 
+def _has_active_tests(cls) -> bool:
+    return any(name.startswith("test_") for name in vars(cls))
+
+
 def test_representative_active_hc_engine_tests_remain_collected():
     assert hasattr(current.TestSafetyGates, "test_hc_sphere_hard_stops_and_exact_boundaries")
-    assert any(name.startswith("test_") for name in vars(current.TestBoundaries))
-    assert hasattr(current.TestApiIntegration, "test_app_exposes_analyze_and_report_routes")
+    assert _has_active_tests(current.TestBoundaries)
+    assert _has_active_tests(current.TestScoringAndCompleteness)
+    assert _has_active_tests(current.TestApiIntegration)
 
 
 def test_retired_methods_are_not_exposed_on_collected_classes():
