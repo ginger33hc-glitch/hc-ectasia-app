@@ -1,0 +1,11 @@
+/* Presentation-only technical texture for the CER-AI public site. */
+html{background:#f7fafc}
+body{position:relative;background-color:#f8fbfd;background-image:linear-gradient(rgba(31,94,140,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(31,94,140,.035) 1px,transparent 1px),radial-gradient(circle at 12% 28%,rgba(31,94,140,.055) 0 1px,transparent 1.5px),radial-gradient(circle at 87% 70%,rgba(23,59,87,.045) 0 1px,transparent 1.5px);background-size:32px 32px,32px 32px,18px 18px,22px 22px;background-attachment:fixed}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.34;background:radial-gradient(ellipse at 88% 18%,transparent 0 92px,rgba(31,94,140,.09) 93px 94px,transparent 95px 118px,rgba(31,94,140,.055) 119px 120px,transparent 121px 150px),radial-gradient(ellipse at 10% 76%,transparent 0 68px,rgba(31,94,140,.06) 69px 70px,transparent 71px 92px,rgba(31,94,140,.04) 93px 94px,transparent 95px)}
+header,.nav-bar,main,footer{position:relative;z-index:1}
+main>section:not(.hero):not(.alt):not(.philosophy){background:rgba(255,255,255,.86)}
+main>section.alt{background:rgba(245,248,250,.88)}
+.hero{background-image:linear-gradient(rgba(31,94,140,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(31,94,140,.055) 1px,transparent 1px),radial-gradient(circle at 83% 46%,transparent 0 88px,rgba(42,102,143,.13) 89px 91px,transparent 92px 118px,rgba(42,102,143,.09) 119px 121px,transparent 122px),linear-gradient(110deg,#f9fcfd 0%,#f2f7fa 52%,#eaf3f8 100%)!important;background-size:42px 42px,42px 42px,auto,auto!important}
+.hero::after{content:"K  43.2 D   |   CCT  512 µm   |   BAD-D   |   ERSS   |   NICE   |   PS3";position:absolute;right:4%;bottom:18px;font:600 10px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.11em;color:rgba(23,59,87,.24);white-space:nowrap;pointer-events:none}
+.risk-card,.feature-card,.guide-step,.developer-card,.hero-card,.history-panel{backdrop-filter:blur(2px)}
+@media(max-width:700px){body{background-size:24px 24px,24px 24px,16px 16px,20px 20px}.hero::after{display:none}}
