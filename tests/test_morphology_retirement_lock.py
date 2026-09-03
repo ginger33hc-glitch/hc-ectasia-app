@@ -18,6 +18,8 @@ def _legacy_decision():
                     "asymmetric bow-tie confirmation",
                     "SRAX confirmation",
                     "inferior steepening morphology",
+                    "readable anterior pattern",
+                    "readable posterior pattern",
                     "Signed I-S (D) required",
                 ],
                 "randleman_erss": {
@@ -44,15 +46,19 @@ def test_unresolved_erss_never_requests_visual_morphology(monkeypatch):
     assert decision["critical_input_issues"] == ["OS Signed I-S (D) is unreadable"]
 
 
-def test_retired_terms_are_never_completion_inputs():
-    for text in (
-        "morphology",
-        "Randleman topography category",
-        "topographic category",
-        "asymmetric bow tie",
-        "SRAX",
-        "inferior steepening morphology",
-    ):
-        assert policy._is_retired_morphology_request(text)
-
-    assert not policy._is_retired_morphology_request("Signed I-S (D) required")
+def test_retired_terms_are_removed_while_signed_i_s_is_preserved():
+    result = {
+        "missing": [
+            "morphology",
+            "Randleman topography category",
+            "topographic category",
+            "asymmetric bow tie",
+            "SRAX",
+            "inferior steepening morphology",
+            "readable anterior pattern",
+            "readable posterior pattern",
+            "Signed I-S (D) required",
+        ]
+    }
+    policy._clean_missing(result)
+    assert result["missing"] == ["Signed I-S (D) required"]
