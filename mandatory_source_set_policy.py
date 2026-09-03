@@ -47,14 +47,26 @@ def _screen_tokens(result: dict[str, Any]) -> set[str]:
     return tokens
 
 
+def _canonical_eye(value: Any) -> str | None:
+    """Map explicit Pentacam laterality aliases to canonical OD/OS only."""
+    token = _norm(value)
+    if token in {"OD", "R", "RIGHT", "RIGHT_EYE", "RE"}:
+        return "OD"
+    if token in {"OS", "L", "LEFT", "LEFT_EYE", "LE"}:
+        return "OS"
+    return None
+
+
 def _eyes(result: dict[str, Any]) -> set[str]:
     eyes = {
-        str(eye.get("eye") or "").upper()
+        canonical
         for eye in result.get("eyes") or []
-        if str(eye.get("eye") or "").upper() in {"OD", "OS"}
+        if (canonical := _canonical_eye(eye.get("eye"))) is not None
     }
-    context_laterality = str((result.get("document_context") or {}).get("laterality") or "").upper()
-    if context_laterality in {"OD", "OS"}:
+    context_laterality = _canonical_eye(
+        (result.get("document_context") or {}).get("laterality")
+    )
+    if context_laterality is not None:
         eyes.add(context_laterality)
     return eyes
 
