@@ -2,9 +2,12 @@
 
 The clinical engine must not run until the mandatory Pentacam source set is
 present. The optional excimer treatment card does not participate in this gate.
+The gate is active only during an actual clinical image-assessment request so
+internal merge utilities and isolated regression fixtures remain reusable.
 """
 from __future__ import annotations
 
+from contextvars import ContextVar
 import re
 import unicodedata
 from typing import Any
@@ -22,6 +25,8 @@ MANDATORY_LABELS = (
 )
 
 _previous_merge_extractions = None
+_previous_run_image_assessment = None
+_gate_active: ContextVar[bool] = ContextVar("cerai_mandatory_source_gate_active", default=False)
 
 
 def _norm(value: Any) -> str:
@@ -90,7 +95,6 @@ def _is_show_two_topometric(tokens: set[str]) -> bool:
 
 
 def _has_show_two_numeric_signature(result: dict[str, Any]) -> bool:
-    """Recognize Show 2 Exams from its source-locked Cornea Front values."""
     for eye in result.get("eyes") or []:
         if eye.get("keratometry_source") == CORNEA_FRONT_KERATOMETRY_SOURCE:
             return True
@@ -98,7 +102,6 @@ def _has_show_two_numeric_signature(result: dict[str, Any]) -> bool:
 
 
 def _has_bad_display_signature(result: dict[str, Any]) -> bool:
-    """Recognize BAD Display when its dedicated labeled fields were transcribed."""
     for reading in result.get("nice_readings") or []:
         if reading.get("b_ele_th_page") == "BAD_DISPLAY":
             return True
@@ -143,8 +146,6 @@ def classify_source_set(results: list[dict[str, Any]]) -> dict[str, Any]:
                     recognized_this_image = True
 
         if _is_show_two_topometric(tokens) or _has_show_two_numeric_signature(result):
-            # One bilateral Show 2 Exams Topometric screenshot is the required source.
-            # Per-eye numeric completeness is checked later by existing field/readiness gates.
             present["Show 2 Exams Topometric"] = True
             recognized_this_image = True
 
@@ -182,16 +183,27 @@ def validate_source_set(results: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def merge_extractions_with_mandatory_source_gate(results):
-    validate_source_set(results)
+    summary = validate_source_set(results) if _gate_active.get() else None
     merged = _previous_merge_extractions(results)
-    merged["mandatory_source_set"] = classify_source_set(results)
+    if summary is not None:
+        merged["mandatory_source_set"] = summary
     return merged
 
 
+async def run_image_assessment_with_mandatory_gate(*args, **kwargs):
+    token = _gate_active.set(True)
+    try:
+        return await _previous_run_image_assessment(*args, **kwargs)
+    finally:
+        _gate_active.reset(token)
+
+
 def install(core) -> None:
-    global _previous_merge_extractions
+    global _previous_merge_extractions, _previous_run_image_assessment
     if getattr(core, "_cerai_mandatory_source_set_installed", False):
         return
     _previous_merge_extractions = core.merge_extractions
+    _previous_run_image_assessment = core._run_image_assessment
     core.merge_extractions = merge_extractions_with_mandatory_source_gate
+    core._run_image_assessment = run_image_assessment_with_mandatory_gate
     core._cerai_mandatory_source_set_installed = True
