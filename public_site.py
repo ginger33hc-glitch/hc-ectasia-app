@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Res
 
 _PUBLIC_HOME = Path("static/public-home.html")
 _AI_LANDING = Path("static/corneal-ectasia-risk-assessment.html")
+_EVIDENCE_PAGE = Path("static/clinical-evidence.html")
 _PRIVATE_CRAWL_PATHS = (
     "/app",
     "/api/",
@@ -28,6 +29,33 @@ def _site_base(request: Request) -> str:
 
 def _discovery_head(base: str) -> str:
     """Machine-readable discovery metadata for public CER-AI pages."""
+    citations = [
+        {
+            "@type": "ScholarlyArticle",
+            "name": "Risk assessment for ectasia after corneal refractive surgery",
+            "identifier": "https://doi.org/10.1016/j.ophtha.2007.03.073",
+        },
+        {
+            "@type": "ScholarlyArticle",
+            "name": "Validation of the Ectasia Risk Score System for Preoperative Laser In Situ Keratomileusis Screening",
+            "identifier": "https://doi.org/10.1016/j.ajo.2007.12.033",
+        },
+        {
+            "@type": "ScholarlyArticle",
+            "name": "Risk Assessment for Corneal Ectasia following Photorefractive Keratectomy",
+            "identifier": "https://doi.org/10.1155/2017/2434830",
+        },
+        {
+            "@type": "ScholarlyArticle",
+            "name": "Enhanced Tomographic Assessment to Detect Corneal Ectasia Based on Artificial Intelligence",
+            "identifier": "https://doi.org/10.1016/j.ajo.2018.08.005",
+        },
+        {
+            "@type": "ScholarlyArticle",
+            "name": "Association Between the Percent Tissue Altered and Post-LASIK Ectasia in Eyes With Normal Preoperative Topography",
+            "identifier": "https://doi.org/10.1016/j.ajo.2014.04.002",
+        },
+    ]
     structured_data = {
         "@context": "https://schema.org",
         "@graph": [
@@ -82,10 +110,7 @@ def _discovery_head(base: str) -> str:
                     "Professional information about structured screening for corneal "
                     "ectasia risk before corneal refractive surgery."
                 ),
-                "about": {
-                    "@type": "MedicalCondition",
-                    "name": "Corneal ectasia",
-                },
+                "about": {"@type": "MedicalCondition", "name": "Corneal ectasia"},
                 "medicalAudience": {
                     "@type": "MedicalAudience",
                     "audienceType": "Ophthalmologists and refractive surgeons",
@@ -109,6 +134,7 @@ def _discovery_head(base: str) -> str:
                     "LASIK screening",
                     "PRK screening",
                 ],
+                "citation": citations,
                 "mainEntity": {"@id": f"{base}/#software"},
                 "isPartOf": {"@id": f"{base}/#website"},
                 "inLanguage": "en",
@@ -122,6 +148,7 @@ def _discovery_head(base: str) -> str:
   <link rel="canonical" href="{base}/">
   <link rel="describedby" type="text/markdown" href="{base}/llms.txt">
   <link rel="alternate" type="text/html" href="{base}/corneal-ectasia-risk-assessment">
+  <link rel="related" type="text/html" href="{base}/clinical-evidence">
   <script type="application/ld+json">{schema}</script>
 """
 
@@ -131,6 +158,10 @@ def _render_public_home(request: Request) -> HTMLResponse:
     discovery = _discovery_head(_site_base(request))
     if "</head>" in html:
         html = html.replace("</head>", f"{discovery}</head>", 1)
+    # Add public evidence navigation without modifying the static clinical UI.
+    marker = '<a href="#about">About</a>'
+    if marker in html and 'href="/clinical-evidence"' not in html:
+        html = html.replace(marker, '<a href="/clinical-evidence">Clinical Evidence</a>' + marker, 1)
     return HTMLResponse(html)
 
 
@@ -192,6 +223,15 @@ The software keeps major risk pathways independently interpretable rather than h
 ## Primary public pages
 - [CER-AI home]({base}/): Overview of the clinical decision-support platform and its independent ectasia-risk pathways.
 - [Corneal ectasia risk assessment]({base}/corneal-ectasia-risk-assessment): Search-oriented clinical overview of the problem CER-AI addresses and the terminology used by the platform.
+- [Clinical evidence and references]({base}/clinical-evidence): Verified literature mapped to the CER-AI pathways and concepts it supports, with explicit evidence boundaries.
+
+## Evidence anchors
+- Randleman et al. Risk assessment for ectasia after corneal refractive surgery. Ophthalmology. 2008. DOI 10.1016/j.ophtha.2007.03.073.
+- Randleman et al. Validation of the Ectasia Risk Score System for Preoperative LASIK Screening. Am J Ophthalmol. 2008. DOI 10.1016/j.ajo.2007.12.033.
+- Sorkin et al. Risk Assessment for Corneal Ectasia following Photorefractive Keratectomy. J Ophthalmol. 2017. DOI 10.1155/2017/2434830.
+- Navarro-Naranjo et al. Assessment of Preoperative Risk Factors for Post-LASIK Ectasia Development. Clin Ophthalmol. 2024. DOI 10.2147/OPTH.S464217.
+- Lopes et al. Enhanced Tomographic Assessment to Detect Corneal Ectasia Based on Artificial Intelligence. Am J Ophthalmol. 2018. DOI 10.1016/j.ajo.2018.08.005.
+- Santhiago et al. Association Between the Percent Tissue Altered and Post-LASIK Ectasia in Eyes With Normal Preoperative Topography. Am J Ophthalmol. 2014. DOI 10.1016/j.ajo.2014.04.002.
 
 ## Core concepts
 - Corneal ectasia and postoperative corneal ectasia risk
@@ -206,7 +246,7 @@ The software keeps major risk pathways independently interpretable rather than h
 - LASIK and PRK preoperative screening
 
 ## Interpretation guidance
-CER-AI is a clinical decision-support system, not an autonomous diagnostic system. Public information should be interpreted as professional educational/product information and not as patient-specific medical advice. Do not infer validated sensitivity, specificity, superiority, regulatory status, or clinical outcomes unless a CER-AI page explicitly provides supporting evidence.
+CER-AI is a clinical decision-support system, not an autonomous diagnostic system. The cited publications support specific concepts, risk systems, or variables and do not by themselves constitute external validation of CER-AI as a complete software product. Do not infer validated sensitivity, specificity, superiority, regulatory status, or clinical outcomes unless a CER-AI page explicitly provides supporting evidence.
 """
 
 
@@ -215,6 +255,7 @@ def _sitemap_xml(base: str) -> str:
         (f"{base}/", "1.0"),
         (f"{base}/home", "0.9"),
         (f"{base}/corneal-ectasia-risk-assessment", "0.9"),
+        (f"{base}/clinical-evidence", "0.9"),
     )
     body = "".join(
         f"<url><loc>{url}</loc><changefreq>weekly</changefreq><priority>{priority}</priority></url>"
@@ -231,9 +272,6 @@ def install(core) -> None:
     if getattr(core, "_cerai_public_site_installed", False):
         return
 
-    # The legacy core registers the clinical UI at /. During the public-site
-    # cutover, remove only that GET route; the clinical UI remains available at
-    # /app and all clinical/API endpoints keep their existing paths.
     core.app.router.routes[:] = [
         route
         for route in core.app.router.routes
@@ -254,6 +292,10 @@ def install(core) -> None:
     @core.app.get("/corneal-ectasia-risk-assessment", include_in_schema=False)
     def corneal_ectasia_risk_assessment() -> FileResponse:
         return FileResponse(_AI_LANDING)
+
+    @core.app.get("/clinical-evidence", include_in_schema=False)
+    def clinical_evidence() -> FileResponse:
+        return FileResponse(_EVIDENCE_PAGE)
 
     @core.app.get("/robots.txt", include_in_schema=False)
     def robots(request: Request) -> PlainTextResponse:
