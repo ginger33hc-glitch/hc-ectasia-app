@@ -52,6 +52,7 @@ import named_user_ui  # noqa: E402
 import pentacam_targeted_reread  # noqa: E402
 import rmin_front_source_policy  # noqa: E402
 import erss_auto_read_policy  # noqa: E402
+import phase3_runtime_seam  # noqa: E402
 
 
 core = bootstrap.core
@@ -99,6 +100,9 @@ COMPOSITION_PHASES = {
         "historical_report",
         "research_export",
         "named_user_ui",
+    ),
+    "phase3_cutover": (
+        "phase3_runtime_seam",
     ),
 }
 
@@ -154,6 +158,11 @@ def compose(version: str):
     # This cleanup remains outside the fully installed NICE engine and removes
     # superseded legacy morphology completion requests.
     erss_auto_read_policy.install(core)
+
+    # Phase 3 introduces only a guarded routing seam at this stage.  Installing
+    # it must not replace assess_eye, hc_engine, merge_extractions, readiness,
+    # report, or archive behavior.  The default flag is disabled.
+    phase3_runtime_seam.install(core)
 
     app.state.cerai_canonical_runtime_ready = True
     core._cerai_runtime_composed = True
