@@ -13,7 +13,7 @@ core=None; _previous_scoring_morphology=None; _previous_required_tomography_miss
 VALID_I_S_STATUSES={"CONFIDENT","SURGEON_CONFIRMED"}
 _CATEGORY_RANK={"NORMAL_SYMMETRIC":0,"ASYMMETRIC_BOWTIE":1,"INFERIOR_STEEPENING_SRA":3,"ABNORMAL_ECTATIC":4}
 _RANDLEMAN_ROWS=("topography","RSB","age","pachymetry","MRSE")
-_RETIRED_TOPOGRAPHY_REQUEST_TERMS=("morphology","topography category","asymmetric bow","inferior steep","anterior pattern","posterior pattern","anterior_pattern","posterior_pattern")
+_RETIRED_TOPOGRAPHY_REQUEST_TERMS=("morphology","topography category","asymmetric bow","inferior steep")
 
 def _field_conflict(eye,field):return any(str(item).split(":",1)[0].strip()==field for item in (eye.get("data_conflicts") or []))
 def _i_s_status(eye):
@@ -93,7 +93,7 @@ def _publish_validated_erss_topography(result,validated):
         if all(core.is_number(rows.get(n)) for n in _RANDLEMAN_ROWS):total=sum(int(rows[n]) for n in _RANDLEMAN_ROWS);score["total"]=total;score["category"]=core.score_category("LASIK",total)
         result["score"]=score
 def _recover_status_after_topography_resolution(result):
-    """Remove only the stale DATA INSUFFICIENT state created by retired pattern inputs."""
+    """Remove only the stale DATA INSUFFICIENT state created by retired generic morphology inputs."""
     if result.get("status")!="DATA INSUFFICIENT" or result.get("missing"):return
     hard=list(result.get("hard_stops") or [])
     reasons=[r for r in (result.get("reasons") or []) if "Decision-critical or required clinical data are missing/unresolved" not in str(r)]
