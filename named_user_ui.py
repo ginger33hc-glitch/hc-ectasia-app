@@ -23,6 +23,13 @@ ARCHIVE_HTML = Path("static/archive.html")
 
 def _authenticated_root_html(display_name: str) -> str:
     html = ROOT_HTML.read_text(encoding="utf-8")
+    # Make the visual CER-AI logo itself a native link back to the public website.
+    # A real anchor is used instead of JavaScript so the navigation works reliably
+    # across browsers, touch devices, cached pages, and CSP/security wrappers.
+    logo_frame = '<div class="brand-logo-frame"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Cornea Ectasia Risk Assessment Intelligence"></div>'
+    linked_logo_frame = '<a href="/" class="brand-logo-frame" aria-label="Return to CER-AI website" title="Return to CER-AI website" style="display:block;cursor:pointer;text-decoration:none"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Cornea Ectasia Risk Assessment Intelligence"></a>'
+    html = html.replace(logo_frame, linked_logo_frame, 1)
+
     label = escape(display_name or "CER-AI user")
     injection = f"""
 <div id="cerAiAccountBar" style="position:fixed;right:12px;bottom:12px;z-index:9999;background:#fff;border:1px solid #bcc8d1;border-radius:9px;padding:8px 10px;box-shadow:0 4px 18px rgba(0,0,0,.14);font:12px Arial,sans-serif;color:#173b57">
@@ -30,30 +37,6 @@ def _authenticated_root_html(display_name: str) -> str:
   <a href="/archive-ui" style="font-weight:bold;color:#1f5e8c">Case Archive</a>
 </div>
 <script>
-(() => {{
-  const appHeader = document.querySelector(".app-header");
-  const brandLockup = document.querySelector(".app-header .brand-lockup");
-  const homeTarget = brandLockup || appHeader;
-  if (homeTarget) {{
-    homeTarget.setAttribute("role", "link");
-    homeTarget.setAttribute("tabindex", "0");
-    homeTarget.setAttribute("aria-label", "Return to CER-AI website");
-    homeTarget.setAttribute("title", "Return to CER-AI website");
-    homeTarget.style.cursor = "pointer";
-    const goHome = () => window.location.assign("/");
-    homeTarget.addEventListener("click", event => {{
-      if (event.target.closest("button, a, input, select, textarea")) return;
-      goHome();
-    }});
-    homeTarget.addEventListener("keydown", event => {{
-      if (event.key === "Enter" || event.key === " ") {{
-        event.preventDefault();
-        goHome();
-      }}
-    }});
-  }}
-}})();
-
 if (typeof ceraiFetch === "function") {{
   ceraiFetch = async function(url, options={{}}) {{
     const response = await fetch(url, options);
