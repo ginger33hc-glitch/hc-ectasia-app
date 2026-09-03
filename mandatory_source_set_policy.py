@@ -24,6 +24,17 @@ MANDATORY_LABELS = (
     "Show 2 Exams Topometric",
 )
 
+BAD_DISPLAY_RECOGNITION_PROMPT = r"""
+MANDATORY BELIN/AMBROSIO PAGE RECOGNITION:
+A Pentacam page whose visible header says "Belin/Ambrosio Display" must be
+classified as a Belin/Ambrosio Display even when it uses an older Pentacam
+layout and does not literally contain the words "Enhanced Ectasia Display".
+For that page, include BELIN_AMBROSIO_DISPLAY in screen_types. Read laterality
+from an explicit visible OD/OS (or Right/Left) label on the page/maps and set
+both the eye item and document laterality consistently. Never infer laterality
+from upload order or neighboring files.
+"""
+
 _previous_merge_extractions = None
 _previous_run_image_assessment = None
 _gate_active: ContextVar[bool] = ContextVar("cerai_mandatory_source_gate_active", default=False)
@@ -117,10 +128,12 @@ def _has_bad_display_signature(result: dict[str, Any]) -> bool:
     for reading in result.get("nice_readings") or []:
         if reading.get("b_ele_th_page") == "BAD_DISPLAY":
             return True
+    bad_fields = {"BAD_D", "Df", "Db", "Dp", "Dt", "Da"}
     for eye in result.get("eyes") or []:
         verified = set(eye.get("table_verified_numeric_fields") or [])
-        if "BAD_D" in verified and eye.get("BAD_D") is not None:
-            return True
+        for field in bad_fields & verified:
+            if eye.get(field) is not None:
+                return True
     return False
 
 
@@ -216,6 +229,8 @@ def install(core) -> None:
         return
     _previous_merge_extractions = core.merge_extractions
     _previous_run_image_assessment = core._run_image_assessment
+    if BAD_DISPLAY_RECOGNITION_PROMPT not in core.PROMPT:
+        core.PROMPT += "\n" + BAD_DISPLAY_RECOGNITION_PROMPT
     core.merge_extractions = merge_extractions_with_mandatory_source_gate
     core._run_image_assessment = run_image_assessment_with_mandatory_gate
     core._cerai_mandatory_source_set_installed = True
