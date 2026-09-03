@@ -53,6 +53,7 @@ import pentacam_targeted_reread  # noqa: E402
 import rmin_front_source_policy  # noqa: E402
 import erss_auto_read_policy  # noqa: E402
 import phase3_runtime_seam  # noqa: E402
+import phase3_workflow_shadow_observer  # noqa: E402
 
 
 core = bootstrap.core
@@ -103,6 +104,7 @@ COMPOSITION_PHASES = {
     ),
     "phase3_cutover": (
         "phase3_runtime_seam",
+        "phase3_workflow_shadow_observer",
     ),
 }
 
@@ -159,10 +161,11 @@ def compose(version: str):
     # superseded legacy morphology completion requests.
     erss_auto_read_policy.install(core)
 
-    # Phase 3 introduces only a guarded routing seam at this stage.  Installing
-    # it must not replace assess_eye, hc_engine, merge_extractions, readiness,
-    # report, or archive behavior.  The default flag is disabled.
+    # Phase 3 introduces only guarded, non-authoritative infrastructure at this
+    # stage.  The routing seam and completed-assessment shadow observer must not
+    # replace clinical decisions, reports, archives, or extraction behavior.
     phase3_runtime_seam.install(core)
+    phase3_workflow_shadow_observer.install(core)
 
     app.state.cerai_canonical_runtime_ready = True
     core._cerai_runtime_composed = True
