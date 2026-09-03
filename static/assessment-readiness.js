@@ -1,4 +1,114 @@
 /* Input completion only. Clinical completeness and scores are owned by the server. */
+(function installSourceImageRetention(){
+  const imageInput=document.getElementById('imageInput');
+  if(!imageInput||typeof DataTransfer==='undefined')return;
+  const MAX_IMAGES=6;
+  let retained=[];
+  let replaying=false;
+
+  const sameFile=(a,b)=>a&&b&&a.name===b.name&&a.size===b.size&&a.lastModified===b.lastModified;
+  const setFiles=files=>{
+    const transfer=new DataTransfer();
+    files.slice(0,MAX_IMAGES).forEach(file=>transfer.items.add(file));
+    imageInput.files=transfer.files;
+    retained=[...imageInput.files];
+  };
+  const ageSnapshot=()=>{
+    const input=document.getElementById('age');
+    const row=document.getElementById('manualAgeRow');
+    if(!input)return null;
+    return {value:input.value,readOnly:input.readOnly,required:input.required,rowHidden:row?row.hidden:null};
+  };
+  const restoreAge=snapshot=>{
+    if(!snapshot)return;
+    queueMicrotask(()=>{
+      const input=document.getElementById('age');
+      const row=document.getElementById('manualAgeRow');
+      if(!input)return;
+      input.value=snapshot.value;input.readOnly=snapshot.readOnly;input.required=snapshot.required;
+      if(row&&snapshot.rowHidden!==null)row.hidden=snapshot.rowHidden;
+    });
+  };
+  const chooseReplacementIndex=files=>{
+    const list=files.map((file,index)=>`${index+1}. ${file.name}`).join('\n');
+    const locale=window.CERAI_I18N?.locale;
+    const promptText=locale==='tr'
+      ?`Altı görüntü zaten yüklü. Değiştirilecek görüntünün numarasını girin:\n${list}`
+      :`Six images are already loaded. Enter the number of the image to replace:\n${list}`;
+    const value=window.prompt(promptText,'');
+    if(value===null)return null;
+    const index=Number.parseInt(value,10)-1;
+    return Number.isInteger(index)&&index>=0&&index<files.length?index:null;
+  };
+  const sharedFilesFromRenderedLinks=async()=>{
+    if(!window.caches)return [];
+    const links=[...document.querySelectorAll('#selectedFiles a.selected-file')]
+      .map(link=>({url:link.getAttribute('href')||'',name:(link.textContent||'shared-image.jpg').trim()}))
+      .filter(item=>item.url.includes('/__hc_share__/'));
+    if(!links.length)return [];
+    const cache=await caches.open('hc-ectasia-shared-images-v1');
+    const files=[];
+    for(const item of links){
+      const response=await cache.match(item.url);
+      if(!response)continue;
+      const blob=await response.blob();
+      files.push(new File([blob],item.name,{type:blob.type||'image/jpeg',lastModified:Date.now()}));
+    }
+    return files;
+  };
+  const mergeFiles=(base,selected)=>{
+    const next=[...base];
+    for(const file of selected){
+      const exact=next.findIndex(existing=>sameFile(existing,file));
+      if(exact>=0){next[exact]=file;continue;}
+      const sameName=next.findIndex(existing=>existing.name===file.name);
+      if(sameName>=0){next[sameName]=file;continue;}
+      if(next.length<MAX_IMAGES){next.push(file);continue;}
+      const replaceIndex=chooseReplacementIndex(next);
+      if(replaceIndex===null)return null;
+      next[replaceIndex]=file;
+    }
+    return next;
+  };
+
+  imageInput.addEventListener('change',event=>{
+    if(replaying)return;
+    const selected=[...imageInput.files];
+    if(!selected.length)return;
+    if(!retained.length){
+      const sharedLinks=document.querySelectorAll('#selectedFiles a.selected-file[href*="/__hc_share__/"]');
+      if(sharedLinks.length){
+        event.stopImmediatePropagation();
+        const snapshot=ageSnapshot();
+        sharedFilesFromRenderedLinks().then(shared=>{
+          const merged=mergeFiles(shared,selected);
+          if(!merged){setFiles(shared);restoreAge(snapshot);return;}
+          setFiles(merged);replaying=true;imageInput.dispatchEvent(new Event('change',{bubbles:true}));replaying=false;restoreAge(snapshot);
+        }).catch(()=>{
+          setFiles(selected);replaying=true;imageInput.dispatchEvent(new Event('change',{bubbles:true}));replaying=false;restoreAge(snapshot);
+        });
+        return;
+      }
+      retained=[...selected];
+      return;
+    }
+    const snapshot=ageSnapshot();
+    const merged=selected.length>=5?selected.slice(0,MAX_IMAGES):mergeFiles(retained,selected);
+    if(!merged){event.stopImmediatePropagation();setFiles(retained);restoreAge(snapshot);return;}
+    setFiles(merged);restoreAge(snapshot);
+  },true);
+
+  const wrapper=imageInput.closest('.file-picker-wrap')||imageInput.parentElement;
+  if(wrapper&&!document.getElementById('source-image-retention-note')){
+    const note=document.createElement('p');note.id='source-image-retention-note';note.className='note';
+    note.textContent=window.CERAI_I18N?.locale==='tr'
+      ?'Eksik veya okunamayan bir kaynak görüntü istenirse yalnızca yeni görüntüyü seçin. Mevcut hasta bilgileri ve seçilmiş görüntüler korunur.'
+      :'If a source image is missing or unreadable, select only the new/replacement image. Existing patient information and selected images are retained.';
+    wrapper.append(note);
+  }
+  window.CERAISourceImageRetention={openPicker:()=>imageInput.click(),files:()=>[...retained]};
+})();
+
 window.HCReadiness = class {
   constructor(panel) { this.panel=panel; this.regionUrls=[]; this.reset(); }
   reset() {
@@ -80,7 +190,14 @@ window.HCReadiness = class {
         input.value=this.overrides[item.eye]?.[item.key]??'';
       }
       if(input){this.hasCompletableInputs=true;input.id=`completion_${seen.size}`;label.htmlFor=input.id;row.append(input);}
-      else {row.classList.add('completion-blocker');const help=document.createElement('span');help.textContent=tr(item.help);row.append(help);}
+      else {
+        row.classList.add('completion-blocker');
+        const help=document.createElement('span');help.textContent=tr(item.help);row.append(help);
+        const replace=document.createElement('button');replace.type='button';replace.className='secondary';
+        replace.textContent=window.CERAI_I18N?.locale==='tr'?'Kaynak görüntü ekle/değiştir':'Add/replace source image';
+        replace.addEventListener('click',()=>window.CERAISourceImageRetention?.openPicker());
+        row.append(replace);
+      }
       this.panel.append(row);
     }
     this.panel.scrollIntoView({behavior:'smooth',block:'start'});
