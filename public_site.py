@@ -149,6 +149,7 @@ def _discovery_head(base: str) -> str:
   <link rel="describedby" type="text/markdown" href="{base}/llms.txt">
   <link rel="alternate" type="text/html" href="{base}/corneal-ectasia-risk-assessment">
   <link rel="related" type="text/html" href="{base}/clinical-evidence">
+  <link rel="stylesheet" href="{base}/static/technical-public.css?v=1">
   <script type="application/ld+json">{schema}</script>
 """
 
