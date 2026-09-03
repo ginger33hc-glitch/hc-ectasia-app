@@ -5,6 +5,7 @@ from clinical_disposition import CAUTION, PASS, STATUS_RANK, STOP_DEFER
 core = bootstrap.core
 _previous_assess_eye = core.assess_eye
 
+
 def _decision_critical_incomplete(result):
     if result.get("missing"):
         return True
@@ -45,33 +46,66 @@ def _apply_locked_i_s_normal_band(eye):
     return working
 
 
-def _prk_caution_was_auto_deferred(result):
+def _remove_prk_ewss_pathway(result):
+    """Remove the legacy provisional PRK-EWSS as a clinical decision pathway.
+
+    PRK remains governed by the independent CER-AI risk/safety layers applied
+    elsewhere (Final BAD-D, NICE, PS3, tissue/procedure hard stops, readiness,
+    and other explicit clinical cautions).  The legacy PRK-EWSS was explicitly
+    unvalidated and must neither create STOP-DEFER nor appear as a fifth score.
+    """
     values = result.get("values") or {}
-    score = result.get("score") or {}
-    return (
-        str(values.get("procedure") or "").upper() == "PRK"
-        and score.get("category") == "CAUTION"
-        and not result.get("hard_stops")
+    if str(values.get("procedure") or "").upper() != "PRK":
+        return result
+
+    original_reasons = list(result.get("reasons") or [])
+    prk_ewss_reasons = [reason for reason in original_reasons if "PRK-EWSS" in str(reason)]
+    remaining_reasons = [reason for reason in original_reasons if "PRK-EWSS" not in str(reason)]
+    result["reasons"] = remaining_reasons
+
+    result["warnings"] = [
+        warning for warning in (result.get("warnings") or [])
+        if "PRK-EWSS" not in str(warning)
+    ]
+
+    if "score" in result:
+        result["score"] = {
+            "rows": {},
+            "total": None,
+            "category": "NOT_APPLICABLE",
+            "source": "PRK-EWSS removed from CER-AI decision architecture",
+            "breakdown": [],
+        }
+    result["instrument"] = (
+        "PRK: no provisional PRK-EWSS score. CER-AI uses independent risk and "
+        "procedure-safety pathways."
     )
+    result["prk_ewss_removed"] = True
+
+    # Never cancel an independently recorded hard stop.
+    if result.get("hard_stops"):
+        return result
+
+    # If upstream STOP-DEFER came from the removed provisional PRK-EWSS only,
+    # release that restriction. Preserve any other upstream concern as CAUTION.
+    if result.get("status") == STOP_DEFER and prk_ewss_reasons:
+        result["status"] = CAUTION if remaining_reasons else PASS
+        result["action"] = (
+            "CAUTION — surgeon review is required. The legacy provisional PRK-EWSS "
+            "does not participate in CER-AI decision-making."
+            if result["status"] == CAUTION
+            else "PRK assessment continues through the remaining independent CER-AI pathways."
+        )
+    return result
 
 
 def assess_eye_with_hc_final_hierarchy(eye, plan, age, patient_modifiers):
     eye = _apply_locked_i_s_normal_band(eye)
     result = _previous_assess_eye(eye, plan, age, patient_modifiers)
+    result = _remove_prk_ewss_pathway(result)
 
     if result.get("status") not in STATUS_RANK:
         raise ValueError(f"Non-canonical CER-AI disposition escaped the clinical engine: {result.get('status')!r}")
-
-    if _prk_caution_was_auto_deferred(result):
-        result["status"] = CAUTION
-        result["action"] = "CAUTION — surgeon review is required; this category does not automatically defer surgery."
-        result["reasons"] = [
-            reason for reason in result.get("reasons", [])
-            if "PRK-EWSS v1.0 provisional caution category" not in str(reason)
-        ]
-        reason = "CER-AI final hierarchy: PRK-EWSS provisional CAUTION does not automatically defer surgery."
-        if reason not in result.setdefault("reasons", []):
-            result["reasons"].append(reason)
 
     if result.get("hard_stops") or result.get("status") == STOP_DEFER:
         result["status"] = STOP_DEFER
