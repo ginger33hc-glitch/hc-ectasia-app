@@ -90,7 +90,7 @@ def test_legacy_bad_component_signature_recognizes_od_page_even_if_screen_type_i
     assert summary["present"]["OD Belin/Ambrosio Display"] is True
 
 
-def test_mandatory_install_adds_explicit_legacy_bad_display_recognition_prompt():
+def test_mandatory_install_adds_explicit_legacy_bad_display_recognition_prompt(monkeypatch):
     class Core:
         PROMPT = "base"
         merge_extractions = staticmethod(lambda results: {})
@@ -99,8 +99,8 @@ def test_mandatory_install_adds_explicit_legacy_bad_display_recognition_prompt()
             return None
 
     core = Core()
-    policy._previous_merge_extractions = None
-    policy._previous_run_image_assessment = None
+    monkeypatch.setattr(policy, "_previous_merge_extractions", None)
+    monkeypatch.setattr(policy, "_previous_run_image_assessment", None)
     policy.install(core)
     assert "Belin/Ambrosio Display" in core.PROMPT
     assert "BELIN_AMBROSIO_DISPLAY" in core.PROMPT
