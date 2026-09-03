@@ -104,6 +104,37 @@ def test_final_hierarchy_never_overrides_missing_or_hard_stop(monkeypatch):
     assert stopped["status"] == "STOP-DEFER"
 
 
+def test_prk_ewss_is_not_a_decision_pathway(monkeypatch):
+    upstream = {
+        "status": "STOP-DEFER",
+        "values": {"procedure": "PRK"},
+        "score": {"rows": {"age": 2}, "total": 4, "category": "HIGH_CONCERN"},
+        "instrument": "PRK-EWSS v1.0 provisional evidence-weighted triage score; not validated",
+        "reasons": ["PRK-EWSS v1.0 provisional high-concern category (score >=4)."],
+        "warnings": ["CER-AI SCORE — SOURCE & BREAKDOWN: PRK-EWSS v1.0 provisional evidence-weighted triage score"],
+    }
+    out = _run_final_policy(monkeypatch, upstream)
+    assert out["status"] == "PASS"
+    assert out["score"]["total"] is None
+    assert out["score"]["category"] == "NOT_APPLICABLE"
+    assert all("PRK-EWSS" not in str(item) for item in out.get("reasons", []))
+    assert all("PRK-EWSS" not in str(item) for item in out.get("warnings", []))
+    assert out["prk_ewss_removed"] is True
+
+
+def test_prk_ewss_removal_never_cancels_independent_hard_stop(monkeypatch):
+    upstream = {
+        "status": "STOP-DEFER",
+        "values": {"procedure": "PRK"},
+        "score": {"rows": {}, "total": 5, "category": "HIGH_CONCERN"},
+        "reasons": ["PRK-EWSS v1.0 provisional high-concern category (score >=4)."],
+        "hard_stops": ["independent tissue safety stop"],
+    }
+    out = _run_final_policy(monkeypatch, upstream)
+    assert out["status"] == "STOP-DEFER"
+    assert "independent tissue safety stop" in out["hard_stops"]
+
+
 def test_secondary_review_alone_does_not_override_principal_hierarchy(monkeypatch):
     out = _run_final_policy(
         monkeypatch,
