@@ -211,12 +211,14 @@ def test_canonical_import_does_not_mutate_frontend_assets():
 
 
 def test_required_runtime_layers_are_installed():
-    assert core._erss_visual_morphology_policy_installed
+    assert core._cerai_erss_numeric_extraction_installed
+    assert core._erss_topography_evidence_policy_installed
     assert core._randleman_bad_independence_installed
     assert core._hc_final_decision_hierarchy_installed
     assert core._hc_status_rank_policy_installed
     assert core._hc_inter_eye_tomography_policy_installed
     assert core._hc_lasik_fallback_installed
+    assert "ERSS VISUAL MORPHOLOGY DISABLED:" in core.PROMPT
 
 
 def test_canonical_runtime_invariants():
