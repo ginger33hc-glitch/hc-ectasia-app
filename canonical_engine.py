@@ -56,6 +56,7 @@ def runtime_invariants():
         targeted = composition.pentacam_targeted_reread
         rmin = composition.rmin_front_source_policy
         new_fields = composition.ps3_extraction_policy
+        mandatory = composition.mandatory_source_set_policy
         if core.extract_one_image is not rmin.extract_one_image_with_front_rmin:
             errors.append("Cornea Front Rmin source lock is not the active extraction layer")
         if rmin._previous_extract_one_image is not targeted.extract_one_image_with_targeted_reread:
@@ -64,8 +65,12 @@ def runtime_invariants():
             errors.append("Rmin map fallback is still enabled")
         if not getattr(core, "_cerai_rmin_front_source_installed", False):
             errors.append("Cornea Front Rmin source lock is not marked active")
-        if core.merge_extractions is not new_fields.merge_extractions_with_new_fields:
-            errors.append("New Pentacam labeled-field merge adapter is not the active merge layer")
+        if core.merge_extractions is not mandatory.merge_extractions_with_mandatory_source_gate:
+            errors.append("Mandatory five-image source gate is not the active outer merge layer")
+        if mandatory._previous_merge_extractions is not new_fields.merge_extractions_with_new_fields:
+            errors.append("PS3/new-field merge adapter is not preserved immediately below the mandatory source gate")
+        if not getattr(core, "_cerai_mandatory_source_set_installed", False):
+            errors.append("Mandatory five-image source gate is not marked active")
         if not getattr(core, "_cerai_ps3_merge_installed", False):
             errors.append("New Pentacam labeled-field merge adapter is not marked active")
         if core.scoring_morphology is not erss_evidence.scoring_morphology_with_i_s_evidence_gate:
@@ -75,7 +80,7 @@ def runtime_invariants():
         if core.required_tomography_missing is not erss_evidence.required_tomography_missing_with_i_s:
             errors.append("ERSS I-S/SRAX evidence gate is not the active tomography requirement layer")
     except Exception as exc:
-        errors.append(f"ERSS numeric evidence module unavailable: {type(exc).__name__}")
+        errors.append(f"ERSS/source-set module unavailable: {type(exc).__name__}")
 
     if not getattr(core, "_cerai_erss_numeric_extraction_installed", False):
         errors.append("ERSS numeric-only extraction policy is not active")
