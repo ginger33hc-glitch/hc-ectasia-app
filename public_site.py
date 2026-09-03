@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Res
 _PUBLIC_HOME = Path("static/public-home.html")
 _AI_LANDING = Path("static/corneal-ectasia-risk-assessment.html")
 _EVIDENCE_PAGE = Path("static/clinical-evidence.html")
+_REFERENCES_PAGE = Path("static/references.html")
 _PRIVATE_CRAWL_PATHS = (
     "/app",
     "/api/",
@@ -149,6 +150,7 @@ def _discovery_head(base: str) -> str:
   <link rel="describedby" type="text/markdown" href="{base}/llms.txt">
   <link rel="alternate" type="text/html" href="{base}/corneal-ectasia-risk-assessment">
   <link rel="related" type="text/html" href="{base}/clinical-evidence">
+  <link rel="related" type="text/html" href="{base}/references">
   <link rel="stylesheet" href="{base}/static/technical-public.css?v=1">
   <script type="application/ld+json">{schema}</script>
 """
@@ -159,10 +161,19 @@ def _render_public_home(request: Request) -> HTMLResponse:
     discovery = _discovery_head(_site_base(request))
     if "</head>" in html:
         html = html.replace("</head>", f"{discovery}</head>", 1)
-    # Add public evidence navigation without modifying the static clinical UI.
     marker = '<a href="#about">About</a>'
     if marker in html and 'href="/clinical-evidence"' not in html:
         html = html.replace(marker, '<a href="/clinical-evidence">Clinical Evidence</a>' + marker, 1)
+    if 'id="references"' not in html and "</main>" in html:
+        references_section = """
+<section id="references" class="alt"><div class="wrap">
+  <div class="section-kicker">Scientific foundation</div>
+  <h2>Medical References</h2>
+  <p class="lead">Review the consolidated medical literature discussed and used across CER-AI development, including ERSS, NICE, PS3, BAD-D, Pentacam tomography, PRFI, PTA, RTA, SCORE, biomechanical safety and postoperative ectasia literature.</p>
+  <div class="cta-panel"><div><h3>View the CER-AI reference registry</h3><p>The registry is searchable by author, title, journal, DOI and clinical topic.</p></div><a class="btn" href="/references">Open References</a></div>
+</div></section>
+"""
+        html = html.replace("</main>", f"{references_section}</main>", 1)
     return HTMLResponse(html)
 
 
@@ -225,6 +236,7 @@ The software keeps major risk pathways independently interpretable rather than h
 - [CER-AI home]({base}/): Overview of the clinical decision-support platform and its independent ectasia-risk pathways.
 - [Corneal ectasia risk assessment]({base}/corneal-ectasia-risk-assessment): Search-oriented clinical overview of the problem CER-AI addresses and the terminology used by the platform.
 - [Clinical evidence and references]({base}/clinical-evidence): Verified literature mapped to the CER-AI pathways and concepts it supports, with explicit evidence boundaries.
+- [Full medical reference registry]({base}/references): Searchable consolidated CER-AI bibliography grouped by clinical topic.
 
 ## Evidence anchors
 - Randleman et al. Risk assessment for ectasia after corneal refractive surgery. Ophthalmology. 2008. DOI 10.1016/j.ophtha.2007.03.073.
@@ -257,6 +269,7 @@ def _sitemap_xml(base: str) -> str:
         (f"{base}/home", "0.9"),
         (f"{base}/corneal-ectasia-risk-assessment", "0.9"),
         (f"{base}/clinical-evidence", "0.9"),
+        (f"{base}/references", "0.9"),
     )
     body = "".join(
         f"<url><loc>{url}</loc><changefreq>weekly</changefreq><priority>{priority}</priority></url>"
@@ -297,6 +310,10 @@ def install(core) -> None:
     @core.app.get("/clinical-evidence", include_in_schema=False)
     def clinical_evidence() -> FileResponse:
         return FileResponse(_EVIDENCE_PAGE)
+
+    @core.app.get("/references", include_in_schema=False)
+    def references() -> FileResponse:
+        return FileResponse(_REFERENCES_PAGE)
 
     @core.app.get("/robots.txt", include_in_schema=False)
     def robots(request: Request) -> PlainTextResponse:
