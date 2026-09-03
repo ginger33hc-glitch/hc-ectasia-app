@@ -29,6 +29,10 @@ jobs:
         env:
           OPENAI_API_KEY: test-key-for-import-only
         run: python -c "import canonical_engine; assert canonical_engine.runtime_invariants()"
+      - name: Phase 1 launch behavior contract
+        env:
+          OPENAI_API_KEY: test-key-for-import-only
+        run: python -m pytest -q tests/test_launch_behavior_contract.py
       - name: Archive, Railway preflight, migration, catalog, audit, user, UI, historical-report, research security, and public site tests
         env:
           OPENAI_API_KEY: test-key-for-import-only
