@@ -49,5 +49,16 @@ for _class_name,_method_names in _RETIRED_METHODS.items():
         delattr(_class,_method_name)
 for _name,_value in vars(_legacy).items():
     if not _name.startswith("__"):globals()[_name]=_value
+
+# Current synthetic fixtures represent complete, reassuring Front-map review unless
+# a test explicitly overrides SRAX. Historical tests keep their original fixture
+# function inside the preserved legacy module.
+_historical_normal_eye=globals().get("normal_eye")
+def normal_eye(*args,**kwargs):
+    eye=_historical_normal_eye(*args,**kwargs)
+    eye["srax"]="NO"
+    eye["srax_deg"]=0.0
+    return eye
+
 PHASE4_RETIRED_HC_ENGINE_METHODS={key:tuple(sorted(value)) for key,value in _RETIRED_METHODS.items()}
 del _class_name,_method_names,_class,_method_name,_name,_value
