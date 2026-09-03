@@ -1,9 +1,9 @@
 """Evidence gate for the existing Randleman/ERSS topography scorer.
 
 This module owns no point table and calculates no ERSS total. It validates the
-anterior-topography evidence passed to the canonical scorer. Signed I-S and
-CER-AI derived SRAX are numeric Randleman inputs; the existing point mapper
-remains the sole scoring authority.
+numeric anterior-topography evidence passed to the canonical scorer. Signed I-S
+and CER-AI derived SRAX are the only ERSS topography scoring authorities;
+visual morphology is retained, when present, as non-scoring context only.
 """
 
 from derived_srax import derive_srax_deg
@@ -60,17 +60,12 @@ def _prepared_eye(eye, plan):
     prepared = dict(eye)
     prepared["_erss_i_s_gate_required"] = (plan or {}).get("procedure") == "LASIK"
     manual_i_s = (plan or {}).get("surgeon_I_S_D")
-    manual_category = (plan or {}).get("surgeon_topography_category")
     prepared["_surgeon_I_S_invalid"] = manual_i_s is not None and not core.is_number(manual_i_s)
-    prepared["_surgeon_category_invalid"] = manual_category not in (None, "", *VALID_CATEGORIES)
 
     if core.is_number(manual_i_s):
         prepared["I_S"] = float(manual_i_s)
         prepared["I_S_status"] = "SURGEON_CONFIRMED"
         prepared["I_S_source"] = "SURGEON_ENTRY"
-    if manual_category in VALID_CATEGORIES:
-        prepared["surgeon_topography_category"] = manual_category
-        prepared["surgeon_topography_category_status"] = "SURGEON_CONFIRMED"
     return prepared
 
 
@@ -102,26 +97,14 @@ def _derived_srax(eye):
     )
 
 
-def _high_confidence_map_category(eye):
-    category = eye.get("morphology")
-    if (
-        eye.get("erss_source_read") == "DEDICATED_CURVATURE_PASS"
-        and eye.get("anterior_curvature_map_visible") == "YES"
-        and eye.get("morphology_confidence") == "HIGH"
-        and category in VALID_CATEGORIES
-    ):
-        return category
-    return None
-
-
 def scoring_morphology_with_i_s_evidence_gate(eye):
-    """Return one mutually exclusive Randleman topography category.
+    """Return one mutually exclusive numeric Randleman topography category.
 
-    All independently valid evidence is considered together: signed I-S,
-    derived SRAX, a HIGH-confidence dedicated anterior-map category, and an
-    explicit surgeon-confirmed category. The highest applicable category wins;
-    categories are never added together. This prevents reassuring numeric data
-    from downgrading stronger definite ectatic morphology evidence.
+    Only two scoring authorities are allowed: signed Topometric I-S and CER-AI
+    derived SRAX. The original Randleman SRA/SRAX threshold is >=20 degrees.
+    When both numeric channels are available, the higher-risk single category
+    wins; categories are never added together. Visual/map morphology and manual
+    visual-category labels do not contribute score points or hard-stop authority.
     """
     if not eye.get("_erss_i_s_gate_required"):
         return _previous_scoring_morphology(eye)
@@ -142,37 +125,34 @@ def scoring_morphology_with_i_s_evidence_gate(eye):
         )
         if derived >= 20.0:
             candidates.append(("INFERIOR_STEEPENING_SRA", "DERIVED_SRAX"))
-            evidence.append("ERSS SRA criterion met: derived SRAX >=20°.")
+            evidence.append("Original Randleman SRA/SRAX criterion met: derived SRAX >=20°.")
 
-    map_category = _high_confidence_map_category(eye)
-    if map_category:
-        candidates.append((map_category, "AUTOMATIC_HIGH_CONFIDENCE_MAP_EVIDENCE"))
+    visual_category = eye.get("morphology")
+    if visual_category in VALID_CATEGORIES:
         evidence.append(
-            "Dedicated reader found a HIGH-confidence category on the complete anterior curvature map; no BAD/BAD-D field was used."
+            f"Visual anterior-map morphology {visual_category} retained as context only; CER-AI does not use visual morphology for ERSS scoring."
+        )
+    if eye.get("surgeon_topography_category") in VALID_CATEGORIES:
+        evidence.append(
+            "Surgeon-entered visual topography category retained as context only; it is not an ERSS scoring authority."
         )
 
-    surgeon_category = eye.get("surgeon_topography_category")
-    if surgeon_category in VALID_CATEGORIES:
-        candidates.append((surgeon_category, "SURGEON_CONFIRMED"))
-        evidence.append("Randleman anterior-topography category was explicitly confirmed by the surgeon.")
-
     if not candidates:
-        confidence = eye.get("morphology_confidence") or "UNSPECIFIED"
         evidence.append(
-            f"Randleman topography remains unscored: no usable I-S/SRAX numeric criterion, HIGH-confidence dedicated map category, or surgeon-confirmed category is available (map confidence: {confidence})."
+            "Randleman topography remains unscored: no usable authoritative signed I-S value is available, so neither the I-S category nor derived SRAX can be used."
         )
         if _i_s_status(eye) == "CONFLICT":
             evidence.append("Conflicting same-eye I-S readings were not used.")
         return {
             "category": "UNCERTAIN",
-            "category_source": "UNRESOLVED",
+            "category_source": "UNRESOLVED_NUMERIC_EVIDENCE",
             "derived_srax_deg": derived,
             "evidence": list(dict.fromkeys(evidence)),
         }
 
     category, source = max(candidates, key=lambda item: _CATEGORY_RANK[item[0]])
     evidence.append(
-        "Highest applicable single Randleman topography category selected across numeric, map, and surgeon-confirmed evidence; categories are never added together."
+        "Highest applicable single Randleman topography category selected from signed I-S and derived SRAX only; categories are never added together."
     )
     return {
         "category": category,
@@ -188,7 +168,7 @@ def required_tomography_missing_with_i_s(eye):
         return missing
     validated = scoring_morphology_with_i_s_evidence_gate(eye).get("category")
     if validated == "UNCERTAIN":
-        missing.append("surgeon-confirmed Randleman topography category when numeric I-S/SRAX evidence and HIGH-confidence map evidence are unavailable")
+        missing.append("usable signed I-S value for numeric Randleman topography scoring")
     return list(dict.fromkeys(missing))
 
 
@@ -214,11 +194,12 @@ def assess_eye_with_i_s_evidence(eye, plan, age, patient_modifiers):
         "derived_SRAX_source": "KISA_KMAX_IS_TOPOGRAPHIC_ASTIG" if validated.get("derived_srax_deg") is not None else None,
         "image_category": working_eye.get("morphology", "UNCERTAIN"),
         "image_category_confidence": working_eye.get("morphology_confidence", "UNSPECIFIED"),
+        "visual_morphology_scoring_authority": False,
         "validated_category": validated.get("category", "UNCERTAIN"),
-        "category_source": validated.get("category_source", "UNRESOLVED"),
-        "single_category_rule": "Highest applicable Randleman topography category only; evidence categories are never added.",
-        "needs_surgeon_I_S": False,
-        "needs_surgeon_category": validated.get("category") == "UNCERTAIN",
+        "category_source": validated.get("category_source", "UNRESOLVED_NUMERIC_EVIDENCE"),
+        "single_category_rule": "Highest applicable category from signed I-S and derived SRAX only; categories are never added.",
+        "needs_surgeon_I_S": validated.get("category") == "UNCERTAIN",
+        "needs_surgeon_category": False,
     }
     result["erss_topography_evidence"] = evidence_record
     result.setdefault("values", {}).update({
@@ -230,8 +211,6 @@ def assess_eye_with_i_s_evidence(eye, plan, age, patient_modifiers):
 
     if working_eye.get("_surgeon_I_S_invalid"):
         result.setdefault("missing", []).append("valid numeric surgeon-confirmed I-S value")
-    if working_eye.get("_surgeon_category_invalid"):
-        result.setdefault("missing", []).append("valid surgeon-confirmed Randleman topography category")
     result["missing"] = list(dict.fromkeys(result.get("missing") or []))
     return result
 
