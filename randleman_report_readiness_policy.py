@@ -5,8 +5,6 @@ Randleman/ERSS five-row score is complete for every assessed virgin eye.
 Missing ERSS components are converted into explicit completion requests so the
 surgeon can supply/confirm the underlying data before report generation.
 """
-from copy import deepcopy
-
 from fastapi import HTTPException
 
 _REQUIRED_ROWS = ("topography", "RSB", "age", "pachymetry", "MRSE")
@@ -34,34 +32,25 @@ def _erss_complete(eye):
     if not isinstance(erss, dict):
         return False
     rows = erss.get("rows") or {}
-    if not all(_number(rows.get(name)) for name in _REQUIRED_ROWS):
-        return False
-    return _number(erss.get("total"))
+    return all(_number(rows.get(name)) for name in _REQUIRED_ROWS) and _number(erss.get("total"))
 
 
 def _component_requests(eye):
-    """Return actionable missing-data messages for an incomplete LASIK ERSS."""
     if not _is_lasik_virgin_eye(eye) or _erss_complete(eye):
         return []
-
     erss = eye.get("randleman_erss") or {}
     rows = erss.get("rows") or {}
     missing_rows = set(erss.get("missing_erss_inputs") or [])
     missing_rows.update(name for name in _REQUIRED_ROWS if not _number(rows.get(name)))
     evidence = eye.get("erss_topography_evidence") or {}
     messages = []
-
     if "topography" in missing_rows:
         if evidence.get("needs_surgeon_I_S"):
             messages.append("Randleman/ERSS requires a usable signed I-S value for numeric topography scoring.")
         if evidence.get("needs_surgeon_SRAX"):
-            messages.append(
-                "Randleman/ERSS requires SRAX >20° confirmation from the Axial/Sagittal Curvature (Front) map."
-            )
+            messages.append("Randleman/ERSS requires SRAX >20° confirmation from the Axial/Sagittal Curvature (Front) map.")
         if not evidence.get("needs_surgeon_I_S") and not evidence.get("needs_surgeon_SRAX"):
-            messages.append(
-                "Randleman/ERSS topography is unresolved; confirm signed I-S and Front-map SRAX evidence."
-            )
+            messages.append("Randleman/ERSS topography is unresolved; confirm signed I-S and Front-map SRAX evidence.")
     if "RSB" in missing_rows:
         messages.append("Randleman/ERSS RSB is unavailable; complete the LASIK flap thickness and ablation inputs.")
     if "age" in missing_rows:
@@ -73,11 +62,8 @@ def _component_requests(eye):
             "Randleman/ERSS requires the preoperative manifest sphere.",
             "Randleman/ERSS requires the preoperative manifest cylinder magnitude.",
         ))
-
     if not messages:
-        messages.append(
-            "Randleman/ERSS score is unavailable; all five LASIK ERSS components must be documented before report generation."
-        )
+        messages.append("Randleman/ERSS score is unavailable; all five LASIK ERSS components must be documented before report generation.")
     return list(dict.fromkeys(messages))
 
 
@@ -86,23 +72,16 @@ def missing_items_with_complete_erss(decision):
     for eye in decision.get("eyes") or []:
         eye_id = eye.get("eye", "GLOBAL")
         for message in _component_requests(eye):
-            items.append((eye_id, message))
+            if "Randleman/ERSS age is unavailable" in message:
+                items.append(("PATIENT", "age"))
+            else:
+                items.append((eye_id, message))
     return list(dict.fromkeys(items))
 
 
 def request_with_randleman(eye, message, extracted):
     text = str(message).lower()
     prefix = str(eye).lower()
-    if "randleman/erss age is unavailable" in text:
-        return {
-            "eye": "PATIENT",
-            "label": "Patient age (years) — required for Randleman/ERSS",
-            "kind": "form",
-            "key": "age",
-            "destination": "source",
-            "form_id": "age",
-            "help": "Randleman/ERSS cannot be completed without age.",
-        }
     if "randleman/erss rsb is unavailable" in text:
         return {
             "eye": eye,
@@ -118,17 +97,9 @@ def request_with_randleman(eye, message, extracted):
 
 def _validate_export_erss(payload):
     decision = payload.get("decision") or {}
-    incomplete = [
-        eye.get("eye", "UNKNOWN")
-        for eye in decision.get("eyes") or []
-        if _is_lasik_virgin_eye(eye) and not _erss_complete(eye)
-    ]
+    incomplete = [eye.get("eye", "UNKNOWN") for eye in decision.get("eyes") or [] if _is_lasik_virgin_eye(eye) and not _erss_complete(eye)]
     if incomplete:
-        raise HTTPException(
-            409,
-            "Randleman/ERSS is incomplete for " + ", ".join(incomplete)
-            + "; complete the missing ERSS inputs before generating a report.",
-        )
+        raise HTTPException(409, "Randleman/ERSS is incomplete for " + ", ".join(incomplete) + "; complete the missing ERSS inputs before generating a report.")
 
 
 def export_payload_with_complete_erss(payload):
