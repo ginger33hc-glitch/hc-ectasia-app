@@ -39,6 +39,11 @@ def scenario(procedure="LASIK"):
     for eye in extracted["eyes"]:
         eye["morphology_confidence"] = "HIGH"
         eye["erss_source_read"] = "DEDICATED_CURVATURE_PASS"
+        # Synthetic baseline fixture explicitly resolves the new mandatory
+        # Front-map SRAX channel as reassuring. Tests that exercise unresolved
+        # SRAX must clear these fields themselves.
+        eye["srax"] = "NO"
+        eye["srax_deg"] = 0.0
     plans = {eye: plan(procedure, flap=100 if procedure == "LASIK" else None) for eye in ("OD", "OS")}
     return extracted, plans
 
