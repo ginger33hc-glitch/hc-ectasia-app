@@ -6,7 +6,15 @@ until explicit equivalence gates are satisfied.
 """
 
 from .disposition import combine_status, presentation_class
+from .erss import (
+    erss_disposition,
+    erss_mrse_points,
+    erss_rsb_points,
+    erss_topography_points,
+    erss_total,
+)
 from .nice import nice_disposition, score_nice
+from .pipeline import ClinicalCoreInput, PIPELINE_ORDER, evaluate_normalized_case
 from .planning import (
     LASIK_PLANS,
     LASIK_PTA_CUTOFF_PERCENT,
@@ -38,16 +46,24 @@ from .safety import (
 )
 
 __all__ = [
+    "ClinicalCoreInput",
     "LASIK_PLANS",
     "LASIK_PTA_CUTOFF_PERCENT",
+    "PIPELINE_ORDER",
     "PS3EyeInput",
     "PS3InterEyeInput",
     "bad_d_classification",
     "combine_status",
     "erss_age_points",
+    "erss_disposition",
+    "erss_mrse_points",
     "erss_pachymetry_points",
+    "erss_rsb_points",
     "erss_topography_category",
+    "erss_topography_points",
+    "erss_total",
     "estimated_final_kmean_d",
+    "evaluate_normalized_case",
     "evaluate_ps3",
     "final_kmean_hard_stop",
     "independent_hard_stop",
