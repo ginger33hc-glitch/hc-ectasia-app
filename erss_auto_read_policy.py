@@ -1,17 +1,16 @@
 """Retire obsolete visual/pattern completion requests from CER-AI readiness.
 
-General visual morphology remains retired. SRAX is no longer retired: when it
-cannot be determined from the Axial/Sagittal Curvature (Front) map, the
-readiness workflow must preserve the explicit surgeon question asking whether
-SRAX/skewed axis is >20 degrees.
+General visual morphology remains retired. Morphology/geometry inspection is permitted only inside
+the dedicated SRAX task on the Axial/Sagittal Curvature (Front) map. The resulting SRAX value/status
+is shared by Randleman/ERSS and PS3. If SRAX cannot be resolved from that source, readiness must keep
+the explicit surgeon confirmation request.
 
-The legacy generic anterior/posterior elevation-at-thinnest fields are also not
-active readiness inputs. NICE/PS3 elevation ownership is through the explicitly
-labeled F. Ele.Th and B. Ele.Th boxes on the BAD/Belin-Ambrosio Display.
+The legacy generic anterior/posterior elevation-at-thinnest fields are also not active readiness
+inputs. NICE/PS3 elevation ownership is through the explicitly labeled F. Ele.Th and B. Ele.Th boxes
+on the BAD/Belin-Ambrosio Display.
 """
 
 _previous_hc_engine = None
-
 
 _RETIRED_REQUEST_TERMS = (
     "morphology",
@@ -31,6 +30,9 @@ _LEGACY_GENERIC_ELEVATION_FIELDS = (
     "posterior_elevation_thinnest_um",
 )
 
+_ERSS_ROWS = ("topography", "RSB", "age", "pachymetry", "MRSE")
+_ERSS_INCOMPLETE_PREFIX = "Randleman/ERSS score incomplete:"
+
 
 def _is_retired_request(item):
     text = str(item).lower()
@@ -43,23 +45,44 @@ def _is_retired_request(item):
     return any(field in text for field in _LEGACY_GENERIC_ELEVATION_FIELDS)
 
 
+def _lasik_result(result):
+    return str((result.get("values") or {}).get("procedure") or "").upper() == "LASIK"
+
+
+def _erss_missing_inputs(erss):
+    rows = erss.get("rows") or {}
+    declared = [str(item) for item in (erss.get("missing_erss_inputs") or [])]
+    inferred = [name for name in _ERSS_ROWS if rows.get(name) is None]
+    return list(dict.fromkeys(declared + inferred))
+
+
 def _clean_missing(result):
-    """Remove retired morphology/generic-elevation requests while preserving SRAX."""
-    result["missing"] = list(
-        dict.fromkeys(
-            item
-            for item in result.get("missing") or []
-            if not _is_retired_request(item)
-        )
-    )
+    """Remove retired generic morphology requests, never canonical ERSS requirements."""
+    cleaned = [
+        item
+        for item in result.get("missing") or []
+        if not _is_retired_request(item)
+        and not str(item).startswith(_ERSS_INCOMPLETE_PREFIX)
+    ]
+
     erss = result.get("randleman_erss")
     if isinstance(erss, dict):
-        erss["missing_erss_inputs"] = [
+        # Do NOT delete canonical "topography" from missing_erss_inputs. That old cleanup
+        # could make an unresolved SRAX/I-S topography row disappear while total stayed None,
+        # allowing a report to be produced without a Randleman score.
+        missing_inputs = [
             item
-            for item in erss.get("missing_erss_inputs") or []
-            if str(item).lower() not in {"topography", "morphology", "topography_category"}
-            and not _is_retired_request(item)
+            for item in _erss_missing_inputs(erss)
+            if not _is_retired_request(item)
+            or str(item).lower() == "topography"
         ]
+        erss["missing_erss_inputs"] = missing_inputs
+
+        if _lasik_result(result) and erss.get("total") is None:
+            label = ", ".join(missing_inputs) if missing_inputs else "unresolved required input"
+            cleaned.append(f"{_ERSS_INCOMPLETE_PREFIX} {label}")
+
+    result["missing"] = list(dict.fromkeys(cleaned))
     return result
 
 
