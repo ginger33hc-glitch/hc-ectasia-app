@@ -13,36 +13,29 @@ def _decision_critical_incomplete(result):
     return "DATA INSUFFICIENT" in status or "NOT ASSESSED" in status
 
 
-def _apply_locked_i_s_normal_band(eye):
-    """Use labeled Pentacam I-S for the normal-band Randleman morphology gate.
+def _remove_visual_morphology_authority(eye):
+    """Prevent visual morphology from affecting CER-AI scoring or hard stops.
 
-    -0.50 through +0.50 D is the CER-AI normal I-S band. A visual ABT label must
-    not override a confident labeled I-S inside that band. However, an already
-    definite ABNORMAL_ECTATIC morphology is a separate safety override and must
-    never be downgraded to normal by the I-S normalization step.
+    Visual anterior-map interpretation is error-prone and is no longer a
+    decision authority. The original observation/evidence may remain in the
+    extraction record for audit context, but the assessor receives neutralized
+    morphology fields. Numeric signed I-S and derived SRAX remain available and
+    are scored by the dedicated ERSS evidence policy.
     """
     working = dict(eye)
-    i_s = working.get("I_S")
-    verified = "I_S" in set(working.get("table_verified_numeric_fields") or [])
-    status = working.get("I_S_status")
-    surgeon_confirmed = status == "SURGEON_CONFIRMED"
-    definite_ectatic = working.get("morphology") == "ABNORMAL_ECTATIC"
-    if (
-        not definite_ectatic
-        and core.is_number(i_s)
-        and (verified or surgeon_confirmed)
-        and -0.50 <= float(i_s) <= 0.50
-    ):
-        working["morphology"] = "NORMAL_SYMMETRIC"
-        working["asymmetric_bow_tie"] = "NO"
-        working["srax"] = "NO"
-        working["srax_deg"] = None
-        working["inferior_opposite_steepening_D"] = None
+    visual = working.get("morphology")
+    if visual not in (None, "UNCERTAIN"):
         evidence = list(working.get("morphology_evidence") or [])
         evidence.append(
-            f"CER-AI signed I-S rule: labeled/confirmed I-S {float(i_s):+.2f} D is within -0.50 to +0.50 D; Randleman I-S category NORMAL_SYMMETRIC."
+            f"Visual morphology {visual} retained as non-scoring context only; CER-AI decision logic uses numeric I-S/SRAX instead."
         )
         working["morphology_evidence"] = list(dict.fromkeys(evidence))
+    working["morphology"] = "UNCERTAIN"
+    working["morphology_confidence"] = "UNREADABLE"
+    working["asymmetric_bow_tie"] = "UNCERTAIN"
+    working["srax"] = "UNCERTAIN"
+    working["srax_deg"] = None
+    working["inferior_opposite_steepening_D"] = None
     return working
 
 
@@ -51,7 +44,7 @@ def _remove_prk_ewss_pathway(result):
 
     PRK remains governed by the independent CER-AI risk/safety layers applied
     elsewhere (Final BAD-D, NICE, PS3, tissue/procedure hard stops, readiness,
-    and other explicit clinical cautions).  The legacy PRK-EWSS was explicitly
+    and other explicit clinical cautions). The legacy PRK-EWSS was explicitly
     unvalidated and must neither create STOP-DEFER nor appear as a fifth score.
     """
     values = result.get("values") or {}
@@ -100,7 +93,7 @@ def _remove_prk_ewss_pathway(result):
 
 
 def assess_eye_with_hc_final_hierarchy(eye, plan, age, patient_modifiers):
-    eye = _apply_locked_i_s_normal_band(eye)
+    eye = _remove_visual_morphology_authority(eye)
     result = _previous_assess_eye(eye, plan, age, patient_modifiers)
     result = _remove_prk_ewss_pathway(result)
 
