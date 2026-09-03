@@ -31,6 +31,7 @@ import microkeratome_report_policy  # noqa: E402
 import nice_policy  # noqa: E402
 import assessment_workflow  # noqa: E402
 import srax_completion_policy  # noqa: E402
+import randleman_report_readiness_policy  # noqa: E402
 import user_access  # noqa: E402
 import operational_security  # noqa: E402
 import public_site  # noqa: E402
@@ -81,6 +82,7 @@ COMPOSITION_PHASES = {
         "microkeratome_report_policy",
         "assessment_workflow",
         "srax_completion_policy",
+        "randleman_report_readiness_policy",
     ),
     "access_and_persistence": (
         "user_access",
@@ -128,6 +130,7 @@ def compose(version: str):
     ps3_runtime_policy.install(core)
     assessment_workflow.install(core)
     srax_completion_policy.install(assessment_workflow)
+    randleman_report_readiness_policy.install(assessment_workflow)
     user_access.install(core)
     operational_security.install(core)
     public_site.install(core)
