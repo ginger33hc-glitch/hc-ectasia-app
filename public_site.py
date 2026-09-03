@@ -17,10 +17,33 @@ _REFERENCES_PAGE = Path("static/references.html")
 _PRIVATE_CRAWL_PATHS = (
     "/app",
     "/api/",
+    "/analyze",
+    "/assessment/",
+    "/report/",
+    "/reports",
     "/archive",
     "/admin",
     "/auth",
-    "/reports",
+    "/portal",
+    "/dashboard",
+    "/login",
+    "/account",
+)
+_AI_CRAWLERS = (
+    "GPTBot",
+    "OAI-SearchBot",
+    "ChatGPT-User",
+    "PerplexityBot",
+    "ClaudeBot",
+    "Claude-SearchBot",
+    "Claude-User",
+    "Applebot-Extended",
+    "Google-Extended",
+)
+_SEARCH_CRAWLERS = (
+    "Googlebot",
+    "Bingbot",
+    "DuckDuckBot",
 )
 
 
@@ -177,46 +200,30 @@ def _render_public_home(request: Request) -> HTMLResponse:
     return HTMLResponse(html)
 
 
+def _robot_group(agents: tuple[str, ...], *, explicit_allow: bool) -> str:
+    lines = [*(f"User-agent: {agent}" for agent in agents)]
+    if explicit_allow:
+        lines.extend(("Allow: /", "Allow: /public/", "Allow: /about/", "Allow: /documentation/"))
+    lines.extend(f"Disallow: {path}" for path in _PRIVATE_CRAWL_PATHS)
+    return "\n".join(lines)
+
+
 def _robots_txt(base: str) -> str:
-    disallow = "\n".join(f"Disallow: {path}" for path in _PRIVATE_CRAWL_PATHS)
+    ai_group = _robot_group(_AI_CRAWLERS, explicit_allow=True)
+    search_group = _robot_group(_SEARCH_CRAWLERS, explicit_allow=True)
+    fallback_group = _robot_group(("*",), explicit_allow=False)
     return f"""# CER-AI public discovery policy
 # Public medical-information pages may be indexed; clinical/private surfaces may not.
+# robots.txt is crawler guidance only and is not an access-control boundary.
 
-User-agent: *
-Allow: /
-{disallow}
+# AI/search-assistant crawlers
+{ai_group}
 
-User-agent: OAI-SearchBot
-Allow: /
-{disallow}
+# Traditional search engines
+{search_group}
 
-User-agent: ChatGPT-User
-Allow: /
-{disallow}
-
-User-agent: GPTBot
-Allow: /
-{disallow}
-
-User-agent: Claude-SearchBot
-Allow: /
-{disallow}
-
-User-agent: Claude-User
-Allow: /
-{disallow}
-
-User-agent: ClaudeBot
-Allow: /
-{disallow}
-
-User-agent: Googlebot
-Allow: /
-{disallow}
-
-User-agent: Google-Extended
-Allow: /
-{disallow}
+# Global fallback: unknown crawlers may access public pages but not clinical/private paths
+{fallback_group}
 
 Sitemap: {base}/sitemap.xml
 """
