@@ -7,57 +7,90 @@
   <title>CER-AI — Cornea Ectasia Risk Assessment Intelligence</title>
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=8">
   <style>
-    :root{--ink:#17212b;--navy:#173b57;--blue:#1f5e8c;--muted:#687684;--line:#d9e1e7;--bg:#f6f8fa;--dark:#05090d;--orange:#ef7f2d}
+    :root{--ink:#17212b;--navy:#173b57;--blue:#1f5e8c;--blue2:#5f8fb3;--muted:#667684;--line:#d8e2e9;--bg:#f5f8fa;--soft:#edf4f8;--dark:#05090d;--orange:#ef7f2d;--shadow:0 14px 38px rgba(23,59,87,.10)}
     *{box-sizing:border-box}
     html{scroll-behavior:smooth}
-    body{margin:0;font-family:Arial,Helvetica,sans-serif;color:var(--ink);background:#fff;line-height:1.55}
+    body{margin:0;font-family:Arial,Helvetica,sans-serif;color:var(--ink);background:#fff;line-height:1.56}
     a{color:inherit}
-    .wrap{width:min(1120px,calc(100% - 36px));margin:0 auto}
-    header{background:var(--dark);border-bottom:1px solid #1f2a33}
-    .nav{min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:24px}
-    .brand{display:flex;align-items:center;gap:14px;text-decoration:none}
-    .brand img{width:210px;max-width:42vw;height:auto;display:block}
+    .wrap{width:min(1140px,calc(100% - 36px));margin:0 auto}
+
+    header{position:sticky;top:0;z-index:50;background:rgba(5,9,13,.97);border-bottom:1px solid #1f2a33;backdrop-filter:blur(10px)}
+    .nav{min-height:92px;display:flex;align-items:center;justify-content:space-between;gap:26px}
+    .brand{display:flex;align-items:center;text-decoration:none;min-width:0}
+    .brand img{width:320px;max-width:48vw;height:auto;display:block;filter:drop-shadow(0 3px 9px rgba(0,0,0,.3))}
     nav{display:flex;align-items:center;gap:24px;color:#d7e2eb;font-size:14px}
-    nav a{text-decoration:none}
-    .nav-cta{padding:10px 15px;border:1px solid #7fa6c4;border-radius:7px;color:#fff}
-    .hero{background:linear-gradient(180deg,#081018 0%,#101f2a 100%);color:#fff;padding:76px 0 84px}
-    .hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:54px;align-items:center}
-    .eyebrow{color:#9bc5e6;text-transform:uppercase;letter-spacing:1.4px;font-size:12px;font-weight:700}
-    h1{font-size:clamp(40px,6vw,72px);line-height:.98;margin:12px 0 14px;letter-spacing:-2px}
-    .subtitle{font-size:clamp(18px,2.3vw,28px);color:#b8d2e6;margin:0 0 22px}
-    .hero p{font-size:18px;max-width:720px;color:#d4dde5}
-    .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
-    .btn{display:inline-block;text-decoration:none;padding:13px 18px;border-radius:8px;font-weight:700}
-    .btn-primary{background:#fff;color:var(--navy)}
-    .btn-secondary{border:1px solid #8ca8bb;color:#fff}
-    .hero-card{background:#fff;color:var(--ink);border-radius:14px;padding:26px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
-    .hero-card h3{margin:0 0 14px;color:var(--navy)}
+    nav a{text-decoration:none;white-space:nowrap}
+    .nav-cta{padding:11px 17px;border:1px solid #7fa6c4;border-radius:8px;color:#fff;background:#163d59}
+
+    .hero{position:relative;overflow:hidden;background:linear-gradient(110deg,#f9fcfd 0%,#f2f7fa 52%,#eaf3f8 100%);padding:84px 0 92px;border-bottom:1px solid var(--line)}
+    .hero::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.58;background-image:
+      linear-gradient(rgba(71,117,150,.08) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(71,117,150,.08) 1px,transparent 1px),
+      radial-gradient(circle at 83% 46%,transparent 0 88px,rgba(42,102,143,.13) 89px 91px,transparent 92px 118px,rgba(42,102,143,.09) 119px 121px,transparent 122px),
+      radial-gradient(circle at 83% 46%,rgba(42,102,143,.08) 0 13px,transparent 14px 35px,rgba(42,102,143,.10) 36px 38px,transparent 39px),
+      radial-gradient(circle at 14% 14%,rgba(42,102,143,.10) 0 2px,transparent 3px),
+      radial-gradient(circle at 26% 78%,rgba(42,102,143,.08) 0 2px,transparent 3px);
+      background-size:42px 42px,42px 42px,auto,auto,92px 92px,78px 78px}
+    .hero::after{content:"";position:absolute;right:4%;top:14%;width:360px;height:240px;border:1px solid rgba(42,102,143,.11);border-radius:52% 48% 52% 48% / 50% 45% 55% 50%;transform:rotate(-7deg);box-shadow:0 0 0 24px rgba(42,102,143,.025),0 0 0 50px rgba(42,102,143,.018);pointer-events:none}
+    .hero-grid{position:relative;z-index:2;display:grid;grid-template-columns:1.12fr .88fr;gap:58px;align-items:center}
+    .eyebrow{color:var(--blue);text-transform:uppercase;letter-spacing:1.45px;font-size:12px;font-weight:800}
+    h1{font-size:clamp(48px,6vw,78px);line-height:.95;margin:13px 0 13px;letter-spacing:-2.3px;color:var(--navy)}
+    .subtitle{font-size:clamp(20px,2.4vw,29px);color:#315f7f;margin:0 0 22px;font-weight:500}
+    .hero p{font-size:18px;max-width:720px;color:#3c4e5d}
+    .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}
+    .btn{display:inline-block;text-decoration:none;padding:13px 19px;border-radius:8px;font-weight:800;transition:transform .15s ease,box-shadow .15s ease}
+    .btn:hover{transform:translateY(-1px)}
+    .btn-primary{background:var(--navy);color:#fff;box-shadow:0 8px 22px rgba(23,59,87,.18)}
+    .btn-secondary{border:1px solid #8ca8bb;color:var(--navy);background:rgba(255,255,255,.78)}
+    .hero-card{background:rgba(255,255,255,.90);color:var(--ink);border:1px solid rgba(140,168,187,.38);border-radius:16px;padding:28px;box-shadow:var(--shadow);backdrop-filter:blur(4px)}
+    .hero-card h3{margin:0 0 14px;color:var(--navy);font-size:22px}
     .hero-card p{font-size:14px;color:var(--muted);margin:0}
-    .pill-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
-    .pill{font-size:12px;padding:7px 9px;border-radius:999px;background:#edf4f8;color:var(--blue);font-weight:700}
-    section{padding:68px 0;border-bottom:1px solid var(--line)}
+    .pill-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+    .pill{font-size:12px;padding:7px 10px;border-radius:999px;background:#edf4f8;color:var(--blue);font-weight:800;border:1px solid #d9e8f1}
+
+    section{padding:72px 0;border-bottom:1px solid var(--line)}
     section.alt{background:var(--bg)}
-    h2{font-size:clamp(28px,4vw,42px);margin:0 0 18px;color:var(--navy);letter-spacing:-.7px}
-    .lead{font-size:18px;max-width:820px;color:#394855}
-    .columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:34px;margin-top:30px}
-    .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:24px}
-    .card h3{margin:0 0 10px;color:var(--navy)}
-    .history{font-weight:800;color:var(--blue);font-size:20px;margin-top:24px}
-    .developer strong{color:var(--navy)}
-    .quote{font-size:26px;line-height:1.3;color:var(--navy);font-weight:700;max-width:840px;margin:0}
-    footer{background:var(--dark);color:#aebdca;padding:34px 0;font-size:13px}
+    .section-kicker{text-transform:uppercase;letter-spacing:1.4px;font-size:12px;font-weight:800;color:var(--blue);margin-bottom:8px}
+    h2{font-size:clamp(30px,4vw,44px);margin:0 0 18px;color:var(--navy);letter-spacing:-.8px}
+    .lead{font-size:18px;max-width:860px;color:#394b59}
+
+    .feature-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin-top:34px}
+    .feature-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:23px 21px;box-shadow:0 6px 18px rgba(23,59,87,.045)}
+    .feature-icon{width:38px;height:38px;border-radius:10px;background:var(--soft);display:grid;place-items:center;color:var(--blue);font-weight:900;margin-bottom:14px;border:1px solid #d9e8f1}
+    .feature-card h3{margin:0 0 9px;color:var(--navy);font-size:17px}
+    .feature-card p{margin:0;color:var(--muted);font-size:14px}
+
+    .history-panel{display:grid;grid-template-columns:1fr auto;gap:36px;align-items:center;margin-top:30px;padding:28px;border:1px solid var(--line);border-radius:15px;background:#fff;box-shadow:0 6px 22px rgba(23,59,87,.05)}
+    .history{font-weight:900;color:var(--blue);font-size:21px;white-space:nowrap}
+
+    .developer-grid{display:grid;grid-template-columns:.82fr 1.18fr;gap:44px;align-items:start}
+    .developer-card{border:1px solid var(--line);border-radius:15px;padding:26px;background:linear-gradient(180deg,#fbfdfe,#f4f8fb)}
+    .developer-name{font-size:26px;font-weight:900;color:var(--navy);margin:0 0 6px}
+    .developer-role{font-size:14px;color:var(--blue);font-weight:800;margin:0 0 16px}
+    .developer-meta{font-size:14px;color:var(--muted);margin:4px 0}
+
+    .philosophy{background:linear-gradient(110deg,#edf4f8 0%,#f8fbfc 100%)}
+    .quote{font-size:clamp(28px,4vw,44px);line-height:1.22;color:var(--navy);font-weight:800;max-width:930px;margin:0 0 20px;letter-spacing:-.6px}
+    .cta-panel{margin-top:30px;padding:28px;border-radius:16px;background:#173b57;color:#fff;display:flex;justify-content:space-between;align-items:center;gap:24px}
+    .cta-panel h3{margin:0 0 6px;font-size:22px}.cta-panel p{margin:0;color:#d4e1ea}.cta-panel .btn{background:#fff;color:var(--navy);white-space:nowrap}
+
+    footer{background:var(--dark);color:#aebdca;padding:36px 0;font-size:13px}
     footer strong{color:#fff}
     .footer-row{display:flex;justify-content:space-between;gap:24px;align-items:flex-start}
-    @media(max-width:800px){nav a:not(.nav-cta){display:none}.hero-grid,.columns{grid-template-columns:1fr}.hero{padding:54px 0 60px}.hero-card{padding:20px}.footer-row{flex-direction:column}.brand img{width:175px}}
+
+    @media(max-width:960px){.feature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.developer-grid{grid-template-columns:1fr}.history-panel{grid-template-columns:1fr}.history{white-space:normal}}
+    @media(max-width:800px){nav a:not(.nav-cta){display:none}.hero-grid{grid-template-columns:1fr}.hero{padding:58px 0 64px}.hero-card{padding:22px}.footer-row,.cta-panel{flex-direction:column;align-items:flex-start}.brand img{width:235px;max-width:58vw}}
+    @media(max-width:560px){.feature-grid{grid-template-columns:1fr}.wrap{width:min(100% - 28px,1140px)}.nav{min-height:80px}.nav-cta{padding:9px 12px;font-size:12px}.brand img{width:205px}}
   </style>
 </head>
 <body>
 <header>
   <div class="wrap nav">
-    <a class="brand" href="/home"><img src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI"></a>
+    <a class="brand" href="/"><img src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Cornea Ectasia Risk Assessment Intelligence"></a>
     <nav aria-label="Primary navigation">
       <a href="#about">About</a>
       <a href="#science">Scientific Basis</a>
+      <a href="#developer">Developer</a>
       <a class="nav-cta" href="/app">Access CER-AI</a>
     </nav>
   </div>
@@ -70,10 +103,11 @@
         <div class="eyebrow">Clinical decision support for refractive surgery</div>
         <h1>CER-AI</h1>
         <div class="subtitle">Cornea Ectasia Risk Assessment Intelligence</div>
-        <p>Structured preoperative ectasia risk assessment combining independent risk pathways, Pentacam-derived data, tissue-safety calculations, and procedure-specific safeguards.</p>
+        <p>Structured preoperative ectasia risk assessment combining independent ectasia-risk pathways, Pentacam-derived data, tissue-safety calculations, and procedure-specific safeguards.</p>
+        <p>Designed to make refractive-surgery screening more structured, transparent, and reproducible without replacing surgeon judgment.</p>
         <div class="actions">
-          <a class="btn btn-primary" href="#about">Learn More</a>
-          <a class="btn btn-secondary" href="/app">Access CER-AI</a>
+          <a class="btn btn-primary" href="/app">Access CER-AI</a>
+          <a class="btn btn-secondary" href="#about">Learn More</a>
         </div>
       </div>
       <aside class="hero-card">
@@ -84,43 +118,58 @@
     </div>
   </section>
 
-  <section id="about">
+  <section id="science" class="alt">
     <div class="wrap">
-      <h2>From HC Ectasia App to CER-AI</h2>
-      <p class="lead">The project began as HC Ectasia App, a focused ectasia-screening tool. As it expanded to include multiple risk systems, Pentacam integration, tissue calculations, surgical eligibility, reporting, and planning support, it evolved into CERAI and subsequently the current CER-AI platform.</p>
-      <div class="history">HC Ectasia App → CERAI → CER-AI</div>
-    </div>
-  </section>
-
-  <section class="alt" id="science">
-    <div class="wrap">
+      <div class="section-kicker">Clinical architecture</div>
       <h2>How CER-AI Works</h2>
-      <div class="columns">
-        <div class="card">
-          <h3>Independent assessment pathways</h3>
-          <p>Randleman / ERSS, Final BAD-D, CER-AI-adapted NICE, PS3, and tissue-safety calculations are evaluated without collapsing them into one unsupported score.</p>
-        </div>
-        <div class="card">
-          <h3>Pentacam source control</h3>
-          <p>Important measurements are linked to defined Pentacam source fields. Missing or conflicting information is identified explicitly rather than silently inferred.</p>
-        </div>
+      <p class="lead">CER-AI separates ectasia-risk assessment from surgical tissue safety and keeps major clinical pathways independently interpretable.</p>
+      <div class="feature-grid">
+        <div class="feature-card"><div class="feature-icon">01</div><h3>Independent Risk Pathways</h3><p>Randleman / ERSS, Final BAD-D, CER-AI-adapted NICE, and PS3 remain distinct rather than being collapsed into a single unsupported score.</p></div>
+        <div class="feature-card"><div class="feature-icon">02</div><h3>Pentacam-Based Structure</h3><p>Important measurements are linked to defined Pentacam source fields and handled consistently across the assessment.</p></div>
+        <div class="feature-card"><div class="feature-icon">03</div><h3>Safety Calculations</h3><p>Tissue safety, pachymetry, treatment magnitude, and procedure-specific constraints are evaluated separately from ectasia scoring.</p></div>
+        <div class="feature-card"><div class="feature-icon">04</div><h3>Transparent Reporting</h3><p>Missing or conflicting information is identified explicitly and the reasoning behind the assessment is documented.</p></div>
       </div>
     </div>
   </section>
 
-  <section>
-    <div class="wrap developer">
-      <h2>Developer and Clinical Lead</h2>
-      <p class="lead"><strong>Hüseyin Cengiz, M.D.</strong> conceived and developed CER-AI from approximately 30 years of clinical and surgical experience in ophthalmology, including refractive, cataract, and vitreoretinal surgery. He is the founder of Vision Eye Hospital and served as Chief Director and Lead Surgeon.</p>
-      <p class="lead">CER-AI grew from the effort to translate decades of clinical refractive-surgery decision-making into a structured digital framework.</p>
+  <section id="about">
+    <div class="wrap">
+      <div class="section-kicker">Project history</div>
+      <h2>From HC Ectasia App to CER-AI</h2>
+      <div class="history-panel">
+        <p class="lead" style="margin:0">The project began as HC Ectasia App, a focused ectasia-screening tool. As it expanded to include multiple risk systems, Pentacam integration, tissue calculations, surgical eligibility, reporting, and planning support, it evolved into CERAI and subsequently the current CER-AI platform.</p>
+        <div class="history">HC Ectasia App → CERAI → CER-AI</div>
+      </div>
     </div>
   </section>
 
-  <section class="alt">
+  <section id="developer" class="alt">
+    <div class="wrap developer-grid">
+      <div class="developer-card">
+        <div class="section-kicker">Developer and Clinical Lead</div>
+        <p class="developer-name">Hüseyin Cengiz, M.D.</p>
+        <p class="developer-role">Ophthalmic Surgeon · Developer of CER-AI</p>
+        <p class="developer-meta">Approximately 30 years of clinical and surgical ophthalmology experience</p>
+        <p class="developer-meta">Refractive · Cataract · Vitreoretinal Surgery</p>
+        <p class="developer-meta">Founder, Vision Eye Hospital</p>
+      </div>
+      <div>
+        <h2>Clinician-led development</h2>
+        <p class="lead">CER-AI was conceived and developed by Hüseyin Cengiz, M.D. from the effort to translate decades of refractive-surgery decision-making into a structured digital framework.</p>
+        <p class="lead">The platform continues to evolve through the interaction of clinical practice, published evidence, and structured software validation.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="philosophy">
     <div class="wrap">
+      <div class="section-kicker">Clinical philosophy</div>
       <p class="quote">Artificial intelligence should support clinical judgment, not replace it.</p>
       <p class="lead">CER-AI organizes and cross-checks clinical information, applies predefined safety rules, and documents the reasoning behind an assessment. The final surgical decision always remains with the surgeon.</p>
-      <div class="actions"><a class="btn btn-primary" style="background:#173b57;color:#fff" href="/app">Access the Clinical Application</a></div>
+      <div class="cta-panel">
+        <div><h3>For ophthalmic surgeons</h3><p>Open the secure clinical application to begin a CER-AI assessment.</p></div>
+        <a class="btn" href="/app">Access CER-AI</a>
+      </div>
     </div>
   </section>
 </main>
@@ -128,7 +177,7 @@
 <footer>
   <div class="wrap footer-row">
     <div><strong>CER-AI — Cornea Ectasia Risk Assessment Intelligence</strong><br>Developed by Hüseyin Cengiz, M.D.</div>
-    <div>© CER-AI. All rights reserved.<br>Final responsibility remains with the treating surgeon.</div>
+    <div>© CER-AI. All rights reserved.<br>Final responsibility always belongs to the surgeon.</div>
   </div>
 </footer>
 </body>
