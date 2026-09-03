@@ -33,12 +33,18 @@ def make_client():
     return TestClient(app, base_url="https://testserver", follow_redirects=False), core
 
 
-def test_unauthenticated_root_redirects_to_login_page():
+def test_unauthenticated_clinical_app_redirects_to_login_page():
+    client, _core = make_client()
+    response = client.get("/app")
+    assert response.status_code == 303
+    assert response.headers["location"] == "/auth/login-page?next=/app"
+    assert response.headers["x-frame-options"] == "DENY"
+
+
+def test_public_root_is_not_intercepted_by_named_user_gate():
     client, _core = make_client()
     response = client.get("/")
-    assert response.status_code == 303
-    assert response.headers["location"] == "/auth/login-page?next=/"
-    assert response.headers["x-frame-options"] == "DENY"
+    assert response.status_code == 404
 
 
 def test_login_page_exists_and_does_not_store_password_in_browser_storage():
@@ -68,10 +74,10 @@ def test_trial_login_page_requests_doctor_name_without_password():
     assert "localStorage" not in text
 
 
-def test_authenticated_root_injects_archive_navigation_and_escapes_display_name():
+def test_authenticated_clinical_app_injects_archive_navigation_and_escapes_display_name():
     client, _core = make_client()
     client.cookies.set("cer_ai_session", "valid")
-    response = client.get("/")
+    response = client.get("/app")
     assert response.status_code == 200
     assert "Case Archive" in response.text
     assert "Doctor &lt;One&gt;" in response.text
