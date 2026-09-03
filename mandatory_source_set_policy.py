@@ -6,9 +6,11 @@ present. The optional excimer treatment card does not participate in this gate.
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
 
 from fastapi import HTTPException
+from pentacam_field_registry import CORNEA_FRONT_KERATOMETRY_SOURCE
 
 
 MANDATORY_LABELS = (
@@ -23,7 +25,9 @@ _previous_merge_extractions = None
 
 
 def _norm(value: Any) -> str:
-    return re.sub(r"[^A-Z0-9]+", "_", str(value or "").upper()).strip("_")
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    return re.sub(r"[^A-Z0-9]+", "_", text.upper()).strip("_")
 
 
 def _screen_tokens(result: dict[str, Any]) -> set[str]:
@@ -39,24 +43,33 @@ def _screen_tokens(result: dict[str, Any]) -> set[str]:
 
 
 def _eyes(result: dict[str, Any]) -> set[str]:
-    return {
+    eyes = {
         str(eye.get("eye") or "").upper()
         for eye in result.get("eyes") or []
         if str(eye.get("eye") or "").upper() in {"OD", "OS"}
     }
+    context_laterality = str((result.get("document_context") or {}).get("laterality") or "").upper()
+    if context_laterality in {"OD", "OS"}:
+        eyes.add(context_laterality)
+    return eyes
 
 
 def _is_four_maps(tokens: set[str]) -> bool:
     return any(
-        token == "FOUR_MAPS_REFRACTIVE"
-        or ("FOUR" in token and "MAP" in token and "REFRACT" in token)
+        token in {"FOUR_MAPS_REFRACTIVE", "4_MAPS_REFRACTIVE", "PENTACAM_4_MAPS_REFRACTIVE"}
+        or (("FOUR" in token or re.search(r"(^|_)4(_|$)", token)) and "MAP" in token and "REFRACT" in token)
         for token in tokens
     )
 
 
 def _is_bad_display(tokens: set[str]) -> bool:
     return any(
-        token in {"BAD_DISPLAY", "BELIN_AMBROSIO_DISPLAY", "BELIN_AMBROSIO_ENHANCED_ECTASIA_DISPLAY"}
+        token in {
+            "BAD_DISPLAY",
+            "BELIN_AMBROSIO_DISPLAY",
+            "BELIN_AMBROSIO_ENHANCED_ECTASIA_DISPLAY",
+            "BELIN_AMBROSIO_ENHANCED_ECTASIA",
+        }
         or ("BELIN" in token and "AMBROSIO" in token)
         or ("ENHANCED" in token and "ECTASIA" in token and "DISPLAY" in token)
         for token in tokens
@@ -65,10 +78,35 @@ def _is_bad_display(tokens: set[str]) -> bool:
 
 def _is_show_two_topometric(tokens: set[str]) -> bool:
     return any(
-        token == "SHOW_2_EXAMS_TOPOMETRIC"
-        or ("SHOW" in token and "2" in token and "EXAM" in token and "TOPOMETRIC" in token)
+        token in {"SHOW_2_EXAMS_TOPOMETRIC", "SHOW_TWO_EXAMS_TOPOMETRIC"}
+        or (
+            "SHOW" in token
+            and ("2" in token or "TWO" in token)
+            and "EXAM" in token
+            and "TOPOMETRIC" in token
+        )
         for token in tokens
     )
+
+
+def _has_show_two_numeric_signature(result: dict[str, Any]) -> bool:
+    """Recognize Show 2 Exams from its source-locked Cornea Front values."""
+    for eye in result.get("eyes") or []:
+        if eye.get("keratometry_source") == CORNEA_FRONT_KERATOMETRY_SOURCE:
+            return True
+    return False
+
+
+def _has_bad_display_signature(result: dict[str, Any]) -> bool:
+    """Recognize BAD Display when its dedicated labeled fields were transcribed."""
+    for reading in result.get("nice_readings") or []:
+        if reading.get("b_ele_th_page") == "BAD_DISPLAY":
+            return True
+    for eye in result.get("eyes") or []:
+        verified = set(eye.get("table_verified_numeric_fields") or [])
+        if "BAD_D" in verified and eye.get("BAD_D") is not None:
+            return True
+    return False
 
 
 def _is_treatment_card(result: dict[str, Any], tokens: set[str]) -> bool:
@@ -96,17 +134,20 @@ def classify_source_set(results: list[dict[str, Any]]) -> dict[str, Any]:
                 if label in present:
                     present[label] = True
                     recognized_this_image = True
-        if _is_bad_display(tokens):
+
+        if _is_bad_display(tokens) or _has_bad_display_signature(result):
             for eye in eyes:
                 label = f"{eye} Belin/Ambrosio Display"
                 if label in present:
                     present[label] = True
                     recognized_this_image = True
-        if _is_show_two_topometric(tokens):
-            # One Show 2 Exams Topometric screenshot is the required source.
-            # Per-eye numeric completeness is checked later by the existing field/readiness gates.
+
+        if _is_show_two_topometric(tokens) or _has_show_two_numeric_signature(result):
+            # One bilateral Show 2 Exams Topometric screenshot is the required source.
+            # Per-eye numeric completeness is checked later by existing field/readiness gates.
             present["Show 2 Exams Topometric"] = True
             recognized_this_image = True
+
         if _is_treatment_card(result, tokens):
             treatment_cards += 1
         if recognized_this_image:
