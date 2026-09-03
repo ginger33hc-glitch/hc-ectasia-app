@@ -1,6 +1,6 @@
 """Named-user web UI routing kept outside the clinical frontend and decision engine.
 
-When named-user authentication is enabled, unauthenticated visits to the main application or archive
+When named-user authentication is enabled, unauthenticated visits to the clinical application or archive
 page are redirected to a dedicated login page. The existing clinical HTML is served unchanged except
 for a small authenticated navigation/session script injected at response time.
 """
@@ -91,7 +91,7 @@ def install(core: Any) -> None:
         @core.app.middleware("http")
         async def named_user_page_gate(request, call_next):
             path = request.url.path
-            if request.method == "GET" and path in {"/", "/archive-ui"}:
+            if request.method == "GET" and path in {"/app", "/archive-ui"}:
                 principal = core._cerai_authenticate_request(request)
                 if principal is None:
                     destination = "/auth/login-page?next=" + quote(path, safe="/")
@@ -99,7 +99,7 @@ def install(core: Any) -> None:
                         RedirectResponse(destination, status_code=303),
                         path,
                     )
-                if path == "/":
+                if path == "/app":
                     response = HTMLResponse(
                         _authenticated_root_html(principal.display_name),
                         headers={"Cache-Control": "no-store"},
