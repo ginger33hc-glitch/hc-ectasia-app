@@ -31,6 +31,7 @@ import microkeratome_planning_policy  # noqa: E402
 import erss_numeric_extraction_policy  # noqa: E402
 import erss_topography_evidence_policy  # noqa: E402
 import ps3_extraction_policy  # noqa: E402
+import mandatory_source_set_policy  # noqa: E402
 import ps3_runtime_policy  # noqa: E402
 import ps3_report_policy  # noqa: E402
 import microkeratome_report_policy  # noqa: E402
@@ -75,6 +76,7 @@ COMPOSITION_PHASES = {
         "erss_numeric_extraction_policy",
         "erss_topography_evidence_policy",
         "ps3_extraction_policy",
+        "mandatory_source_set_policy",
         "pentacam_targeted_reread",
         "rmin_front_source_policy",
         "erss_auto_read_policy",
@@ -124,6 +126,7 @@ def compose(version: str):
     microkeratome_planning_policy.install(core)
     nice_policy.install(core)
     ps3_extraction_policy.install(core)
+    mandatory_source_set_policy.install(core)
     ps3_runtime_policy.install(core)
     assessment_workflow.install(core)
     user_access.install(core)
