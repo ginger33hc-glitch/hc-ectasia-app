@@ -1,13 +1,6 @@
-"""Production adapter for the independent PS3 policy.
-
-PS3 remains a separate result channel. It never rewrites Randleman, BAD-D, or
-NICE scores. It may only restrict the currently selected procedure according
-to the PS3 decision matrix.
-"""
+"""Production adapter for the independent PS3 policy."""
 from dataclasses import asdict
-
 from ps3_policy import DEFER, PS3EyeInput, PS3InterEyeInput, evaluate_ps3
-
 
 _previous_hc_engine = None
 _installed_hc_engine = None
@@ -57,20 +50,41 @@ def _inter_eye(source):
         return None
     od, os = source["OD"], source["OS"]
     return PS3InterEyeInput(
-        od_anterior_km_d=od.get("Kmean_D"),
-        os_anterior_km_d=os.get("Kmean_D"),
-        od_posterior_km_d=od.get("posterior_Kmean_D"),
-        os_posterior_km_d=os.get("posterior_Kmean_D"),
-        od_thinnest_um=od.get("pachy_thinnest_um"),
-        os_thinnest_um=os.get("pachy_thinnest_um"),
-        od_front_elevation_thinnest_um=od.get("F_Ele_Th_um"),
-        os_front_elevation_thinnest_um=os.get("F_Ele_Th_um"),
-        od_back_elevation_thinnest_um=od.get("B_Ele_Th_um"),
-        os_back_elevation_thinnest_um=os.get("B_Ele_Th_um"),
+        od.get("Kmean_D"),
+        os.get("Kmean_D"),
+        od.get("posterior_Kmean_D"),
+        os.get("posterior_Kmean_D"),
+        od.get("pachy_thinnest_um"),
+        os.get("pachy_thinnest_um"),
+        od.get("F_Ele_Th_um"),
+        os.get("F_Ele_Th_um"),
+        od.get("B_Ele_Th_um"),
+        os.get("B_Ele_Th_um"),
     )
 
 
+def _surgeon_confirmed_srax(eye):
+    value = str(eye.get("srax") or "").upper()
+    if value not in {"YES", "NO"}:
+        return None
+    provenance = (eye.get("field_provenance") or {}).get("srax") or []
+    if any(
+        isinstance(item, dict)
+        and str(item.get("source") or "").upper() == "SURGEON_CONFIRMED"
+        for item in provenance
+    ):
+        return value
+    return None
+
+
 def _eye_input(eye, plan):
+    # Numeric SRAX is source-locked by extraction to the Axial/Sagittal Curvature
+    # (Front) map. A categorical YES/NO without a numeric value is accepted only
+    # when it came from the explicit surgeon Front-map confirmation workflow.
+    srax_deg = eye.get("srax_deg") if _finite(eye.get("srax_deg")) else None
+    categorical_srax = None
+    if srax_deg is None:
+        categorical_srax = _surgeon_confirmed_srax(eye)
     return PS3EyeInput(
         anterior_km_d=eye.get("Kmean_D"),
         thinnest_um=eye.get("pachy_thinnest_um"),
@@ -79,17 +93,13 @@ def _eye_input(eye, plan):
         manifest_astig_d=_manifest_astig(plan),
         manifest_axis_deg=_manifest_axis(plan),
         ppi_avg=eye.get("PPI_avg"),
-        kmax_d=eye.get("Kmax_D"),
-        i_s_d=eye.get("I_S"),
-        kisa_percent=eye.get("KISA"),
-        # Main BFS/BFTE PS3 elevation inputs intentionally remain unbound until
-        # their distinct labeled boxes are mapped unambiguously. F.Ele.Th and
-        # B.Ele.Th are used for the agreed inter-eye comparison only.
+        srax=categorical_srax,
+        srax_deg=srax_deg,
         refractive_group=_refractive_group(plan),
     )
 
 
-def _selected_procedure_disposition(result, procedure):
+def _selected(result, procedure):
     procedure = str(procedure or "").upper()
     if procedure == "PRK":
         return result.disposition.prk
@@ -100,7 +110,7 @@ def _selected_procedure_disposition(result, procedure):
     return None
 
 
-def _procedure_summary(result):
+def _summary(result):
     return (
         f"PRK {result.disposition.prk}; SMILE {result.disposition.smile}; "
         f"LASIK {result.disposition.lasik}"
@@ -110,8 +120,9 @@ def _procedure_summary(result):
 def hc_engine_with_ps3(extracted, age, eye_plans, patient_modifiers, patient_metadata=None):
     if _previous_hc_engine is None or _runtime_core is None:
         raise RuntimeError("PS3 runtime adapter was not initialized")
-
-    decision = _previous_hc_engine(extracted, age, eye_plans, patient_modifiers, patient_metadata)
+    decision = _previous_hc_engine(
+        extracted, age, eye_plans, patient_modifiers, patient_metadata
+    )
     source = {
         item.get("eye"): item
         for item in extracted.get("eyes", [])
@@ -123,55 +134,64 @@ def hc_engine_with_ps3(extracted, age, eye_plans, patient_modifiers, patient_met
         eye_name = eye_result.get("eye")
         eye = source.get(eye_name)
         plan = eye_plans.get(eye_name, {})
-        if not eye or eye_result.get("status") == "POST-REFRACTIVE PATHWAY REQUIRED" or plan.get("prior") != "no":
+        if (
+            not eye
+            or eye_result.get("status") == "POST-REFRACTIVE PATHWAY REQUIRED"
+            or plan.get("prior") != "no"
+        ):
             eye_result["ps3"] = {
                 "applicable": False,
                 "reason": "PS3 virgin-cornea pathway not applicable.",
             }
             continue
 
-        ps3 = evaluate_ps3(_eye_input(eye, plan), bilateral)
-        payload = asdict(ps3)
+        result = evaluate_ps3(_eye_input(eye, plan), bilateral)
+        payload = asdict(result)
         payload["applicable"] = True
-        payload["derived_srax_label"] = "DERIVED SRAX — not directly reported by Pentacam"
+        payload["srax_source"] = "AXIAL_SAGITTAL_CURVATURE_FRONT_ONLY"
         eye_result["ps3"] = payload
-
         eye_result.setdefault("reasons", []).append(
-            f"PS3: {ps3.moderate_count} moderate, {ps3.high_count} high risk factor(s); "
-            f"{_procedure_summary(ps3)}."
+            f"PS3: {result.moderate_count} moderate, {result.high_count} high risk factor(s); "
+            f"{_summary(result)}."
         )
         eye_result.setdefault("warnings", []).extend(
-            f"PS3 surgeon review required: {note}" for note in ps3.review_notes
+            f"PS3 surgeon review required: {note}" for note in result.review_notes
         )
+        if any(
+            finding.key == "srax" and finding.status == "NOT_EVALUATED"
+            for finding in result.findings
+        ):
+            eye_result.setdefault("warnings", []).append(
+                "SRAX surgeon confirmation required: on the Axial/Sagittal Curvature (Front) map, "
+                "is skewed axis >20°?"
+            )
 
-        selected = _selected_procedure_disposition(ps3, plan.get("procedure"))
-        if selected == DEFER:
+        if _selected(result, plan.get("procedure")) == DEFER:
             reason = (
                 f"PS3 DEFER for selected {str(plan.get('procedure') or '').upper()}: "
-                f"{ps3.moderate_count} moderate, {ps3.high_count} high risk factor(s)."
+                f"{result.moderate_count} moderate, {result.high_count} high risk factor(s)."
             )
             eye_result.setdefault("hard_stops", []).append(reason)
             eye_result.setdefault("reasons", []).append(reason)
-            eye_result["status"] = _runtime_core.combine_status(eye_result["status"], "STOP-DEFER")
+            eye_result["status"] = _runtime_core.combine_status(
+                eye_result["status"], "STOP-DEFER"
+            )
             eye_result["action"] = "STOP-DEFER — selected procedure is not allowed by PS3."
-
-        decision["status"] = _runtime_core.combine_status(decision["status"], eye_result["status"])
+        decision["status"] = _runtime_core.combine_status(
+            decision["status"], eye_result["status"]
+        )
 
     decision["ps3_method_note"] = (
-        "PS3 is reported independently. Corneal Thickness Map morphology, Relative Thickness Map, "
-        "and PTI/CTSP profile morphology are not automatically evaluated and require surgeon review."
+        "PS3 is independent. SRAX is accepted only from the Axial/Sagittal Curvature (Front) map "
+        "or explicit surgeon confirmation; inverse-KISA SRAX is prohibited."
     )
     return decision
 
 
 def install(core):
-    global _previous_hc_engine
-    global _installed_hc_engine
-    global _runtime_core
-
+    global _previous_hc_engine, _installed_hc_engine, _runtime_core
     if getattr(core, "_cerai_ps3_runtime_installed", False):
         return
-
     _runtime_core = core
     _previous_hc_engine = core.hc_engine
     _installed_hc_engine = hc_engine_with_ps3

@@ -17,12 +17,11 @@ def _eye(name="OD", km=47.0, ppi=1.1):
         "pachy_thinnest_um": 520 if name == "OD" else 525,
         "topographic_astig_D": 1.0,
         "topographic_steep_axis_deg": 0.0,
-        "Kmax_D": 47.0,
-        "I_S": 0.4,
-        "KISA": 5.0,
         "PPI_avg": ppi,
         "F_Ele_Th_um": 2.0 if name == "OD" else 3.0,
         "B_Ele_Th_um": 5.0 if name == "OD" else 8.0,
+        "srax": "NO",
+        "srax_deg": 10.0,
     }
 
 
@@ -90,6 +89,7 @@ def test_ps3_runtime_keeps_single_moderate_prk_allowed_without_rewriting_upstrea
     assert od["ps3"]["high_count"] == 0
     assert od["ps3"]["disposition"]["prk"] == "ALLOWED"
     assert od["ps3"]["disposition"]["lasik"] == "DEFER"
+    assert od["ps3"]["srax_source"] == "AXIAL_SAGITTAL_CURVATURE_FRONT_ONLY"
     assert od["status"] == "PASS"
     assert od["hard_stops"] == []
     assert any(reason.startswith("PS3:") for reason in od["reasons"])
@@ -142,3 +142,35 @@ def test_runtime_marks_three_unread_morphology_domains_for_surgeon_review():
     notes = decision["eyes"][0]["ps3"]["review_notes"]
     assert len(notes) == 3
     assert all("surgeon review required" in note.lower() for note in notes)
+
+
+def test_front_map_srax_more_than_20_is_high_and_defers_selected_prk():
+    core = SimpleNamespace(hc_engine=_base_engine, combine_status=_combine)
+    ps3_runtime_policy.install(core)
+    od = _eye("OD")
+    od.update({"srax": "YES", "srax_deg": 20.1})
+    decision = core.hc_engine({"eyes": [od, _eye("OS")]}, 35, {"OD": _plan("PRK"), "OS": _plan("PRK")}, {})
+    result = decision["eyes"][0]
+    srax = next(f for f in result["ps3"]["findings"] if f["key"] == "srax")
+    assert srax["status"] == "HIGH"
+    assert result["status"] == "STOP-DEFER"
+
+
+def test_exact_20_is_not_high_and_unresolved_srax_requests_confirmation():
+    core = SimpleNamespace(hc_engine=_base_engine, combine_status=_combine)
+    ps3_runtime_policy.install(core)
+    boundary = _eye("OD")
+    boundary.update({"srax": "NO", "srax_deg": 20.0})
+    decision = core.hc_engine({"eyes": [boundary, _eye("OS")]}, 35, {"OD": _plan(), "OS": _plan()}, {})
+    srax = next(f for f in decision["eyes"][0]["ps3"]["findings"] if f["key"] == "srax")
+    assert srax["status"] == "NORMAL"
+
+    core2 = SimpleNamespace(hc_engine=_base_engine, combine_status=_combine)
+    ps3_runtime_policy.install(core2)
+    unresolved = _eye("OD")
+    unresolved.update({"srax": "UNCERTAIN", "srax_deg": None})
+    decision2 = core2.hc_engine({"eyes": [unresolved, _eye("OS")]}, 35, {"OD": _plan(), "OS": _plan()}, {})
+    od = decision2["eyes"][0]
+    srax2 = next(f for f in od["ps3"]["findings"] if f["key"] == "srax")
+    assert srax2["status"] == "NOT_EVALUATED"
+    assert any("SRAX surgeon confirmation required" in warning for warning in od["warnings"])

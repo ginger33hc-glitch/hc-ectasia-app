@@ -9,7 +9,6 @@ from ps3_policy import (
     NOT_EVALUATED,
     PS3EyeInput,
     PS3InterEyeInput,
-    derive_srax_deg,
     evaluate_ps3,
 )
 
@@ -27,9 +26,8 @@ def normal_eye(**overrides):
         manifest_astig_d=1.0,
         manifest_axis_deg=5.0,
         ppi_avg=1.1,
-        kmax_d=47.0,
-        i_s_d=0.4,
-        kisa_percent=5.0,
+        srax="NO",
+        srax_deg=10.0,
         bfte_front_um=8.0,
         bfte_back_um=10.0,
         refractive_group="MYOPIC_EMMETROPIC",
@@ -173,15 +171,26 @@ def test_unread_morphologies_are_explicitly_not_evaluated_and_do_not_count_as_no
     assert len(result.review_notes) == 3
 
 
-def test_derived_srax_uses_agreed_kmax_kisa_i_s_astig_operational_formula():
-    value = derive_srax_deg(kisa_percent=120, kmax_d=49.2, i_s_d=2.0, astig_d=2.0)
-    assert value == pytest.approx(45.0)
+def test_srax_exactly_20_is_not_high_but_more_than_20_is_high():
+    boundary = evaluate_ps3(normal_eye(srax="NO", srax_deg=20.0), normal_inter_eye())
+    assert finding(boundary, "srax").status == NORMAL
+    assert boundary.srax_deg == pytest.approx(20.0)
+
+    high = evaluate_ps3(normal_eye(srax="YES", srax_deg=20.01), normal_inter_eye())
+    assert finding(high, "srax").status == HIGH
+    assert high.srax_deg == pytest.approx(20.01)
 
 
-def test_derived_srax_above_22_is_high_and_invalid_over_180_is_not_evaluated():
-    high = evaluate_ps3(normal_eye(kisa_percent=60.0, kmax_d=49.2, i_s_d=2.0, topographic_astig_d=2.0), normal_inter_eye())
-    assert finding(high, "derived_srax").status == HIGH
+def test_srax_unavailable_is_not_evaluated_and_requests_surgeon_review():
+    result = evaluate_ps3(normal_eye(srax="UNCERTAIN", srax_deg=None), normal_inter_eye())
+    item = finding(result, "srax")
+    assert item.status == NOT_EVALUATED
+    assert "Axial/Sagittal Curvature (Front)" in item.detail
+    assert "ask surgeon" in item.detail.lower()
 
-    invalid = evaluate_ps3(normal_eye(kisa_percent=1000.0, kmax_d=47.0, i_s_d=0.1, topographic_astig_d=0.1), normal_inter_eye())
-    assert invalid.derived_srax_deg is None
-    assert finding(invalid, "derived_srax").status == NOT_EVALUATED
+
+def test_binary_front_map_or_surgeon_confirmation_is_supported_without_numeric_srax():
+    high = evaluate_ps3(normal_eye(srax="YES", srax_deg=None), normal_inter_eye())
+    normal = evaluate_ps3(normal_eye(srax="NO", srax_deg=None), normal_inter_eye())
+    assert finding(high, "srax").status == HIGH
+    assert finding(normal, "srax").status == NORMAL

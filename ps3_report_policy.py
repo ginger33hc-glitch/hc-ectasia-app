@@ -1,128 +1,34 @@
-"""PS3 presentation adapter for CER-AI PDF/DOCX reports.
-
-The report builders remain untouched. This module extends their shared metric
-and finding seams so PDF and DOCX stay aligned. PS3 remains an independent
-risk channel and is never added to Randleman/ERSS, BAD-D, or NICE.
-"""
-
-
-def _procedure_summary(ps3):
-    disposition = ps3.get("disposition") or {}
-    return (
-        f"PRK {disposition.get('prk', 'NOT EVALUATED')} / "
-        f"SMILE {disposition.get('smile', 'NOT EVALUATED')} / "
-        f"LASIK {disposition.get('lasik', 'NOT EVALUATED')}"
-    )
-
-
-def _overall_classification(ps3):
-    moderate = int(ps3.get("moderate_count") or 0)
-    high = int(ps3.get("high_count") or 0)
-    if high >= 1 or moderate >= 2:
-        return "FAIL / DEFER"
-    if moderate == 1:
-        return "MODERATE"
-    return "NO PS3 RISK FACTOR"
-
-
-def _ps3_finding_lines(ps3):
-    lines = []
-    for finding in ps3.get("findings") or []:
-        key = str(finding.get("key") or "PS3 item").replace("_", " ").title()
-        status = str(finding.get("status") or "NOT_EVALUATED")
-        detail = str(finding.get("detail") or "")
-        lines.append(f"{key}: {status}" + (f" — {detail}" if detail else ""))
-    return lines
-
-
-def _triggering_findings(ps3):
-    triggers = []
-    for finding in ps3.get("findings") or []:
-        status = str(finding.get("status") or "")
-        if status not in {"MODERATE", "HIGH"}:
-            continue
-        key = str(finding.get("key") or "PS3 item").replace("_", " ").title()
-        detail = str(finding.get("detail") or "")
-        triggers.append(f"{key}: {status}" + (f" — {detail}" if detail else ""))
-    return triggers
-
-
-def _interpretation_lines(ps3):
-    moderate = int(ps3.get("moderate_count") or 0)
-    high = int(ps3.get("high_count") or 0)
-    classification = _overall_classification(ps3)
-    procedures = _procedure_summary(ps3)
-    triggers = _triggering_findings(ps3)
-
-    if classification == "NO PS3 RISK FACTOR":
-        return [
-            "PS3 classification: NO PS3 RISK FACTOR. No Moderate or High PS3 criterion was detected among evaluated components.",
-            f"PS3 procedure disposition: {procedures}.",
-        ]
-
-    if classification == "MODERATE":
-        lines = [
-            "PS3 classification: MODERATE — exactly one Moderate PS3 risk factor was detected and no High-risk factor was detected.",
-            "PS3 procedure rule: surface ablation/PRK and SMILE remain allowed by PS3; LASIK is DEFERRED by PS3.",
-        ]
-        lines.extend(f"Triggering PS3 criterion: {item}" for item in triggers)
-        return lines
-
-    lines = [
-        f"PS3 classification: FAIL / DEFER — {moderate} Moderate and {high} High PS3 risk factor(s) detected.",
-        "PS3 procedure rule: two or more Moderate factors, or any one High factor, DEFER PRK/surface ablation, SMILE, and LASIK under PS3.",
-    ]
-    lines.extend(f"Triggering PS3 criterion: {item}" for item in triggers)
-    return lines
-
-
+"""PS3 presentation adapter for CER-AI reports."""
+def _procedure_summary(p):
+ d=p.get("disposition") or {};return f"PRK {d.get('prk','NOT EVALUATED')} / SMILE {d.get('smile','NOT EVALUATED')} / LASIK {d.get('lasik','NOT EVALUATED')}"
+def _overall_classification(p):
+ m=int(p.get("moderate_count") or 0);h=int(p.get("high_count") or 0);return "FAIL / DEFER" if h>=1 or m>=2 else "MODERATE" if m==1 else "NO PS3 RISK FACTOR"
+def _ps3_finding_lines(p):
+ return [f"{str(x.get('key') or 'PS3 item').replace('_',' ').title()}: {str(x.get('status') or 'NOT_EVALUATED')}"+(f" — {x.get('detail')}" if x.get('detail') else "") for x in p.get("findings") or []]
+def _triggering_findings(p):
+ out=[]
+ for x in p.get("findings") or []:
+  if str(x.get("status") or "") in {"MODERATE","HIGH"}:out.append(f"{str(x.get('key') or 'PS3 item').replace('_',' ').title()}: {x.get('status')}"+(f" — {x.get('detail')}" if x.get('detail') else ""))
+ return out
+def _interpretation_lines(p):
+ m=int(p.get("moderate_count") or 0);h=int(p.get("high_count") or 0);c=_overall_classification(p);pr=_procedure_summary(p);t=_triggering_findings(p)
+ if c=="NO PS3 RISK FACTOR":return ["PS3 classification: NO PS3 RISK FACTOR. No Moderate or High PS3 criterion was detected among evaluated components.",f"PS3 procedure disposition: {pr}."]
+ if c=="MODERATE":return ["PS3 classification: MODERATE — exactly one Moderate PS3 risk factor was detected and no High-risk factor was detected.","PS3 procedure rule: surface ablation/PRK and SMILE remain allowed by PS3; LASIK is DEFERRED by PS3."]+[f"Triggering PS3 criterion: {x}" for x in t]
+ return [f"PS3 classification: FAIL / DEFER — {m} Moderate and {h} High PS3 risk factor(s) detected.","PS3 procedure rule: two or more Moderate factors, or any one High factor, DEFER PRK/surface ablation, SMILE, and LASIK under PS3."]+[f"Triggering PS3 criterion: {x}" for x in t]
 def install(report_module):
-    if getattr(report_module, "_cerai_ps3_report_installed", False):
-        return
-
-    previous_metrics = report_module._eye_metrics
-    previous_findings = report_module._findings
-
-    def eye_metrics_with_ps3(eye, locale="en"):
-        rows = list(previous_metrics(eye, locale))
-        ps3 = eye.get("ps3") or {}
-        if not ps3.get("applicable"):
-            return rows
-        tr = lambda text: report_module.translate_text(text, locale)
-        moderate = ps3.get("moderate_count")
-        high = ps3.get("high_count")
-        derived = ps3.get("derived_srax_deg")
-        inter_eye = ps3.get("inter_eye_score")
-        rows.extend([
-            (tr("PS3 / classification"), tr(f"{moderate} moderate / {high} high — {_overall_classification(ps3)}")),
-            (tr("PS3 procedure disposition"), tr(_procedure_summary(ps3))),
-            (tr("PS3 inter-eye asymmetry score"), tr("Not evaluated" if inter_eye is None else f"{inter_eye}/5")),
-            (tr("PS3 derived SRAX"), tr("Not evaluated" if derived is None else f"{float(derived):.1f} degrees — derived, not directly reported by Pentacam")),
-        ])
-        return rows
-
-    def findings_with_ps3(eye, locale="en"):
-        groups = list(previous_findings(eye, locale))
-        ps3 = eye.get("ps3") or {}
-        if not ps3.get("applicable"):
-            return groups
-        tr = lambda text: report_module.translate_text(text, locale)
-        interpretation = [tr(line) for line in _interpretation_lines(ps3)]
-        ps3_lines = [tr(line) for line in _ps3_finding_lines(ps3)]
-        review_lines = [tr(str(note)) for note in ps3.get("review_notes") or []]
-
-        # These groups are intentionally appended after all existing findings so
-        # PS3 appears as a distinct final report section, analogous to the
-        # independent BAD-D / ERSS / NICE channels rather than being blended
-        # into any of them.
-        if interpretation:
-            groups.append((tr("PS3 summary and interpretation"), interpretation))
-        if ps3_lines:
-            groups.append((tr("PS3 criteria audit"), ps3_lines))
-        if review_lines:
-            groups.append((tr("PS3 surgeon review required"), review_lines))
-        return groups
-
-    report_module._eye_metrics = eye_metrics_with_ps3
-    report_module._findings = findings_with_ps3
-    report_module._cerai_ps3_report_installed = True
+ if getattr(report_module,"_cerai_ps3_report_installed",False):return
+ pm=report_module._eye_metrics;pf=report_module._findings
+ def metrics(e,locale="en"):
+  rows=list(pm(e,locale));p=e.get("ps3") or {}
+  if not p.get("applicable"):return rows
+  tr=lambda x:report_module.translate_text(x,locale);m=p.get("moderate_count");h=p.get("high_count");s=p.get("srax_deg");inter=p.get("inter_eye_score")
+  rows.extend([(tr("PS3 / classification"),tr(f"{m} moderate / {h} high — {_overall_classification(p)}")),(tr("PS3 procedure disposition"),tr(_procedure_summary(p))),(tr("PS3 inter-eye asymmetry score"),tr("Not evaluated" if inter is None else f"{inter}/5")),(tr("PS3 SRAX (Front map only)"),tr("Not evaluated — surgeon confirmation required if map cannot be classified" if s is None else f"{float(s):.1f} degrees"))]);return rows
+ def findings(e,locale="en"):
+  g=list(pf(e,locale));p=e.get("ps3") or {}
+  if not p.get("applicable"):return g
+  tr=lambda x:report_module.translate_text(x,locale);a=[tr(x) for x in _interpretation_lines(p)];b=[tr(x) for x in _ps3_finding_lines(p)];r=[tr(str(x)) for x in p.get("review_notes") or []]
+  if a:g.append((tr("PS3 summary and interpretation"),a))
+  if b:g.append((tr("PS3 criteria audit"),b))
+  if r:g.append((tr("PS3 surgeon review required"),r))
+  return g
+ report_module._eye_metrics=metrics;report_module._findings=findings;report_module._cerai_ps3_report_installed=True
