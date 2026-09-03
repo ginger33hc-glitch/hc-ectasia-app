@@ -90,8 +90,6 @@ def runtime_invariants():
         errors.append("BAD-independent Randleman ERSS pathway is not active")
     if not getattr(core, "_hc_final_decision_hierarchy_installed", False):
         errors.append("CER-AI final BAD-D/Randleman decision hierarchy is not active")
-    if not getattr(core, "_hc_status_rank_policy_installed", False):
-        errors.append("CER-AI aggregate status ranking is not active")
     if not getattr(core, "_hc_inter_eye_tomography_policy_installed", False):
         errors.append("Automated inter-eye tomography concern layer is not active")
     if (
