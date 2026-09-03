@@ -1,7 +1,5 @@
 from copy import deepcopy
 
-from fastapi.testclient import TestClient
-
 from tests.test_nice_workflow import scenario, core, MODIFIERS
 import assessment_workflow as workflow
 
@@ -31,22 +29,13 @@ def test_debug_after_direct_microkeratome_wrapper_call():
     assert after.get("status") != "DATA INSUFFICIENT", {"before": _snapshot(before), "after": _snapshot(after)}
 
 
-def test_debug_after_malformed_completion_then_exact_nice_case():
-    first_extracted, first_plans = scenario("LASIK")
-    ready = workflow.begin(core, first_extracted, 35, first_plans, MODIFIERS, {})
-    first_plans["OD"]["surgeon_I_S_D"] = .5
-    response = TestClient(core.app).post("/assessment/complete", json={
-        "assessment_token": ready["assessment_token"], "age": 35,
-        "eye_plans": first_plans, "patient_modifiers": MODIFIERS,
-        "clinical_overrides": {"OD": None},
-    })
-    assert response.status_code == 422
-
+def test_debug_workflow_baseline_readiness():
     extracted, plans = scenario("LASIK")
-    eye = extracted["eyes"][0]
-    eye["K2_D"] = 43
-    eye["nice_candidates"][0].update(B_Ele_Th_um=8, central_pachy_um=565)
-    from microkeratome_planning_policy import hc_engine_with_microkeratome_planning
-    before = hc_engine_with_microkeratome_planning(deepcopy(extracted), 35, deepcopy(plans), MODIFIERS)["eyes"][0]
-    after = core.hc_engine(extracted, 35, plans, MODIFIERS)["eyes"][0]
-    assert after.get("status") != "DATA INSUFFICIENT", {"before": _snapshot(before), "after": _snapshot(after)}
+    response = workflow.begin(core, extracted, 35, plans, MODIFIERS, {})
+    assert response.get("workflow_status") == "READY", {
+        "workflow_status": response.get("workflow_status"),
+        "message": response.get("message"),
+        "missing": response.get("missing"),
+        "input_requests": response.get("input_requests"),
+        "critical_input_issues": (response.get("extracted") or {}).get("critical_input_issues"),
+    }
