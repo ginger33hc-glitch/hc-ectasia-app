@@ -52,7 +52,6 @@ def runtime_invariants():
             )
 
     try:
-        erss = composition.erss_topography_guard
         erss_evidence = composition.erss_topography_evidence_policy
         targeted = composition.pentacam_targeted_reread
         rmin = composition.rmin_front_source_policy
@@ -61,37 +60,23 @@ def runtime_invariants():
             errors.append("Cornea Front Rmin source lock is not the active extraction layer")
         if rmin._previous_extract_one_image is not targeted.extract_one_image_with_targeted_reread:
             errors.append("Targeted Pentacam reread is not preserved immediately below Rmin source lock")
-        if targeted._previous_extract_one_image is not erss.extract_one_image_with_erss:
-            errors.append(
-                "Dedicated ERSS reader is not preserved immediately below the targeted numeric reread"
-            )
         if "Rmin_mm" in getattr(core, "MAP_FALLBACK_NUMERIC_FIELDS", ()):
             errors.append("Rmin map fallback is still enabled")
         if not getattr(core, "_cerai_rmin_front_source_installed", False):
             errors.append("Cornea Front Rmin source lock is not marked active")
         if core.merge_extractions is not new_fields.merge_extractions_with_new_fields:
             errors.append("New Pentacam labeled-field merge adapter is not the active merge layer")
-        if new_fields._previous_merge_extractions is not erss.merge_extractions_with_erss_source_guard:
-            errors.append(
-                "ERSS source-aware multi-image merge is not preserved immediately below the new-field merge adapter"
-            )
         if not getattr(core, "_cerai_ps3_merge_installed", False):
             errors.append("New Pentacam labeled-field merge adapter is not marked active")
         if core.scoring_morphology is not erss_evidence.scoring_morphology_with_i_s_evidence_gate:
-            errors.append("ERSS I-S/SRAX evidence gate is not the active morphology handoff")
+            errors.append("ERSS I-S/SRAX evidence gate is not the active numeric topography handoff")
         if core.assess_eye is not erss_evidence.assess_eye_with_i_s_evidence:
             errors.append("ERSS I-S/SRAX evidence gate is not the active eye-assessment layer")
         if core.required_tomography_missing is not erss_evidence.required_tomography_missing_with_i_s:
             errors.append("ERSS I-S/SRAX evidence gate is not the active tomography requirement layer")
-        if erss_evidence._previous_scoring_morphology is not erss.scoring_morphology_with_dedicated_source:
-            errors.append(
-                "Dedicated ERSS morphology reader is not preserved immediately below the I-S/SRAX evidence gate"
-            )
     except Exception as exc:
-        errors.append(f"ERSS/source-isolation module unavailable: {type(exc).__name__}")
+        errors.append(f"ERSS numeric evidence module unavailable: {type(exc).__name__}")
 
-    if not getattr(core, "_erss_visual_morphology_policy_installed", False):
-        errors.append("Improved ERSS visual morphology policy is not active")
     if not getattr(core, "_randleman_bad_independence_installed", False):
         errors.append("BAD-independent Randleman ERSS pathway is not active")
     if not getattr(core, "_hc_final_decision_hierarchy_installed", False):
@@ -114,7 +99,7 @@ def runtime_invariants():
     if composition.ps3_runtime_policy._installed_hc_engine is not composition.ps3_runtime_policy.hc_engine_with_ps3:
         errors.append("PS3 runtime adapter identity is invalid")
     if composition.erss_auto_read_policy._previous_hc_engine is not composition.ps3_runtime_policy.hc_engine_with_ps3:
-        errors.append("PS3 is not preserved immediately below the outer ERSS auto-read layer")
+        errors.append("PS3 is not preserved immediately below the outer ERSS cleanup layer")
     if not getattr(core, "_hc_readiness_installed", False):
         errors.append("Pre-report readiness workflow is not active")
     if not getattr(core, "_cerai_report_builders_installed", False):
@@ -136,11 +121,11 @@ def runtime_invariants():
     if not getattr(core, "_cerai_named_user_ui_installed", False):
         errors.append("Named-user archive UI boundary is not active")
     if not getattr(core, "_erss_topography_evidence_policy_installed", False):
-        errors.append("ERSS I-S/SRAX topography evidence gate is not active")
+        errors.append("ERSS I-S/SRAX numeric topography evidence gate is not active")
     if not getattr(core, "_erss_auto_read_policy_installed", False):
-        errors.append("ERSS morphology auto-read separation policy is not active")
+        errors.append("ERSS legacy morphology cleanup policy is not active")
     if core.hc_engine is not composition.erss_auto_read_policy.hc_engine_with_erss_auto_read:
-        errors.append("ERSS auto-read cleanup is not the outermost clinical engine layer")
+        errors.append("ERSS cleanup is not the outermost clinical engine layer")
     if not getattr(core, "_cerai_targeted_pentacam_reread_installed", False):
         errors.append("Targeted Pentacam numeric reread layer is not active")
     if getattr(core.lasik_topography_points, "__module__", None) != "app":
