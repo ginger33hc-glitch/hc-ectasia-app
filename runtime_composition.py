@@ -20,12 +20,10 @@ import hc_age_policy  # noqa: E402
 import hc_bad_final_policy  # noqa: F401,E402
 import merge_policy_base  # noqa: F401,E402
 import extraction_guard  # noqa: F401,E402
-import erss_topography_guard  # noqa: F401,E402
 import report_export_guard  # noqa: F401,E402
 import critical_score_highlight  # noqa: E402
 import pachymetry_policy  # noqa: F401,E402
 import randleman_bad_independence  # noqa: F401,E402
-import erss_visual_morphology_policy  # noqa: E402
 import hc_final_decision_policy  # noqa: F401,E402
 import status_rank_policy  # noqa: E402
 import inter_eye_tomography_policy  # noqa: E402
@@ -73,8 +71,6 @@ COMPOSITION_PHASES = {
     "pentacam_extraction": (
         "merge_policy_base",
         "extraction_guard",
-        "erss_topography_guard",
-        "erss_visual_morphology_policy",
         "erss_topography_evidence_policy",
         "ps3_extraction_policy",
         "pentacam_targeted_reread",
@@ -117,7 +113,6 @@ def compose(version: str):
     critical_score_highlight.install(core, reports)
     ps3_report_policy.install(reports)
     microkeratome_report_policy.install(reports)
-    erss_visual_morphology_policy.install(erss_topography_guard)
     erss_topography_evidence_policy.install(
         core,
         prior_assess_eye=bootstrap._original_assess_eye,
@@ -150,7 +145,8 @@ def compose(version: str):
     named_user_ui.install(core)
     pentacam_targeted_reread.install(core)
     rmin_front_source_policy.install(core, pentacam_targeted_reread)
-    # This cleanup must remain outside the fully installed NICE engine.
+    # This cleanup remains outside the fully installed NICE engine and removes
+    # superseded legacy morphology completion requests.
     erss_auto_read_policy.install(core)
 
     app.state.cerai_canonical_runtime_ready = True
