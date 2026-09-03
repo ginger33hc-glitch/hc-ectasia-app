@@ -23,11 +23,9 @@ def test_nice_caution_wording_is_consistent_in_reports_and_rule_documents():
     assert "5-8 = otomatik erteleme olmadan DİKKAT" in translated
     assert "≥9 = DURDUR-ERTELE" in translated
     assert "CAUTION / STOP-DEFER" not in translated
-
     browser_i18n = Path("static/i18n.js").read_text(encoding="utf-8")
     assert NOTE in browser_i18n
     assert "5-8 = otomatik erteleme olmadan DİKKAT" in browser_i18n
-
     protocol = Path("CER-AI_PROTOCOL_v0.7.md").read_text(encoding="utf-8")
     readme = Path("README.md").read_text(encoding="utf-8")
     assert "`CAUTION` always means STOP/DEFER" not in protocol
@@ -39,9 +37,6 @@ def scenario(procedure="LASIK"):
     for eye in extracted["eyes"]:
         eye["morphology_confidence"] = "HIGH"
         eye["erss_source_read"] = "DEDICATED_CURVATURE_PASS"
-        # Synthetic baseline fixture explicitly resolves the new mandatory
-        # Front-map SRAX channel as reassuring. Tests that exercise unresolved
-        # SRAX must clear these fields themselves.
         eye["srax"] = "NO"
         eye["srax_deg"] = 0.0
     plans = {eye: plan(procedure, flap=100 if procedure == "LASIK" else None) for eye in ("OD", "OS")}
@@ -109,6 +104,15 @@ def test_runtime_4_5_8_9_and_no_duplicate_erss(procedure,pe,k2,central,total,sta
     from microkeratome_planning_policy import hc_engine_with_microkeratome_planning
     before=hc_engine_with_microkeratome_planning(deepcopy(extracted),35,deepcopy(plans),MODIFIERS)["eyes"][0]
     after=core.hc_engine(extracted,35,plans,MODIFIERS)["eyes"][0]
+    if procedure == "LASIK" and after["status"] == "DATA INSUFFICIENT":
+        pytest.fail(repr({
+            "missing": after.get("missing"),
+            "reasons": after.get("reasons"),
+            "erss": after.get("randleman_erss"),
+            "evidence": after.get("erss_topography_evidence"),
+            "topography": after.get("topography_classification"),
+            "values": after.get("values"),
+        }))
     assert after["nice"]["total"]==total
     assert before.get("randleman_erss")==after.get("randleman_erss")
     assert before["score"]==after["score"]
@@ -201,9 +205,7 @@ def test_missing_manifest_bad_nice_all_prompt_together_no_report(monkeypatch):
 def test_missing_patient_age_is_requested_once_not_once_per_eye():
     extracted, plans = scenario()
     result = workflow.begin(core, extracted, None, plans, MODIFIERS, {})
-    age_requests = [
-        item for item in result["input_requests"] if item.get("form_id") == "age"
-    ]
+    age_requests = [item for item in result["input_requests"] if item.get("form_id") == "age"]
     assert len(age_requests) == 1
     assert age_requests[0]["eye"] == "PATIENT"
     assert age_requests[0]["label"] == "Patient age (years)"
@@ -245,10 +247,7 @@ def test_retired_pattern_conflict_never_requests_surgeon_selection():
         {"file": "od-a.png", "source": "VISUAL_CLASSIFICATION"},
         {"file": "od-b.png", "source": "VISUAL_CLASSIFICATION"},
     ]
-    result = workflow.begin(
-        core, extracted, 35, plans, MODIFIERS, {},
-        source_images=[(b"a", "od-a.png"), (b"b", "od-b.png")],
-    )
+    result = workflow.begin(core, extracted, 35, plans, MODIFIERS, {}, source_images=[(b"a", "od-a.png"), (b"b", "od-b.png")])
     requests = [item for item in result.get("input_requests", []) if item.get("key") == "anterior_pattern"]
     assert requests == []
     assert result["workflow_status"] == "READY", result
@@ -263,10 +262,8 @@ def test_hard_stop_does_not_skip_other_missing_questions():
 
 def test_prior_surgery_not_forced_through_nice():
     extracted,plans=scenario()
-    for eye in extracted["eyes"]:
-        eye["nice_candidates"]=[]
-    for p in plans.values():
-        p["prior"]="yes"
+    for eye in extracted["eyes"]: eye["nice_candidates"]=[]
+    for p in plans.values(): p["prior"]="yes"
     result=workflow.begin(core,extracted,35,plans,MODIFIERS,{})
     assert result["workflow_status"]=="READY"
     assert all(e["nice"]["category"]=="NOT_APPLICABLE" for e in result["decision"]["eyes"])
