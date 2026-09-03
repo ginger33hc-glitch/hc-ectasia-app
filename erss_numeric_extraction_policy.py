@@ -7,7 +7,11 @@ not an ERSS scoring authority in this adapter.
 
 _START = "Only the categorical fields that genuinely require map inspection may be produced visually:"
 _END = "For an Excimer Laser Takip Karti, extract treatment_corrections only from the row explicitly labeled"
-_REPLACEMENT = """ERSS SRAX SOURCE LOCK:
+_REPLACEMENT = """ERSS VISUAL MORPHOLOGY DISABLED:
+General ERSS/Randleman visual morphology classification is disabled. The sole permitted visual ERSS
+measurement is the source-locked SRAX geometry described below.
+
+ERSS SRAX SOURCE LOCK:
 Do not inspect or classify general anterior curvature-map morphology for ERSS/Randleman scoring.
 Do not visually score asymmetric bow-tie, inferior steepening, keratoconus pattern, forme-fruste
 pattern, PMD pattern, or any other ERSS morphology category.
