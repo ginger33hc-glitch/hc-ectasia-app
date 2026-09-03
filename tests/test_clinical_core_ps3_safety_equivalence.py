@@ -73,9 +73,8 @@ def test_ps3_clinical_core_facade_matches_existing_pure_policy():
         manifest_astig_d=2.0,
         manifest_axis_deg=90.0,
         ppi_avg=1.0,
-        kmax_d=47.0,
-        i_s_d=0.5,
-        kisa_percent=1.0,
+        srax="NO",
+        srax_deg=0.0,
         bfte_front_um=10.0,
         bfte_back_um=12.0,
         refractive_group="MYOPIC_EMMETROPIC",
@@ -98,12 +97,12 @@ def test_ps3_clinical_core_facade_matches_existing_pure_policy():
 
 
 def test_ps3_one_moderate_and_two_moderate_dispositions_remain_separate():
-    one = evaluate_ps3(PS3EyeInput(anterior_km_d=49.0, thinnest_um=520.0))
+    one = evaluate_ps3(PS3EyeInput(anterior_km_d=49.0, thinnest_um=520.0, srax="NO", srax_deg=0.0))
     assert one.moderate_count == 1
     assert one.disposition.lasik == ps3_policy.DEFER
     assert one.disposition.prk == ps3_policy.ALLOWED
 
-    two = evaluate_ps3(PS3EyeInput(anterior_km_d=49.0, thinnest_um=490.0))
+    two = evaluate_ps3(PS3EyeInput(anterior_km_d=49.0, thinnest_um=490.0, srax="NO", srax_deg=0.0))
     assert two.moderate_count >= 2
     assert two.disposition.lasik == ps3_policy.DEFER
     assert two.disposition.prk == ps3_policy.DEFER
