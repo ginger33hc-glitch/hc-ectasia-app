@@ -10,7 +10,7 @@ import sys
 
 import canonical_engine
 import hc_final_decision_policy as final_policy
-import status_rank_policy
+from clinical_disposition import STATUS_RANK
 
 core = canonical_engine.core
 
@@ -48,7 +48,7 @@ def test_randleman_topography_mapping():
 
 
 def test_status_aggregation_order_for_all_known_statuses():
-    rank = status_rank_policy._STATUS_RANK
+    rank = STATUS_RANK
     statuses = tuple(rank)
     for current in statuses:
         for new in statuses:
