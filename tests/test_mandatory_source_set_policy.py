@@ -64,3 +64,43 @@ def test_more_than_six_images_is_rejected():
         policy.validate_source_set(items)
     assert exc.value.status_code == 422
     assert "at most 6 images" in exc.value.detail
+
+
+def test_legacy_bad_component_signature_recognizes_od_page_even_if_screen_type_is_imperfect():
+    legacy_bad = {
+        "document_context": {
+            "document_type": "PENTACAM_TOPOGRAPHY",
+            "laterality": "OD",
+        },
+        "eyes": [
+            {
+                "eye": "OD",
+                "screen_types": ["PENTACAM_TOPOGRAPHY"],
+                "table_verified_numeric_fields": ["Df", "Db", "Dp", "Dt", "Da"],
+                "Df": -0.93,
+                "Db": 0.73,
+                "Dp": 0.47,
+                "Dt": -0.56,
+                "Da": 0.41,
+            }
+        ],
+        "treatment_corrections": [],
+    }
+    summary = policy.classify_source_set([legacy_bad])
+    assert summary["present"]["OD Belin/Ambrosio Display"] is True
+
+
+def test_mandatory_install_adds_explicit_legacy_bad_display_recognition_prompt():
+    class Core:
+        PROMPT = "base"
+        merge_extractions = staticmethod(lambda results: {})
+
+        async def _run_image_assessment(self, *args, **kwargs):
+            return None
+
+    core = Core()
+    policy._previous_merge_extractions = None
+    policy._previous_run_image_assessment = None
+    policy.install(core)
+    assert "Belin/Ambrosio Display" in core.PROMPT
+    assert "BELIN_AMBROSIO_DISPLAY" in core.PROMPT
