@@ -1,5 +1,6 @@
 /* Input completion only. Clinical completeness and scores are owned by the server. */
 (function installSourceImageRetention(){
+  if(typeof window==='undefined'||typeof document==='undefined')return;
   const imageInput=document.getElementById('imageInput');
   if(!imageInput||typeof DataTransfer==='undefined')return;
   const MAX_IMAGES=6;
