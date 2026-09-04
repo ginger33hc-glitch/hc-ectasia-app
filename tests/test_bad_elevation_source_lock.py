@@ -83,6 +83,10 @@ def test_retired_patterns_and_generic_elevation_never_reach_readiness():
         decision = cleanup.hc_engine_with_erss_auto_read({}, 30, {}, {}, {})
         assert decision["eyes"][0]["missing"] == ["NICE: I_S_D"]
         assert decision["critical_input_issues"] == []
-        assert decision["eyes"][0]["randleman_erss"]["missing_erss_inputs"] == []
+        # The synthetic fixture has no completed ERSS row values. Retired morphology
+        # is removed, but all five canonical rows remain missing so readiness fails closed.
+        assert decision["eyes"][0]["randleman_erss"]["missing_erss_inputs"] == [
+            "topography", "RSB", "age", "pachymetry", "MRSE"
+        ]
     finally:
         cleanup._previous_hc_engine = previous
