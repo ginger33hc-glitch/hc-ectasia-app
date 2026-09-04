@@ -39,7 +39,7 @@ def _equivalent(field,a,b):
         d=abs((a%180)-(b%180));return min(d,180-d)<=1e-6
     return abs(a-b)<=1e-6
 
-def _normalized_token(v):return str(v or "").upper().replace("/","_").replace(" ","_\")
+def _normalized_token(v):return str(v or "").upper().replace("/","_").replace(" ","_")
 def _screen_tokens(result,eye):
     context=result.get("document_context") or {};tokens=[context.get("document_type"),context.get("display_type"),context.get("screen_type")];tokens.extend(eye.get("screen_types") or []);return [_normalized_token(x) for x in tokens]
 def _is_bad_display(result,eye):
