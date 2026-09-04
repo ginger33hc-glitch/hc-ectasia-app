@@ -46,6 +46,7 @@ import research_export  # noqa: E402
 import named_user_ui  # noqa: E402
 import pentacam_targeted_reread  # noqa: E402
 import rmin_front_source_policy  # noqa: E402
+import geometric_srax_policy  # noqa: E402
 import erss_auto_read_policy  # noqa: E402
 import phase3_runtime_seam  # noqa: E402
 import phase3_workflow_shadow_observer  # noqa: E402
@@ -74,6 +75,7 @@ COMPOSITION_PHASES = {
         "mandatory_source_set_policy",
         "pentacam_targeted_reread",
         "rmin_front_source_policy",
+        "geometric_srax_policy",
         "erss_auto_read_policy",
         "bad_display_source_policy",
     ),
@@ -156,6 +158,7 @@ def compose(version: str):
     named_user_ui.install(core)
     pentacam_targeted_reread.install(core)
     rmin_front_source_policy.install(core, pentacam_targeted_reread)
+    geometric_srax_policy.install(core, rmin_front_source_policy)
     erss_auto_read_policy.install(core)
     bad_display_source_policy.install(core)
 
