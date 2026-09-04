@@ -36,6 +36,8 @@ def test_unresolved_erss_preserves_explicit_front_map_srax_confirmation():
         "Signed I-S (D) required",
         "SRAX >20° confirmation from the Axial/Sagittal Curvature (Front) map",
     ]
-    # Retired morphology is removed, but unresolved canonical topography must
-    # remain visible so LASIK report readiness fails closed.
-    assert result["randleman_erss"]["missing_erss_inputs"] == ["topography"]
+    # No ERSS rows are populated in this fixture, so the fail-closed cleanup must
+    # preserve every canonical row as missing while removing only retired morphology.
+    assert result["randleman_erss"]["missing_erss_inputs"] == [
+        "topography", "RSB", "age", "pachymetry", "MRSE"
+    ]
