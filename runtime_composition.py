@@ -73,9 +73,9 @@ COMPOSITION_PHASES = {
         "erss_topography_evidence_policy",
         "ps3_extraction_policy",
         "mandatory_source_set_policy",
+        "srax_geometry_policy",
         "pentacam_targeted_reread",
         "rmin_front_source_policy",
-        "srax_geometry_policy",
         "erss_auto_read_policy",
         "bad_display_source_policy",
     ),
@@ -156,9 +156,9 @@ def compose(version: str):
     historical_report.install(core, archive_runtime)
     research_export.install(core, archive_runtime)
     named_user_ui.install(core)
+    srax_geometry_policy.install(core)
     pentacam_targeted_reread.install(core)
     rmin_front_source_policy.install(core, pentacam_targeted_reread)
-    srax_geometry_policy.install(core)
     erss_auto_read_policy.install(core)
     bad_display_source_policy.install(core)
 
