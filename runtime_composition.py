@@ -11,6 +11,7 @@ import reports
 
 import hc_age_policy  # noqa: E402
 import hc_bad_final_policy  # noqa: F401,E402
+import bad_display_source_policy  # noqa: E402
 import merge_policy_base  # noqa: F401,E402
 import extraction_guard  # noqa: F401,E402
 import report_export_guard  # noqa: F401,E402
@@ -74,6 +75,7 @@ COMPOSITION_PHASES = {
         "pentacam_targeted_reread",
         "rmin_front_source_policy",
         "erss_auto_read_policy",
+        "bad_display_source_policy",
     ),
     "reporting_and_readiness": (
         "report_export_guard",
@@ -155,6 +157,7 @@ def compose(version: str):
     pentacam_targeted_reread.install(core)
     rmin_front_source_policy.install(core, pentacam_targeted_reread)
     erss_auto_read_policy.install(core)
+    bad_display_source_policy.install(core)
 
     phase3_runtime_seam.install(core)
     phase3_workflow_shadow_observer.install(core)
