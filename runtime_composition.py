@@ -57,7 +57,6 @@ COMPOSITION_PHASES = {
     "clinical_policy": (
         "hc_age_policy",
         "hc_bad_final_policy",
-        "bad_display_source_policy",
         "pachymetry_policy",
         "randleman_bad_independence",
         "hc_final_decision_policy",
@@ -76,6 +75,7 @@ COMPOSITION_PHASES = {
         "pentacam_targeted_reread",
         "rmin_front_source_policy",
         "erss_auto_read_policy",
+        "bad_display_source_policy",
     ),
     "reporting_and_readiness": (
         "report_export_guard",
@@ -116,7 +116,6 @@ def compose(version: str):
     reports.APP_VERSION = version
 
     hc_age_policy.install(core, score_audit_owner=bootstrap)
-    bad_display_source_policy.install(core)
     critical_score_highlight.install(core, reports)
     ps3_report_policy.install(reports)
     microkeratome_report_policy.install(reports)
@@ -158,6 +157,7 @@ def compose(version: str):
     pentacam_targeted_reread.install(core)
     rmin_front_source_policy.install(core, pentacam_targeted_reread)
     erss_auto_read_policy.install(core)
+    bad_display_source_policy.install(core)
 
     phase3_runtime_seam.install(core)
     phase3_workflow_shadow_observer.install(core)
