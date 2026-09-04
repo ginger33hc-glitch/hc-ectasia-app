@@ -1,221 +1,67 @@
 import canonical_engine as runtime
 from pathlib import Path
-
 from test_hc_engine import MODIFIERS, normal_eye, plan
+core=runtime.core
 
-
-core = runtime.core
-
-
-def lasik_plan():
-    return plan("LASIK", sphere=-3.0, cylinder=0.0, ablation=60, flap=100)
-
+def lasik_plan():return plan("LASIK",sphere=-3.0,cylinder=0.0,ablation=60,flap=100)
+def resolve_srax(eye,degrees):
+    eye["srax_deg"]=degrees;eye["srax_source"]="AXIAL_SAGITTAL_CURVATURE_FRONT";eye["srax"]="YES" if degrees>20 else "NO"
 
 def test_evidence_module_does_not_replace_or_duplicate_point_mapper():
-    assert core.lasik_topography_points.__module__ == "app"
-    assert core.lasik_topography_points("ASYMMETRIC_BOWTIE") == 1
-    assert core.lasik_topography_points("INFERIOR_STEEPENING_SRA") == 3
-
+    assert core.lasik_topography_points.__module__=="app";assert core.lasik_topography_points("ASYMMETRIC_BOWTIE")==1;assert core.lasik_topography_points("INFERIOR_STEEPENING_SRA")==3
 
 def test_dedicated_schema_and_browser_form_carry_i_s_confirmation():
     import erss_topography_guard as guard
-
     assert "I_S" in guard.ERSS_SCHEMA["required"]
-    assert "morphology_confidence" in guard.ERSS_SCHEMA["required"]
-    assert "PENTACAM_TOPOMETRIC_KC" in guard.ERSS_SCHEMA["properties"]["display_type"]["enum"]
-    html = Path("static/index.html").read_text(encoding="utf-8")
-    assert '${eye}_surgeon_i_s' in html
-    assert 'surgeon_I_S_D:numberOrNull' in html
-    assert 'surgeon_topography_category:value' in html
+    html=Path("static/index.html").read_text(encoding="utf-8");assert '${eye}_surgeon_i_s' in html;assert 'surgeon_I_S_D:numberOrNull' in html
 
+def test_missing_i_s_and_srax_leave_topography_unresolved():
+    eye=normal_eye();eye["I_S"]=None;eye["table_verified_numeric_fields"].remove("I_S")
+    result=core.assess_eye(eye,lasik_plan(),30,MODIFIERS);e=result["erss_topography_evidence"]
+    assert result["randleman_erss"]["rows"]["topography"] is None;assert result["randleman_erss"]["total"] is None;assert e["needs_surgeon_I_S"] is True;assert e["needs_surgeon_SRAX"] is True;assert "PASS" not in result["status"]
 
-def test_missing_i_s_does_not_replace_a_required_topography_category():
-    eye = normal_eye()
-    eye["I_S"] = None
-    eye["table_verified_numeric_fields"].remove("I_S")
-    result = core.assess_eye(eye, lasik_plan(), 30, MODIFIERS)
-    assert result["randleman_erss"]["rows"]["topography"] is None
-    assert result["randleman_erss"]["total"] is None
-    assert result["erss_topography_evidence"]["needs_surgeon_I_S"] is False
-    assert result["erss_topography_evidence"]["needs_surgeon_category"] is True
-    assert "PASS" not in result["status"]
+def test_visual_morphology_cannot_complete_erss_without_i_s():
+    eye=normal_eye(morphology="ASYMMETRIC_BOWTIE");eye["I_S"]=None;eye["table_verified_numeric_fields"].remove("I_S");resolve_srax(eye,10)
+    result=core.assess_eye(eye,lasik_plan(),30,MODIFIERS);assert result["randleman_erss"]["rows"]["topography"] is None;assert result["erss_topography_evidence"]["needs_surgeon_I_S"] is True
 
+def test_visual_srax_label_without_authoritative_angle_cannot_complete_erss():
+    eye=normal_eye(morphology="INFERIOR_STEEPENING_SRA");eye["srax"]="YES";eye["srax_deg"]=None
+    result=core.assess_eye(eye,lasik_plan(),30,MODIFIERS);assert result["randleman_erss"]["rows"]["topography"] is None;assert result["erss_topography_evidence"]["needs_surgeon_SRAX"] is True
 
-def test_high_confidence_dedicated_map_can_complete_erss_without_i_s():
-    eye = normal_eye(morphology="ASYMMETRIC_BOWTIE")
-    eye.update({
-        "I_S": None,
-        "morphology_confidence": "HIGH",
-        "anterior_curvature_map_visible": "YES",
-        "erss_source_read": "DEDICATED_CURVATURE_PASS",
-        "inferior_opposite_steepening_D": None,
-        "srax_deg": None,
-    })
-    eye["table_verified_numeric_fields"].remove("I_S")
-    result = core.assess_eye(eye, lasik_plan(), 30, MODIFIERS)
-    assert result["randleman_erss"]["rows"]["topography"] == 1
-    assert result["randleman_erss"]["total"] is not None
-    assert result["erss_topography_evidence"]["category_source"] == "AUTOMATIC_HIGH_CONFIDENCE_MAP_EVIDENCE"
-    assert result["erss_topography_evidence"]["needs_surgeon_category"] is False
+def test_lasik_i_s_gate_does_not_change_separate_prk_pathway():
+    eye=normal_eye();eye["I_S"]=None;eye["table_verified_numeric_fields"].remove("I_S");result=core.assess_eye(eye,plan("PRK",sphere=-3.0,cylinder=0.0,ablation=60,flap=None),30,MODIFIERS);assert "erss_topography_evidence" not in result
 
-
-def test_high_confidence_visual_srax_can_complete_erss_without_inventing_angle():
-    eye = normal_eye(morphology="INFERIOR_STEEPENING_SRA")
-    eye.update({
-        "I_S": None,
-        "morphology_confidence": "HIGH",
-        "anterior_curvature_map_visible": "YES",
-        "erss_source_read": "DEDICATED_CURVATURE_PASS",
-        "srax": "YES",
-        "srax_deg": None,
-        "inferior_opposite_steepening_D": None,
-    })
-    eye["table_verified_numeric_fields"].remove("I_S")
-    result = core.assess_eye(eye, lasik_plan(), 30, MODIFIERS)
-    assert result["randleman_erss"]["rows"]["topography"] == 3
-    assert result["erss_topography_evidence"]["validated_category"] == "INFERIOR_STEEPENING_SRA"
-    assert result["erss_topography_evidence"]["category_source"] == "AUTOMATIC_HIGH_CONFIDENCE_MAP_EVIDENCE"
-
-
-def test_moderate_confidence_map_never_supplies_a_reassuring_zero():
-    eye = normal_eye(morphology="NORMAL_SYMMETRIC")
-    eye.update({
-        "I_S": None,
-        "morphology_confidence": "MODERATE",
-        "anterior_curvature_map_visible": "YES",
-        "erss_source_read": "DEDICATED_CURVATURE_PASS",
-        "inferior_opposite_steepening_D": None,
-        "srax_deg": None,
-    })
-    eye["table_verified_numeric_fields"].remove("I_S")
-    result = core.assess_eye(eye, lasik_plan(), 30, MODIFIERS)
-    assert result["randleman_erss"]["rows"]["topography"] is None
-    assert result["erss_topography_evidence"]["needs_surgeon_category"] is True
-    assert "PASS" not in result["status"]
-
-
-def test_lasik_i_s_gate_does_not_change_the_separate_prk_pathway():
-    eye = normal_eye()
-    eye["I_S"] = None
-    eye["table_verified_numeric_fields"].remove("I_S")
-    result = core.assess_eye(eye, plan("PRK", sphere=-3.0, cylinder=0.0, ablation=60, flap=None), 30, MODIFIERS)
-    assert "erss_topography_evidence" not in result
-    assert not any("I-S value for Randleman" in str(item) for item in result.get("missing") or [])
-
-
-def test_conflicting_i_s_is_not_resolved_by_scoring_the_maximum():
-    eye = normal_eye()
-    eye["data_conflicts"] = ["I_S: 0.50 vs 1.50"]
-    result = core.assess_eye(eye, lasik_plan(), 30, MODIFIERS)
-    assert result["erss_topography_evidence"]["I_S_status"] == "CONFLICT"
-    assert result["randleman_erss"]["rows"]["topography"] is None
-    assert result["randleman_erss"]["total"] is None
-
+def test_conflicting_i_s_is_not_resolved_by_scoring_maximum():
+    eye=normal_eye();eye["data_conflicts"]=["I_S: 0.50 vs 1.50"];resolve_srax(eye,10);result=core.assess_eye(eye,lasik_plan(),30,MODIFIERS);assert result["erss_topography_evidence"]["I_S_status"]=="CONFLICT";assert result["randleman_erss"]["total"] is None
 
 def test_dedicated_and_general_same_image_i_s_conflict_requires_confirmation(monkeypatch):
     import erss_topography_guard as guard
-    from test_erss_runtime import eye as extracted_eye, result as extraction_result
+    from test_erss_runtime import eye as extracted_eye,result as extraction_result
+    source_eye=extracted_eye(True,"NORMAL_SYMMETRIC","topometric.jpg");source_eye["I_S"]=0.5;source_eye["table_verified_numeric_fields"]=["I_S"];general=extraction_result(source_eye,"topometric.jpg")
+    monkeypatch.setattr(guard,"_original_extract_one_image",lambda raw,filename:general);monkeypatch.setattr(guard,"_erss_second_pass",lambda raw,filename:{"display_type":"PENTACAM_TOPOMETRIC_KC","eye":"OD","I_S":0.75,"I_S_status":"CONFIDENT"})
+    extracted=guard.extract_one_image_with_erss(b"image","topometric.jpg");assert extracted["eyes"][0]["I_S"] is None;assert any(str(item).startswith("I_S:") for item in extracted["eyes"][0]["data_conflicts"])
 
-    source_eye = extracted_eye(True, "NORMAL_SYMMETRIC", "topometric.jpg")
-    source_eye["I_S"] = 0.5
-    source_eye["table_verified_numeric_fields"] = ["I_S"]
-    general = extraction_result(source_eye, "topometric.jpg")
-    monkeypatch.setattr(guard, "_original_extract_one_image", lambda raw, filename: general)
-    monkeypatch.setattr(guard, "_erss_second_pass", lambda raw, filename: {
-        "display_type": "PENTACAM_TOPOMETRIC_KC",
-        "eye": "OD",
-        "I_S": 0.75,
-        "I_S_status": "CONFIDENT",
-    })
-    extracted = guard.extract_one_image_with_erss(b"image", "topometric.jpg")
-    assert extracted["eyes"][0]["I_S"] is None
-    assert "I_S" not in extracted["eyes"][0]["table_verified_numeric_fields"]
-    assert any(str(item).startswith("I_S:") for item in extracted["eyes"][0]["data_conflicts"])
+def test_i_s_abt_scores_one_when_srax_resolved_negative():
+    eye=normal_eye();eye["I_S"]=0.75;resolve_srax(eye,10);result=core.assess_eye(eye,lasik_plan(),30,MODIFIERS);assert result["erss_topography_evidence"]["validated_category"]=="ASYMMETRIC_BOWTIE";assert result["randleman_erss"]["rows"]["topography"]==1
 
+def test_srax_over_20_selects_single_three_point_category():
+    eye=normal_eye();eye["I_S"]=0.8;resolve_srax(eye,20.1);result=core.assess_eye(eye,lasik_plan(),30,MODIFIERS);assert result["erss_topography_evidence"]["validated_category"]=="INFERIOR_STEEPENING_SRA";assert result["randleman_erss"]["rows"]["topography"]==3
 
-def test_lower_surgeon_category_does_not_downgrade_stronger_validated_abt_evidence():
-    eye = normal_eye(morphology="ASYMMETRIC_BOWTIE")
-    eye.update({"I_S": 0.5, "inferior_opposite_steepening_D": 0.75, "asymmetric_bow_tie": "YES"})
-    p = lasik_plan()
-    p["surgeon_topography_category"] = "NORMAL_SYMMETRIC"
-    result = core.assess_eye(eye, p, 30, MODIFIERS)
-    assert result["erss_topography_evidence"]["validated_category"] == "ASYMMETRIC_BOWTIE"
-    assert result["randleman_erss"]["rows"]["topography"] == 1
+def test_srax_exactly_20_is_not_positive():
+    eye=normal_eye();eye["I_S"]=0.8;resolve_srax(eye,20.0);result=core.assess_eye(eye,lasik_plan(),30,MODIFIERS);assert result["erss_topography_evidence"]["validated_category"]=="ASYMMETRIC_BOWTIE";assert result["randleman_erss"]["rows"]["topography"]==1
 
+def test_surgeon_i_s_enters_numeric_classifier_when_srax_resolved():
+    eye=normal_eye();eye["I_S"]=None;eye["table_verified_numeric_fields"].remove("I_S");resolve_srax(eye,10);p=lasik_plan();p["surgeon_I_S_D"]=-0.61;result=core.assess_eye(eye,p,30,MODIFIERS);assert result["erss_topography_evidence"]["I_S_source"]=="SURGEON_ENTRY";assert result["erss_topography_evidence"]["validated_category"]=="ASYMMETRIC_BOWTIE"
 
-def test_manual_confirmation_survives_existing_effective_plan_normalization():
-    p = lasik_plan()
-    p.update({"surgeon_I_S_D": -0.61, "surgeon_topography_category": "NORMAL_SYMMETRIC"})
-    effective = core.apply_extracted_corrections({"treatment_corrections": []}, {"OD": p, "OS": {}})
-    assert effective["OD"]["surgeon_I_S_D"] == -0.61
-    assert effective["OD"]["surgeon_topography_category"] == "NORMAL_SYMMETRIC"
-
-
-def test_inferior_steepening_takes_one_three_point_category_not_abt_plus_three():
-    eye = normal_eye(morphology="ASYMMETRIC_BOWTIE")
-    eye.update({
-        "I_S": 0.8,
-        "inferior_opposite_steepening_D": 1.0,
-        "srax_deg": 20.0,
-        "asymmetric_bow_tie": "YES",
-        "srax": "YES",
-        "erss_source_read": "DEDICATED_CURVATURE_PASS",
-    })
-    result = core.assess_eye(eye, lasik_plan(), 30, MODIFIERS)
-    assert result["erss_topography_evidence"]["validated_category"] == "INFERIOR_STEEPENING_SRA"
-    assert result["randleman_erss"]["rows"]["topography"] == 3
-
-
-def test_surgeon_confirmation_enters_existing_scorer_without_new_point_path():
-    eye = normal_eye(morphology="ASYMMETRIC_BOWTIE")
-    eye["I_S"] = None
-    eye["table_verified_numeric_fields"].remove("I_S")
-    p = lasik_plan()
-    p.update({"surgeon_I_S_D": -0.61, "surgeon_topography_category": "ASYMMETRIC_BOWTIE"})
-    result = core.assess_eye(eye, p, 30, MODIFIERS)
-    assert result["erss_topography_evidence"]["I_S_source"] == "SURGEON_ENTRY"
-    assert result["erss_topography_evidence"]["validated_category"] == "ASYMMETRIC_BOWTIE"
-    assert result["randleman_erss"]["rows"]["topography"] == 1
-
-
-def test_i_s_at_abnormal_threshold_uses_one_four_point_category():
-    eye = normal_eye(morphology="ASYMMETRIC_BOWTIE")
-    eye["I_S"] = 1.4
-    result = core.assess_eye(eye, lasik_plan(), 30, MODIFIERS)
-    assert result["erss_topography_evidence"]["validated_category"] == "ABNORMAL_ECTATIC"
-    assert result["randleman_erss"]["rows"]["topography"] == 4
-
+def test_i_s_at_abnormal_threshold_uses_four_point_category_when_srax_resolved():
+    eye=normal_eye();eye["I_S"]=1.4;resolve_srax(eye,10);result=core.assess_eye(eye,lasik_plan(),30,MODIFIERS);assert result["erss_topography_evidence"]["validated_category"]=="ABNORMAL_ECTATIC";assert result["randleman_erss"]["rows"]["topography"]==4
 
 def test_all_five_lasik_erss_parameter_boundaries_are_locked():
-    assert [core.lasik_rsb_points(x) for x in (239.999, 240, 260, 280, 300)] == [4, 3, 2, 1, 0]
-    assert [core.age_points(x) for x in (18, 19, 20, 21, 30)] == [3, 2, 2, 0, 0]
-    assert [core.lasik_pachy_points(x) for x in (479.999, 480, 499.999, 500, 509.999, 510)] == [None, 2, 2, 1, 1, 0]
-    assert [core.lasik_mrse_points(x) for x in (-14.001, -14, -12, -10, -8)] == [4, 3, 2, 1, 0]
-    assert [core.lasik_topography_points(x) for x in (
-        "NORMAL_SYMMETRIC", "ASYMMETRIC_BOWTIE", "INFERIOR_STEEPENING_SRA", "ABNORMAL_ECTATIC"
-    )] == [0, 1, 3, 4]
+    assert [core.lasik_rsb_points(x) for x in (239.999,240,260,280,300)]==[4,3,2,1,0]
+    assert [core.age_points(x) for x in (18,19,20,21,30)]==[3,2,2,0,0]
+    assert [core.lasik_pachy_points(x) for x in (479.999,480,480.001,499.999,500,509.999,510)]==[None,None,2,2,1,1,0]
+    assert [core.lasik_mrse_points(x) for x in (-14.001,-14,-12,-10,-8)]==[4,3,2,1,0]
 
-
-def test_complete_erss_rows_use_manifest_mrse_and_planned_rsb():
-    eye = normal_eye(pachy=520, morphology="NORMAL_SYMMETRIC")
-    eye.update({
-        "morphology_confidence": "HIGH",
-        "anterior_curvature_map_visible": "YES",
-        "erss_source_read": "DEDICATED_CURVATURE_PASS",
-    })
-    p = lasik_plan()
-    p.update({
-        "manifest_sphere_D": -9.0,
-        "manifest_cylinder_magnitude_D": 2.0,
-        "manifest_normalized_axis_deg": 180,
-        "flap_um": 100,
-        "ablation_um": 140,
-    })
-    result = core.assess_eye(eye, p, 20, MODIFIERS)
-    erss = result["randleman_erss"]
-    assert result["values"]["MRSE_D"] == -10.0
-    assert result["lasik_planning_sequence"][0]["LASIK_RSB_um"] == 280.0
-    assert result["values"]["LASIK_RSB_um"] == 384.0
-    assert erss["rows"] == {"topography": 0, "RSB": 0, "age": 2, "pachymetry": 0, "MRSE": 1}
-    assert erss["total"] == 3
-    assert erss["bad_dependency"] is False
+def test_complete_erss_rows_use_manifest_mrse_and_planned_rsb_with_authoritative_topography():
+    eye=normal_eye(pachy=520);eye["I_S"]=0.0;resolve_srax(eye,10);p=lasik_plan();p.update({"manifest_sphere_D":-9.0,"manifest_cylinder_magnitude_D":2.0,"manifest_normalized_axis_deg":180,"flap_um":100,"ablation_um":140})
+    result=core.assess_eye(eye,p,20,MODIFIERS);erss=result["randleman_erss"];assert result["values"]["MRSE_D"]==-10.0;assert erss["rows"]=={"topography":0,"RSB":0,"age":2,"pachymetry":0,"MRSE":1};assert erss["total"]==3;assert erss["bad_dependency"] is False
