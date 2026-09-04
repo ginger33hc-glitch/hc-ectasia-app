@@ -15,9 +15,7 @@ def source_result(screen_type, rmin=6.34):
     return {
         "document_context": {"document_type": "PENTACAM_TOPOGRAPHY"},
         "eyes": [{
-            "eye": "OS",
-            "screen_types": [screen_type],
-            "Rmin_mm": rmin,
+            "eye": "OS", "screen_types": [screen_type], "Rmin_mm": rmin,
             "table_verified_numeric_fields": ["Rmin_mm"],
             "map_fallback_numeric_fields": ["Rmin_mm"],
             "field_provenance": {"Rmin_mm": [{"source": "OLD"}]},
@@ -25,21 +23,21 @@ def source_result(screen_type, rmin=6.34):
     }
 
 
-def test_non_four_maps_rmin_is_cleared_and_never_reused():
+def test_non_show_two_rmin_is_cleared_and_never_reused():
     c = core()
     targeted = SimpleNamespace(targeted_reread=lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError()))
-    wrapped = policy.make_extractor(c, lambda raw, filename: source_result("SHOW_2_EXAMS_TOPOMETRIC"), targeted)
-    result = wrapped(b"x", "show2.png")
+    wrapped = policy.make_extractor(c, lambda raw, filename: source_result("FOUR_MAPS_REFRACTIVE"), targeted)
+    result = wrapped(b"x", "fourmaps.png")
     eye = result["eyes"][0]
     assert eye["Rmin_mm"] is None
     assert "Rmin_mm" not in eye["table_verified_numeric_fields"]
     assert "Rmin_mm" not in eye["map_fallback_numeric_fields"]
 
 
-def test_four_maps_accepts_only_cornea_front_rmin():
+def test_show_two_accepts_only_cornea_back_rmin():
     c = core()
     reread = {
-        "screen_family": "FOUR_MAPS_REFRACTIVE",
+        "screen_family": "SHOW_2_EXAMS_TOPOMETRIC",
         "readings": [
             {"eye": "OS", "field": "Rmin_mm", "value": 6.81, "status": "CONFIDENT",
              "printed_label": "Rmin:", "group_label": "Cornea Front", "source_tile": "UPPER_LEFT"},
@@ -48,25 +46,25 @@ def test_four_maps_accepts_only_cornea_front_rmin():
         ],
     }
     targeted = SimpleNamespace(targeted_reread=lambda *args, **kwargs: reread)
-    wrapped = policy.make_extractor(c, lambda raw, filename: source_result("FOUR_MAPS_REFRACTIVE"), targeted)
-    result = wrapped(b"x", "fourmaps.png")
+    wrapped = policy.make_extractor(c, lambda raw, filename: source_result("SHOW_2_EXAMS_TOPOMETRIC"), targeted)
+    result = wrapped(b"x", "show2.png")
     eye = result["eyes"][0]
-    assert eye["Rmin_mm"] == 6.81
-    assert eye["field_provenance"]["Rmin_mm"][0]["source"] == "FOUR_MAPS_REFRACTIVE_CORNEA_FRONT"
+    assert eye["Rmin_mm"] == 6.34
+    assert eye["field_provenance"]["Rmin_mm"][0]["source"] == "SHOW_2_EXAMS_TOPOMETRIC_CORNEA_BACK"
 
 
-def test_cornea_back_only_rmin_is_rejected():
+def test_cornea_front_only_rmin_is_rejected():
     c = core()
     reread = {
-        "screen_family": "FOUR_MAPS_REFRACTIVE",
+        "screen_family": "SHOW_2_EXAMS_TOPOMETRIC",
         "readings": [
-            {"eye": "OS", "field": "Rmin_mm", "value": 6.34, "status": "CONFIDENT",
-             "printed_label": "Rmin:", "group_label": "Cornea Back", "source_tile": "UPPER_LEFT"},
+            {"eye": "OS", "field": "Rmin_mm", "value": 6.81, "status": "CONFIDENT",
+             "printed_label": "Rmin:", "group_label": "Cornea Front", "source_tile": "UPPER_LEFT"},
         ],
     }
     targeted = SimpleNamespace(targeted_reread=lambda *args, **kwargs: reread)
-    wrapped = policy.make_extractor(c, lambda raw, filename: source_result("FOUR_MAPS_REFRACTIVE"), targeted)
-    result = wrapped(b"x", "fourmaps.png")
+    wrapped = policy.make_extractor(c, lambda raw, filename: source_result("SHOW_2_EXAMS_TOPOMETRIC"), targeted)
+    result = wrapped(b"x", "show2.png")
     assert result["eyes"][0]["Rmin_mm"] is None
 
 
@@ -82,6 +80,7 @@ def test_install_removes_rmin_map_fallback_and_appends_source_lock():
         policy.install(c, targeted)
         assert "Rmin_mm" not in c.MAP_FALLBACK_NUMERIC_FIELDS
         assert "CER-AI RMIN SOURCE LOCK" in c.PROMPT
+        assert "CORNEA BACK" in c.PROMPT
         assert c._cerai_rmin_front_source_installed is True
     finally:
         policy._previous_extract_one_image = old_previous

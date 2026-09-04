@@ -5,19 +5,17 @@ records provenance/coverage, and flags implausible or internally inconsistent tr
 the CER-AI engine consumes them.
 
 Multi-image numeric reconciliation policy:
-- When the same numeric parameter is read from multiple valid sources of the same provenance class,
-  a relative spread of <=1% is accepted as normal extraction/measurement variation.
-- Exclusive labeled-box fields (Kmax, ARTmax, Thinnest Locat., and Pupil Center +) are not
-  reconciled here. For remaining fields, the parameter-specific safety-limiting reading is retained:
-  lower for Rmin and higher for other numeric fields.
-- Differences >1%, nonnumeric disagreements, and disagreements across unequal source-priority
-  classes continue through the existing conflict/safety pathway.
+- The owner-defined canonical Pentacam fields are NEVER reconciled here. They are direct
+  single-source transcriptions and fail closed when their canonical source is unreadable.
+- For non-locked numeric parameters, readings from multiple valid sources of the same provenance
+  class may use the historical <=1% reconciliation rule.
 """
 import re
 from typing import Any, Dict, List
 
 import bootstrap
 from pentacam_field_registry import EXCLUSIVE_LABELED_BOX_FIELDS
+from pentacam_canonical_source_lock import LOCKED_FIELDS
 
 core = bootstrap.core
 _original_merge = core.merge_extractions
@@ -50,7 +48,6 @@ def _num(value: Any) -> bool:
 
 
 def _within_one_percent(values: List[float]) -> bool:
-    """True when the full numeric spread is <=1% of the largest absolute reading."""
     if len(values) < 2:
         return False
     low, high = min(values), max(values)
@@ -73,12 +70,7 @@ def _safety_limiting_value(field: str, values: List[float]) -> float:
 
 
 def _reconcile_one_percent(merged: Dict[str, Any], results: List[Dict[str, Any]]) -> None:
-    """Apply the CER-AI <=1% duplicate-reading rule after the core merge.
-
-    Only readings with the same accepted provenance class are compared. This preserves the existing
-    labeled-table-over-map-fallback priority. The rule is deliberately not used to reconcile a
-    mixture of labeled-table and fallback values.
-    """
+    """Historical duplicate tolerance for NON-LOCKED fields only."""
     observations: Dict[str, Dict[str, Dict[str, List[float]]]] = {}
     for result in results:
         for raw_eye in result.get("eyes", []):
@@ -88,7 +80,7 @@ def _reconcile_one_percent(merged: Dict[str, Any], results: List[Dict[str, Any]]
             if not eye_id:
                 continue
             for field, value in raw_eye.items():
-                if field in EXCLUSIVE_LABELED_BOX_FIELDS:
+                if field in LOCKED_FIELDS or field in EXCLUSIVE_LABELED_BOX_FIELDS:
                     continue
                 if not _num(value):
                     continue
@@ -103,8 +95,6 @@ def _reconcile_one_percent(merged: Dict[str, Any], results: List[Dict[str, Any]]
         eye_id = eye.get("eye")
         accepted_fields = set()
         for field, classes in observations.get(eye_id, {}).items():
-            # Respect source priority: use labeled-table observations when present; otherwise the
-            # permitted fallback class. Never combine the two classes for tolerance adjudication.
             values = classes.get("LABELED_TABLE") or classes.get("PERMITTED_MAP_FALLBACK") or []
             if _within_one_percent(values):
                 retained = _safety_limiting_value(field, values)
@@ -113,13 +103,10 @@ def _reconcile_one_percent(merged: Dict[str, Any], results: List[Dict[str, Any]]
                 eye.setdefault("numeric_reconciliation", {})[field] = {
                     "rule": "RELATIVE_SPREAD_LE_1_PERCENT_USE_SAFETY_LIMITING",
                     "direction": "LOWER" if field in LOWER_IS_SAFETY_LIMITING else "HIGHER",
-                    "values": sorted(set(values)),
-                    "retained": retained,
+                    "values": sorted(set(values)), "retained": retained,
                 }
-
         if not accepted_fields:
             continue
-
         kept_conflicts = []
         for item in list(eye.get("data_conflicts") or []):
             match = _CONFLICT_RE.match(str(item).strip())
@@ -129,7 +116,6 @@ def _reconcile_one_percent(merged: Dict[str, Any], results: List[Dict[str, Any]]
                     continue
             kept_conflicts.append(item)
         eye["data_conflicts"] = kept_conflicts
-
         for field in sorted(accepted_fields):
             details = eye["numeric_reconciliation"][field]
             merged.setdefault("global_warnings", []).append(
@@ -145,12 +131,10 @@ def _audit_eye(eye: Dict[str, Any]) -> Dict[str, Any]:
     fallback = set(eye.get("map_fallback_numeric_fields") or [])
     issues: List[str] = []
     warnings: List[str] = []
-
     for field, (low, high) in PLAUSIBLE.items():
         value = eye.get(field)
         if value is not None and (not _num(value) or not low <= float(value) <= high):
             issues.append(f"{field}: extracted value {value!r} is outside validation range {low:g}–{high:g}")
-
     for field in DECISION_FIELDS:
         value = eye.get(field)
         if value is None:
@@ -159,31 +143,25 @@ def _audit_eye(eye: Dict[str, Any]) -> Dict[str, Any]:
             issues.append(f"{field}: decision-critical value has no accepted labeled-field/map-fallback provenance")
         if not provenance.get(field):
             warnings.append(f"{field}: source-file provenance record is unavailable")
-
     pmin, pavg, pmax = eye.get("PPI_min"), eye.get("PPI_avg"), eye.get("PPI_max")
     if all(_num(v) for v in (pmin, pavg, pmax)) and not float(pmin) <= float(pavg) <= float(pmax):
         issues.append("PPI internal check failed: expected PPI min ≤ average ≤ max")
-
-
     conflicts = [
         conflict for conflict in (eye.get("data_conflicts") or [])
         if str(conflict).split(":", 1)[0].strip() not in NON_BLOCKING_CONFLICT_FIELDS
     ]
     if conflicts:
         issues.extend(f"unresolved multi-image conflict: {item}" for item in conflicts)
-
     available = sum(1 for field in DECISION_FIELDS if _num(eye.get(field)))
     table_count = sum(1 for field in DECISION_FIELDS if field in verified and _num(eye.get(field)))
     fallback_count = sum(1 for field in DECISION_FIELDS if field in fallback and _num(eye.get(field)))
     return {
         "status": "FAIL" if issues else "PASS" if available == len(DECISION_FIELDS) else "INCOMPLETE",
-        "decision_fields_available": available,
-        "decision_fields_required": len(DECISION_FIELDS),
+        "decision_fields_available": available, "decision_fields_required": len(DECISION_FIELDS),
         "decision_fields_from_labeled_tables": table_count,
         "decision_fields_from_permitted_map_fallback": fallback_count,
         "source_files": list(eye.get("source_files") or []),
-        "issues": list(dict.fromkeys(issues)),
-        "warnings": list(dict.fromkeys(warnings)),
+        "issues": list(dict.fromkeys(issues)), "warnings": list(dict.fromkeys(warnings)),
     }
 
 
@@ -196,16 +174,14 @@ def merge_extractions_guarded(results):
         result = _audit_eye(eye)
         audit[eye_id] = result
         eye["extraction_validation"] = result
-        if result["issues"]:
-            for issue in result["issues"]:
-                message = f"{eye_id} extraction validation: {issue}"
-                if message not in merged.setdefault("critical_input_issues", []):
-                    merged["critical_input_issues"].append(message)
-        if result["warnings"]:
-            for warning in result["warnings"]:
-                message = f"{eye_id} extraction audit: {warning}"
-                if message not in merged.setdefault("global_warnings", []):
-                    merged["global_warnings"].append(message)
+        for issue in result["issues"]:
+            message = f"{eye_id} extraction validation: {issue}"
+            if message not in merged.setdefault("critical_input_issues", []):
+                merged["critical_input_issues"].append(message)
+        for warning in result["warnings"]:
+            message = f"{eye_id} extraction audit: {warning}"
+            if message not in merged.setdefault("global_warnings", []):
+                merged["global_warnings"].append(message)
     merged["extraction_validation"] = audit
     merged["critical_input_issues"] = sorted(set(merged.get("critical_input_issues", [])))
     merged["global_warnings"] = list(dict.fromkeys(merged.get("global_warnings", [])))

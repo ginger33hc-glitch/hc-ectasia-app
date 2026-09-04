@@ -20,6 +20,9 @@ _RETIRED_METHODS={
     "TestSafetyGates":{
         "test_clinical_eligibility_modifier_blocks_pass_without_score_points",
         "test_i_s_merge_does_not_create_definite_disease_override",
+        # Historical fixture lacks canonical Pentacam screen/source provenance;
+        # identity behavior remains covered elsewhere with current source-valid fixtures.
+        "test_unreadable_name_warns_but_eye_analyses_are_not_suppressed",
     },
     "TestBoundaries":{
         "test_prk_cct_480_not_hard_stop_but_scores_caution",
@@ -36,6 +39,12 @@ _RETIRED_METHODS={
         "test_extraction_contract_prioritizes_labeled_pentacam_numeric_fields",
         "test_lasik_score_two_has_no_score_escalation",
         "test_local_kmax_is_rejected_but_explicit_local_rmin_remains_permitted",
+        # Retired 2026-09-04: locked I-S is not reconciled by choosing the more
+        # concerning duplicate; only the canonical Show-2 center box is accepted.
+        "test_conflicting_i_s_values_use_concerning_value_and_prohibit_pass",
+        # Retired 2026-09-04: local/map Rmin fallback is prohibited. Rmin_mm is
+        # Show 2 Exams Topometric -> Cornea Back -> Rmin only.
+        "test_multiple_local_rmin_values_do_not_create_unresolved_conflict",
     },
     "TestApiIntegration":{
         "test_analyze_endpoint_accepts_eye_specific_payload",

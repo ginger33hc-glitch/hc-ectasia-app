@@ -17,11 +17,12 @@ def test_historical_hc_engine_module_is_non_collected():
 
 def test_explicit_hc_engine_methods_are_retired():
     manifest=current.PHASE4_RETIRED_HC_ENGINE_METHODS
-    assert sum(len(methods) for methods in manifest.values())==16
+    assert sum(len(methods) for methods in manifest.values())==19
     expected={
         "TestSafetyGates":{
             "test_clinical_eligibility_modifier_blocks_pass_without_score_points",
             "test_i_s_merge_does_not_create_definite_disease_override",
+            "test_unreadable_name_warns_but_eye_analyses_are_not_suppressed",
         },
         "TestBoundaries":{
             "test_prk_cct_480_not_hard_stop_but_scores_caution",
@@ -38,6 +39,8 @@ def test_explicit_hc_engine_methods_are_retired():
             "test_extraction_contract_prioritizes_labeled_pentacam_numeric_fields",
             "test_lasik_score_two_has_no_score_escalation",
             "test_local_kmax_is_rejected_but_explicit_local_rmin_remains_permitted",
+            "test_conflicting_i_s_values_use_concerning_value_and_prohibit_pass",
+            "test_multiple_local_rmin_values_do_not_create_unresolved_conflict",
         },
         "TestApiIntegration":{
             "test_analyze_endpoint_accepts_eye_specific_payload",

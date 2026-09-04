@@ -48,6 +48,7 @@ import pentacam_targeted_reread  # noqa: E402
 import rmin_front_source_policy  # noqa: E402
 import geometric_srax_policy  # noqa: E402
 import erss_auto_read_policy  # noqa: E402
+import pentacam_canonical_source_enforcement  # noqa: E402
 import phase3_runtime_seam  # noqa: E402
 import phase3_workflow_shadow_observer  # noqa: E402
 
@@ -56,55 +57,29 @@ app = bootstrap.app
 
 COMPOSITION_PHASES = {
     "clinical_policy": (
-        "hc_age_policy",
-        "hc_bad_final_policy",
-        "pachymetry_policy",
-        "randleman_bad_independence",
-        "hc_final_decision_policy",
-        "inter_eye_tomography_policy",
-        "microkeratome_planning_policy",
-        "nice_policy",
-        "ps3_runtime_policy",
+        "hc_age_policy", "hc_bad_final_policy", "pachymetry_policy",
+        "randleman_bad_independence", "hc_final_decision_policy",
+        "inter_eye_tomography_policy", "microkeratome_planning_policy",
+        "nice_policy", "ps3_runtime_policy",
     ),
     "pentacam_extraction": (
-        "merge_policy_base",
-        "extraction_guard",
-        "erss_numeric_extraction_policy",
-        "erss_topography_evidence_policy",
-        "ps3_extraction_policy",
-        "mandatory_source_set_policy",
-        "pentacam_targeted_reread",
-        "rmin_front_source_policy",
-        "geometric_srax_policy",
-        "erss_auto_read_policy",
+        "merge_policy_base", "extraction_guard", "erss_numeric_extraction_policy",
+        "erss_topography_evidence_policy", "pentacam_canonical_source_enforcement",
+        "ps3_extraction_policy", "mandatory_source_set_policy", "pentacam_targeted_reread",
+        "rmin_front_source_policy", "geometric_srax_policy", "erss_auto_read_policy",
         "bad_display_source_policy",
     ),
     "reporting_and_readiness": (
-        "report_export_guard",
-        "critical_score_highlight",
-        "ps3_report_policy",
-        "microkeratome_report_policy",
-        "assessment_workflow",
-        "srax_completion_policy",
+        "report_export_guard", "critical_score_highlight", "ps3_report_policy",
+        "microkeratome_report_policy", "assessment_workflow", "srax_completion_policy",
         "randleman_report_readiness_policy",
     ),
     "access_and_persistence": (
-        "user_access",
-        "operational_security",
-        "public_site",
-        "analysis_job_service",
-        "mobile_install_section",
-        "case_archive",
-        "audit_log",
-        "case_catalog",
-        "historical_report",
-        "research_export",
-        "named_user_ui",
+        "user_access", "operational_security", "public_site", "analysis_job_service",
+        "mobile_install_section", "case_archive", "audit_log", "case_catalog",
+        "historical_report", "research_export", "named_user_ui",
     ),
-    "phase3_cutover": (
-        "phase3_runtime_seam",
-        "phase3_workflow_shadow_observer",
-    ),
+    "phase3_cutover": ("phase3_runtime_seam", "phase3_workflow_shadow_observer"),
 }
 
 
@@ -122,15 +97,19 @@ def compose(version: str):
     ps3_report_policy.install(reports)
     microkeratome_report_policy.install(reports)
     erss_numeric_extraction_policy.install(core)
-    erss_topography_evidence_policy.install(
-        core,
-        prior_assess_eye=bootstrap._original_assess_eye,
-    )
+    erss_topography_evidence_policy.install(core, prior_assess_eye=bootstrap._original_assess_eye)
     inter_eye_tomography_policy.install(core, compatibility_owner=bootstrap)
     microkeratome_planning_policy.install(core)
     nice_policy.install(core)
+
+    # Source lock is installed before the PS3 merge adapter so the required
+    # runtime chain remains: mandatory gate -> PS3 merge -> canonical source lock.
+    # This preserves the established startup invariants while making every older
+    # source/fallback path subordinate to the owner-defined canonical source set.
+    pentacam_canonical_source_enforcement.install(core, pentacam_targeted_reread)
     ps3_extraction_policy.install(core)
     mandatory_source_set_policy.install(core)
+
     ps3_runtime_policy.install(core)
     assessment_workflow.install(core)
     srax_completion_policy.install(assessment_workflow)
@@ -146,10 +125,7 @@ def compose(version: str):
     if archive_enabled:
         archive_runtime = case_archive.install(core)
     else:
-        archive_runtime = case_archive.install(
-            core,
-            runtime=case_archive.CaseArchiveRuntime(None, required=False),
-        )
+        archive_runtime = case_archive.install(core, runtime=case_archive.CaseArchiveRuntime(None, required=False))
 
     audit_log.install(core, archive_runtime)
     case_catalog.install(core, archive_runtime)
