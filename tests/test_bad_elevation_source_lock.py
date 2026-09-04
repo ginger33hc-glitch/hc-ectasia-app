@@ -83,6 +83,8 @@ def test_retired_patterns_and_generic_elevation_never_reach_readiness():
         decision = cleanup.hc_engine_with_erss_auto_read({}, 30, {}, {}, {})
         assert decision["eyes"][0]["missing"] == ["NICE: I_S_D"]
         assert decision["critical_input_issues"] == []
-        assert decision["eyes"][0]["randleman_erss"]["missing_erss_inputs"] == []
+        # Retired morphology is removed, but canonical ERSS topography remains
+        # unresolved until signed I-S and Front-map SRAX are available.
+        assert decision["eyes"][0]["randleman_erss"]["missing_erss_inputs"] == ["topography"]
     finally:
         cleanup._previous_hc_engine = previous
