@@ -11,6 +11,7 @@ import reports
 
 import hc_age_policy  # noqa: E402
 import hc_bad_final_policy  # noqa: F401,E402
+import bad_display_source_policy  # noqa: E402
 import merge_policy_base  # noqa: F401,E402
 import extraction_guard  # noqa: F401,E402
 import report_export_guard  # noqa: F401,E402
@@ -56,6 +57,7 @@ COMPOSITION_PHASES = {
     "clinical_policy": (
         "hc_age_policy",
         "hc_bad_final_policy",
+        "bad_display_source_policy",
         "pachymetry_policy",
         "randleman_bad_independence",
         "hc_final_decision_policy",
@@ -114,6 +116,7 @@ def compose(version: str):
     reports.APP_VERSION = version
 
     hc_age_policy.install(core, score_audit_owner=bootstrap)
+    bad_display_source_policy.install(core)
     critical_score_highlight.install(core, reports)
     ps3_report_policy.install(reports)
     microkeratome_report_policy.install(reports)
