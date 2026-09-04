@@ -35,6 +35,14 @@ for _name, _value in vars(_legacy).items():
     if not _name.startswith("__"):
         globals()[_name] = _value
 
+# Explicit bindings keep static analysis deterministic while the historical test surface is
+# re-exported dynamically above.
+pentacam_result = _legacy.pentacam_result
+reading = _legacy.reading
+targeted = _legacy.targeted
+Core = _legacy.Core
+assessment_workflow = _legacy.assessment_workflow
+
 
 def test_pupil_center_reread_uses_four_maps_lower_left_source_and_feeds_nice():
     result = pentacam_result()
