@@ -94,12 +94,24 @@ def _reread_family_ok(screen_family: Any, field: str) -> bool:
     return str(screen_family or "") == required
 
 
+def _source_rejection_message(eye: Any, field: str, actual: Any) -> str:
+    required = _required_family(field)
+    if field == "B_Ele_Th_um":
+        return (
+            f"Targeted Pentacam reread rejected {eye} {field}: canonical source is the "
+            "verified BAD Display labeled B. Ele.Th box; alternate screens/maps are not accepted."
+        )
+    return (
+        f"Targeted Pentacam reread rejected {eye} {field}: source family {actual or 'UNKNOWN'} "
+        f"is not canonical; required source family is {required}."
+    )
+
+
 def install(core: Any, targeted_reread: Any) -> None:
     if getattr(core, "_canonical_pentacam_source_lock_installed", False): return
     if SOURCE_LOCK_PROMPT not in core.PROMPT: core.PROMPT += SOURCE_LOCK_PROMPT
     if SOURCE_LOCK_PROMPT not in targeted_reread.REREAD_PROMPT: targeted_reread.REREAD_PROMPT += SOURCE_LOCK_PROMPT
 
-    # Extend exact-label validation for newly canonicalized Show-2 fields.
     prior_label_support = targeted_reread.label_supports_field
     def label_supports_field_locked(field, printed_label, group_label=None):
         label = targeted_reread._normalize_label(printed_label)
@@ -111,16 +123,25 @@ def install(core: Any, targeted_reread: Any) -> None:
         return prior_label_support(field, printed_label, group_label)
     targeted_reread.label_supports_field = label_supports_field_locked
 
-    # Reject wrong-screen candidates before the existing targeted-reread acceptance code sees them.
     prior_apply = targeted_reread.apply_targeted_readings
     def apply_targeted_readings_locked(core_arg, result, reread, requested, filename,
                                        patient_age_requested=False, pentacam_qs_requested=False):
         reread = dict(reread or {})
         family = reread.get("screen_family")
-        reread["readings"] = [
-            reading for reading in reread.get("readings") or []
-            if not isinstance(reading, dict) or _reread_family_ok(family, str(reading.get("field") or ""))
-        ]
+        kept = []
+        for reading in reread.get("readings") or []:
+            if not isinstance(reading, dict):
+                kept.append(reading)
+                continue
+            field = str(reading.get("field") or "")
+            if _reread_family_ok(family, field):
+                kept.append(reading)
+                continue
+            if reading.get("status") == "CONFIDENT" and core_arg.is_number(reading.get("value")):
+                result.setdefault("global_warnings", []).append(
+                    _source_rejection_message(reading.get("eye"), field, family)
+                )
+        reread["readings"] = kept
         return prior_apply(core_arg, result, reread, requested, filename,
                            patient_age_requested, pentacam_qs_requested)
     targeted_reread.apply_targeted_readings = apply_targeted_readings_locked
