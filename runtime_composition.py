@@ -46,11 +46,10 @@ def compose(version:str):
  if getattr(core,"_cerai_runtime_composed",False):return getattr(core,"_cerai_case_archive_runtime",None)
  core.APP_VERSION=version;core.app.title=f"CER-AI v{version}";reports.APP_VERSION=version
  hc_age_policy.install(core,score_audit_owner=bootstrap);status_rank_policy.install(core);critical_score_highlight.install(core,reports)
- # Legacy morphology reader may still exist for non-scoring compatibility, but the approved ERSS evidence gate retires it as a scoring authority.
  erss_visual_morphology_policy.install(erss_topography_guard);erss_topography_evidence_policy.install(core)
- ps3_extraction_policy.install(core)
+ # Add source-locked PS3 fields beneath the canonical ERSS merge; core.merge_extractions identity remains unchanged.
+ ps3_extraction_policy.install(core,erss_topography_guard)
  inter_eye_tomography_policy.install(core,compatibility_owner=bootstrap);microkeratome_planning_policy.install(core);nice_policy.install(core)
- # PS3 wraps the completed canonical clinical engine as an independent restrictive channel.
  ps3_runtime_policy.install(core)
  assessment_workflow.install(core);randleman_report_readiness_policy.install(assessment_workflow);ps3_report_policy.install(reports)
  user_access.install(core);operational_security.install(core)
