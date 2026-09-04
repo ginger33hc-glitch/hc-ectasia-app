@@ -1,6 +1,6 @@
 """Strict source ownership for additional PS3 Pentacam fields.
 
-This module augments the output of the canonical ERSS source-aware merge. It never
+This module augments beneath the canonical ERSS source-aware merge. It never
 replaces core.merge_extractions, never scores PS3, and never calculates SRAX.
 """
 from math import isfinite
@@ -46,7 +46,6 @@ def _bad_b_ele_th_candidates(results,eye_name):
     return values
 
 def augment_merged_extraction(results,merged):
-    """Add only source-locked PS3 fields to an already canonical ERSS merge result."""
     by_eye={x.get("eye"):x for x in merged.get("eyes",[]) if x.get("eye") in {"OD","OS"}}
     for eye_name,target in by_eye.items():
         verified=list(target.get("table_verified_numeric_fields") or []);conflicts=list(target.get("data_conflicts") or [])
@@ -81,7 +80,16 @@ def augment_merged_extraction(results,merged):
         target["table_verified_numeric_fields"]=verified;target["data_conflicts"]=conflicts
     return merged
 
-def install(core):
+def attach_beneath_erss_merge(erss_module):
+    """Wrap ERSS's private base merge while leaving core.merge_extractions identity unchanged."""
+    if getattr(erss_module,"_cerai_ps3_base_merge_augmented",False):return
+    base_merge=erss_module._original_merge
+    def base_merge_with_ps3(results):
+        return augment_merged_extraction(results,base_merge(results))
+    erss_module._original_merge=base_merge_with_ps3
+    erss_module._cerai_ps3_base_merge_augmented=True
+
+def install(core,erss_module=None):
     if getattr(core,"_cerai_ps3_extraction_installed",False):return
     eye_schema=core.SCHEMA["properties"]["eyes"]["items"];properties=eye_schema["properties"];required=eye_schema["required"]
     for name,schema in PS3_EXTRA_FIELDS.items():
@@ -91,5 +99,5 @@ def install(core):
     for name in PS3_EXTRA_FIELDS:
         if name not in enum:enum.append(name)
     if "PS3 ADDITIONAL LABELED-BOX READINGS" not in core.PROMPT:core.PROMPT+="\n"+PS3_SOURCE_PROMPT
-    # Deliberately do not replace core.merge_extractions. The canonical ERSS merge remains outermost.
+    if erss_module is not None:attach_beneath_erss_merge(erss_module)
     core._cerai_ps3_extraction_installed=True
