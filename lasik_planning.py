@@ -22,7 +22,7 @@ LASIK_PLANS = (
 )
 
 _INDEPENDENT_HARD_STOP_MARKERS = (
-    "thinnest preoperative cornea <480",
+    "thinnest preoperative cornea <=480",
     "Definite KC/FFKC/PMD",
     "intended sphere <−10.00",
     "intended sphere >+6.00",
@@ -42,13 +42,7 @@ def _pta_cutoff(result: Dict[str, Any]) -> bool:
 
 
 def _plan_responsive_failure(result: Dict[str, Any]) -> bool:
-    """Return only failures that changing flap/zone parameters may resolve.
-
-    STOP-DEFER is a final clinical category and deliberately combines several
-    causes.  It must not, by itself, trigger LASIK fallback: instability,
-    pregnancy, and an ERSS score of 3 are not corrected by changing the flap.
-    The legacy fallback trigger was a plan hard stop or ERSS HIGH result.
-    """
+    """Return only failures that changing flap/zone parameters may resolve."""
     if result.get("hard_stops"):
         return True
     return (result.get("score") or {}).get("category") == "HIGH"
