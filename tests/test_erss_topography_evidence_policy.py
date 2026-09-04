@@ -5,7 +5,7 @@ core=runtime.core
 
 def lasik_plan():return plan("LASIK",sphere=-3.0,cylinder=0.0,ablation=60,flap=100)
 def resolve_srax(eye,degrees):
-    eye["srax_deg"]=degrees;eye["srax_source"]="AXIAL_SAGITTAL_CURVATURE_FRONT";eye["srax"]="YES" if degrees>20 else "NO"
+    eye["srax_deg"]=degrees;eye["srax_source"]="AXIAL_SAGITTAL_CURVATURE_FRONT";eye["srax"]="YES" if degrees>20 else "NO";eye.setdefault("field_provenance",{})["srax"]=[{"source":"SURGEON_CONFIRMED","map":"AXIAL_SAGITTAL_CURVATURE_FRONT"}]
 
 def test_evidence_module_does_not_replace_or_duplicate_point_mapper():
     assert core.lasik_topography_points.__module__=="app";assert core.lasik_topography_points("ASYMMETRIC_BOWTIE")==1;assert core.lasik_topography_points("INFERIOR_STEEPENING_SRA")==3
