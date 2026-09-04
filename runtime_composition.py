@@ -65,9 +65,9 @@ COMPOSITION_PHASES = {
     "pentacam_extraction": (
         "merge_policy_base", "extraction_guard", "erss_numeric_extraction_policy",
         "erss_topography_evidence_policy", "ps3_extraction_policy",
-        "mandatory_source_set_policy", "pentacam_targeted_reread",
-        "rmin_front_source_policy", "geometric_srax_policy", "erss_auto_read_policy",
-        "bad_display_source_policy", "pentacam_canonical_source_enforcement",
+        "pentacam_canonical_source_enforcement", "mandatory_source_set_policy",
+        "pentacam_targeted_reread", "rmin_front_source_policy",
+        "geometric_srax_policy", "erss_auto_read_policy", "bad_display_source_policy",
     ),
     "reporting_and_readiness": (
         "report_export_guard", "critical_score_highlight", "ps3_report_policy",
@@ -102,7 +102,13 @@ def compose(version: str):
     microkeratome_planning_policy.install(core)
     nice_policy.install(core)
     ps3_extraction_policy.install(core)
+
+    # Canonical source lock must sit inside the mandatory five-image gate. This
+    # preserves the gate as the active outer merge layer while still making the
+    # owner-defined source contract override every older source/fallback path.
+    pentacam_canonical_source_enforcement.install(core, pentacam_targeted_reread)
     mandatory_source_set_policy.install(core)
+
     ps3_runtime_policy.install(core)
     assessment_workflow.install(core)
     srax_completion_policy.install(assessment_workflow)
@@ -130,9 +136,6 @@ def compose(version: str):
     geometric_srax_policy.install(core, rmin_front_source_policy)
     erss_auto_read_policy.install(core)
     bad_display_source_policy.install(core)
-    # Install last among extraction policies so the owner-defined canonical source
-    # contract overrides every older source/fallback/derivation path.
-    pentacam_canonical_source_enforcement.install(core, pentacam_targeted_reread)
 
     phase3_runtime_seam.install(core)
     phase3_workflow_shadow_observer.install(core)
