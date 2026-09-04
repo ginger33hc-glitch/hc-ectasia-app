@@ -55,16 +55,23 @@ def runtime_invariants():
         erss_evidence = composition.erss_topography_evidence_policy
         targeted = composition.pentacam_targeted_reread
         rmin = composition.rmin_front_source_policy
+        geometric = composition.geometric_srax_policy
         new_fields = composition.ps3_extraction_policy
         mandatory = composition.mandatory_source_set_policy
-        if core.extract_one_image is not rmin.extract_one_image_with_front_rmin:
-            errors.append("Cornea Front Rmin source lock is not the active extraction layer")
+        if core.extract_one_image is not geometric.extract_one_image_with_geometric_srax:
+            errors.append("Deterministic geometric SRAX is not the active extraction layer")
+        if geometric._previous_extract_one_image is not rmin.extract_one_image_with_front_rmin:
+            errors.append("Cornea Front Rmin source lock is not preserved immediately below geometric SRAX")
         if rmin._previous_extract_one_image is not targeted.extract_one_image_with_targeted_reread:
             errors.append("Targeted Pentacam reread is not preserved immediately below Rmin source lock")
         if "Rmin_mm" in getattr(core, "MAP_FALLBACK_NUMERIC_FIELDS", ()):
             errors.append("Rmin map fallback is still enabled")
         if not getattr(core, "_cerai_rmin_front_source_installed", False):
             errors.append("Cornea Front Rmin source lock is not marked active")
+        if not getattr(core, "_cerai_geometric_srax_installed", False):
+            errors.append("Deterministic geometric SRAX extraction is not marked active")
+        if getattr(core, "_cerai_geometric_srax_algorithm", None) != "srax-geom-v1":
+            errors.append("Unexpected geometric SRAX algorithm version")
         if core.merge_extractions is not mandatory.merge_extractions_with_mandatory_source_gate:
             errors.append("Mandatory five-image source gate is not the active outer merge layer")
         if mandatory._previous_merge_extractions is not new_fields.merge_extractions_with_new_fields:
@@ -86,6 +93,8 @@ def runtime_invariants():
         errors.append("ERSS numeric-only extraction policy is not active")
     if "ERSS VISUAL MORPHOLOGY DISABLED:" not in core.PROMPT:
         errors.append("ERSS visual morphology extraction is still present in the production prompt")
+    if "ERSS SRAX SOURCE LOCK — MODEL ESTIMATION DISABLED:" not in core.PROMPT:
+        errors.append("Model-based SRAX estimation has not been disabled")
     if not getattr(core, "_randleman_bad_independence_installed", False):
         errors.append("BAD-independent Randleman ERSS pathway is not active")
     if not getattr(core, "_hc_final_decision_hierarchy_installed", False):
