@@ -13,12 +13,12 @@ bow-tie, inferior steepening, keratoconus pattern, forme-fruste pattern, PMD pat
 morphology category.
 
 ERSS SRAX SOURCE LOCK:
-MODEL ESTIMATION DISABLED. SRAX is measured outside this extraction model by CER-AI's deterministic
-geometric image-analysis engine using only the Axial/Sagittal Curvature (Front) map on the Pentacam
-4 Maps Refractive page. Do not visually estimate SRAX, do not return a numeric srax_deg from map
-appearance, and do not derive SRAX from KISA, Kmax, I-S, astigmatism tables, K1/K2/global Axis,
-BAD/Belin-Ambrosio values, Elevation Front, Elevation Back, Corneal Thickness, pachymetry, or any other
-surrogate.
+ERSS SRAX SOURCE LOCK — MODEL ESTIMATION DISABLED:
+SRAX is measured outside this extraction model by CER-AI's deterministic geometric image-analysis
+engine using only the Axial/Sagittal Curvature (Front) map on the Pentacam 4 Maps Refractive page.
+Do not visually estimate SRAX, do not return a numeric srax_deg from map appearance, and do not derive
+SRAX from KISA, Kmax, I-S, astigmatism tables, K1/K2/global Axis, BAD/Belin-Ambrosio values, Elevation
+Front, Elevation Back, Corneal Thickness, pachymetry, or any other surrogate.
 
 For every image handled by this model, return srax=UNCERTAIN and srax_deg=null. The deterministic
 geometry layer may replace those values after this extraction if, and only if, it can localize the
