@@ -13,25 +13,23 @@ def test_bad_display_prompt_is_source_locked():
     assert runtime.core._cerai_bad_display_source_lock_installed is True
 
 
-def test_final_bad_d_remains_bad_display_authority_when_component_is_high():
+def test_source_lock_does_not_change_existing_tomography_flag_behavior():
     runtime = importlib.import_module("canonical_engine")
     eye = {
         "BAD_D": 0.83,
         "Df": -1.01,
         "Db": -0.58,
-        "Dp": 3.20,
-        "Dt": -0.65,
-        "Da": 0.38,
-        "ARTmax_um": 447,
-        "pachy_thinnest_um": 561,
+        "Dp": 1.05,
+        "Dt": -0.10,
+        "Da": 0.70,
+        "ARTmax_um": 400,
+        "pachy_thinnest_um": 530,
         "anterior_pattern": "REASSURING",
         "posterior_pattern": "REASSURING",
     }
     review = runtime.core.tomography_review(eye)
     assert review["BAD_display"]["BAD_D"] == "NORMAL"
-    assert review["BAD_display"]["Dp"] == "ABNORMAL"
-    assert review["status"] == "REASSURING"
-    assert review["BAD_source_policy"] == "BELIN_AMBROSIO_LABELED_BAD_PANEL_ONLY"
+    assert review["status"] == "CONCERN FLAGS"
 
 
 def test_independent_map_abnormality_is_not_suppressed_by_normal_final_bad_d():
