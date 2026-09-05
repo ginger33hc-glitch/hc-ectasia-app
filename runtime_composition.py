@@ -38,7 +38,7 @@ import erss_auto_read_policy
 core=bootstrap.core;app=bootstrap.app
 COMPOSITION_PHASES={
  "clinical_policy":("hc_age_policy","hc_bad_final_policy","pachymetry_policy","randleman_bad_independence","hc_final_decision_policy","status_rank_policy","inter_eye_tomography_policy","microkeratome_planning_policy","nice_policy","ps3_runtime_policy"),
- "pentacam_extraction":("merge_policy_base","extraction_guard","erss_topography_guard","erss_visual_morphology_policy","erss_topography_evidence_policy","ps3_extraction_policy","pentacam_targeted_reread","topometric_index_review_policy","erss_auto_read_policy"),
+ "pentacam_extraction":("merge_policy_base","extraction_guard","erss_topography_guard","erss_visual_morphology_policy","erss_topography_evidence_policy","ps3_extraction_policy","pentacam_targeted_reread","erss_auto_read_policy"),
  "reporting_and_readiness":("report_export_guard","critical_score_highlight","assessment_workflow","randleman_report_readiness_policy","ps3_report_policy","topometric_index_review_policy"),
  "access_and_persistence":("user_access","operational_security","case_archive","audit_log","case_catalog","historical_report","research_export","named_user_ui"),
 }
