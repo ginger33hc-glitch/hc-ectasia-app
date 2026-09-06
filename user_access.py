@@ -29,9 +29,6 @@ ROLE_DOCTOR = "DOCTOR"
 ALLOWED_ROLES = frozenset({ROLE_OWNER, ROLE_DOCTOR})
 SESSION_COOKIE = "cer_ai_session"
 NAMED_USERS_ENABLED = os.getenv("CERAI_NAMED_USERS_ENABLED", "0").strip() == "1"
-# Temporary supervised trial mode. Existing named-user deployments enter the trial flow unless
-# they explicitly opt out; deployments without named users remain unchanged. Set this to 0 to
-# restore the password-backed registry without changing or deleting the stored account hashes.
 TRIAL_NAME_LOGIN_ENABLED = os.getenv(
     "CERAI_TRIAL_NAME_LOGIN_ENABLED",
     "1" if NAMED_USERS_ENABLED else "0",
@@ -99,7 +96,6 @@ def hash_password(
     r: int = 8,
     p: int = 1,
 ) -> str:
-    """Create a portable scrypt verifier. Intended for the offline helper script, not login."""
     if not isinstance(password, str) or len(password) < 12:
         raise ValueError("CER-AI account passwords must contain at least 12 characters.")
     salt = salt or os.urandom(16)
@@ -214,6 +210,16 @@ def configure_from_environment() -> None:
     _users_by_username = parse_registry(raw)
 
 
+def enabled_owner_principal() -> Optional[Principal]:
+    """Return the sole enabled OWNER principal; refuse ambiguity if multiple owners exist."""
+    owners = [
+        account.principal
+        for account in _users_by_username.values()
+        if account.enabled and account.principal.role == ROLE_OWNER
+    ]
+    return owners[0] if len(owners) == 1 else None
+
+
 def _prune_sessions(now: Optional[float] = None) -> None:
     now = monotonic() if now is None else now
     for token in list(_sessions):
@@ -268,7 +274,6 @@ def authenticate_credentials(username: Any, password: Any) -> Principal:
 
 
 def authenticate_trial_name(value: Any) -> Principal:
-    """Create a stable DOCTOR identity from a displayed name during supervised trial use."""
     display_name = " ".join(str(value or "").strip().split())
     if not 2 <= len(display_name) <= 160:
         raise HTTPException(422, "Doctor name must contain 2 to 160 characters.")
@@ -339,7 +344,6 @@ def require_current_principal() -> Principal:
 
 
 def install(core: Any) -> None:
-    """Install authentication endpoints and expose request-auth hooks to the security boundary."""
     if getattr(core, "_cerai_named_user_access_installed", False):
         return
     configure_from_environment()
