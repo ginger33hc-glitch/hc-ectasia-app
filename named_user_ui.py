@@ -114,15 +114,16 @@ def install(core: Any) -> None:
         @core.app.middleware("http")
         async def named_user_page_gate(request, call_next):
             path = request.url.path
-            if request.method == "GET" and path in {"/app", "/archive-ui"}:
+            if request.method == "GET" and path in {"/app", "/testing-app", "/archive-ui"}:
                 principal = core._cerai_authenticate_request(request)
                 if principal is None:
-                    destination = "/auth/login-page?next=" + quote(path, safe="/")
+                    login_target = "/app" if path == "/testing-app" else path
+                    destination = "/auth/login-page?next=" + quote(login_target, safe="/")
                     return operational_security._secure_response(
                         RedirectResponse(destination, status_code=303),
                         path,
                     )
-                if path == "/app":
+                if path in {"/app", "/testing-app"}:
                     response = HTMLResponse(
                         _authenticated_root_html(principal.display_name),
                         headers={"Cache-Control": "no-store"},
