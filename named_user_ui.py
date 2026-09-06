@@ -1,8 +1,9 @@
 """Named-user web UI routing kept outside the clinical frontend and decision engine.
 
 When named-user authentication is enabled, unauthenticated visits to the clinical application or archive
-page are redirected to a dedicated login page. The existing clinical HTML is served unchanged except
-for a small authenticated navigation/session script injected at response time.
+page are redirected to a dedicated login page. An optional high-entropy OWNER entry path can create the
+sole OWNER session directly for supervised private testing; the path itself is the bearer credential and
+is supplied only through Railway configuration.
 """
 
 from __future__ import annotations
@@ -121,11 +122,38 @@ def install(core: Any) -> None:
         @core.app.middleware("http")
         async def named_user_page_gate(request, call_next):
             path = request.url.path
-            guarded_paths = {"/app", "/testing-app", "/archive-ui"}
-            if owner_entry:
-                guarded_paths.add(owner_entry)
 
-            if request.method == "GET" and path in guarded_paths:
+            if owner_entry and request.method == "GET" and path == owner_entry:
+                principal = user_access.enabled_owner_principal()
+                if principal is None:
+                    return operational_security._secure_response(
+                        HTMLResponse("Not Found", status_code=404), path
+                    )
+                token = user_access.create_session(principal)
+                response = RedirectResponse("/app", status_code=303)
+                response.set_cookie(
+                    user_access.SESSION_COOKIE,
+                    token,
+                    max_age=user_access.SESSION_TTL_SECONDS,
+                    httponly=True,
+                    secure=user_access.COOKIE_SECURE,
+                    samesite="strict",
+                    path="/",
+                )
+                audit = getattr(core, "_cerai_audit_event", None)
+                if audit is not None:
+                    try:
+                        audit(
+                            "LOGIN_SUCCESS",
+                            actor=principal,
+                            details={"role": principal.role, "authentication_mode": "OWNER_MAGIC_LINK"},
+                        )
+                    except Exception:
+                        user_access.remove_session(token)
+                        raise
+                return operational_security._secure_response(response, path)
+
+            if request.method == "GET" and path in {"/app", "/testing-app", "/archive-ui"}:
                 principal = core._cerai_authenticate_request(request)
                 if principal is None:
                     login_target = "/app" if path == "/testing-app" else path
@@ -134,18 +162,6 @@ def install(core: Any) -> None:
                         RedirectResponse(destination, status_code=303),
                         path,
                     )
-
-                if owner_entry and path == owner_entry:
-                    if str(getattr(principal, "role", "")).upper() != "OWNER":
-                        return operational_security._secure_response(
-                            HTMLResponse("Not Found", status_code=404),
-                            path,
-                        )
-                    response = HTMLResponse(
-                        _authenticated_root_html(principal.display_name),
-                        headers={"Cache-Control": "no-store"},
-                    )
-                    return operational_security._secure_response(response, path)
 
                 if path in {"/app", "/testing-app"}:
                     response = HTMLResponse(
