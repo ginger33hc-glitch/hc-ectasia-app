@@ -1,6 +1,7 @@
 const SHARE_CACHE = "hc-ectasia-shared-images-v1";
 const SHARE_PATH = "/share-target";
 const SHARE_STORAGE_PATH = "/__hc_share__/";
+const PUBLIC_HELPER_PATH = "/static/public-tr-home-overrides.js";
 
 self.addEventListener("install", () => self.skipWaiting());
 
@@ -38,6 +39,11 @@ self.addEventListener("fetch",event=>{
   const url=new URL(event.request.url);
   if(event.request.method==="POST" && url.origin===self.location.origin && url.pathname===SHARE_PATH){
     event.respondWith(receiveSharedImages(event.request));
+  }else if(event.request.method==="GET" && url.origin===self.location.origin && url.pathname===PUBLIC_HELPER_PATH){
+    // The public homepage historically referenced this helper with a fixed ?v=1 URL.
+    // Force a revalidated network request so mobile navigation/PWA presentation updates
+    // are not hidden behind an older browser cache entry.
+    event.respondWith(fetch(new Request(event.request,{cache:"reload"})));
   }else if(event.request.method==="GET" && url.origin===self.location.origin && url.pathname.startsWith(SHARE_STORAGE_PATH)){
     // Permit an explicit surgeon preview without copying every shared image
     // into page memory during initial load.
