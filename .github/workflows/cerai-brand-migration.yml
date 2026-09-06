@@ -31,9 +31,11 @@ jobs:
               'Corneal Refractive Analysis Intelligence',
           )
           # Historical product names are permitted only where the public website
-          # explicitly documents the project's evolution, plus its regression test.
+          # explicitly documents the project's evolution, plus its translation layer
+          # and regression test.
           historical_branding_paths = {
               Path('static/public-home.html'),
+              Path('static/public-i18n.js'),
               Path('tests/test_public_site.py'),
           }
           # Preserve this pre-existing wire-protocol header until all deployed clients have moved
