@@ -1,8 +1,8 @@
 {
   "name": "CER-AI — Cornea Ectasia Risk Assessment Intelligence",
   "short_name": "CER-AI",
-  "id": "/",
-  "start_url": "/",
+  "id": "/app",
+  "start_url": "/app",
   "scope": "/",
   "display": "standalone",
   "background_color": "#05090d",
