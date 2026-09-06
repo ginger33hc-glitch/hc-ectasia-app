@@ -14,8 +14,10 @@ _PUBLIC_HOME = Path("static/public-home.html")
 _AI_LANDING = Path("static/corneal-ectasia-risk-assessment.html")
 _EVIDENCE_PAGE = Path("static/clinical-evidence.html")
 _REFERENCES_PAGE = Path("static/references.html")
+_TESTING_NOTICE = Path("static/testing-notice.html")
 _PRIVATE_CRAWL_PATHS = (
     "/app",
+    "/testing-app",
     "/api/",
     "/analyze",
     "/assessment/",
@@ -334,8 +336,14 @@ def install(core) -> None:
     def sitemap(request: Request) -> Response:
         return Response(_sitemap_xml(_site_base(request)), media_type="application/xml")
 
+    # Public website application links intentionally land on the testing notice.
     @core.app.get("/app", include_in_schema=False)
-    def clinical_app_entry() -> FileResponse:
+    def public_application_notice() -> FileResponse:
+        return FileResponse(_TESTING_NOTICE)
+
+    # Separate non-public entry point retained for the current authorized testing phase.
+    @core.app.get("/testing-app", include_in_schema=False)
+    def clinical_testing_entry() -> FileResponse:
         return FileResponse("static/index.html")
 
     core._cerai_public_site_installed = True
