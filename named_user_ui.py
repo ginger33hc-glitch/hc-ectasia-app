@@ -8,6 +8,7 @@ for a small authenticated navigation/session script injected at response time.
 from __future__ import annotations
 
 from html import escape
+import os
 from pathlib import Path
 from urllib.parse import quote
 from typing import Any
@@ -23,17 +24,10 @@ ARCHIVE_HTML = Path("static/archive.html")
 
 def _authenticated_root_html(display_name: str) -> str:
     html = ROOT_HTML.read_text(encoding="utf-8")
-    # Make the visual CER-AI logo itself a native link back to the public website.
-    # A real anchor is used instead of JavaScript so the navigation works reliably
-    # across browsers, touch devices, cached pages, and CSP/security wrappers.
     logo_frame = '<div class="brand-logo-frame"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Cornea Ectasia Risk Assessment Intelligence"></div>'
     linked_logo_frame = '<a href="/" class="brand-logo-frame" aria-label="Return to CER-AI website" title="Return to CER-AI website" style="display:block;cursor:pointer;text-decoration:none"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Cornea Ectasia Risk Assessment Intelligence"></a>'
     html = html.replace(logo_frame, linked_logo_frame, 1)
 
-    # ERSS is numeric-only. Remove visual morphology from the doctor's visible
-    # workflow while preserving one hidden compatibility element because the
-    # legacy frontend JavaScript still queries this id during plan assembly and
-    # completion rendering. Its value is always blank and has no scoring authority.
     html = html.replace(
         '<summary>Randleman topography — surgeon confirmation required</summary>',
         '<summary>Randleman I-S — surgeon confirmation required</summary>',
@@ -68,6 +62,17 @@ if (typeof ceraiFetch === "function") {{
     return html.replace("</body>", injection + "\n</body>")
 
 
+def _owner_entry_path() -> str:
+    raw = os.getenv("CERAI_OWNER_ENTRY_PATH", "").strip()
+    if not raw:
+        return ""
+    if not raw.startswith("/"):
+        raw = "/" + raw
+    if raw in {"/", "/app", "/testing-app", "/auth/login-page", "/archive-ui"}:
+        return ""
+    return raw
+
+
 def install(core: Any) -> None:
     if getattr(core, "_cerai_named_user_ui_installed", False):
         return
@@ -76,6 +81,8 @@ def install(core: Any) -> None:
     if enabled:
         import operational_security
         import user_access
+
+        owner_entry = _owner_entry_path()
 
         @core.app.get("/auth/login-page", include_in_schema=False)
         def login_page():
@@ -114,7 +121,11 @@ def install(core: Any) -> None:
         @core.app.middleware("http")
         async def named_user_page_gate(request, call_next):
             path = request.url.path
-            if request.method == "GET" and path in {"/app", "/testing-app", "/archive-ui"}:
+            guarded_paths = {"/app", "/testing-app", "/archive-ui"}
+            if owner_entry:
+                guarded_paths.add(owner_entry)
+
+            if request.method == "GET" and path in guarded_paths:
                 principal = core._cerai_authenticate_request(request)
                 if principal is None:
                     login_target = "/app" if path == "/testing-app" else path
@@ -123,6 +134,19 @@ def install(core: Any) -> None:
                         RedirectResponse(destination, status_code=303),
                         path,
                     )
+
+                if owner_entry and path == owner_entry:
+                    if str(getattr(principal, "role", "")).upper() != "OWNER":
+                        return operational_security._secure_response(
+                            HTMLResponse("Not Found", status_code=404),
+                            path,
+                        )
+                    response = HTMLResponse(
+                        _authenticated_root_html(principal.display_name),
+                        headers={"Cache-Control": "no-store"},
+                    )
+                    return operational_security._secure_response(response, path)
+
                 if path in {"/app", "/testing-app"}:
                     response = HTMLResponse(
                         _authenticated_root_html(principal.display_name),
