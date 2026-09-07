@@ -8,8 +8,8 @@ from __future__ import annotations
 from typing import Any, Mapping, Optional
 
 from clinical_core.pipeline import ClinicalCoreInput
+from clinical_core.ps3 import PS3EyeInput, PS3InterEyeInput
 from clinical_core.refraction import normalize_minus_cylinder
-import ps3_runtime_policy
 
 
 def _finite(value: Any) -> bool:
@@ -53,13 +53,54 @@ def _front_map_srax(eye):
     return value if value is not None and 0.0 <= value <= 90.0 else None
 
 
+def _surgeon_confirmed_srax(eye):
+    state = str(eye.get("srax") or "").upper()
+    if state not in {"YES", "NO"}:
+        return None
+    for item in (eye.get("field_provenance") or {}).get("srax") or []:
+        if isinstance(item, dict) and str(item.get("source") or "").upper() == "SURGEON_CONFIRMED":
+            return state
+    return None
+
+
+def _ps3_eye(eye, manifest):
+    srax_deg = _front_map_srax(eye)
+    return PS3EyeInput(
+        anterior_km_d=_first_number(eye, "Kmean_D"),
+        thinnest_um=_first_number(eye, "pachy_thinnest_um"),
+        topographic_astig_d=_first_number(eye, "topographic_astig_D"),
+        topographic_steep_axis_deg=_first_number(eye, "topographic_steep_axis_deg"),
+        manifest_astig_d=abs(manifest.cylinder_d) if manifest is not None else None,
+        manifest_axis_deg=manifest.axis_deg if manifest is not None else None,
+        ppi_avg=_first_number(eye, "PPI_avg"),
+        f_ele_th_um=_first_number(eye, "F_Ele_Th_um"),
+        b_ele_th_um=_first_number(eye, "B_Ele_Th_um"),
+        srax=None if srax_deg is not None else _surgeon_confirmed_srax(eye),
+        srax_deg=srax_deg,
+    )
+
+
 def build_inter_eye_ps3(extracted):
     source = {
         item.get("eye"): item
         for item in extracted.get("eyes", [])
         if item.get("eye") in {"OD", "OS"}
     }
-    return ps3_runtime_policy._inter_eye(source)
+    if set(source) != {"OD", "OS"}:
+        return None
+    od, os = source["OD"], source["OS"]
+    return PS3InterEyeInput(
+        od_anterior_km_d=_first_number(od, "Kmean_D"),
+        os_anterior_km_d=_first_number(os, "Kmean_D"),
+        od_posterior_km_d=_first_number(od, "posterior_Kmean_D"),
+        os_posterior_km_d=_first_number(os, "posterior_Kmean_D"),
+        od_thinnest_um=_first_number(od, "pachy_thinnest_um"),
+        os_thinnest_um=_first_number(os, "pachy_thinnest_um"),
+        od_front_elevation_thinnest_um=_first_number(od, "F_Ele_Th_um"),
+        os_front_elevation_thinnest_um=_first_number(os, "F_Ele_Th_um"),
+        od_back_elevation_thinnest_um=_first_number(od, "B_Ele_Th_um"),
+        os_back_elevation_thinnest_um=_first_number(os, "B_Ele_Th_um"),
+    )
 
 
 def build_clinical_core_input(eye, plan, *, age_years, extracted=None):
@@ -80,9 +121,6 @@ def build_clinical_core_input(eye, plan, *, age_years, extracted=None):
     i_s = _first_number(plan, "surgeon_I_S_D")
     if i_s is None:
         i_s = _first_number(eye, "I_S")
-
-    ps3_eye = ps3_runtime_policy._eye_input(dict(eye), dict(plan))
-    ps3_inter_eye = build_inter_eye_ps3(extracted) if extracted is not None else None
 
     return ClinicalCoreInput(
         procedure=procedure,
@@ -108,10 +146,9 @@ def build_clinical_core_input(eye, plan, *, age_years, extracted=None):
         ppi_min=_first_number(eye, "PPI_min"),
         ppi_avg=_first_number(eye, "PPI_avg"),
         ppi_max=_first_number(eye, "PPI_max"),
-        # NICE consumes the same canonical fields; there is no NICE-specific reader.
         nice_k2_d=_first_number(eye, "K2_D"),
         nice_central_pachy_um=_first_number(eye, "central_pachy_um"),
         nice_b_ele_th_um=_first_number(eye, "B_Ele_Th_um"),
-        ps3_eye=ps3_eye,
-        ps3_inter_eye=ps3_inter_eye,
+        ps3_eye=_ps3_eye(eye, manifest),
+        ps3_inter_eye=build_inter_eye_ps3(extracted) if extracted is not None else None,
     )
