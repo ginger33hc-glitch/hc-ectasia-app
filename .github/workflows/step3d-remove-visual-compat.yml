@@ -1,3 +1,4 @@
+# trigger: execute Step 3D guarded migration
 name: Step 3D remove visual compatibility
 on:
   pull_request:
@@ -34,7 +35,6 @@ jobs:
           if missing:
               raise SystemExit(f'app.py drift; missing markers: {missing}')
 
-          # Remove legacy visual fields from schema properties.
           patterns = [
               r'\n\s*"morphology": \{"type": "string", "enum": list\(MORPHOLOGY\)\},',
               r'\n\s*"morphology_evidence": \{"type": "array", "items": \{"type": "string"\}\},',
@@ -48,23 +48,14 @@ jobs:
               if n != 1:
                   raise SystemExit(f'expected exactly one schema removal for {p!r}, got {n}')
 
-          # Remove required-list entries and prompt sentence fragments.
           text = text.replace('                    "morphology",\n                    "morphology_evidence", "asymmetric_bow_tie", "srax", "srax_deg",\n                    "inferior_opposite_steepening_D",\n                    "anterior_pattern", "posterior_pattern",\n', '                    "srax", "srax_deg",\n')
           text = text.replace('General morphology outputs remain morphology=UNCERTAIN,\nmorphology_evidence=[], asymmetric_bow_tie=UNCERTAIN, and inferior_opposite_steepening_D=null.\n', '')
-
-          # Remove obsolete conservative/morphology merge setup.
           text = re.sub(r'\n\s*"srax_deg": "max", "inferior_opposite_steepening_D": "max",', '\n        "srax_deg": "max",', text)
           text = re.sub(r'\n\s*morphology_rank = \{.*?\n\s*\}\n', '\n', text, count=1, flags=re.S)
           text = re.sub(r'\n\s*posterior_rank = \{"UNREADABLE": 0, "REASSURING": 1, "BORDERLINE": 2, "ABNORMAL": 3\}\n', '\n', text, count=1)
-
-          # Remove visual provenance loop and morphology_evidence aggregation.
           text = re.sub(r'\n\s*for field in \("morphology", "anterior_pattern", "posterior_pattern", "asymmetric_bow_tie", "srax"\):\n\s*if eye\.get\(field\) is not None:\n\s*eye\["field_provenance"\]\[field\] = \[\{"file": source_filename, "source": "VISUAL_CLASSIFICATION"\}\]\n', '\n', text, count=1)
           text = re.sub(r'\n\s*target\["morphology_evidence"\] = list\(\n\s*dict\.fromkeys\(target\.get\("morphology_evidence", \[\]\) \+ eye\.get\("morphology_evidence", \[\]\)\)\n\s*\)\n', '\n', text, count=1)
-
-          # Remove visual fields from merge skip tuple.
           text = text.replace('                    "morphology_evidence", "source_files", "quality_by_source", "_source_filename",\n', '                    "source_files", "quality_by_source", "_source_filename",\n')
-
-          # Remove visual special-case merge and conflict-resolution branches.
           text = re.sub(r'\n\s*# Missing/uncertain information on a page that lacks the relevant map is not\n\s*# contradictory evidence against a readable observation on another page\.\n\s*if key == "morphology":.*?\n\s*if key in planning_conflict_fields:', '\n                if key in planning_conflict_fields:', text, count=1, flags=re.S)
           text = re.sub(r'\n\s*elif key == "morphology":.*?\n\s*elif old != value:', '\n                elif old != value:', text, count=1, flags=re.S)
 
@@ -80,14 +71,12 @@ jobs:
           ast.parse(g)
           geo.write_text(g)
 
-          # Retire obsolete visual inter-eye implementation and its dedicated tests.
           for path in ('inter_eye_tomography.py', 'tests/test_inter_eye_tomography.py'):
               p = Path(path)
               if not p.exists():
                   raise SystemExit(f'missing expected legacy path {path}')
               p.unlink()
 
-          # Cleanup contract: no automated visual merge machinery remains in app.
           t = Path('tests/test_phase4_cleanup_contract.py').read_text()
           marker = '    assert "numeric_tolerance" not in text\n'
           if marker not in t:
