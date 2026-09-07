@@ -1,15 +1,22 @@
 """Explicit side-effect-free CER-AI clinical-core pipeline.
 
-This is the Phase 2 parallel orchestrator.  It starts from already-normalized
-clinical values and calls pure modules in a fixed, auditable order.  It is not
-yet wired into the production FastAPI runtime.
+Pipeline stages calculate structured findings only. ``finalize_disposition`` is
+the sole owner of final PASS/CAUTION/STOP-DEFER/ASSESSMENT INCOMPLETE.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 from typing import Optional
 
-from .disposition import CAUTION, DATA_INSUFFICIENT, PASS, STOP_DEFER, combine_status
+from .disposition import (
+    ASSESSMENT_INCOMPLETE,
+    CAUTION,
+    PASS,
+    STOP_DEFER,
+    DecisionFinding,
+    finalize_disposition,
+)
 from .erss import erss_disposition, erss_total
 from .nice import nice_disposition, score_nice
 from .ps3 import PS3EyeInput, PS3InterEyeInput, evaluate_ps3
@@ -17,7 +24,6 @@ from .rules import bad_d_classification
 from .safety import (
     estimated_final_kmean_d,
     final_kmean_hard_stop,
-    lasik_pta_hard_stop,
     lasik_pta_percent,
     lasik_rsb_hard_stop,
     lasik_rsb_um,
@@ -34,7 +40,7 @@ PIPELINE_ORDER = (
     "nice",
     "ps3",
     "procedural_safety",
-    "disposition_aggregation",
+    "final_disposition",
 )
 
 
@@ -59,6 +65,10 @@ class ClinicalCoreInput:
     ps3_inter_eye: Optional[PS3InterEyeInput] = None
 
 
+def _finite(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and isfinite(float(value))
+
+
 def _bad_d_disposition(classification: str) -> str:
     if classification == "ABNORMAL":
         return STOP_DEFER
@@ -66,33 +76,50 @@ def _bad_d_disposition(classification: str) -> str:
         return CAUTION
     if classification == "NORMAL":
         return PASS
-    return DATA_INSUFFICIENT
+    return ASSESSMENT_INCOMPLETE
 
 
 def _ps3_procedure_disposition(ps3_result, procedure: str) -> str:
     if ps3_result is None:
-        return DATA_INSUFFICIENT
-    key = (procedure or "").strip().upper()
-    value = {
+        return ASSESSMENT_INCOMPLETE
+    selected = {
         "LASIK": ps3_result.disposition.lasik,
         "PRK": ps3_result.disposition.prk,
         "SMILE": ps3_result.disposition.smile,
-    }.get(key)
-    if value == "DEFER":
+    }.get((procedure or "").strip().upper())
+    if selected == "DEFER":
         return STOP_DEFER
-    if value == "ALLOWED":
+    if selected == "ALLOWED" and ps3_result.complete:
         return PASS
-    return DATA_INSUFFICIENT
+    return ASSESSMENT_INCOMPLETE
+
+
+def _safety_status(procedure: str, inp: ClinicalCoreInput, rsb, rst, final_k) -> tuple[str, dict]:
+    hard_stops = {
+        "preop_thickness": preop_thickness_hard_stop(inp.thinnest_um),
+        "sphere_magnitude": sphere_magnitude_hard_stop(inp.intended_sphere_d),
+        "lasik_rsb": procedure == "LASIK" and lasik_rsb_hard_stop(rsb),
+        "prk_rst": procedure == "PRK" and prk_rst_hard_stop(rst),
+        "final_kmean": final_kmean_hard_stop(final_k),
+    }
+    if any(hard_stops.values()):
+        return STOP_DEFER, hard_stops
+
+    required = [inp.thinnest_um, inp.intended_sphere_d, inp.ablation_um, inp.preop_kmean_d, inp.intended_mrse_d]
+    if procedure == "LASIK":
+        required.append(inp.flap_um)
+    if not all(_finite(value) for value in required):
+        return ASSESSMENT_INCOMPLETE, hard_stops
+    if procedure == "LASIK" and rsb is None:
+        return ASSESSMENT_INCOMPLETE, hard_stops
+    if procedure == "PRK" and rst is None:
+        return ASSESSMENT_INCOMPLETE, hard_stops
+    if final_k is None:
+        return ASSESSMENT_INCOMPLETE, hard_stops
+    return PASS, hard_stops
 
 
 def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
-    """Evaluate the extracted pure-core stages in one explicit order.
-
-    This is intentionally not the complete production engine yet: readiness,
-    identity/source validation, contact-lens washout, clinical eligibility,
-    treatment-card reconciliation, planning fallback, reporting and archive
-    remain outside this function until their own Phase 2 extraction gates pass.
-    """
     procedure = (inp.procedure or "").strip().upper()
 
     rsb = lasik_rsb_um(inp.thinnest_um, inp.flap_um, inp.ablation_um) if procedure == "LASIK" else None
@@ -123,23 +150,22 @@ def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
         inp.i_s_d,
     )
     nice_status = nice_disposition(nice["total"])
+    if nice_status == "DATA INSUFFICIENT":
+        nice_status = ASSESSMENT_INCOMPLETE
 
     ps3_result = evaluate_ps3(inp.ps3_eye, inp.ps3_inter_eye) if inp.ps3_eye is not None else None
     ps3_status = _ps3_procedure_disposition(ps3_result, procedure)
 
-    safety_stops = {
-        "preop_thickness": preop_thickness_hard_stop(inp.thinnest_um),
-        "sphere_magnitude": sphere_magnitude_hard_stop(inp.intended_sphere_d),
-        "lasik_rsb": procedure == "LASIK" and lasik_rsb_hard_stop(rsb),
-        "lasik_pta": procedure == "LASIK" and lasik_pta_hard_stop(pta),
-        "prk_rst": procedure == "PRK" and prk_rst_hard_stop(rst),
-        "final_kmean": final_kmean_hard_stop(final_k),
-    }
-    safety_status = STOP_DEFER if any(safety_stops.values()) else PASS
+    safety_status, safety_stops = _safety_status(procedure, inp, rsb, rst, final_k)
 
-    overall = PASS
-    for status in (erss_status, bad_status, nice_status, ps3_status, safety_status):
-        overall = combine_status(overall, status)
+    findings = (
+        DecisionFinding("randleman_erss", erss_status, "LASIK ERSS" if procedure == "LASIK" else "Not applicable"),
+        DecisionFinding("bad_d", bad_status, f"Final BAD-D: {bad_class}"),
+        DecisionFinding("nice", nice_status, f"NICE total: {nice.get('total')!r}"),
+        DecisionFinding("ps3", ps3_status, "PS3 procedure disposition"),
+        DecisionFinding("procedural_safety", safety_status, "Independent tissue/refractive safety gates"),
+    )
+    final = finalize_disposition(findings)
 
     return {
         "pipeline_order": PIPELINE_ORDER,
@@ -159,5 +185,7 @@ def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
             "hard_stops": safety_stops,
             "status": safety_status,
         },
-        "status": overall,
+        "decision_findings": findings,
+        "final_disposition": final,
+        "status": final.status,
     }
