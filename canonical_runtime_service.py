@@ -24,6 +24,9 @@ from clinical_core.disposition import (
     finalize_disposition,
 )
 from clinical_core.pipeline import evaluate_normalized_case
+from clinical_core.report_payload import build_report_payload
+from clinical_core.version import CLINICAL_POLICY_VERSION, SRAX_POLICY_VERSION
+from pentacam_canonical_source_lock import POLICY_VERSION as SOURCE_REGISTRY_VERSION
 
 POST_REFRACTIVE = "POST-REFRACTIVE PATHWAY REQUIRED"
 SUPPORTED_PROCEDURES = frozenset({"LASIK", "PRK", "SMILE"})
@@ -110,7 +113,29 @@ def _action(status: str) -> str:
     return "Clinical review required."
 
 
-def _virgin_eye_payload(eye_name: str, core_result: Mapping[str, Any]) -> dict[str, Any]:
+def _report_payload(
+    eye_name: str,
+    source_eye: Mapping[str, Any],
+    core_result: Mapping[str, Any],
+    software_version: str | None,
+) -> dict[str, Any]:
+    return build_report_payload(
+        core_result,
+        eye=eye_name,
+        software_version=software_version or "UNSPECIFIED",
+        clinical_policy_version=CLINICAL_POLICY_VERSION,
+        source_registry_version=SOURCE_REGISTRY_VERSION,
+        srax_algorithm_version=SRAX_POLICY_VERSION,
+        manual_corrections=source_eye.get("surgeon_corrections") or (),
+    )
+
+
+def _virgin_eye_payload(
+    eye_name: str,
+    source_eye: Mapping[str, Any],
+    core_result: Mapping[str, Any],
+    software_version: str | None,
+) -> dict[str, Any]:
     safety = core_result.get("procedural_safety") or {}
     status = str(core_result.get("status") or ASSESSMENT_INCOMPLETE)
     bad = core_result.get("bad_d") or {}
@@ -132,6 +157,7 @@ def _virgin_eye_payload(eye_name: str, core_result: Mapping[str, Any]) -> dict[s
         "reasons": _decision_reasons(core_result),
         "warnings": [],
         "missing": _missing(core_result),
+        "report_payload": _report_payload(eye_name, source_eye, core_result, software_version),
         "canonical_result": _plain(core_result),
     }
 
@@ -151,6 +177,7 @@ def _post_refractive_eye_payload(eye_name: str) -> dict[str, Any]:
         "reasons": ["Prior corneal refractive surgery requires a separate pathway."],
         "warnings": [],
         "missing": [],
+        "report_payload": None,
         "canonical_result": None,
     }
 
@@ -205,6 +232,7 @@ def evaluate_case(
                 "reasons": ["Supported procedure is required."],
                 "warnings": [],
                 "missing": ["procedure"],
+                "report_payload": None,
                 "canonical_result": None,
             })
             continue
@@ -214,11 +242,17 @@ def evaluate_case(
             age_years=age_years,
             extracted=extracted,
         )
-        results.append(_virgin_eye_payload(eye_name, evaluate_normalized_case(normalized)))
+        core_result = evaluate_normalized_case(normalized)
+        results.append(_virgin_eye_payload(eye_name, eye, core_result, software_version))
 
     return {
         "status": _overall_status(results) if results else ASSESSMENT_INCOMPLETE,
         "eyes": results,
         "version": software_version,
+        "policy_versions": {
+            "clinical": CLINICAL_POLICY_VERSION,
+            "source_registry": SOURCE_REGISTRY_VERSION,
+            "srax": SRAX_POLICY_VERSION,
+        },
         "engine": "CERAI_CANONICAL_CLINICAL_CORE",
     }
