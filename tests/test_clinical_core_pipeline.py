@@ -154,12 +154,12 @@ def test_pta_is_reported_but_not_a_global_stop_driver():
     assert "lasik_pta" not in result["procedural_safety"]["hard_stops"]
 
 
-def test_erss_rsb_and_mrse_points_match_current_production_functions():
+def test_erss_rsb_and_mrse_boundary_contract_is_canonical():
     from clinical_core.erss import erss_mrse_points, erss_rsb_points
-    rsb_values = (239.999, 240, 260, 280, 300)
-    mrse_values = (-14.001, -14, -12, -10, -8)
-    assert [erss_rsb_points(v) for v in rsb_values] == [core.lasik_rsb_points(v) for v in rsb_values]
-    assert [erss_mrse_points(v) for v in mrse_values] == [core.lasik_mrse_points(v) for v in mrse_values]
+    rsb_values = (239.999, 240, 259.999, 260, 279.999, 280, 299.999, 300)
+    mrse_values = (-14.001, -14, -12.001, -12, -10.001, -10, -8.001, -8)
+    assert [erss_rsb_points(v) for v in rsb_values] == [4, 3, 3, 2, 2, 1, 1, 0]
+    assert [erss_mrse_points(v) for v in mrse_values] == [4, 3, 3, 2, 2, 1, 1, 0]
 
 
 def test_importing_pipeline_does_not_mutate_production_runtime():

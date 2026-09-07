@@ -58,6 +58,13 @@ def test_app_no_longer_defines_or_calls_legacy_clinical_engine():
     assert "from nice_policy import attach_readings" not in text
     assert "attach_readings(" not in text
     assert "def merge_extractions(" in text
+    retired_helpers = {
+        "bad_classification", "lasik_topography_points", "scoring_morphology",
+        "lasik_rsb_points", "age_points", "lasik_pachy_points", "lasik_mrse_points",
+        "prk_morphology_points", "prk_pachy_points", "score_category", "tomography_review",
+        "estimate_ablation", "refractive_pattern", "required_tomography_missing",
+    }
+    assert retired_helpers.isdisjoint(top_level_functions)
 
 
 def test_retirement_record_exists_and_names_canonical_authority():

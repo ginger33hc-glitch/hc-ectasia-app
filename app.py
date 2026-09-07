@@ -591,321 +591,32 @@ def validate_plan(plan: Dict[str, Any]) -> List[str]:
     return errors
 
 
-def bad_classification(value: Optional[float], final: bool = False) -> str:
-    if not is_number(value):
-        return "UNAVAILABLE"
-    if final:
-        if value <= 1.6:
-            return "NORMAL"
-        if value < 2.6:
-            return "SUSPICIOUS"
-        return "ABNORMAL"
-    if value < 1.6:
-        return "NORMAL"
-    if value < 2.6:
-        return "SUSPICIOUS"
-    return "ABNORMAL"
 
 
-def lasik_topography_points(morphology: str) -> Optional[int]:
-    return {
-        "NORMAL_SYMMETRIC": 0,
-        "ASYMMETRIC_BOWTIE": 1,
-        "INFERIOR_STEEPENING_SRA": 3,
-        "ABNORMAL_ECTATIC": 4,
-    }.get(morphology)
 
 
-def scoring_morphology(eye: Dict[str, Any]) -> Dict[str, Any]:
-    """Apply published ERSS Placido definitions without declaring disease from one index."""
-    reported_category = eye.get("morphology", "UNCERTAIN")
-    category = reported_category
-    evidence = list(eye.get("morphology_evidence", []))
-    i_s = eye.get("I_S")
-    srax_deg = eye.get("srax_deg")
-    inferior_opposite = eye.get("inferior_opposite_steepening_D")
-    srax_supported = is_number(srax_deg) and srax_deg >= 20
-    inferior_supported = (
-        is_number(inferior_opposite)
-        and inferior_opposite >= 1.0
-        and is_number(i_s)
-        and i_s < 1.4
-    )
-    asymmetric_supported = (
-        is_number(inferior_opposite)
-        and 0.5 < inferior_opposite < 1.0
-        and not srax_supported
-    )
-    if reported_category == "ABNORMAL_ECTATIC":
-        category = "ABNORMAL_ECTATIC"
-    elif is_number(i_s) and i_s >= 1.4:
-        category = "ABNORMAL_ECTATIC"
-        evidence.append("Published Placido-era ERSS abnormal-pattern criterion: I-S >=1.4 D.")
-    elif srax_supported or inferior_supported:
-        category = "INFERIOR_STEEPENING_SRA"
-        if srax_supported:
-            evidence.append("Published ERSS SRA/SRAX category supported: SRA/SRAX >=20 degrees.")
-        if inferior_supported:
-            evidence.append(
-                "Published ERSS inferior-steepening category supported: >=1.0 D versus the opposite "
-                "region with I-S <1.4 D."
-            )
-    elif reported_category == "INFERIOR_STEEPENING_SRA" or eye.get("srax") == "YES":
-        category = "UNCERTAIN"
-        evidence.append(
-            "SRAX/inferior-steepening label not scored: neither SRA/SRAX >=20 degrees nor the "
-            ">=1.0 D inferior-opposite criterion with I-S <1.4 D was documented."
-        )
-    elif reported_category == "ASYMMETRIC_BOWTIE" or eye.get("asymmetric_bow_tie") == "YES":
-        if asymmetric_supported:
-            category = "ASYMMETRIC_BOWTIE"
-            evidence.append(
-                "Published ERSS asymmetric-bowtie category supported: >0.5 D and <1.0 D "
-                "versus the region 180 degrees opposite, without SRA."
-            )
-        else:
-            category = "UNCERTAIN"
-            evidence.append(
-                "Asymmetric-bowtie label not scored: the required >0.5 D and <1.0 D "
-                "opposite-region difference without SRA was not documented."
-            )
-    return {"category": category, "evidence": list(dict.fromkeys(evidence))}
 
 
-def lasik_rsb_points(rsb: Optional[float]) -> Optional[int]:
-    if not is_number(rsb):
-        return None
-    if rsb < 240:
-        return 4
-    if rsb < 260:
-        return 3
-    if rsb < 280:
-        return 2
-    if rsb < 300:
-        return 1
-    return 0
 
 
-def age_points(age: Optional[int]) -> Optional[int]:
-    if not is_number(age) or age < 18:
-        return None
-    if age <= 21:
-        return 3
-    if age <= 25:
-        return 2
-    if age <= 29:
-        return 1
-    return 0
 
 
-def lasik_pachy_points(pachy: Optional[float]) -> Optional[int]:
-    if not is_number(pachy):
-        return None
-    # The printed ERSS table leaves 450 µm unstated and places 510 µm on
-    # conflicting/overlapping boundaries. Do not silently adjudicate either.
-    if pachy in (450, 510):
-        return None
-    if pachy < 450:
-        return 4
-    if pachy <= 480:
-        return 3
-    if pachy <= 510:
-        return 2
-    return 0
 
 
-def lasik_mrse_points(mrse: Optional[float]) -> Optional[int]:
-    if not is_number(mrse):
-        return None
-    if mrse < -14:
-        return 4
-    if mrse < -12:
-        return 3
-    if mrse < -10:
-        return 2
-    if mrse < -8:
-        return 1
-    return 0
 
 
-def prk_morphology_points(morphology: str) -> Optional[int]:
-    return {
-        "NORMAL_SYMMETRIC": 0,
-        "ASYMMETRIC_BOWTIE": 2,
-        "INFERIOR_STEEPENING_SRA": 5,
-        # A numeric Placido abnormal-pattern criterion yields high concern but
-        # is not, by itself, relabeled as a definite-disease override.
-        "ABNORMAL_ECTATIC": 5,
-    }.get(morphology)
 
 
-def prk_pachy_points(pachy: Optional[float]) -> Optional[int]:
-    if not is_number(pachy):
-        return None
-    if pachy <= 450:
-        return 4
-    if pachy <= 480:
-        return 3
-    if pachy <= 510:
-        return 2
-    return 0
 
 
-def score_category(procedure: str, score: int) -> str:
-    if procedure == "LASIK":
-        if score <= 2:
-            return "LOW"
-        if score == 3:
-            return "MODERATE"
-        return "HIGH"
-    if score <= 1:
-        return "LOWER_FLAGGED_BURDEN"
-    if score <= 3:
-        return "CAUTION"
-    return "HIGH_CONCERN"
 
 
-def tomography_review(eye: Dict[str, Any]) -> Dict[str, Any]:
-    bad = {"BAD_D": bad_classification(eye.get("BAD_D"), final=True)}
-    for key in ("Df", "Db", "Dp", "Dt", "Da"):
-        bad[key] = bad_classification(eye.get(key))
-
-    flags: List[str] = []
-    if is_number(eye.get("ARTmax_um")) and eye["ARTmax_um"] <= 424:
-        flags.append("ARTmax <=424 µm: cross-sectional subclinical-KC concern flag.")
-    if is_number(eye.get("pachy_thinnest_um")) and eye["pachy_thinnest_um"] <= 544:
-        flags.append("Thinnest pachymetry <=544 µm: cross-sectional phenotype flag, not an exclusion cutoff.")
-    if is_number(eye.get("Dt")) and eye["Dt"] >= -0.165:
-        flags.append("BAD-Dt >=-0.165: cross-sectional subclinical-KC concern flag.")
-    if is_number(eye.get("Da")) and eye["Da"] >= 0.585:
-        flags.append("BAD-Da >=0.585: cross-sectional subclinical-KC concern flag.")
-
-    display_values = list(bad.values())
-    map_patterns = (eye.get("anterior_pattern"), eye.get("posterior_pattern"))
-    if "ABNORMAL" in display_values or "ABNORMAL" in map_patterns:
-        status = "ABNORMAL"
-    elif "SUSPICIOUS" in display_values or "BORDERLINE" in map_patterns:
-        status = "SUSPICIOUS"
-    elif "UNAVAILABLE" in display_values or "UNREADABLE" in map_patterns:
-        status = "INCOMPLETE"
-    elif flags:
-        status = "CONCERN FLAGS"
-    else:
-        status = "REASSURING"
-
-    return {
-        "status": status,
-        "BAD_display": bad,
-        "cross_sectional_flags": flags,
-        "evidence_note": (
-            "BAD and ARTmax/TP/Dt/Da thresholds are adjunctive diagnostic/review signals; "
-            "they are not independently validated predictors of post-refractive ectasia."
-        ),
-    }
 
 
-def estimate_ablation(plan: Dict[str, Any], warnings: List[str]) -> Optional[float]:
-    ablation = plan.get("ablation_um")
-    if is_number(ablation) and 0 <= float(ablation) <= 400:
-        return float(ablation)
-    if ablation is not None:
-        return None
-    sphere = plan.get("intended_sphere_D")
-    cylinder = plan.get("intended_cylinder_magnitude_D")
-    optical_zone = plan.get("optical_zone_mm")
-    platform = str(plan.get("laser_platform") or "").lower().replace(" ", "")
-    is_ex500 = "alcon" in platform and "ex500" in platform
-    ablation_rate = {6.0: 12.0, 6.5: 15.0, 7.0: 16.33}.get(optical_zone) if is_ex500 else None
-    if is_number(sphere) and sphere > 0:
-        warnings.append(
-            "The CER-AI linear EX500 ablation estimate is not applied to a hyperopic or mixed-meridian plan; "
-            "enter the actual laser-plan maximum ablation."
-        )
-        return None
-    if is_number(sphere) and is_number(cylinder) and ablation_rate is not None:
-        warnings.append(
-            f"Maximum ablation estimated with the CER-AI Alcon EX500, {optical_zone:.1f}-mm-zone, "
-            f"{ablation_rate:g} µm/D convention; "
-            "actual laser-plan maximum is preferred."
-        )
-        return (abs(float(sphere)) + abs(float(cylinder))) * ablation_rate
-    if is_number(sphere) and is_number(cylinder):
-        warnings.append(
-            "The CER-AI ablation estimate was not applied because an Alcon EX500 with a 6.0-mm, "
-            "6.5-mm, or 7.0-mm optical zone was not explicitly documented."
-        )
-    return None
 
 
-def refractive_pattern(sphere: Any, cylinder_magnitude: Any) -> Dict[str, Any]:
-    """Classify a correction from its two principal meridians in minus-cylinder notation."""
-    if not is_number(sphere) or not is_number(cylinder_magnitude):
-        return {"category": "UNAVAILABLE", "principal_meridians_D": [None, None]}
-    meridian_1 = float(sphere)
-    meridian_2 = float(sphere) - float(cylinder_magnitude)
-    eps = 1e-9
-    if abs(meridian_1) <= eps:
-        meridian_1 = 0.0
-    if abs(meridian_2) <= eps:
-        meridian_2 = 0.0
-    if meridian_1 > 0 and meridian_2 > 0:
-        category = "HYPEROPIC"
-    elif meridian_1 > 0 and meridian_2 < 0:
-        category = "MIXED_ASTIGMATISM"
-    elif meridian_1 < 0 and meridian_2 < 0:
-        category = "MYOPIC"
-    elif meridian_1 > 0 and meridian_2 == 0:
-        category = "SIMPLE_HYPEROPIC_ASTIGMATISM"
-    elif meridian_1 == 0 and meridian_2 < 0:
-        category = "SIMPLE_MYOPIC_ASTIGMATISM"
-    elif meridian_1 == 0 and meridian_2 == 0:
-        category = "PLANO"
-    else:
-        category = "UNCLASSIFIED"
-    return {"category": category, "principal_meridians_D": [meridian_1, meridian_2]}
 
 
-def required_tomography_missing(eye: Dict[str, Any]) -> List[str]:
-    required = (
-        "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp", "Dt", "Da", "ARTmax_um", "PPI_max"
-    )
-    missing = [key for key in required if not is_number(eye.get(key))]
-    derived = scoring_morphology(eye)["category"]
-    if derived not in MORPHOLOGY or derived == "UNCERTAIN":
-        missing.append("classifiable topographic morphology")
-    if eye.get("posterior_pattern") in (None, "UNREADABLE"):
-        missing.append("readable posterior pattern")
-    if eye.get("anterior_pattern") in (None, "UNREADABLE"):
-        missing.append("readable anterior pattern")
-    plausible_ranges = {
-        "pachy_thinnest_um": (300, 800), "K1_D": (20, 80), "K2_D": (20, 80),
-        "K1_axis_deg": (0, 180), "K2_axis_deg": (0, 180), "Kmax_D": (20, 90),
-        "corneal_diameter_mm": (8, 16), "ARTmax_um": (1, 1000), "PPI_min": (0.01, 10),
-        "PPI_avg": (0.01, 10), "PPI_max": (0.01, 10), "Rmin_mm": (3, 15),
-        "thinnest_x_mm": (-10, 10), "thinnest_y_mm": (-10, 10),
-        "anterior_elevation_thinnest_um": (-300, 300),
-        "posterior_elevation_thinnest_um": (-300, 300),
-    }
-    for field, (low, high) in plausible_ranges.items():
-        value = eye.get(field)
-        if value is not None and (not is_number(value) or not low <= float(value) <= high):
-            missing.append(f"plausible {field} ({low} to {high})")
-    ppi_min, ppi_avg, ppi_max = eye.get("PPI_min"), eye.get("PPI_avg"), eye.get("PPI_max")
-    if all(is_number(value) for value in (ppi_min, ppi_avg, ppi_max)) and not (
-        float(ppi_min) <= float(ppi_avg) <= float(ppi_max)
-    ):
-        missing.append("internally consistent PPI minimum/average/maximum")
-    # Defensive compatibility filter: legacy/cached extraction payloads may still contain
-    # conflicts for descriptive, non-decision fields. They must never prohibit PASS.
-    non_decision_conflict_fields = {
-        "K1_D", "K2_D", "thinnest_x_mm", "thinnest_y_mm", "morphology_confidence"
-    }
-    for conflict in eye.get("data_conflicts", []):
-        conflict_field = str(conflict).split(":", 1)[0].strip()
-        if conflict_field in non_decision_conflict_fields:
-            continue
-        missing.append(f"unresolved multi-image conflict: {conflict}")
-    return missing
 
 
 
@@ -977,14 +688,6 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             eye["missing_or_unreadable"] = list(dict.fromkeys(missing))
             eye["table_verified_numeric_fields"] = sorted(verified_set)
             eye["map_fallback_numeric_fields"] = sorted(fallback_set)
-        derived = scoring_morphology(eye)["category"]
-        eye["scoring_morphology"] = derived
-        if eye.get("morphology") in ("ASYMMETRIC_BOWTIE", "INFERIOR_STEEPENING_SRA") and derived == "UNCERTAIN":
-            eye["morphology"] = "UNCERTAIN"
-        if eye.get("asymmetric_bow_tie") == "YES" and derived != "ASYMMETRIC_BOWTIE":
-            eye["asymmetric_bow_tie"] = "UNCERTAIN"
-        if eye.get("srax") == "YES" and derived != "INFERIOR_STEEPENING_SRA":
-            eye["srax"] = "UNCERTAIN"
         return eye
 
     for result in results:
