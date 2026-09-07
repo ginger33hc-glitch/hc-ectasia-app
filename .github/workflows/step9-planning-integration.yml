@@ -1,3 +1,4 @@
+# trigger
 name: Step 9 canonical planning integration
 on:
   pull_request:
@@ -54,7 +55,6 @@ jobs:
           ast.parse(t)
           p.write_text(t)
 
-          # Runtime orchestration: same canonical core for every candidate.
           p = Path('canonical_runtime_service.py')
           t = p.read_text()
           import_marker = 'from clinical_core.pipeline import evaluate_normalized_case\n'
@@ -122,295 +122,69 @@ def _candidate_rejection_reasons(core_result, eligibility_missing=()):
     return (str(core_result.get("status") or ASSESSMENT_INCOMPLETE),)
 
 
-def _evaluate_lasik_planning(
-    eye_name,
-    source_eye,
-    resolved_plan,
-    *,
-    age_years,
-    extracted,
-    eligibility,
-):
-    preliminary = build_clinical_core_input(
-        source_eye,
-        resolved_plan,
-        age_years=age_years,
-        extracted=extracted,
-        plan_already_resolved=True,
-    )
+def _evaluate_lasik_planning(eye_name, source_eye, resolved_plan, *, age_years, extracted, eligibility):
+    preliminary = build_clinical_core_input(source_eye, resolved_plan, age_years=age_years, extracted=extracted, plan_already_resolved=True)
     if not _finite_number(resolved_plan.get("flap_um")):
         core_result = evaluate_normalized_case(preliminary, external_findings=eligibility.findings)
-        return core_result, dict(resolved_plan), {
-            "selected_plan": None,
-            "sequence": [],
-            "rejection_reasons": ["LASIK flap selection required before automatic A/B/C planning."],
-            "mmc_guidance": "NOT_APPLICABLE",
-        }
-
+        return core_result, dict(resolved_plan), {"selected_plan": None, "sequence": [], "rejection_reasons": ["LASIK flap selection required before automatic A/B/C planning."], "mmc_guidance": "NOT_APPLICABLE"}
     intended_refraction = _intended_refraction_from_input(preliminary)
     intended_group = refractive_group(intended_refraction) if intended_refraction is not None else None
     candidate_meta = {}
-
     def evaluator(spec):
         candidate = dict(resolved_plan)
         candidate["plan_name"] = spec["name"]
         candidate["flap_um"] = float(spec["flap_um"])
         candidate["optical_zone_mm"] = float(spec["optical_zone_mm"])
         candidate["transition_zone_mm"] = float(spec["transition_zone_mm"])
-        ablation, source = _candidate_ablation(
-            resolved_plan,
-            spec,
-            intended_group,
-            preliminary.intended_mrse_d,
-        )
+        ablation, source = _candidate_ablation(resolved_plan, spec, intended_group, preliminary.intended_mrse_d)
         candidate["ablation_source"] = source
         if ablation is None:
             reason = "Actual maximum ablation is required for this plan; the myopic linear estimate is not permitted for this refractive profile."
-            candidate_meta[spec["name"]] = {
-                "candidate_plan": candidate,
-                "status": ASSESSMENT_INCOMPLETE,
-                "ablation_um": None,
-                "ablation_source": source,
-            }
+            candidate_meta[spec["name"]] = {"candidate_plan": candidate, "status": ASSESSMENT_INCOMPLETE, "ablation_um": None, "ablation_source": source}
             return PlanEvaluation(spec["name"], False, (reason,))
         candidate["ablation_um"] = float(ablation)
         candidate["max_ablation_um"] = float(ablation)
-        normalized = build_clinical_core_input(
-            source_eye,
-            candidate,
-            age_years=age_years,
-            extracted=extracted,
-            plan_already_resolved=True,
-        )
-        core_result = evaluate_normalized_case(
-            normalized,
-            external_findings=eligibility.findings,
-        )
+        normalized = build_clinical_core_input(source_eye, candidate, age_years=age_years, extracted=extracted, plan_already_resolved=True)
+        core_result = evaluate_normalized_case(normalized, external_findings=eligibility.findings)
         status = str(core_result.get("status") or ASSESSMENT_INCOMPLETE)
         safe = status in {PASS, CAUTION}
         reasons = () if safe else _candidate_rejection_reasons(core_result, eligibility.missing)
-        candidate_meta[spec["name"]] = {
-            "candidate_plan": candidate,
-            "status": status,
-            "ablation_um": float(ablation),
-            "ablation_source": source,
-        }
+        candidate_meta[spec["name"]] = {"candidate_plan": candidate, "status": status, "ablation_um": float(ablation), "ablation_source": source}
         return PlanEvaluation(spec["name"], safe, reasons, core_result)
-
     selected = select_first_safe_lasik_plan(evaluator)
     sequence = []
     for evaluation in selected.sequence:
         spec = next(item for item in LASIK_PLANS if item["name"] == evaluation.plan)
         meta = candidate_meta[evaluation.plan]
-        sequence.append({
-            "plan": evaluation.plan,
-            "safe": evaluation.safe,
-            "rejection_reasons": list(evaluation.rejection_reasons),
-            "status": meta["status"],
-            "flap_um": float(spec["flap_um"]),
-            "optical_zone_mm": float(spec["optical_zone_mm"]),
-            "transition_zone_mm": float(spec["transition_zone_mm"]),
-            "ablation_um": meta["ablation_um"],
-            "ablation_source": meta["ablation_source"],
-        })
-
-    planning = {
-        "selected_plan": selected.selected_plan,
-        "sequence": sequence,
-        "rejection_reasons": [],
-        "mmc_guidance": "NOT_APPLICABLE",
-    }
+        sequence.append({"plan": evaluation.plan, "safe": evaluation.safe, "rejection_reasons": list(evaluation.rejection_reasons), "status": meta["status"], "flap_um": float(spec["flap_um"]), "optical_zone_mm": float(spec["optical_zone_mm"]), "transition_zone_mm": float(spec["transition_zone_mm"]), "ablation_um": meta["ablation_um"], "ablation_source": meta["ablation_source"]})
+    planning = {"selected_plan": selected.selected_plan, "sequence": sequence, "rejection_reasons": [], "mmc_guidance": "NOT_APPLICABLE"}
     if selected.selected_plan is not None:
         evaluation = next(item for item in selected.sequence if item.plan == selected.selected_plan)
         return evaluation.result, dict(candidate_meta[selected.selected_plan]["candidate_plan"]), planning
-
     evaluated = [item for item in selected.sequence if item.result is not None]
-    core_result = (
-        evaluated[-1].result
-        if evaluated
-        else evaluate_normalized_case(preliminary, external_findings=eligibility.findings)
-    )
+    core_result = evaluated[-1].result if evaluated else evaluate_normalized_case(preliminary, external_findings=eligibility.findings)
     return core_result, dict(resolved_plan), planning
 
 
 def _non_lasik_planning(procedure, normalized, core_result):
-    return {
-        "selected_plan": None,
-        "sequence": [],
-        "rejection_reasons": [],
-        "mmc_guidance": mmc_guidance(
-            procedure,
-            core_result.get("intended_refractive_group"),
-            normalized.intended_mrse_d,
-        ),
-    }
+    return {"selected_plan": None, "sequence": [], "rejection_reasons": [], "mmc_guidance": mmc_guidance(procedure, core_result.get("intended_refractive_group"), normalized.intended_mrse_d)}
 '''
           if '_evaluate_lasik_planning(' not in t:
               if t.count(helper_marker) != 1:
                   raise SystemExit('runtime helper insertion marker drifted')
               t = t.replace(helper_marker, helpers + helper_marker, 1)
 
-          # Replace _virgin_eye_payload with planning-aware projection.
           module = ast.parse(t)
           funcs = {node.name: node for node in module.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
           node = funcs.get('_virgin_eye_payload')
           if node is None:
               raise SystemExit('_virgin_eye_payload not found')
-          new_func = r'''def _virgin_eye_payload(
-    eye_name: str,
-    source_eye: Mapping[str, Any],
-    core_result: Mapping[str, Any],
-    software_version: str | None,
-    *,
-    eligibility_missing=(),
-    eligibility_notes=(),
-    planning=None,
-) -> dict[str, Any]:
-    safety = core_result.get("procedural_safety") or {}
-    status = str(core_result.get("status") or ASSESSMENT_INCOMPLETE)
-    bad = core_result.get("bad_d") or {}
-    ps3 = core_result.get("ps3")
-    return {
-        "eye": eye_name,
-        "status": status,
-        "action": _action(status),
-        "score": _plain(core_result.get("erss")),
-        "bad_summary": {
-            "value": getattr(bad.get("result"), "final_d", None),
-            "category": bad.get("classification"),
-        },
-        "bad": _plain(bad.get("result")),
-        "nice": _plain(core_result.get("nice")),
-        "ps3": _plain(ps3),
-        "values": _values(core_result),
-        "hard_stops": _hard_stop_reasons(safety),
-        "reasons": _decision_reasons(core_result),
-        "warnings": [],
-        "clinical_modifiers": list(eligibility_notes or ()),
-        "missing": _missing(core_result, eligibility_missing),
-        "planning": _plain(planning or {}),
-        "report_payload": _report_payload(eye_name, source_eye, core_result, software_version),
-        "canonical_result": _plain(core_result),
-    }
-'''
-          lines = t.splitlines(keepends=True)
-          start = node.lineno - 1
-          end = node.end_lineno
-          lines[start:end] = [new_func + '\n']
-          t = ''.join(lines)
-
-          # Replace evaluate_case so resolved plans are consumed once and LASIK candidates
-          # are evaluated by the same canonical core.
-          module = ast.parse(t)
-          funcs = {node.name: node for node in module.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
-          node = funcs.get('evaluate_case')
-          if node is None:
-              raise SystemExit('evaluate_case not found')
-          new_eval = r'''def evaluate_case(
-    extracted: Mapping[str, Any],
-    age_years: Any,
-    eye_plans: Mapping[str, Mapping[str, Any]],
-    patient_modifiers: Mapping[str, Any],
-    *,
-    software_version: str | None = None,
-) -> dict[str, Any]:
-    """Resolve treatment roles once, then evaluate each eye through the canonical core."""
-    if not isinstance(patient_modifiers, Mapping):
-        raise TypeError("patient_modifiers must be a mapping")
-
-    source = _eye_by_name(extracted)
-    resolved_plans = resolve_case_plans(extracted, eye_plans)
-    effective_plans = {eye: dict(plan) for eye, plan in resolved_plans.items()}
-    bilateral = set(source) == {"OD", "OS"}
-    results: list[dict[str, Any]] = []
-
-    for eye_name in ("OD", "OS"):
-        eye = source.get(eye_name)
-        plan = effective_plans.get(eye_name)
-        if eye is None or not isinstance(plan, Mapping):
-            continue
-        prior = str(plan.get("prior") or "").strip().lower()
-        if prior and prior != "no":
-            results.append(_post_refractive_eye_payload(eye_name))
-            continue
-        procedure = str(plan.get("procedure") or "").strip().upper()
-        if procedure not in SUPPORTED_PROCEDURES:
-            results.append({
-                "eye": eye_name,
-                "status": ASSESSMENT_INCOMPLETE,
-                "action": _action(ASSESSMENT_INCOMPLETE),
-                "score": None,
-                "bad_summary": None,
-                "bad": None,
-                "nice": {"total": None, "category": "INCOMPLETE", "rows": {}, "missing": []},
-                "ps3": None,
-                "values": {},
-                "hard_stops": [],
-                "reasons": ["Supported procedure is required."],
-                "warnings": [],
-                "clinical_modifiers": [],
-                "missing": ["procedure"],
-                "planning": {},
-                "report_payload": None,
-                "canonical_result": None,
-            })
-            continue
-
-        eligibility = evaluate_eligibility(plan, patient_modifiers, bilateral=bilateral)
-        if procedure == "LASIK":
-            core_result, effective_plan, planning = _evaluate_lasik_planning(
-                eye_name,
-                eye,
-                plan,
-                age_years=age_years,
-                extracted=extracted,
-                eligibility=eligibility,
-            )
-            effective_plans[eye_name] = effective_plan
-        else:
-            normalized = build_clinical_core_input(
-                eye,
-                plan,
-                age_years=age_years,
-                extracted=extracted,
-                plan_already_resolved=True,
-            )
-            core_result = evaluate_normalized_case(
-                normalized,
-                external_findings=eligibility.findings,
-            )
-            planning = _non_lasik_planning(procedure, normalized, core_result)
-
-        results.append(_virgin_eye_payload(
-            eye_name,
-            eye,
-            core_result,
-            software_version,
-            eligibility_missing=eligibility.missing,
-            eligibility_notes=eligibility.notes,
-            planning=planning,
-        ))
-
-    return {
-        "status": _overall_status(results) if results else ASSESSMENT_INCOMPLETE,
-        "eyes": results,
-        "effective_eye_plans": _plain(effective_plans),
-        "version": software_version,
-        "policy_versions": {
-            "clinical": CLINICAL_POLICY_VERSION,
-            "source_registry": SOURCE_REGISTRY_VERSION,
-            "srax": SRAX_POLICY_VERSION,
-        },
-        "engine": "CERAI_CANONICAL_CLINICAL_CORE",
-    }
-'''
-          lines = t.splitlines(keepends=True)
-          start = node.lineno - 1
-          end = node.end_lineno
-          lines[start:end] = [new_eval + '\n']
-          t = ''.join(lines)
-          ast.parse(t)
-          p.write_text(t)
+          new_func = '''def _virgin_eye_payload(eye_name: str, source_eye: Mapping[str, Any], core_result: Mapping[str, Any], software_version: str | None, *, eligibility_missing=(), eligibility_notes=(), planning=None) -> dict[str, Any]:\n    safety = core_result.get("procedural_safety") or {}\n    status = str(core_result.get("status") or ASSESSMENT_INCOMPLETE)\n    bad = core_result.get("bad_d") or {}\n    ps3 = core_result.get("ps3")\n    return {"eye": eye_name, "status": status, "action": _action(status), "score": _plain(core_result.get("erss")), "bad_summary": {"value": getattr(bad.get("result"), "final_d", None), "category": bad.get("classification")}, "bad": _plain(bad.get("result")), "nice": _plain(core_result.get("nice")), "ps3": _plain(ps3), "values": _values(core_result), "hard_stops": _hard_stop_reasons(safety), "reasons": _decision_reasons(core_result), "warnings": [], "clinical_modifiers": list(eligibility_notes or ()), "missing": _missing(core_result, eligibility_missing), "planning": _plain(planning or {}), "report_payload": _report_payload(eye_name, source_eye, core_result, software_version), "canonical_result": _plain(core_result)}\n'''
+          lines = t.splitlines(keepends=True); lines[node.lineno-1:node.end_lineno] = [new_func + '\n']; t = ''.join(lines)
+          module = ast.parse(t); funcs = {node.name: node for node in module.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}; node = funcs.get('evaluate_case')
+          new_eval = '''def evaluate_case(extracted: Mapping[str, Any], age_years: Any, eye_plans: Mapping[str, Mapping[str, Any]], patient_modifiers: Mapping[str, Any], *, software_version: str | None = None) -> dict[str, Any]:\n    if not isinstance(patient_modifiers, Mapping):\n        raise TypeError("patient_modifiers must be a mapping")\n    source = _eye_by_name(extracted)\n    resolved_plans = resolve_case_plans(extracted, eye_plans)\n    effective_plans = {eye: dict(plan) for eye, plan in resolved_plans.items()}\n    bilateral = set(source) == {"OD", "OS"}\n    results = []\n    for eye_name in ("OD", "OS"):\n        eye = source.get(eye_name); plan = effective_plans.get(eye_name)\n        if eye is None or not isinstance(plan, Mapping):\n            continue\n        prior = str(plan.get("prior") or "").strip().lower()\n        if prior and prior != "no":\n            results.append(_post_refractive_eye_payload(eye_name)); continue\n        procedure = str(plan.get("procedure") or "").strip().upper()\n        if procedure not in SUPPORTED_PROCEDURES:\n            results.append({"eye": eye_name, "status": ASSESSMENT_INCOMPLETE, "action": _action(ASSESSMENT_INCOMPLETE), "score": None, "bad_summary": None, "bad": None, "nice": {"total": None, "category": "INCOMPLETE", "rows": {}, "missing": []}, "ps3": None, "values": {}, "hard_stops": [], "reasons": ["Supported procedure is required."], "warnings": [], "clinical_modifiers": [], "missing": ["procedure"], "planning": {}, "report_payload": None, "canonical_result": None}); continue\n        eligibility = evaluate_eligibility(plan, patient_modifiers, bilateral=bilateral)\n        if procedure == "LASIK":\n            core_result, effective_plan, planning = _evaluate_lasik_planning(eye_name, eye, plan, age_years=age_years, extracted=extracted, eligibility=eligibility)\n            effective_plans[eye_name] = effective_plan\n        else:\n            normalized = build_clinical_core_input(eye, plan, age_years=age_years, extracted=extracted, plan_already_resolved=True)\n            core_result = evaluate_normalized_case(normalized, external_findings=eligibility.findings)\n            planning = _non_lasik_planning(procedure, normalized, core_result)\n        results.append(_virgin_eye_payload(eye_name, eye, core_result, software_version, eligibility_missing=eligibility.missing, eligibility_notes=eligibility.notes, planning=planning))\n    return {"status": _overall_status(results) if results else ASSESSMENT_INCOMPLETE, "eyes": results, "effective_eye_plans": _plain(effective_plans), "version": software_version, "policy_versions": {"clinical": CLINICAL_POLICY_VERSION, "source_registry": SOURCE_REGISTRY_VERSION, "srax": SRAX_POLICY_VERSION}, "engine": "CERAI_CANONICAL_CLINICAL_CORE"}\n'''
+          lines = t.splitlines(keepends=True); lines[node.lineno-1:node.end_lineno] = [new_eval + '\n']; t = ''.join(lines)
+          ast.parse(t); p.write_text(t)
           PY
           git diff --check
           python -m py_compile clinical_core/planning.py canonical_input_adapter.py canonical_runtime_service.py
