@@ -1,0 +1,62 @@
+name: Step 7 completion gate fix v2
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: monday-clean-architecture
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Apply Step 7 completion fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import ast
+
+          p = Path('canonical_runtime_service.py')
+          t = p.read_text()
+          old = '''def _missing(core_result: Mapping[str, Any], eligibility_missing=()) -> list[str]:\n    missing = []\n    erss = core_result.get("erss") or {}\n    for key in erss.get("missing") or []:\n        missing.append(f"Randleman: {key}")\n    for field in (core_result.get("nice") or {}).get("missing") or []:\n        missing.append(f"NICE: {field}")\n    ps3 = core_result.get("ps3")\n    if ps3 is not None:\n        for key in getattr(ps3, "missing_keys", ()):\n            missing.append(f"PS3: {key}")\n    for key in (core_result.get("procedural_safety") or {}).get("missing") or []:\n        missing.append(f"Safety: {key}")\n    for key in eligibility_missing or ():\n        missing.append(f"Clinical eligibility: {key}")\n    return list(dict.fromkeys(missing))\n'''
+          new = '''def _missing(core_result: Mapping[str, Any], eligibility_missing=()) -> list[str]:\n    missing = []\n    final = core_result.get("final_disposition")\n    irrevocable_stop = getattr(final, "status", None) == STOP_DEFER\n    erss = core_result.get("erss") or {}\n    for key in erss.get("missing") or []:\n        if irrevocable_stop and key == "SRAX":\n            continue\n        missing.append(f"Randleman: {key}")\n    for field in (core_result.get("nice") or {}).get("missing") or []:\n        missing.append(f"NICE: {field}")\n    ps3 = core_result.get("ps3")\n    if ps3 is not None:\n        for key in getattr(ps3, "missing_keys", ()):\n            if irrevocable_stop and key == "srax":\n                continue\n            missing.append(f"PS3: {key}")\n    for key in (core_result.get("procedural_safety") or {}).get("missing") or []:\n        missing.append(f"Safety: {key}")\n    for key in eligibility_missing or ():\n        missing.append(f"Clinical eligibility: {key}")\n    return list(dict.fromkeys(missing))\n'''
+          if t.count(old) != 1:
+              raise SystemExit(f'canonical_runtime_service _missing block drifted: {t.count(old)}')
+          p.write_text(t.replace(old, new, 1))
+
+          p = Path('assessment_workflow.py')
+          t = p.read_text()
+          marker = '        "nice: b_ele_th_um": "B_Ele_Th_um",\n        "randleman: pachymetry": "pachy_thinnest_um",\n'
+          repl = '        "nice: b_ele_th_um": "B_Ele_Th_um",\n        "ps3: ppi_average": "PPI_avg",\n        "randleman: pachymetry": "pachy_thinnest_um",\n'
+          if t.count(marker) != 1:
+              raise SystemExit(f'assessment_workflow source mapping marker drifted: {t.count(marker)}')
+          p.write_text(t.replace(marker, repl, 1))
+
+          p = Path('pentacam_field_registry.py')
+          t = p.read_text()
+          retired = '    "inferior_opposite_steepening_D": "Inferior-opposite steepening (D)",\n'
+          if t.count(retired) != 1:
+              raise SystemExit(f'retired completion field marker drifted: {t.count(retired)}')
+          p.write_text(t.replace(retired, '', 1))
+
+          for path in ('canonical_runtime_service.py', 'assessment_workflow.py', 'pentacam_field_registry.py'):
+              ast.parse(Path(path).read_text())
+          PY
+          git diff --check
+          python -m py_compile canonical_runtime_service.py assessment_workflow.py pentacam_field_registry.py
+      - name: Commit Step 7 completion fixes
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add canonical_runtime_service.py assessment_workflow.py pentacam_field_registry.py
+          git diff --cached --quiet && exit 1
+          git commit -m 'Fix canonical pre-report completion gate'
+          git push origin HEAD:monday-clean-architecture
