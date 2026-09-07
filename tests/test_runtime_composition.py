@@ -87,7 +87,11 @@ def test_every_runtime_topic_is_owned_by_one_phase():
             owners[module] = phase
 
     assert owners["assessment_workflow"] == "canonical_workflow"
-    assert owners["pentacam_targeted_reread"] == "pentacam_extraction_pending_stage2_3"
+    assert "pentacam_targeted_reread" not in owners
+    assert "geometric_srax_policy" not in owners
+    extraction_source = inspect.getsource(canonical_engine.core.extract_one_image)
+    assert "pentacam_targeted_reread.enrich_extraction(" in extraction_source
+    assert "geometric_srax_policy.enrich_extraction(" in extraction_source
     assert owners["report_export_guard"] == "reporting_pending_stage10"
     assert owners["operational_security"] == "access_and_persistence"
 
@@ -122,6 +126,8 @@ def test_compose_does_not_install_or_call_a_clinical_scorer():
     assert "ps3_runtime_policy" not in source
     assert "hc_final_decision_policy" not in source
     assert "microkeratome_planning_policy" not in source
+    assert "pentacam_targeted_reread.install" not in source
+    assert "geometric_srax_policy.install" not in source
 
 
 def test_active_runtime_exposes_exact_manifest():
