@@ -58,6 +58,8 @@ def test_app_no_longer_defines_or_calls_legacy_clinical_engine():
     assert "from nice_policy import attach_readings" not in text
     assert "attach_readings(" not in text
     assert "def merge_extractions(" in text
+    assert "MAP_FALLBACK_NUMERIC_FIELDS" not in text
+    assert "map_fallback_numeric_fields" not in text
     retired_helpers = {
         "bad_classification", "lasik_topography_points", "scoring_morphology",
         "lasik_rsb_points", "age_points", "lasik_pachy_points", "lasik_mrse_points",

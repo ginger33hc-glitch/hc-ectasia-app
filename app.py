@@ -84,8 +84,6 @@ TABLE_NUMERIC_FIELDS = (
     "central_pachy_um", "B_Ele_Th_um", "F_Ele_Th_um", "posterior_Kmean_D",
     "topographic_astig_D", "topographic_steep_axis_deg", "topometric_RMin", "TKC",
 )
-MAP_FALLBACK_NUMERIC_FIELDS = ()
-
 SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -138,10 +136,6 @@ SCHEMA = {
                     "table_verified_numeric_fields": {
                         "type": "array",
                         "items": {"type": "string", "enum": list(TABLE_NUMERIC_FIELDS)},
-                    },
-                    "map_fallback_numeric_fields": {
-                        "type": "array",
-                        "items": {"type": "string", "enum": list(MAP_FALLBACK_NUMERIC_FIELDS)},
                     },
                     "keratometry_source": {
                         "type": "string",
@@ -206,7 +200,7 @@ SCHEMA = {
                 },
                 "required": [
                     "eye", "screen_types", "quality", "missing_or_unreadable",
-                    "table_verified_numeric_fields", "map_fallback_numeric_fields", "keratometry_source",
+                    "table_verified_numeric_fields", "keratometry_source",
                     "K1_D", "K1_axis_deg",
                     "K2_D", "K2_axis_deg", "Kmax_D", "corneal_diameter_mm", "pachy_thinnest_um",
                     "BAD_D", "Df", "Db", "Dp", "Dt", "Da",
@@ -650,9 +644,6 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     eye[field] = None
                 verified_set -= CORNEA_FRONT_KERATOMETRY_FIELDS
                 eye["missing_or_unreadable"] = list(dict.fromkeys(missing))
-            fallback_set = set(eye.get("map_fallback_numeric_fields", []))
-            fallback_set &= set(MAP_FALLBACK_NUMERIC_FIELDS)
-            fallback_set -= verified_set  # A readable labeled table value always has priority.
             missing = list(eye.get("missing_or_unreadable", []))
             source_ids = eye.get("canonical_source_ids")
             source_ids = source_ids if isinstance(source_ids, dict) else {}
@@ -662,15 +653,13 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 if source_ids.get(field) != canonical_source_id(field):
                     eye[field] = None
                     verified_set.discard(field)
-                    fallback_set.discard(field)
                     missing.append(field)
             for field in TABLE_NUMERIC_FIELDS:
-                if eye.get(field) is not None and field not in verified_set and field not in fallback_set:
+                if eye.get(field) is not None and field not in verified_set:
                     eye[field] = None
                     missing.append(field)
             eye["missing_or_unreadable"] = list(dict.fromkeys(missing))
             eye["table_verified_numeric_fields"] = sorted(verified_set)
-            eye["map_fallback_numeric_fields"] = sorted(fallback_set)
         return eye
 
     for result in results:
@@ -753,9 +742,6 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                         eye["field_provenance"][field] = targeted or [
                             {"file": source_filename, "source": source}
                         ]
-                for field in eye.get("map_fallback_numeric_fields", []):
-                    if eye.get(field) is not None:
-                        eye["field_provenance"][field] = [{"file": source_filename, "source": "PERMITTED_MAP_FALLBACK"}]
                 for field in ("morphology", "anterior_pattern", "posterior_pattern", "asymmetric_bow_tie", "srax"):
                     if eye.get(field) is not None:
                         eye["field_provenance"][field] = [{"file": source_filename, "source": "VISUAL_CLASSIFICATION"}]
@@ -765,9 +751,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             target = by_eye[eye_id]
             target.setdefault("data_conflicts", [])
             target_table_sources = set(target.get("table_verified_numeric_fields", []))
-            target_map_sources = set(target.get("map_fallback_numeric_fields", []))
             incoming_table_sources = set(eye.get("table_verified_numeric_fields", []))
-            incoming_map_sources = set(eye.get("map_fallback_numeric_fields", []))
             target["screen_types"] = sorted(set(target.get("screen_types", []) + eye.get("screen_types", [])))
             target["source_files"] = sorted(set(target.get("source_files", []) + eye.get("source_files", [])))
             target.setdefault("quality_by_source", {}).update(eye.get("quality_by_source", {}))
@@ -792,13 +776,6 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             target["table_verified_numeric_fields"] = sorted(
                 set(target.get("table_verified_numeric_fields", []))
                 | set(eye.get("table_verified_numeric_fields", []))
-            )
-            target["map_fallback_numeric_fields"] = sorted(
-                (
-                    set(target.get("map_fallback_numeric_fields", []))
-                    | set(eye.get("map_fallback_numeric_fields", []))
-                )
-                - set(target["table_verified_numeric_fields"])
             )
             if eye.get("keratometry_source") == CORNEA_FRONT_KERATOMETRY_SOURCE:
                 target["keratometry_source"] = CORNEA_FRONT_KERATOMETRY_SOURCE
@@ -840,7 +817,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             for key, value in eye.items():
                 if key in (
                     "eye", "screen_types", "quality", "missing_or_unreadable",
-                    "table_verified_numeric_fields", "map_fallback_numeric_fields",
+                    "table_verified_numeric_fields",
                     "keratometry_source",
                     "morphology_evidence", "source_files", "quality_by_source", "_source_filename",
                     "_pentacam_qs", "pentacam_qs", "scoring_morphology", "field_provenance",
@@ -865,24 +842,6 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     # first valid same-eye box transcription; duplicate screens are not a
                     # consensus source and must not manufacture a conflict.
                     continue
-
-                if key in TABLE_NUMERIC_FIELDS:
-                    if key in incoming_table_sources and key in target_map_sources and key not in target_table_sources:
-                        target[key] = value
-                        continue
-                    if key in target_table_sources and key in incoming_map_sources:
-                        continue
-                    if key in target_map_sources and key in incoming_map_sources:
-                        # Same-parameter local readings are a lower-priority substitute for one
-                        # unreadable edge box. Preserve the safety-limiting value but do not label
-                        # this permitted fallback-source merge as an unresolved clinical conflict.
-                        if key in conservative and is_number(old) and is_number(value):
-                            target[key] = min(old, value) if conservative[key] == "min" else max(old, value)
-                        merged["global_warnings"].append(
-                            f"Multiple permitted local-map {key} readings for {eye_id}; "
-                            "a conservative value was retained without creating an unresolved conflict."
-                        )
-                        continue
 
                 # Missing/uncertain information on a page that lacks the relevant map is not
                 # contradictory evidence against a readable observation on another page.

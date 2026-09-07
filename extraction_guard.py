@@ -7,8 +7,7 @@ the CER-AI engine consumes them.
 Multi-image numeric reconciliation policy:
 - The owner-defined canonical Pentacam fields are NEVER reconciled here. They are direct
   single-source transcriptions and fail closed when their canonical source is unreadable.
-- For non-locked numeric parameters, readings from multiple valid sources of the same provenance
-  class may use the historical <=1% reconciliation rule.
+- For non-locked numeric parameters, repeated labeled-table readings may use the historical <=1% reconciliation rule.
 """
 import re
 from typing import Any, Dict, List
@@ -56,8 +55,6 @@ def _within_one_percent(values: List[float]) -> bool:
 def _source_class(raw_eye: Dict[str, Any], field: str) -> str:
     if field in set(raw_eye.get("table_verified_numeric_fields") or []):
         return "LABELED_TABLE"
-    if field in set(raw_eye.get("map_fallback_numeric_fields") or []):
-        return "PERMITTED_MAP_FALLBACK"
     return "UNVERIFIED"
 
 
@@ -91,7 +88,7 @@ def _reconcile_one_percent(merged: Dict[str, Any], results: List[Dict[str, Any]]
         eye_id = eye.get("eye")
         accepted_fields = set()
         for field, classes in observations.get(eye_id, {}).items():
-            values = classes.get("LABELED_TABLE") or classes.get("PERMITTED_MAP_FALLBACK") or []
+            values = classes.get("LABELED_TABLE") or []
             if _within_one_percent(values):
                 retained = _safety_limiting_value(field, values)
                 eye[field] = retained
@@ -124,7 +121,6 @@ def _audit_eye(eye: Dict[str, Any]) -> Dict[str, Any]:
     provenance = eye.get("field_provenance") or {}
     verified = set(eye.get("table_verified_numeric_fields") or [])
     surgeon_verified = set(eye.get("surgeon_verified_numeric_fields") or [])
-    fallback = set(eye.get("map_fallback_numeric_fields") or [])
     issues: List[str] = []
     warnings: List[str] = []
     for field, (low, high) in PLAUSIBLE.items():
@@ -135,8 +131,8 @@ def _audit_eye(eye: Dict[str, Any]) -> Dict[str, Any]:
         value = eye.get(field)
         if value is None:
             continue
-        if field not in verified and field not in fallback and field not in surgeon_verified:
-            issues.append(f"{field}: decision-critical value has no accepted labeled-field/map-fallback provenance")
+        if field not in verified and field not in surgeon_verified:
+            issues.append(f"{field}: decision-critical value has no accepted labeled-field provenance")
         if not provenance.get(field):
             warnings.append(f"{field}: source-file provenance record is unavailable")
     pmin, pavg, pmax = eye.get("PPI_min"), eye.get("PPI_avg"), eye.get("PPI_max")
@@ -150,12 +146,10 @@ def _audit_eye(eye: Dict[str, Any]) -> Dict[str, Any]:
         issues.extend(f"unresolved multi-image conflict: {item}" for item in conflicts)
     available = sum(1 for field in DECISION_FIELDS if _num(eye.get(field)))
     table_count = sum(1 for field in DECISION_FIELDS if field in verified and _num(eye.get(field)))
-    fallback_count = sum(1 for field in DECISION_FIELDS if field in fallback and _num(eye.get(field)))
     return {
         "status": "FAIL" if issues else "PASS" if available == len(DECISION_FIELDS) else "INCOMPLETE",
         "decision_fields_available": available, "decision_fields_required": len(DECISION_FIELDS),
         "decision_fields_from_labeled_tables": table_count,
-        "decision_fields_from_permitted_map_fallback": fallback_count,
         "source_files": list(eye.get("source_files") or []),
         "issues": list(dict.fromkeys(issues)), "warnings": list(dict.fromkeys(warnings)),
     }

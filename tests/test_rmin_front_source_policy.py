@@ -7,7 +7,7 @@ from pentacam_canonical_source_lock import SHOW_2_CORNEA_BACK, canonical_source_
 
 def test_rmin_has_one_canonical_source_and_no_map_fallback():
     assert canonical_source_id("Rmin_mm") == SHOW_2_CORNEA_BACK
-    assert "Rmin_mm" not in canonical_engine.core.MAP_FALLBACK_NUMERIC_FIELDS
+    assert not hasattr(canonical_engine.core, "MAP_FALLBACK_NUMERIC_FIELDS")
     assert not Path("rmin_front_source_policy.py").exists()
 
 
