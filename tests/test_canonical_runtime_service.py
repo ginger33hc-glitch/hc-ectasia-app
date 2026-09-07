@@ -134,7 +134,8 @@ def test_missing_od_value_never_cross_fills_from_os():
     result = _evaluate(extracted=_case(od=od, os=os))
     by_eye = {eye["eye"]: eye for eye in result["eyes"]}
     assert by_eye["OD"]["status"] == "ASSESSMENT INCOMPLETE"
-    assert "Randleman: topography" in by_eye["OD"]["missing"]
+    assert "Randleman: I_S" in by_eye["OD"]["missing"]
+    assert "NICE: I_S_D" in by_eye["OD"]["missing"]
     assert by_eye["OS"]["status"] == "PASS"
     assert result["status"] == "ASSESSMENT INCOMPLETE"
 
