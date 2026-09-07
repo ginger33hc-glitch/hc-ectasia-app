@@ -53,7 +53,7 @@ def test_pure_nice_matches_numeric_scoring_reference(k2, central, pe, i_s):
         (8, CAUTION),
         (9, STOP_DEFER),
         (12, STOP_DEFER),
-        (None, "DATA INSUFFICIENT"),
+        (None, ASSESSMENT_INCOMPLETE),
     ],
 )
 def test_nice_specific_disposition(total, expected):
