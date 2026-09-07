@@ -113,12 +113,26 @@ def _ps3_procedure_disposition(ps3_result, procedure: str) -> str:
 
 
 def _intended_refraction(inp: ClinicalCoreInput):
-    if not all(_finite(value) for value in (inp.intended_sphere_d, inp.intended_cylinder_d, inp.intended_axis_deg)):
+    if not _finite(inp.intended_sphere_d) or not _finite(inp.intended_cylinder_d):
         return None
-    return normalize_minus_cylinder(inp.intended_sphere_d, inp.intended_cylinder_d, inp.intended_axis_deg)
+    cylinder = float(inp.intended_cylinder_d)
+    if abs(cylinder) <= 1e-12:
+        axis = float(inp.intended_axis_deg) if _finite(inp.intended_axis_deg) else 0.0
+    elif _finite(inp.intended_axis_deg):
+        axis = float(inp.intended_axis_deg)
+    else:
+        return None
+    return normalize_minus_cylinder(inp.intended_sphere_d, cylinder, axis)
 
 
-def _safety_status(procedure: str, inp: ClinicalCoreInput, rsb, rst, final_k, intended_group) -> tuple[str, dict]:
+def _safety_status(
+    procedure: str,
+    inp: ClinicalCoreInput,
+    rsb,
+    rst,
+    final_k,
+    intended_group,
+) -> tuple[str, dict, list[str]]:
     hard_stops = {
         "preop_thickness": preop_thickness_hard_stop(inp.thinnest_um),
         "sphere_magnitude": sphere_magnitude_hard_stop(inp.intended_sphere_d),
@@ -126,23 +140,38 @@ def _safety_status(procedure: str, inp: ClinicalCoreInput, rsb, rst, final_k, in
         "prk_rst": procedure == "PRK" and prk_rst_hard_stop(rst),
         "final_kmean": final_kmean_hard_stop(final_k),
     }
-    if any(hard_stops.values()):
-        return STOP_DEFER, hard_stops
 
-    required = [inp.thinnest_um, inp.intended_sphere_d, inp.ablation_um, inp.preop_kmean_d, inp.intended_mrse_d]
-    if procedure == "LASIK":
-        required.append(inp.flap_um)
-    if not all(_finite(value) for value in required):
-        return ASSESSMENT_INCOMPLETE, hard_stops
-    if procedure == "LASIK" and rsb is None:
-        return ASSESSMENT_INCOMPLETE, hard_stops
+    missing: list[str] = []
+    required = (
+        ("thinnest_um", inp.thinnest_um),
+        ("intended_sphere_d", inp.intended_sphere_d),
+        ("intended_cylinder_d", inp.intended_cylinder_d),
+        ("ablation_um", inp.ablation_um),
+        ("preop_kmean_d", inp.preop_kmean_d),
+        ("intended_mrse_d", inp.intended_mrse_d),
+    )
+    missing.extend(name for name, value in required if not _finite(value))
+    if _finite(inp.intended_cylinder_d) and abs(float(inp.intended_cylinder_d)) > 1e-12 and not _finite(inp.intended_axis_deg):
+        missing.append("intended_axis_deg")
+    if procedure == "LASIK" and not _finite(inp.flap_um):
+        missing.append("flap_um")
+    if procedure == "LASIK" and rsb is None and "flap_um" not in missing:
+        missing.append("LASIK_RSB_um")
     if procedure == "PRK" and rst is None:
-        return ASSESSMENT_INCOMPLETE, hard_stops
+        missing.append("PRK_RST_um")
     if intended_group == MIXED:
-        return ASSESSMENT_INCOMPLETE, hard_stops
-    if final_k is None:
-        return ASSESSMENT_INCOMPLETE, hard_stops
-    return PASS, hard_stops
+        missing.append("mixed_astigmatism_meridional_final_k_assessment")
+    elif intended_group is None:
+        missing.append("intended_refractive_group")
+    elif final_k is None:
+        missing.append("estimated_final_Kmean_D")
+
+    missing = list(dict.fromkeys(missing))
+    if any(hard_stops.values()):
+        return STOP_DEFER, hard_stops, missing
+    if missing:
+        return ASSESSMENT_INCOMPLETE, hard_stops, missing
+    return PASS, hard_stops, []
 
 
 def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
@@ -155,7 +184,7 @@ def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
     rst = prk_rst_um(inp.thinnest_um, inp.ablation_um) if procedure == "PRK" else None
     pta = lasik_pta_percent(inp.thinnest_um, inp.flap_um, inp.ablation_um) if procedure == "LASIK" else None
 
-    scalar_final_k_valid = intended_refraction is None or scalar_final_k_is_valid(intended_refraction)
+    scalar_final_k_valid = intended_refraction is not None and scalar_final_k_is_valid(intended_refraction)
     final_k = estimated_final_kmean_d(inp.preop_kmean_d, inp.intended_mrse_d) if scalar_final_k_valid else None
 
     erss = None
@@ -198,7 +227,9 @@ def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
     ps3_result = evaluate_ps3(inp.ps3_eye, inp.ps3_inter_eye) if inp.ps3_eye is not None else None
     ps3_status = _ps3_procedure_disposition(ps3_result, procedure)
 
-    safety_status, safety_stops = _safety_status(procedure, inp, rsb, rst, final_k, intended_group)
+    safety_status, safety_stops, safety_missing = _safety_status(
+        procedure, inp, rsb, rst, final_k, intended_group
+    )
 
     safety_detail = "Independent tissue/refractive safety gates"
     if intended_group == MIXED:
@@ -231,6 +262,7 @@ def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
             "estimated_final_Kmean_D": final_k,
             "scalar_final_Kmean_model_valid": scalar_final_k_valid,
             "hard_stops": safety_stops,
+            "missing": safety_missing,
             "status": safety_status,
         },
         "decision_findings": findings,
