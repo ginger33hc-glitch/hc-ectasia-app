@@ -54,6 +54,7 @@ def compare_eye_results(
             {
                 "PASS": "ALLOWED",
                 "STOP-DEFER": "DEFER",
+                "ASSESSMENT INCOMPLETE": "INCOMPLETE",
             }.get(linear.get("ps3_status")),
         ),
     }
