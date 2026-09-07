@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 import canonical_engine
+from pentacam_canonical_source_lock import BAD_PPI
 
 _LEGACY_PATH = Path(__file__).with_name("legacy_pentacam_targeted_reread_tests.py")
 _SPEC = importlib.util.spec_from_file_location("cerai_legacy_pentacam_targeted_reread_tests", _LEGACY_PATH)
@@ -120,6 +121,7 @@ def test_targeted_tile_evidence_survives_canonical_merge_without_legacy_hc_fixtu
     result = pentacam_result(PPI_max=1.42)
     eye = result["eyes"][0]
     eye["table_verified_numeric_fields"] = ["PPI_max"]
+    eye["canonical_source_ids"] = {"PPI_max": BAD_PPI}
     eye["targeted_reread_evidence"] = {
         "PPI_max": [{
             "file": "od-bad.png",
