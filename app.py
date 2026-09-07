@@ -339,52 +339,29 @@ when their own labeled table value is unreadable. A labeled BAD-display center/b
 counts as a printed parameter field; an unlabeled number inside the map does not. The table source
 always overrides a local-map fallback when both are visible.
 
-Only the categorical fields that genuinely require map inspection may be produced visually:
-morphology, asymmetric_bow_tie, srax, anterior_pattern, and posterior_pattern. srax_deg and
-inferior_opposite_steepening_D may be returned only when their exact geometric/numeric criteria can
-be directly verified from the visible curvature map; otherwise return null. These two visual-derived
-numeric fields are not members of table_verified_numeric_fields.
+ERSS VISUAL MORPHOLOGY DISABLED:
+General ERSS/Randleman visual morphology classification is disabled. Do not visually score asymmetric
+bow-tie, inferior steepening, keratoconus pattern, forme-fruste pattern, PMD pattern, or any other ERSS
+morphology category.
 
-Classify the visible Placido/topographic morphology using exactly
-one of: NORMAL_SYMMETRIC, ASYMMETRIC_BOWTIE, INFERIOR_STEEPENING_SRA,
-ABNORMAL_ECTATIC, UNCERTAIN. Transcribe visible anterior/posterior elevation-at-thinnest-point,
-thinnest-point location, pachymetric-progression, topometric, corneal-volume, and HOA/coma values
-when they are printed; otherwise return null. Classify both visible anterior and posterior maps as
-REASSURING, BORDERLINE, ABNORMAL, or UNREADABLE. ABNORMAL_ECTATIC is reserved for a clearly visible keratoconus,
-forme-fruste keratoconus, pellucid/ectatic pattern; do not infer it from one isolated index.
-In particular, extract K1_D/K1_axis_deg, K2_D/K2_axis_deg, and Kmean_D only from the locked
-Show 2 Exams Topometric > Cornea Front source defined above. The axis must be printed as part of
-the corresponding K row; never use the refractive cylinder axis as a keratometric axis.
-corneal_diameter_mm means horizontal
-white-to-white (HWTW) only. Extract it only from the Pentacam's explicitly labeled HWTW,
-horizontal WTW, horizontal white-to-white, WTW/white-to-white, or Cornea Diameter/W2W field.
-The Pentacam Cornea Diameter/W2W output is used here solely as its horizontal white-to-white
-measurement. Never use a vertical diameter, an unlabeled caliper distance, a map estimate, an
-average of diameters, or a value calculated from another measurement. If the horizontal identity
-or printed value is uncertain, return corneal_diameter_mm=null and do not add it to
-table_verified_numeric_fields.
-Rmin_mm may use the restricted, explicitly labeled local fallback described above only
-when its edge/side box is unreadable. Never use an ordinary numeric spot label printed inside a
-curvature map as K1, K2, Kmax, or Rmin. Classify morphology only when an axial,
-sagittal, tangential, or Placido curvature/topography map is actually visible. A BAD display without
-such a curvature map does not support a morphology classification; use UNCERTAIN for morphology,
-asymmetric_bow_tie, and srax on that image rather than inferring them from elevation or pachymetry.
-Apply the published Placido-era ERSS morphology definitions strictly. A small or merely nonzero axis
-deviation is not SRAX/SRA. Set srax=YES and use INFERIOR_STEEPENING_SRA only when the image
-supports a skewed radial axis of at least 20 degrees. srax_deg is the angular separation of the two
-principal hemi-meridians; it is not the cylinder axis and not deviation from the horizontal or vertical
-meridian. Alternatively, INFERIOR_STEEPENING_SRA may be used when there is at least 1.0 D of
-inferior steepening versus the region 180 degrees opposite the steepest region and the printed I-S is
-less than 1.4 D. Record that regional difference only in inferior_opposite_steepening_D. Do not infer
-either numeric criterion from a slight visual asymmetry or from map colors alone. If the 20-degree or
-1.0-D criterion cannot be verified, set srax=UNCERTAIN, srax_deg=null, and use UNCERTAIN rather than
-INFERIOR_STEEPENING_SRA. Asymmetric bowtie requires greater than 0.5 D but less than 1.0 D of
-asymmetric steepening versus the region 180 degrees opposite, without SRA. Normal/symmetrical
-includes round, oval, and symmetric bowtie patterns. Record short visible reasons in
-morphology_evidence. If the relevant map is not sufficiently visible, use UNCERTAIN. Do not make a
-surgical recommendation. Do not calculate or infer missing BAD-D,
-component D values, ARTmax, or other indices from related measurements. Treat this as strict
-transcription and structured image interpretation, not autonomous diagnosis.
+ERSS SRAX SOURCE LOCK — MODEL ESTIMATION DISABLED:
+SRAX is measured outside the extraction model by CER-AI's deterministic geometric image-analysis
+engine using only the Axial/Sagittal Curvature (Front) map on the Pentacam 4 Maps Refractive page.
+Do not visually estimate SRAX, return a numeric srax_deg from map appearance, or derive SRAX from
+KISA, Kmax, I-S, astigmatism tables, K1/K2/global Axis, BAD values, elevation, pachymetry, or any surrogate.
+For every image handled by this model, return srax=UNCERTAIN and srax_deg=null. The deterministic
+geometry layer may replace those values only when the correct Front map and both hemimeridian axes
+are resolved with adequate confidence. General morphology outputs remain morphology=UNCERTAIN,
+morphology_evidence=[], asymmetric_bow_tie=UNCERTAIN, and inferior_opposite_steepening_D=null.
+Anterior/posterior tomography pattern fields remain separate non-ERSS review inputs.
+
+BELIN/AMBROSIO BAD DISPLAY SOURCE LOCK:
+BAD_D, Df, Db, Dp, Dt, and Da may be transcribed ONLY from the explicitly labeled bottom BAD-D
+component strip on a visible Belin/Ambrosio Display for the same eye. Preserve every printed sign
+exactly. Never derive or reconstruct Df from anterior elevation, Db from B.Ele.Th/posterior elevation,
+Dp from PPI, Dt from thinnest pachymetry, Da from ARTmax, or Final D from the component values. Never
+substitute a color, map spot, neighboring value, or another screen/eye. If the label, sign, digits, or
+laterality is unreadable, return null for that field. Final BAD-D remains the printed overall BAD signal.
 
 For an Excimer Laser Takip Karti, extract treatment_corrections only from the row explicitly labeled
 "Duzeltme Miktari" (including Turkish characters). Do not substitute values from "Subjektif
