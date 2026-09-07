@@ -1,4 +1,16 @@
-from pentacam_canonical_source_lock import CANONICAL_FIELD_SOURCES, derivation_is_allowed
+from pentacam_canonical_source_lock import (
+    BAD_CENTER,
+    BAD_PPI,
+    BAD_STRIP,
+    CANONICAL_FIELD_SOURCES,
+    FOUR_MAPS_LOWER_LEFT,
+    SHOW_2_CORNEA_BACK,
+    SHOW_2_CORNEA_FRONT,
+    SHOW_2_INDICES,
+    canonical_source_id,
+    derivation_is_allowed,
+    source_is_allowed,
+)
 from pentacam_canonical_source_enforcement import (
     BAD, FOURMAPS, SHOW2, _required_family, _strip_noncanonical,
 )
@@ -26,18 +38,42 @@ def test_all_owner_locked_fields_forbid_derivation():
     assert all(not derivation_is_allowed(field) for field in CANONICAL_FIELD_SOURCES)
 
 
-def test_show2_indices_are_show2_only():
+def test_cornea_front_is_exact_source_for_anterior_keratometry():
+    for field in (
+        "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmean_D",
+        "topographic_astig_D", "topographic_steep_axis_deg",
+    ):
+        assert canonical_source_id(field) == SHOW_2_CORNEA_FRONT
+
+
+def test_cornea_back_is_exact_source_for_posterior_values():
+    assert canonical_source_id("Rmin_mm") == SHOW_2_CORNEA_BACK
+    assert canonical_source_id("posterior_Kmean_D") == SHOW_2_CORNEA_BACK
+    assert source_is_allowed("Rmin_mm", SHOW_2_CORNEA_BACK)
+    assert not source_is_allowed("Rmin_mm", SHOW_2_CORNEA_FRONT)
+
+
+def test_show2_indices_are_exact_center_index_sources():
     for field in ("ISV", "IVA", "KI", "CKI", "IHA", "IHD", "TKC", "KISA", "I_S", "topometric_RMin"):
+        assert canonical_source_id(field) == SHOW_2_INDICES
         assert _required_family(field) == SHOW2
 
 
-def test_four_maps_lower_left_fields_are_four_maps_only():
+def test_four_maps_lower_left_fields_are_exact_sources():
     for field in ("central_pachy_um", "pachy_thinnest_um", "Kmax_D", "corneal_diameter_mm"):
+        assert canonical_source_id(field) == FOUR_MAPS_LOWER_LEFT
         assert _required_family(field) == FOURMAPS
 
 
-def test_bad_fields_are_bad_display_only():
-    for field in ("F_Ele_Th_um", "B_Ele_Th_um", "PPI_min", "PPI_avg", "PPI_max", "ARTmax_um", "Df", "Db", "Dp", "Dt", "Da", "BAD_D"):
+def test_bad_fields_are_exact_box_sources():
+    for field in ("F_Ele_Th_um", "B_Ele_Th_um"):
+        assert canonical_source_id(field) == BAD_CENTER
+        assert _required_family(field) == BAD
+    for field in ("PPI_min", "PPI_avg", "PPI_max", "ARTmax_um"):
+        assert canonical_source_id(field) == BAD_PPI
+        assert _required_family(field) == BAD
+    for field in ("Df", "Db", "Dp", "Dt", "Da", "BAD_D"):
+        assert canonical_source_id(field) == BAD_STRIP
         assert _required_family(field) == BAD
 
 
