@@ -1,0 +1,143 @@
+name: Step 3C remove numeric reconciliation
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  clean:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: monday-clean-architecture
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Guard and delete reconciliation paths
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import ast
+
+          app = Path('app.py').read_text()
+          guard = Path('extraction_guard.py').read_text()
+          registry = Path('pentacam_field_registry.py').read_text()
+          engine = Path('canonical_engine.py').read_text()
+          test = Path('tests/test_reconciliation_behavior_lock.py').read_text()
+          cleanup = Path('tests/test_phase4_cleanup_contract.py').read_text()
+
+          assert 'numeric_tolerance = {' in app
+          assert 'EXCLUSIVE_LABELED_BOX_FIELDS' in app
+          assert 'def _reconcile_one_percent' in guard
+          assert 'EXCLUSIVE_LABELED_BOX_FIELDS = frozenset' in registry
+
+          # app.py: remove tolerance/first-wins suppression and make locked conflicts fail closed.
+          app = app.replace('    EXCLUSIVE_LABELED_BOX_FIELDS,\n', '', 1)
+          tol = '''    numeric_tolerance = {\n        "K1_D": 0.25, "K2_D": 0.25,\n        "K1_axis_deg": 2.0, "K2_axis_deg": 2.0, "corneal_diameter_mm": 0.10,\n    }\n'''
+          assert tol in app
+          app = app.replace(tol, '', 1)
+          app = app.replace(
+              '    # Descriptive values that do not drive a CER-AI decision must never become unresolved conflicts\n'
+              '    # that prohibit PASS. Across overlapping Pentacam screens, preserve source priority\n'
+              '    # (labeled table over permitted map fallback); at equal priority retain the first reading.\n',
+              '    # Descriptive values that do not drive a CER-AI decision must never become unresolved conflicts\n'
+              '    # that prohibit PASS. Canonical numeric disagreements are never tolerance-reconciled.\n', 1,
+          )
+          app = app.replace('            target_table_sources = set(target.get("table_verified_numeric_fields", []))\n', '', 1)
+          app = app.replace('            incoming_table_sources = set(eye.get("table_verified_numeric_fields", []))\n', '', 1)
+          prov_skip = '''                if (\n                    field in EXCLUSIVE_LABELED_BOX_FIELDS\n                    and field in target_table_sources\n                    and target.get(field) is not None\n                ):\n                    continue\n'''
+          assert prov_skip in app
+          app = app.replace(prov_skip, '', 1)
+
+          old_marker = '''                old = target.get(key)\n                if old is None and value is not None:\n                    target[key] = value\n                    continue\n'''
+          new_marker = '''                # Once a locked canonical field conflicts, no later duplicate may silently refill it.\n                existing_locked_conflict = key in LOCKED_FIELDS and any(\n                    str(item).split(":", 1)[0].strip() == key\n                    for item in target.get("data_conflicts", [])\n                )\n                if existing_locked_conflict:\n                    continue\n                old = target.get(key)\n                if old is None and value is not None:\n                    target[key] = value\n                    continue\n'''
+          assert old_marker in app
+          app = app.replace(old_marker, new_marker, 1)
+
+          exclusive = '''                if (\n                    key in EXCLUSIVE_LABELED_BOX_FIELDS\n                    and key in target_table_sources\n                    and key in incoming_table_sources\n                ):\n                    # This field is owned by its explicitly labeled Pentacam box. Retain the\n                    # first valid same-eye box transcription; duplicate screens are not a\n                    # consensus source and must not manufacture a conflict.\n                    continue\n\n'''
+          assert exclusive in app
+          app = app.replace(exclusive, '', 1)
+          tolerance = '''                if (\n                    key in numeric_tolerance\n                    and is_number(old)\n                    and is_number(value)\n                    and abs(float(old) - float(value)) <= numeric_tolerance[key]\n                ):\n                    continue\n\n'''
+          assert tolerance in app
+          app = app.replace(tolerance, '', 1)
+
+          planning = '                if key in planning_conflict_fields:\n'
+          assert planning in app
+          locked_conflict = '''                if key in LOCKED_FIELDS:\n                    target["data_conflicts"].append(f"{key}: {old} vs {value}")\n                    target[key] = None\n                    continue\n\n'''
+          app = app.replace(planning, locked_conflict + planning, 1)
+
+          # extraction_guard.py: delete historical <=1% reconciliation completely.
+          guard = guard.replace('import re\n', '', 1)
+          guard = guard.replace('from pentacam_field_registry import EXCLUSIVE_LABELED_BOX_FIELDS\n', '', 1)
+          guard = guard.replace('from pentacam_canonical_source_lock import LOCKED_FIELDS\n', '', 1)
+          guard = guard.replace('LOWER_IS_SAFETY_LIMITING = {"Rmin_mm"}\n', '', 1)
+          start = guard.index('_CONFLICT_RE = re.compile(')
+          end = guard.index('\n\ndef _audit_eye', start)
+          guard = guard[:start] + guard[end+2:]
+          guard = guard.replace(
+              'def apply_extraction_validation(merged, results):\n    """Audit one already-canonical merged payload without replacing merge ownership."""\n    _reconcile_one_percent(merged, results)\n',
+              'def apply_extraction_validation(merged):\n    """Audit one already-canonical merged payload without replacing merge ownership."""\n', 1,
+          )
+          guard = guard.replace(
+              'Multi-image numeric reconciliation policy:\n- The owner-defined canonical Pentacam fields are NEVER reconciled here. They are direct\n  single-source transcriptions and fail closed when their canonical source is unreadable.\n- For non-locked numeric parameters, repeated labeled-table readings may use the historical <=1% reconciliation rule.\n',
+              'Canonical numeric disagreements are not reconciled here. They remain explicit conflicts until resolved.\n', 1,
+          )
+
+          app = app.replace('    return apply_extraction_validation(merged, results)\n', '    return apply_extraction_validation(merged)\n', 1)
+          engine = engine.replace(
+              '    if "apply_extraction_validation(merged, results)" not in merge_source:\n',
+              '    if "apply_extraction_validation(merged)" not in merge_source:\n', 1,
+          )
+
+          # Registry no longer needs a duplicate exclusivity list; LOCKED_FIELDS is canonical.
+          rstart = registry.index('EXCLUSIVE_LABELED_BOX_FIELDS = frozenset({')
+          rend = registry.index('\n\nCOMPLETION_NUMERIC_FIELDS', rstart)
+          registry = registry[:rstart] + registry[rend+2:]
+
+          # Tests: remove the legacy exclusivity/tolerance assertions and add close-difference conflict locks.
+          test = test.replace('    LOCKED_FIELDS,\n', '', 1)
+          old_test = '''def test_locked_fields_are_not_eligible_for_numeric_reconciliation():\n    from extraction_guard import EXCLUSIVE_LABELED_BOX_FIELDS\n    assert LOCKED_FIELDS - {"topometric_RMin"} <= EXCLUSIVE_LABELED_BOX_FIELDS\n\n\n'''
+          assert old_test in test
+          test = test.replace(old_test, '', 1)
+          test = test.replace('    assert "PPI_avg" not in od.get("numeric_reconciliation", {})\n', '    assert "numeric_reconciliation" not in od\n', 1)
+          test = test.replace('    assert "K1_D" not in od.get("numeric_reconciliation", {})\n', '    assert "numeric_reconciliation" not in od\n', 1)
+          test = test.replace('    assert "PPI_avg" not in od.get("numeric_reconciliation", {})\n', '    assert "numeric_reconciliation" not in od\n', 1)
+          addition = '''\n\ndef test_close_same_source_k1_disagreement_remains_conflict():\n    merged = core.merge_extractions([\n        _numeric_result("show2a.jpg", "K1_D", 44.50, "SHOW_2_EXAMS_TOPOMETRIC", source_id=SHOW_2_CORNEA_FRONT),\n        _numeric_result("show2b.jpg", "K1_D", 44.60, "SHOW_2_EXAMS_TOPOMETRIC", source_id=SHOW_2_CORNEA_FRONT),\n    ])\n    od = merged["eyes"][0]\n    assert od["K1_D"] is None\n    assert any(str(item).startswith("K1_D:") for item in od.get("data_conflicts", []))\n\n\ndef test_sub_one_percent_same_source_ppi_disagreement_remains_conflict():\n    merged = core.merge_extractions([\n        _numeric_result("bad1.jpg", "PPI_avg", 1.000, "BAD_DISPLAY", source_id=BAD_PPI),\n        _numeric_result("bad2.jpg", "PPI_avg", 1.005, "BAD_DISPLAY", source_id=BAD_PPI),\n    ])\n    od = merged["eyes"][0]\n    assert od["PPI_avg"] is None\n    assert any(str(item).startswith("PPI_avg:") for item in od.get("data_conflicts", []))\n'''
+          test = test.rstrip() + addition + '\n'
+
+          needle = '    assert "map_fallback_numeric_fields" not in text\n'
+          assert needle in cleanup
+          cleanup = cleanup.replace(
+              needle,
+              needle + '    assert "numeric_tolerance" not in text\n    assert "EXCLUSIVE_LABELED_BOX_FIELDS" not in text\n', 1,
+          )
+
+          for name,text in {
+              'app.py': app,
+              'extraction_guard.py': guard,
+              'pentacam_field_registry.py': registry,
+              'canonical_engine.py': engine,
+              'tests/test_reconciliation_behavior_lock.py': test,
+              'tests/test_phase4_cleanup_contract.py': cleanup,
+          }.items():
+              ast.parse(text)
+              Path(name).write_text(text)
+
+          production = ''.join(Path(p).read_text() for p in ('app.py','extraction_guard.py','pentacam_field_registry.py'))
+          for forbidden in ('numeric_tolerance','_reconcile_one_percent','numeric_reconciliation','EXCLUSIVE_LABELED_BOX_FIELDS','RELATIVE_SPREAD_LE_1_PERCENT'):
+              assert forbidden not in production, forbidden
+          PY
+      - name: Commit Step 3C cleanup
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app.py extraction_guard.py pentacam_field_registry.py canonical_engine.py tests/test_reconciliation_behavior_lock.py tests/test_phase4_cleanup_contract.py
+          git commit -m "Remove obsolete numeric reconciliation paths"
+          git push origin HEAD:monday-clean-architecture
