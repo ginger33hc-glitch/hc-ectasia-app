@@ -25,7 +25,6 @@ def _eye():
         "quality": "ADEQUATE",
         "missing_or_unreadable": [],
         "table_verified_numeric_fields": [],
-        "map_fallback_numeric_fields": [],
         "keratometry_source": "NOT_SHOWN",
         "canonical_source_ids": {},
         "data_conflicts": [],
@@ -67,7 +66,7 @@ def _result(eye, filename):
     }
 
 
-def _numeric_result(filename, field, value, screen, provenance="table", source_id=None):
+def _numeric_result(filename, field, value, screen, verified=True, source_id=None):
     e = _eye()
     e["screen_types"] = [screen]
     e["keratometry_source"] = (
@@ -75,8 +74,7 @@ def _numeric_result(filename, field, value, screen, provenance="table", source_i
         if screen == "SHOW_2_EXAMS_TOPOMETRIC" else "OTHER_PENTACAM_SOURCE"
     )
     e[field] = value
-    e["table_verified_numeric_fields"] = [field] if provenance == "table" else []
-    e["map_fallback_numeric_fields"] = [field] if provenance == "fallback" else []
+    e["table_verified_numeric_fields"] = [field] if verified else []
     if source_id is not None:
         e["canonical_source_ids"][field] = source_id
     return _result(e, filename)
@@ -115,28 +113,28 @@ def test_wrong_screen_ppi_is_rejected_instead_of_one_percent_merge():
     assert "PPI_avg" not in od.get("numeric_reconciliation", {})
 
 
-def test_rmin_map_fallback_is_prohibited_even_with_correct_source_identity():
+def test_unverified_rmin_is_rejected_even_with_correct_source_identity():
     merged = core.merge_extractions([
         _numeric_result(
             "show2.jpg", "Rmin_mm", 5.33, "SHOW_2_EXAMS_TOPOMETRIC",
-            "fallback", source_id=SHOW_2_CORNEA_BACK,
+            verified=False, source_id=SHOW_2_CORNEA_BACK,
         ),
     ])
     od = merged["eyes"][0]
     assert od["Rmin_mm"] is None
-    assert "Rmin_mm" not in od.get("map_fallback_numeric_fields", [])
+    assert "Rmin_mm" in od.get("missing_or_unreadable", [])
 
 
-def test_k1_map_fallback_is_never_accepted():
+def test_unverified_k1_is_never_accepted_even_with_source_identity():
     merged = core.merge_extractions([
         _numeric_result(
             "show2.jpg", "K1_D", 44.6, "SHOW_2_EXAMS_TOPOMETRIC",
-            "fallback", source_id=SHOW_2_CORNEA_FRONT,
+            verified=False, source_id=SHOW_2_CORNEA_FRONT,
         ),
     ])
     od = merged["eyes"][0]
     assert od["K1_D"] is None
-    assert "K1_D" not in od.get("map_fallback_numeric_fields", [])
+    assert "K1_D" in od.get("missing_or_unreadable", [])
 
 
 def test_canonical_k1_direct_read_is_retained():
