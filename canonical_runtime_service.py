@@ -31,7 +31,7 @@ SUPPORTED_PROCEDURES = frozenset({"LASIK", "PRK", "SMILE"})
 
 def _plain(value: Any) -> Any:
     if is_dataclass(value):
-        return asdict(value)
+        return _plain(asdict(value))
     if isinstance(value, Mapping):
         return {key: _plain(item) for key, item in value.items()}
     if isinstance(value, tuple):
@@ -132,7 +132,7 @@ def _virgin_eye_payload(eye_name: str, core_result: Mapping[str, Any]) -> dict[s
         "reasons": _decision_reasons(core_result),
         "warnings": [],
         "missing": _missing(core_result),
-        "canonical_result": core_result,
+        "canonical_result": _plain(core_result),
     }
 
 
@@ -191,7 +191,7 @@ def evaluate_case(
             continue
         procedure = str(plan.get("procedure") or "").strip().upper()
         if procedure not in SUPPORTED_PROCEDURES:
-            incomplete = {
+            results.append({
                 "eye": eye_name,
                 "status": ASSESSMENT_INCOMPLETE,
                 "action": _action(ASSESSMENT_INCOMPLETE),
@@ -206,8 +206,7 @@ def evaluate_case(
                 "warnings": [],
                 "missing": ["procedure"],
                 "canonical_result": None,
-            }
-            results.append(incomplete)
+            })
             continue
         normalized = build_clinical_core_input(
             eye,
