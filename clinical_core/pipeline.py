@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from math import isfinite
 from typing import Optional
 
-from .bad import final_bad_d_classification
+from .bad import BADContext, evaluate_bad
 from .disposition import (
     ASSESSMENT_INCOMPLETE,
     CAUTION,
@@ -61,6 +61,15 @@ class ClinicalCoreInput:
     preop_kmean_d: Optional[float] = None
     intended_mrse_d: Optional[float] = None
     final_bad_d: Optional[float] = None
+    bad_df: Optional[float] = None
+    bad_db: Optional[float] = None
+    bad_dp: Optional[float] = None
+    bad_dt: Optional[float] = None
+    bad_da: Optional[float] = None
+    artmax_um: Optional[float] = None
+    ppi_min: Optional[float] = None
+    ppi_avg: Optional[float] = None
+    ppi_max: Optional[float] = None
     nice_k2_d: Optional[float] = None
     nice_central_pachy_um: Optional[float] = None
     nice_b_ele_th_um: Optional[float] = None
@@ -160,8 +169,21 @@ def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
         )
         erss_status = erss_disposition(erss["total"])
 
-    bad_class = final_bad_d_classification(inp.final_bad_d)
-    bad_status = _bad_d_disposition(bad_class)
+    bad = evaluate_bad(
+        inp.final_bad_d,
+        context=BADContext(
+            df=inp.bad_df,
+            db=inp.bad_db,
+            dp=inp.bad_dp,
+            dt=inp.bad_dt,
+            da=inp.bad_da,
+            artmax_um=inp.artmax_um,
+            ppi_min=inp.ppi_min,
+            ppi_avg=inp.ppi_avg,
+            ppi_max=inp.ppi_max,
+        ),
+    )
+    bad_status = _bad_d_disposition(bad.classification)
 
     nice = score_nice(
         inp.nice_k2_d,
@@ -186,7 +208,7 @@ def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
 
     findings = (
         DecisionFinding("randleman_erss", erss_status, "LASIK ERSS" if procedure == "LASIK" else "Not applicable"),
-        DecisionFinding("bad_d", bad_status, f"Final BAD-D: {bad_class}"),
+        DecisionFinding("bad_d", bad_status, f"Final BAD-D: {bad.classification}"),
         DecisionFinding("nice", nice_status, f"NICE total: {nice.get('total')!r}"),
         DecisionFinding("ps3", ps3_status, "PS3 procedure disposition"),
         DecisionFinding("procedural_safety", safety_status, safety_detail),
@@ -199,7 +221,7 @@ def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
         "intended_refractive_group": intended_group,
         "erss": erss,
         "erss_status": erss_status,
-        "bad_d": {"classification": bad_class, "status": bad_status},
+        "bad_d": {"result": bad, "classification": bad.classification, "status": bad_status},
         "nice": nice,
         "nice_status": nice_status,
         "ps3": ps3_result,
