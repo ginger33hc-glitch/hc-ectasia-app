@@ -1,0 +1,45 @@
+name: Step 2G audit dead clinical code
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: monday-clean-architecture
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Audit legacy clinical helper references
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import ast
+          names = {
+              'bad_classification','lasik_topography_points','scoring_morphology',
+              'lasik_rsb_points','age_points','lasik_pachy_points','lasik_mrse_points',
+              'prk_morphology_points','prk_pachy_points','score_category','tomography_review',
+              'estimate_ablation','refractive_pattern',
+          }
+          for name in sorted(names):
+              hits=[]
+              for path in Path('.').rglob('*.py'):
+                  if '.git' in path.parts:
+                      continue
+                  text=path.read_text(errors='ignore')
+                  try: tree=ast.parse(text)
+                  except SyntaxError: continue
+                  for node in ast.walk(tree):
+                      if isinstance(node, ast.Call):
+                          fn=node.func
+                          called = fn.id if isinstance(fn, ast.Name) else fn.attr if isinstance(fn, ast.Attribute) else None
+                          if called == name:
+                              hits.append(f'{path}:{getattr(node,"lineno",0)}')
+              print(f'{name}: {", ".join(hits) if hits else "NO CALLERS"}')
+          PY
