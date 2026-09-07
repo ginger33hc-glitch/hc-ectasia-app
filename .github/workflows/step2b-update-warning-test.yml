@@ -1,0 +1,40 @@
+name: Step 2B update canonical-source warning test
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: monday-clean-architecture
+          fetch-depth: 0
+      - name: Update stale wrapper-era warning assertion
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('tests/legacy_pentacam_targeted_reread_tests.py')
+          text = path.read_text(encoding='utf-8')
+          old = '    assert any("verified BAD Display" in warning for warning in result["global_warnings"])\n'
+          new = '    assert any("canonical source" in warning for warning in result["global_warnings"])\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'ABORT: expected warning assertion once, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          python -m py_compile tests/legacy_pentacam_targeted_reread_tests.py
+          git diff --check
+      - name: Commit warning assertion migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/legacy_pentacam_targeted_reread_tests.py
+          git commit -m "Update targeted reread source warning assertion"
+          git push origin HEAD:monday-clean-architecture
