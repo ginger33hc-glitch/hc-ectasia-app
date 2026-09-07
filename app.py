@@ -797,6 +797,10 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     continue
                 if value is None or old == value:
                     continue
+                if key in LOCKED_FIELDS:
+                    target["data_conflicts"].append(f"{key}: {old} vs {value}")
+                    target[key] = None
+                    continue
                 if key in planning_conflict_fields:
                     target[key] = None
                     target.setdefault("planning_data_issues", []).append(
