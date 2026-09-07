@@ -1,4 +1,9 @@
-"""Pure NICE and single-final-disposition tests."""
+"""Pure NICE and single-final-disposition tests.
+
+Step-1 authority note: the duplicate ``nice_scoring.py`` implementation was
+retired. These tests now lock the approved NICE thresholds directly at the sole
+canonical owner, ``clinical_core.nice``.
+"""
 
 import pytest
 
@@ -13,36 +18,46 @@ from clinical_core.disposition import (
     presentation_class,
 )
 from clinical_core.nice import nice_disposition, score_nice
-from nice_scoring import score_nice as production_score_nice
 
 
 @pytest.mark.parametrize(
-    "k2,central,pe,i_s",
+    "inputs,expected_rows,expected_total,expected_category",
     [
-        (44.0, 530, 10.0, 0.5),
-        (45.0, 520, 15.5, 1.0),
-        (47.0, 500, 17.9, 1.4),
-        (47.1, 499, 18.0, 1.41),
-        (48.5, 480, 22.0, -0.5),
-        (None, 520, 15, 1.0),
-        (44.0, None, 15, 1.0),
-        (44.0, 520, None, 1.0),
-        (44.0, 520, 15, None),
-        (19.9, 520, 15, 1.0),
-        (80.1, 520, 15, 1.0),
-        (44.0, 299, 15, 1.0),
-        (44.0, 801, 15, 1.0),
-        (44.0, 520, 301, 1.0),
+        ((44.99, 521, 15.5, 0.99), {"K2": 1, "central_pachymetry": 1, "B_Ele_Th": 1, "I_S": 1}, 4, "NO_NICE_ESCALATION"),
+        ((45.0, 520, 15.5001, 1.0), {"K2": 2, "central_pachymetry": 2, "B_Ele_Th": 2, "I_S": 2}, 8, "CAUTION"),
+        ((47.0, 500, 17.9999, 1.4), {"K2": 2, "central_pachymetry": 2, "B_Ele_Th": 2, "I_S": 2}, 8, "CAUTION"),
+        ((47.0001, 499.999, 18.0, 1.4001), {"K2": 3, "central_pachymetry": 3, "B_Ele_Th": 3, "I_S": 3}, 12, "HARD_STOP"),
+        ((48.5, 530, 10.0, -0.5), {"K2": 3, "central_pachymetry": 1, "B_Ele_Th": 1, "I_S": 1}, 6, "CAUTION"),
     ],
 )
-def test_pure_nice_matches_numeric_scoring_reference(k2, central, pe, i_s):
-    expected = production_score_nice(k2, central, pe, i_s)
-    actual = score_nice(k2, central, pe, i_s)
-    assert actual["total"] == expected["total"]
-    assert actual["category"] == expected["category"]
-    assert actual["rows"] == expected["rows"]
-    assert actual["values"] == expected["values"]
-    assert actual["missing"] == expected["missing"]
+def test_canonical_nice_boundary_rows(inputs, expected_rows, expected_total, expected_category):
+    actual = score_nice(*inputs)
+    assert actual["rows"] == expected_rows
+    assert actual["total"] == expected_total
+    assert actual["category"] == expected_category
+    assert actual["missing"] == []
+
+
+@pytest.mark.parametrize(
+    "inputs,expected_missing",
+    [
+        ((None, 520, 15, 1.0), ["K2_D"]),
+        ((44.0, None, 15, 1.0), ["central_pachy_um"]),
+        ((44.0, 520, None, 1.0), ["B_Ele_Th_um"]),
+        ((44.0, 520, 15, None), ["I_S_D"]),
+        ((19.9, 520, 15, 1.0), ["K2_D"]),
+        ((80.1, 520, 15, 1.0), ["K2_D"]),
+        ((44.0, 299, 15, 1.0), ["central_pachy_um"]),
+        ((44.0, 801, 15, 1.0), ["central_pachy_um"]),
+        ((44.0, 520, 301, 1.0), ["B_Ele_Th_um"]),
+    ],
+)
+def test_canonical_nice_incomplete_inputs_fail_closed(inputs, expected_missing):
+    actual = score_nice(*inputs)
+    assert actual["total"] is None
+    assert actual["category"] == "INCOMPLETE"
+    assert actual["rows"] == {}
+    assert actual["missing"] == expected_missing
 
 
 @pytest.mark.parametrize(
