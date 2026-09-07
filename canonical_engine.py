@@ -10,6 +10,8 @@ import inspect
 
 import assessment_workflow
 import canonical_runtime_service
+import geometric_srax_policy
+import pentacam_targeted_reread
 import runtime_composition as composition
 from clinical_core.bad import final_bad_d_classification
 from clinical_core.erss import erss_disposition, erss_rsb_points
@@ -86,11 +88,21 @@ def runtime_invariants():
     if "srax_completion_policy" in phase_names or "randleman_report_readiness_policy" in phase_names:
         errors.append("Retired workflow monkey-patch remains in production composition")
 
+    extraction_source = inspect.getsource(core.extract_one_image)
+    if "pentacam_targeted_reread.enrich_extraction(" not in extraction_source:
+        errors.append("Targeted Pentacam reread is not directly owned by app.extract_one_image")
+    if "geometric_srax_policy.enrich_extraction(" not in extraction_source:
+        errors.append("Geometric SRAX is not directly owned by app.extract_one_image")
+    if callable(getattr(pentacam_targeted_reread, "install", None)):
+        errors.append("Targeted Pentacam reread must not expose a runtime installer")
+    if callable(getattr(geometric_srax_policy, "install", None)):
+        errors.append("Geometric SRAX must not expose a runtime installer")
+    if "pentacam_targeted_reread" in phase_names or "geometric_srax_policy" in phase_names:
+        errors.append("Per-image extraction wrapper remains in runtime composition")
+
     # Extraction/transport/operational boundaries still required at this stage.
     for marker, message in (
         ("_cerai_mandatory_source_set_installed", "Mandatory Pentacam source gate is not active"),
-        ("_cerai_targeted_pentacam_reread_installed", "Targeted Pentacam reread is not active"),
-        ("_cerai_geometric_srax_installed", "Geometric SRAX extraction is not active"),
         ("_hc_readiness_installed", "Assessment workflow endpoints are not installed"),
         ("_cerai_report_builders_installed", "Report builders are not installed"),
         ("_cerai_named_user_access_installed", "Named-user access boundary is not active"),

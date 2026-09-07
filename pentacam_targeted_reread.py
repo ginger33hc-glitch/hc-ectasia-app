@@ -15,7 +15,7 @@ from io import BytesIO
 import json
 import os
 import re
-from typing import Any, Callable
+from typing import Any
 
 from PIL import Image, ImageOps
 from pentacam_canonical_source_lock import (
@@ -670,44 +670,29 @@ def targeted_reread(
     return json.loads(response.output_text)
 
 
-def make_targeted_extractor(core: Any, previous: Callable[[bytes, str], dict[str, Any]]):
-    def extract_one_image_with_targeted_reread(raw: bytes, filename: str) -> dict[str, Any]:
-        result = previous(raw, filename)
-        requested = missing_targets_by_eye(result)
-        patient_age_requested = patient_age_is_missing(result)
-        pentacam_qs_requested = pentacam_qs_is_missing(result)
-        if not _enabled() or (
-            not requested and not patient_age_requested
-            and not pentacam_qs_requested
-        ):
-            return result
-        try:
-            reread = targeted_reread(
-                core, raw, filename, requested, patient_age_requested, pentacam_qs_requested,
-            )
-            return apply_targeted_readings(
-                core, result, reread, requested, filename, patient_age_requested,
-                pentacam_qs_requested,
-            )
-        except Exception as exc:
-            result.setdefault("global_warnings", []).append(
-                f"Targeted Pentacam numeric reread failed for {filename}: "
-                f"{type(exc).__name__}; original extraction retained."
-            )
-            return result
 
-    return extract_one_image_with_targeted_reread
-
-
-_previous_extract_one_image = None
-extract_one_image_with_targeted_reread = None
-
-
-def install(core: Any) -> None:
-    global _previous_extract_one_image, extract_one_image_with_targeted_reread
-    if getattr(core, "_cerai_targeted_pentacam_reread_installed", False):
-        return
-    _previous_extract_one_image = core.extract_one_image
-    extract_one_image_with_targeted_reread = make_targeted_extractor(core, _previous_extract_one_image)
-    core.extract_one_image = extract_one_image_with_targeted_reread
-    core._cerai_targeted_pentacam_reread_installed = True
+def enrich_extraction(
+    core: Any, result: dict[str, Any], raw: bytes, filename: str
+) -> dict[str, Any]:
+    """Run the targeted second pass explicitly after primary extraction."""
+    requested = missing_targets_by_eye(result)
+    patient_age_requested = patient_age_is_missing(result)
+    pentacam_qs_requested = pentacam_qs_is_missing(result)
+    if not _enabled() or (
+        not requested and not patient_age_requested and not pentacam_qs_requested
+    ):
+        return result
+    try:
+        reread = targeted_reread(
+            core, raw, filename, requested, patient_age_requested, pentacam_qs_requested,
+        )
+        return apply_targeted_readings(
+            core, result, reread, requested, filename, patient_age_requested,
+            pentacam_qs_requested,
+        )
+    except Exception as exc:
+        result.setdefault("global_warnings", []).append(
+            f"Targeted Pentacam numeric reread failed for {filename}: "
+            f"{type(exc).__name__}; original extraction retained."
+        )
+        return result

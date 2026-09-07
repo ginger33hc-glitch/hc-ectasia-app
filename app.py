@@ -15,6 +15,9 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 
+import pentacam_targeted_reread
+import geometric_srax_policy
+
 from clinical_disposition import combine_status as combine_clinical_status
 from pentacam_canonical_source_lock import (
     CANONICAL_FIELD_SOURCES, LOCKED_FIELDS, canonical_source_id,
@@ -1427,6 +1430,10 @@ def extract_one_image(raw: bytes, filename: str) -> Dict[str, Any]:
         for eye in result.get("eyes", []):
             eye["_source_filename"] = filename
             eye["_pentacam_qs"] = context.get("pentacam_qs", "NOT_SHOWN")
+        result = pentacam_targeted_reread.enrich_extraction(
+            sys.modules[__name__], result, raw, filename
+        )
+        result = geometric_srax_policy.enrich_extraction(result, raw, filename)
         return result
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"OpenAI output was not valid JSON: {exc}") from exc

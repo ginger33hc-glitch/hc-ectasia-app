@@ -10,7 +10,7 @@ from __future__ import annotations
 from io import BytesIO
 import math
 import os
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 from PIL import Image, ImageOps
@@ -195,57 +195,48 @@ def measure_srax(raw: bytes) -> dict[str, Any]:
     }
 
 
-def make_geometric_srax_extractor(core: Any, previous: Callable[[bytes, str], dict[str, Any]]):
-    def extract_one_image_with_geometric_srax(raw: bytes, filename: str) -> dict[str, Any]:
-        result = previous(raw, filename)
-        if not _enabled():
-            return result
-        eyes = [eye for eye in result.get("eyes") or [] if eye.get("eye") in {"OD", "OS"} and _is_four_maps_eye(eye)]
-        if len(eyes) != 1:
-            return result
-        eye = eyes[0]
-        try:
-            measurement = measure_srax(raw)
-        except Exception as exc:
-            result.setdefault("global_warnings", []).append(
-                f"Geometric SRAX measurement failed for {filename}: {type(exc).__name__}; SRAX remains unresolved."
-            )
-            eye["srax"] = "UNCERTAIN"
-            eye["srax_deg"] = None
-            return result
 
-        eye["srax_geometry"] = measurement
-        if measurement.get("status") != "CONFIDENT":
-            eye["srax"] = "UNCERTAIN"
-            eye["srax_deg"] = None
-            return result
-
-        eye["srax"] = measurement["srax"]
-        eye["srax_deg"] = measurement["srax_deg"]
-        eye.setdefault("morphology_evidence", []).append(
-            "Deterministic Front-map SRAX geometry "
-            f"({ALGORITHM_VERSION}): superior axis {measurement['superior_axis_deg']:.1f}°, "
-            f"inferior axis {measurement['inferior_axis_deg']:.1f}°, "
-            f"SRAX {measurement['srax_deg']:.1f}°; strict >20° criterion."
+def enrich_extraction(result: dict[str, Any], raw: bytes, filename: str) -> dict[str, Any]:
+    """Apply deterministic Front-map SRAX geometry explicitly to one extraction result."""
+    if not _enabled():
+        return result
+    eyes = [
+        eye for eye in result.get("eyes") or []
+        if eye.get("eye") in {"OD", "OS"} and _is_four_maps_eye(eye)
+    ]
+    if len(eyes) != 1:
+        return result
+    eye = eyes[0]
+    try:
+        measurement = measure_srax(raw)
+    except Exception as exc:
+        result.setdefault("global_warnings", []).append(
+            f"Geometric SRAX measurement failed for {filename}: {type(exc).__name__}; "
+            "SRAX remains unresolved."
         )
-        provenance = eye.setdefault("field_provenance", {})
-        provenance["srax"] = [{"source": "AXIAL_SAGITTAL_CURVATURE_FRONT_GEOMETRIC", "file": filename}]
-        provenance["srax_deg"] = [{"source": "AXIAL_SAGITTAL_CURVATURE_FRONT_GEOMETRIC", "file": filename}]
+        eye["srax"] = "UNCERTAIN"
+        eye["srax_deg"] = None
         return result
 
-    return extract_one_image_with_geometric_srax
+    eye["srax_geometry"] = measurement
+    if measurement.get("status") != "CONFIDENT":
+        eye["srax"] = "UNCERTAIN"
+        eye["srax_deg"] = None
+        return result
 
-
-_previous_extract_one_image = None
-extract_one_image_with_geometric_srax = None
-
-
-def install(core: Any, previous_owner: Any = None) -> None:
-    global _previous_extract_one_image, extract_one_image_with_geometric_srax
-    if getattr(core, "_cerai_geometric_srax_installed", False):
-        return
-    _previous_extract_one_image = core.extract_one_image
-    extract_one_image_with_geometric_srax = make_geometric_srax_extractor(core, _previous_extract_one_image)
-    core.extract_one_image = extract_one_image_with_geometric_srax
-    core._cerai_geometric_srax_installed = True
-    core._cerai_geometric_srax_algorithm = ALGORITHM_VERSION
+    eye["srax"] = measurement["srax"]
+    eye["srax_deg"] = measurement["srax_deg"]
+    eye.setdefault("morphology_evidence", []).append(
+        "Deterministic Front-map SRAX geometry "
+        f"({ALGORITHM_VERSION}): superior axis {measurement['superior_axis_deg']:.1f}°, "
+        f"inferior axis {measurement['inferior_axis_deg']:.1f}°, "
+        f"SRAX {measurement['srax_deg']:.1f}°; strict >20° criterion."
+    )
+    provenance = eye.setdefault("field_provenance", {})
+    provenance["srax"] = [
+        {"source": "AXIAL_SAGITTAL_CURVATURE_FRONT_GEOMETRIC", "file": filename}
+    ]
+    provenance["srax_deg"] = [
+        {"source": "AXIAL_SAGITTAL_CURVATURE_FRONT_GEOMETRIC", "file": filename}
+    ]
+    return result

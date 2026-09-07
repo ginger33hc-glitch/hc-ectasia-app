@@ -31,8 +31,6 @@ import case_catalog  # noqa: E402
 import historical_report  # noqa: E402
 import research_export  # noqa: E402
 import named_user_ui  # noqa: E402
-import pentacam_targeted_reread  # noqa: E402
-import geometric_srax_policy  # noqa: E402
 
 core = bootstrap.core
 app = bootstrap.app
@@ -40,8 +38,7 @@ app = bootstrap.app
 COMPOSITION_PHASES = {
     "pentacam_extraction_pending_stage2_3": (
         "merge_policy_base", "extraction_guard",
-        "mandatory_source_set_policy", "pentacam_targeted_reread",
-        "geometric_srax_policy",
+        "mandatory_source_set_policy",
     ),
     "reporting_pending_stage10": (
         "report_export_guard", "critical_score_highlight",
@@ -96,8 +93,6 @@ def compose(version: str):
     research_export.install(core, archive_runtime)
     named_user_ui.install(core)
 
-    pentacam_targeted_reread.install(core)
-    geometric_srax_policy.install(core)
 
     app.state.cerai_canonical_runtime_ready = True
     core._cerai_runtime_composed = True
