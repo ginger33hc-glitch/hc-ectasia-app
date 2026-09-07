@@ -1,11 +1,11 @@
 """Direct case-level runtime for the CER-AI canonical clinical core.
 
-This module is the future authoritative clinical runtime boundary. It does not
-install or wrap application functions. It receives already-reconciled extraction,
-normalized surgeon plans, and documented patient modifiers; maps each virgin eye
-once into ``ClinicalCoreInput``; supplies pure eligibility findings; calls the
-canonical clinical core once; and projects that result into the stable case
-payload consumed by workflow/report/archive.
+This module is the authoritative clinical runtime boundary. It does not install
+or wrap application functions. It receives already-reconciled extraction,
+surgeon plans, and documented patient modifiers; resolves treatment-role source
+precedence exactly once; maps each virgin eye into ``ClinicalCoreInput``; supplies
+pure eligibility findings; calls the canonical clinical core once; and projects
+that result into the stable case payload consumed by workflow/report/archive.
 
 No Pentacam reading, clinical threshold table, score formula, or downstream
 correction belongs here.
@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import asdict, is_dataclass
 from typing import Any, Mapping
 
-from canonical_input_adapter import build_clinical_core_input
+from canonical_input_adapter import build_clinical_core_input, resolve_case_plans
 from clinical_core.disposition import (
     ASSESSMENT_INCOMPLETE,
     CAUTION,
@@ -214,17 +214,18 @@ def evaluate_case(
     *,
     software_version: str | None = None,
 ) -> dict[str, Any]:
-    """Evaluate each classified eye exactly once through the canonical core."""
+    """Resolve plans once, then evaluate each eye once through the canonical core."""
     if not isinstance(patient_modifiers, Mapping):
         raise TypeError("patient_modifiers must be a mapping")
 
     source = _eye_by_name(extracted)
+    resolved_plans = resolve_case_plans(extracted, eye_plans)
     bilateral = set(source) == {"OD", "OS"}
     results: list[dict[str, Any]] = []
 
     for eye_name in ("OD", "OS"):
         eye = source.get(eye_name)
-        plan = eye_plans.get(eye_name)
+        plan = resolved_plans.get(eye_name)
         if eye is None or not isinstance(plan, Mapping):
             continue
         prior = str(plan.get("prior") or "").strip().lower()
@@ -276,6 +277,7 @@ def evaluate_case(
     return {
         "status": _overall_status(results) if results else ASSESSMENT_INCOMPLETE,
         "eyes": results,
+        "effective_eye_plans": _plain(resolved_plans),
         "version": software_version,
         "policy_versions": {
             "clinical": CLINICAL_POLICY_VERSION,
