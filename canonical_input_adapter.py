@@ -1,10 +1,19 @@
-"""Read-only adapter from reconciled canonical data to ClinicalCoreInput.
+"""Canonical read-only adapter from reconciled data to ``ClinicalCoreInput``.
 
-This adapter performs no clinical scoring and owns no screen-specific readers.
-It maps already-reconciled canonical fields into the pure clinical core exactly once.
+This module owns treatment-role normalization exactly once. It performs no
+clinical scoring and owns no screen-specific readers. Source extraction is
+already complete before this boundary.
+
+Treatment-role precedence is explicit:
+1. surgeon-entered values for that role;
+2. one unambiguous CONFIDENT Düzeltme Miktarı treatment-card value;
+3. for intended treatment only, manifest refraction when the intended role is
+   wholly blank.
+A partially entered role is never completed from another source.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any, Mapping, Optional
 
 from clinical_core.pipeline import ClinicalCoreInput
@@ -24,17 +33,70 @@ def _first_number(mapping: Mapping[str, Any], *keys: str) -> Optional[float]:
     return None
 
 
+def _role_keys(prefix: str) -> tuple[str, ...]:
+    return (
+        f"{prefix}_entered_sphere_D",
+        f"{prefix}_cylinder_signed_D",
+        f"{prefix}_sphere_D",
+        f"{prefix}_cylinder_magnitude_D",
+        f"{prefix}_axis_deg",
+        f"{prefix}_entered_axis_deg",
+        f"{prefix}_normalized_axis_deg",
+    )
+
+
+def _role_supplied(plan: Mapping[str, Any], prefix: str) -> bool:
+    return any(plan.get(key) is not None for key in _role_keys(prefix))
+
+
+def _raw_axis(mapping: Mapping[str, Any], prefix: str) -> Optional[float]:
+    aliases = [f"{prefix}_axis_deg", f"{prefix}_entered_axis_deg"]
+    # The existing browser/API contract may provide one shared entered axis.
+    aliases.append("entered_axis_deg")
+    return _first_number(mapping, *aliases)
+
+
+def _normalized_axis(mapping: Mapping[str, Any], prefix: str) -> Optional[float]:
+    aliases = [f"{prefix}_normalized_axis_deg", f"{prefix}_axis_deg"]
+    if prefix == "intended":
+        aliases.append("correction_axis_deg")
+    return _first_number(mapping, *aliases)
+
+
 def _refraction(mapping: Mapping[str, Any], prefix: str):
-    sphere = _first_number(mapping, f"{prefix}_sphere_D", f"{prefix}_entered_sphere_D")
-    cylinder = _first_number(mapping, f"{prefix}_cylinder_signed_D")
-    if cylinder is None:
-        magnitude = _first_number(mapping, f"{prefix}_cylinder_magnitude_D")
-        if magnitude is not None:
-            cylinder = -abs(magnitude)
-    axis = _first_number(mapping, f"{prefix}_axis_deg")
-    if sphere is None or cylinder is None or axis is None:
-        return None
-    return normalize_minus_cylinder(sphere, cylinder, axis)
+    """Normalize one role without mixing raw and already-normalized notation."""
+    entered_sphere = _first_number(mapping, f"{prefix}_entered_sphere_D")
+    signed_cylinder = _first_number(mapping, f"{prefix}_cylinder_signed_D")
+    raw_present = (
+        mapping.get(f"{prefix}_entered_sphere_D") is not None
+        or mapping.get(f"{prefix}_cylinder_signed_D") is not None
+    )
+    if raw_present:
+        if entered_sphere is None or signed_cylinder is None:
+            return None
+        axis = _raw_axis(mapping, prefix)
+        if abs(signed_cylinder) <= 1e-12 and axis is None:
+            axis = 0.0
+        if axis is None:
+            return None
+        return normalize_minus_cylinder(entered_sphere, signed_cylinder, axis)
+
+    sphere = _first_number(mapping, f"{prefix}_sphere_D")
+    magnitude = _first_number(mapping, f"{prefix}_cylinder_magnitude_D")
+    normalized_present = (
+        mapping.get(f"{prefix}_sphere_D") is not None
+        or mapping.get(f"{prefix}_cylinder_magnitude_D") is not None
+    )
+    if normalized_present:
+        if sphere is None or magnitude is None:
+            return None
+        axis = _normalized_axis(mapping, prefix)
+        if abs(magnitude) <= 1e-12 and axis is None:
+            axis = 0.0
+        if axis is None:
+            return None
+        return normalize_minus_cylinder(sphere, -abs(magnitude), axis)
+    return None
 
 
 def _mrse(mapping: Mapping[str, Any], prefix: str):
@@ -42,6 +104,106 @@ def _mrse(mapping: Mapping[str, Any], prefix: str):
     if normalized is not None:
         return normalized.mrse_d
     return _first_number(mapping, f"{prefix}_mrse_D", f"{prefix}_MRSE_D")
+
+
+def _card_correction(extracted: Mapping[str, Any] | None, eye_name: str | None):
+    if not isinstance(extracted, Mapping) or eye_name not in {"OD", "OS"}:
+        return None
+    candidates = []
+    for item in extracted.get("treatment_corrections") or []:
+        if not isinstance(item, Mapping) or item.get("eye") != eye_name:
+            continue
+        if str(item.get("source_label") or "").upper() != "DUZELTME_MIKTARI":
+            continue
+        if str(item.get("sphere_cylinder_status") or "").upper() != "CONFIDENT":
+            continue
+        sphere = item.get("sphere_D")
+        cylinder = item.get("cylinder_D")
+        if not _finite(sphere) or not _finite(cylinder):
+            continue
+        axis = item.get("axis_deg")
+        axis_confident = str(item.get("axis_status") or "").upper() == "CONFIDENT"
+        candidates.append((
+            float(sphere),
+            float(cylinder),
+            float(axis) if axis_confident and _finite(axis) else None,
+        ))
+    unique = list(dict.fromkeys(candidates))
+    return unique[0] if len(unique) == 1 else None
+
+
+def _set_raw_role(plan: dict[str, Any], prefix: str, correction) -> None:
+    sphere, cylinder, axis = correction
+    plan[f"{prefix}_entered_sphere_D"] = sphere
+    plan[f"{prefix}_cylinder_signed_D"] = cylinder
+    if axis is not None:
+        plan[f"{prefix}_axis_deg"] = axis
+
+
+def _copy_manifest_to_intended(plan: dict[str, Any]) -> None:
+    """Copy one complete notation family; never synthesize a partial role."""
+    manifest_raw = (
+        plan.get("manifest_entered_sphere_D"),
+        plan.get("manifest_cylinder_signed_D"),
+    )
+    if all(value is not None for value in manifest_raw):
+        plan["intended_entered_sphere_D"] = manifest_raw[0]
+        plan["intended_cylinder_signed_D"] = manifest_raw[1]
+        axis = _raw_axis(plan, "manifest")
+        if axis is not None:
+            plan["intended_axis_deg"] = axis
+        return
+
+    manifest_normalized = (
+        plan.get("manifest_sphere_D"),
+        plan.get("manifest_cylinder_magnitude_D"),
+    )
+    if all(value is not None for value in manifest_normalized):
+        plan["intended_sphere_D"] = manifest_normalized[0]
+        plan["intended_cylinder_magnitude_D"] = manifest_normalized[1]
+        axis = _normalized_axis(plan, "manifest")
+        if axis is not None:
+            plan["intended_normalized_axis_deg"] = axis
+
+
+def resolve_eye_plan(
+    plan: Mapping[str, Any],
+    *,
+    extracted: Mapping[str, Any] | None = None,
+    eye_name: str | None = None,
+) -> dict[str, Any]:
+    """Resolve source precedence without mutating the caller's plan."""
+    resolved = deepcopy(dict(plan or {}))
+    correction = _card_correction(extracted, eye_name)
+
+    manifest_supplied = _role_supplied(resolved, "manifest")
+    intended_supplied = _role_supplied(resolved, "intended")
+
+    if not manifest_supplied and correction is not None:
+        _set_raw_role(resolved, "manifest", correction)
+        resolved["manifest_source"] = "TREATMENT_CARD_DUZELTME_MIKTARI"
+
+    if not intended_supplied:
+        if correction is not None:
+            _set_raw_role(resolved, "intended", correction)
+            resolved["intended_source"] = "TREATMENT_CARD_DUZELTME_MIKTARI"
+        else:
+            _copy_manifest_to_intended(resolved)
+            if _role_supplied(resolved, "intended"):
+                resolved["intended_source"] = "DEFAULTED_FROM_MANIFEST"
+
+    return resolved
+
+
+def resolve_case_plans(
+    extracted: Mapping[str, Any],
+    eye_plans: Mapping[str, Mapping[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    return {
+        eye: resolve_eye_plan(plan, extracted=extracted, eye_name=eye)
+        for eye, plan in eye_plans.items()
+        if eye in {"OD", "OS"} and isinstance(plan, Mapping)
+    }
 
 
 def _ablation(plan):
@@ -104,25 +266,34 @@ def build_inter_eye_ps3(extracted):
 
 
 def build_clinical_core_input(eye, plan, *, age_years, extracted=None):
-    manifest = _refraction(plan, "manifest")
-    intended = _refraction(plan, "intended")
-    manifest_mrse = manifest.mrse_d if manifest is not None else _mrse(plan, "manifest")
-    intended_mrse = intended.mrse_d if intended is not None else _mrse(plan, "intended")
+    resolved = resolve_eye_plan(
+        plan,
+        extracted=extracted,
+        eye_name=eye.get("eye") if isinstance(eye, Mapping) else None,
+    )
+    manifest = _refraction(resolved, "manifest")
+    intended = _refraction(resolved, "intended")
+    manifest_mrse = manifest.mrse_d if manifest is not None else _mrse(resolved, "manifest")
+    intended_mrse = intended.mrse_d if intended is not None else _mrse(resolved, "intended")
 
     intended_sphere = intended.sphere_d if intended is not None else _first_number(
-        plan, "intended_sphere_D", "intended_entered_sphere_D"
+        resolved, "intended_sphere_D", "intended_entered_sphere_D"
     )
     intended_cylinder = intended.cylinder_d if intended is not None else _first_number(
-        plan, "intended_cylinder_signed_D"
+        resolved, "intended_cylinder_signed_D"
     )
-    intended_axis = intended.axis_deg if intended is not None else _first_number(plan, "intended_axis_deg")
+    if intended_cylinder is None:
+        magnitude = _first_number(resolved, "intended_cylinder_magnitude_D")
+        if magnitude is not None:
+            intended_cylinder = -abs(magnitude)
+    intended_axis = intended.axis_deg if intended is not None else _normalized_axis(resolved, "intended")
 
-    i_s = _first_number(plan, "surgeon_I_S_D")
+    i_s = _first_number(resolved, "surgeon_I_S_D")
     if i_s is None:
         i_s = _first_number(eye, "I_S")
 
     return ClinicalCoreInput(
-        procedure=str(plan.get("procedure") or "").strip().upper(),
+        procedure=str(resolved.get("procedure") or "").strip().upper(),
         age_years=age_years,
         thinnest_um=_first_number(eye, "pachy_thinnest_um"),
         i_s_d=i_s,
@@ -131,8 +302,8 @@ def build_clinical_core_input(eye, plan, *, age_years, extracted=None):
         intended_sphere_d=intended_sphere,
         intended_cylinder_d=intended_cylinder,
         intended_axis_deg=intended_axis,
-        flap_um=_first_number(plan, "flap_um"),
-        ablation_um=_ablation(plan),
+        flap_um=_first_number(resolved, "flap_um"),
+        ablation_um=_ablation(resolved),
         preop_kmean_d=_first_number(eye, "Kmean_D"),
         intended_mrse_d=intended_mrse,
         final_bad_d=_first_number(eye, "BAD_D"),
