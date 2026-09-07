@@ -20,6 +20,7 @@ from .disposition import (
 from .erss import erss_disposition, erss_total
 from .nice import nice_disposition, score_nice
 from .ps3 import PS3EyeInput, PS3InterEyeInput, evaluate_ps3
+from .refraction import MIXED, normalize_minus_cylinder, refractive_group, scalar_final_k_is_valid
 from .rules import bad_d_classification
 from .safety import (
     estimated_final_kmean_d,
@@ -53,6 +54,8 @@ class ClinicalCoreInput:
     derived_srax_deg: Optional[float] = None
     manifest_mrse_d: Optional[float] = None
     intended_sphere_d: Optional[float] = None
+    intended_cylinder_d: Optional[float] = None
+    intended_axis_deg: Optional[float] = None
     flap_um: Optional[float] = None
     ablation_um: Optional[float] = None
     preop_kmean_d: Optional[float] = None
@@ -94,7 +97,13 @@ def _ps3_procedure_disposition(ps3_result, procedure: str) -> str:
     return ASSESSMENT_INCOMPLETE
 
 
-def _safety_status(procedure: str, inp: ClinicalCoreInput, rsb, rst, final_k) -> tuple[str, dict]:
+def _intended_refraction(inp: ClinicalCoreInput):
+    if not all(_finite(value) for value in (inp.intended_sphere_d, inp.intended_cylinder_d, inp.intended_axis_deg)):
+        return None
+    return normalize_minus_cylinder(inp.intended_sphere_d, inp.intended_cylinder_d, inp.intended_axis_deg)
+
+
+def _safety_status(procedure: str, inp: ClinicalCoreInput, rsb, rst, final_k, intended_group) -> tuple[str, dict]:
     hard_stops = {
         "preop_thickness": preop_thickness_hard_stop(inp.thinnest_um),
         "sphere_magnitude": sphere_magnitude_hard_stop(inp.intended_sphere_d),
@@ -114,6 +123,8 @@ def _safety_status(procedure: str, inp: ClinicalCoreInput, rsb, rst, final_k) ->
         return ASSESSMENT_INCOMPLETE, hard_stops
     if procedure == "PRK" and rst is None:
         return ASSESSMENT_INCOMPLETE, hard_stops
+    if intended_group == MIXED:
+        return ASSESSMENT_INCOMPLETE, hard_stops
     if final_k is None:
         return ASSESSMENT_INCOMPLETE, hard_stops
     return PASS, hard_stops
@@ -122,10 +133,19 @@ def _safety_status(procedure: str, inp: ClinicalCoreInput, rsb, rst, final_k) ->
 def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
     procedure = (inp.procedure or "").strip().upper()
 
+    intended_refraction = _intended_refraction(inp)
+    intended_group = refractive_group(intended_refraction) if intended_refraction is not None else None
+
     rsb = lasik_rsb_um(inp.thinnest_um, inp.flap_um, inp.ablation_um) if procedure == "LASIK" else None
     rst = prk_rst_um(inp.thinnest_um, inp.ablation_um) if procedure == "PRK" else None
     pta = lasik_pta_percent(inp.thinnest_um, inp.flap_um, inp.ablation_um) if procedure == "LASIK" else None
-    final_k = estimated_final_kmean_d(inp.preop_kmean_d, inp.intended_mrse_d)
+
+    scalar_final_k_valid = intended_refraction is None or scalar_final_k_is_valid(intended_refraction)
+    final_k = (
+        estimated_final_kmean_d(inp.preop_kmean_d, inp.intended_mrse_d)
+        if scalar_final_k_valid
+        else None
+    )
 
     erss = None
     erss_status = PASS
@@ -156,20 +176,27 @@ def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
     ps3_result = evaluate_ps3(inp.ps3_eye, inp.ps3_inter_eye) if inp.ps3_eye is not None else None
     ps3_status = _ps3_procedure_disposition(ps3_result, procedure)
 
-    safety_status, safety_stops = _safety_status(procedure, inp, rsb, rst, final_k)
+    safety_status, safety_stops = _safety_status(
+        procedure, inp, rsb, rst, final_k, intended_group
+    )
+
+    safety_detail = "Independent tissue/refractive safety gates"
+    if intended_group == MIXED:
+        safety_detail += "; scalar MRSE/Kmean final-K model prohibited for mixed astigmatism"
 
     findings = (
         DecisionFinding("randleman_erss", erss_status, "LASIK ERSS" if procedure == "LASIK" else "Not applicable"),
         DecisionFinding("bad_d", bad_status, f"Final BAD-D: {bad_class}"),
         DecisionFinding("nice", nice_status, f"NICE total: {nice.get('total')!r}"),
         DecisionFinding("ps3", ps3_status, "PS3 procedure disposition"),
-        DecisionFinding("procedural_safety", safety_status, "Independent tissue/refractive safety gates"),
+        DecisionFinding("procedural_safety", safety_status, safety_detail),
     )
     final = finalize_disposition(findings)
 
     return {
         "pipeline_order": PIPELINE_ORDER,
         "procedure": procedure,
+        "intended_refractive_group": intended_group,
         "erss": erss,
         "erss_status": erss_status,
         "bad_d": {"classification": bad_class, "status": bad_status},
@@ -182,6 +209,7 @@ def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
             "PRK_RST_um": rst,
             "LASIK_PTA_percent": pta,
             "estimated_final_Kmean_D": final_k,
+            "scalar_final_Kmean_model_valid": scalar_final_k_valid,
             "hard_stops": safety_stops,
             "status": safety_status,
         },
