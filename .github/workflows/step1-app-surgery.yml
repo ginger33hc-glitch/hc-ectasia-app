@@ -4,6 +4,7 @@ on:
   push:
     branches: [monday-clean-architecture]
 
+# One-shot Step 1 trigger. Remove this workflow after successful guarded cleanup.
 permissions:
   contents: write
 
