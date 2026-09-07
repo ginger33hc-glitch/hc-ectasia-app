@@ -1,0 +1,91 @@
+name: Step 2F flatten bootstrap EX500 ownership
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  flatten:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: monday-clean-architecture
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Guard and move EX500 extraction ownership into app
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import ast
+
+          app = Path('app.py').read_text()
+          bootstrap = Path('bootstrap.py').read_text()
+          engine = Path('canonical_engine.py').read_text()
+
+          schema_start = 'core.SCHEMA["properties"]["document_context"]["properties"]["document_type"]["enum"].append("ALCON_EX500_PLANNING")\n'
+          schema_end = 'core.SCHEMA["required"].append("laser_plans")\n'
+          prompt_start = 'core.PROMPT += """\n\nALCON WAVELIGHT EX500 PLANNING-SCREEN RULE:\n'
+          assert schema_start in bootstrap and schema_end in bootstrap
+          assert prompt_start in bootstrap
+          assert 'ALCON_EX500_PLANNING' not in app.split('_CANONICAL_SOURCE_ID_PROPERTIES', 1)[0]
+
+          # Extract the existing validated blocks verbatim, changing only owner prefix.
+          s0 = bootstrap.index(schema_start)
+          s1 = bootstrap.index(schema_end, s0) + len(schema_end)
+          schema_block = bootstrap[s0:s1].replace('core.SCHEMA', 'SCHEMA')
+
+          p0 = bootstrap.index('core.PROMPT += """', s1)
+          p1 = bootstrap.index('\n"""', p0) + len('\n"""')
+          prompt_block = bootstrap[p0:p1].replace('core.PROMPT', 'PROMPT', 1)
+
+          schema_needle = '}\n\n_CANONICAL_SOURCE_ID_PROPERTIES = {'
+          assert schema_needle in app
+          app = app.replace(
+              schema_needle,
+              '}\n\n# Canonical EX500 extraction schema; no import-time extension layer.\n' + schema_block + '\n_CANONICAL_SOURCE_ID_PROPERTIES = {',
+              1,
+          )
+
+          prompt_needle = 'PROMPT += "\\n" + mandatory_source_set_policy.BAD_DISPLAY_RECOGNITION_PROMPT\n'
+          assert prompt_needle in app
+          app = app.replace(
+              prompt_needle,
+              prompt_needle + '\n# Canonical EX500 transcription rule; no bootstrap prompt mutation.\n' + prompt_block + '\n',
+              1,
+          )
+
+          bootstrap = '''"""Compatibility bootstrap for CER-AI.\n\nAll extraction schema, prompt, merge, and clinical ownership lives in canonical modules.\nThis module only preserves the historical import surface used by runtime composition.\n"""\n\nimport app as core\n\napp = core.app\n'''
+
+          needle = '    # Workflow must call the direct canonical runtime, never the legacy clinical engine.\n'
+          assert needle in engine
+          invariant = '''    bootstrap_source = inspect.getsource(composition.bootstrap)\n    if "SCHEMA[" in bootstrap_source or "PROMPT +=" in bootstrap_source or "merge_extractions =" in bootstrap_source:\n        errors.append("Bootstrap still owns or mutates extraction policy")\n    if composition.bootstrap.core is not core:\n        errors.append("Bootstrap compatibility alias does not reference canonical app module")\n\n'''
+          engine = engine.replace(needle, invariant + needle, 1)
+
+          ast.parse(app)
+          ast.parse(bootstrap)
+          ast.parse(engine)
+          Path('app.py').write_text(app)
+          Path('bootstrap.py').write_text(bootstrap)
+          Path('canonical_engine.py').write_text(engine)
+
+          assert 'ALCON_EX500_PLANNING' in app
+          assert 'ALCON WAVELIGHT EX500 PLANNING-SCREEN RULE:' in app
+          assert 'SCHEMA[' not in bootstrap
+          assert 'PROMPT +=' not in bootstrap
+          assert 'merge_extractions =' not in bootstrap
+          PY
+      - name: Commit canonical EX500 extraction ownership
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app.py bootstrap.py canonical_engine.py
+          git commit -m "Move EX500 extraction ownership into canonical app"
+          git push origin HEAD:monday-clean-architecture
