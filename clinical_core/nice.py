@@ -1,13 +1,14 @@
 """Pure CER-AI NICE scoring and disposition rules.
 
-This module mirrors the launch-frozen NICE behavior without importing the
-application runtime. It is intentionally side-effect-free so it can be tested
-against production before any wiring change.
+This module is side-effect free and owns the four-input NICE calculation plus
+its canonical NICE-specific disposition. No downstream status translation is required.
 """
 from __future__ import annotations
 
 from math import isfinite
 from typing import Any
+
+from .disposition import ASSESSMENT_INCOMPLETE, CAUTION, PASS, STOP_DEFER
 
 
 def _finite(value: Any) -> bool:
@@ -61,13 +62,12 @@ def score_nice(k2_d, central_pachy_um, b_ele_th_um, i_s_d) -> dict[str, Any]:
 
 
 def nice_disposition(total) -> str:
-    """Return the launch-frozen NICE-specific escalation only."""
     if not isinstance(total, int) or isinstance(total, bool):
-        return "DATA INSUFFICIENT"
+        return ASSESSMENT_INCOMPLETE
     if total >= 9:
-        return "STOP-DEFER"
+        return STOP_DEFER
     if total >= 5:
-        return "CAUTION"
+        return CAUTION
     if total == 4:
-        return "PASS"
-    return "DATA INSUFFICIENT"
+        return PASS
+    return ASSESSMENT_INCOMPLETE
