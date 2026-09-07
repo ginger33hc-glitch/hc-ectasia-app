@@ -1,7 +1,9 @@
 """Launch behavior contract locks for the canonical runtime."""
 from pathlib import Path
+import inspect
 
 import canonical_engine
+import mandatory_source_set_policy
 from clinical_core.disposition import CAUTION, PASS, STOP_DEFER, DecisionFinding, finalize_disposition
 from clinical_core.safety import FINAL_KMEAN_MAX_D, FINAL_KMEAN_MIN_D, PRK_EPITHELIUM_UM
 
@@ -38,7 +40,12 @@ def test_phase1_contract_uses_direct_canonical_clinical_authority():
         name for values in runtime_composition.COMPOSITION_PHASES.values() for name in values
     }
 
-    assert canonical_engine.core._cerai_mandatory_source_set_installed
+    assessment_source = inspect.getsource(canonical_engine.core._run_image_assessment)
+    assert "mandatory_source_set_policy.validate_source_set(extraction_results)" in assessment_source
+    assert not callable(getattr(mandatory_source_set_policy, "install", None))
+    assert "mandatory_source_set_policy" not in {
+        name for values in runtime_composition.COMPOSITION_PHASES.values() for name in values
+    }
     assert canonical_engine.core._hc_readiness_installed
     assert "clinical_policy_legacy_pending_retirement" not in runtime_composition.COMPOSITION_PHASES
 
