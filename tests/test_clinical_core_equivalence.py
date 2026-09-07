@@ -48,10 +48,11 @@ def test_signed_i_s_boundaries_are_frozen():
 def test_numeric_topography_higher_single_category_wins():
     assert erss_topography_category(0.0, None) == "NORMAL_SYMMETRIC"
     assert erss_topography_category(0.8, None) == "ASYMMETRIC_BOWTIE"
-    assert erss_topography_category(0.8, 19.999) == "ASYMMETRIC_BOWTIE"
-    assert erss_topography_category(0.8, 20.0) == "INFERIOR_STEEPENING_SRA"
-    assert erss_topography_category(1.2, 20.0) == "INFERIOR_STEEPENING_SRA"
-    assert erss_topography_category(1.4, 20.0) == "ABNORMAL_ECTATIC"
+    assert erss_topography_category(0.8, 19.9) == "ASYMMETRIC_BOWTIE"
+    assert erss_topography_category(0.8, 20.0) == "ASYMMETRIC_BOWTIE"
+    assert erss_topography_category(0.8, 20.1) == "INFERIOR_STEEPENING_SRA"
+    assert erss_topography_category(1.2, 20.1) == "INFERIOR_STEEPENING_SRA"
+    assert erss_topography_category(1.4, 20.1) == "ABNORMAL_ECTATIC"
 
 
 def test_visual_morphology_is_not_an_input_to_pure_topography_rule():
