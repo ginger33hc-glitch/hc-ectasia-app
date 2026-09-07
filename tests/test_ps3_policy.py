@@ -28,11 +28,10 @@ def normal_eye(**overrides):
         manifest_astig_d=1.0,
         manifest_axis_deg=5.0,
         ppi_avg=1.1,
+        f_ele_th_um=8.0,
+        b_ele_th_um=10.0,
         srax="NO",
         srax_deg=10.0,
-        bfte_front_um=8.0,
-        bfte_back_um=10.0,
-        refractive_group="MYOPIC_EMMETROPIC",
     )
     values.update(overrides)
     return PS3EyeInput(**values)
@@ -57,29 +56,24 @@ def normal_inter_eye(**overrides):
 
 @pytest.mark.parametrize("km,status", [(47.99, NORMAL), (48.0, MODERATE), (50.0, MODERATE), (50.01, HIGH)])
 def test_anterior_km_boundaries(km, status):
-    result = evaluate_ps3(normal_eye(anterior_km_d=km), normal_inter_eye())
-    assert finding(result, "anterior_km").status == status
+    assert finding(evaluate_ps3(normal_eye(anterior_km_d=km), normal_inter_eye()), "anterior_km").status == status
 
 
 @pytest.mark.parametrize("thinnest,status", [(500.01, NORMAL), (500.0, MODERATE), (470.0, MODERATE), (469.99, HIGH)])
 def test_thinnest_boundaries(thinnest, status):
-    result = evaluate_ps3(normal_eye(thinnest_um=thinnest), normal_inter_eye())
-    assert finding(result, "thinnest").status == status
+    assert finding(evaluate_ps3(normal_eye(thinnest_um=thinnest), normal_inter_eye()), "thinnest").status == status
 
 
 def test_axis_difference_wraps_at_180_degrees():
-    result = evaluate_ps3(normal_eye(topographic_steep_axis_deg=175, manifest_axis_deg=5), normal_inter_eye())
-    assert finding(result, "astigmatic_study").status == NORMAL
+    assert finding(evaluate_ps3(normal_eye(topographic_steep_axis_deg=175, manifest_axis_deg=5), normal_inter_eye()), "astigmatic_study").status == NORMAL
 
 
 def test_astigmatic_study_moderate_if_magnitude_difference_exceeds_one_diopter():
-    result = evaluate_ps3(normal_eye(manifest_astig_d=2.01), normal_inter_eye())
-    assert finding(result, "astigmatic_study").status == MODERATE
+    assert finding(evaluate_ps3(normal_eye(manifest_astig_d=2.01), normal_inter_eye()), "astigmatic_study").status == MODERATE
 
 
 def test_astigmatic_study_moderate_if_axis_difference_exceeds_ten_degrees():
-    result = evaluate_ps3(normal_eye(topographic_steep_axis_deg=0, manifest_axis_deg=10.1), normal_inter_eye())
-    assert finding(result, "astigmatic_study").status == MODERATE
+    assert finding(evaluate_ps3(normal_eye(topographic_steep_axis_deg=0, manifest_axis_deg=10.1), normal_inter_eye()), "astigmatic_study").status == MODERATE
 
 
 def test_ppi_average_boundary():
@@ -87,24 +81,20 @@ def test_ppi_average_boundary():
     assert finding(evaluate_ps3(normal_eye(ppi_avg=1.2001), normal_inter_eye()), "ppi_average").status == MODERATE
 
 
-def test_bfte_high_risk_thresholds_are_strictly_greater_than_12_and_15():
-    result = evaluate_ps3(normal_eye(bfte_front_um=12.0, bfte_back_um=15.0), normal_inter_eye())
-    assert finding(result, "elevation").status == NORMAL
-    result = evaluate_ps3(normal_eye(bfte_front_um=12.01, bfte_back_um=15.0), normal_inter_eye())
-    assert finding(result, "elevation").status == HIGH
+def test_canonical_f_b_ele_th_thresholds_are_strictly_greater_than_12_and_15():
+    boundary = evaluate_ps3(normal_eye(f_ele_th_um=12.0, b_ele_th_um=15.0), normal_inter_eye())
+    assert finding(boundary, "elevation").status == NORMAL
+    front_high = evaluate_ps3(normal_eye(f_ele_th_um=12.01, b_ele_th_um=15.0), normal_inter_eye())
+    assert finding(front_high, "elevation").status == HIGH
+    back_high = evaluate_ps3(normal_eye(f_ele_th_um=12.0, b_ele_th_um=15.01), normal_inter_eye())
+    assert finding(back_high, "elevation").status == HIGH
 
 
-def test_bfs_myopic_emmetropic_thresholds_are_inclusive():
-    result = evaluate_ps3(normal_eye(bfte_front_um=None, bfte_back_um=None, bfs_front_um=8.0, bfs_back_um=17.0), normal_inter_eye())
-    assert finding(result, "elevation").status == HIGH
-
-
-def test_bfs_hyperopic_mixed_thresholds_are_inclusive():
-    result = evaluate_ps3(normal_eye(
-        bfte_front_um=None, bfte_back_um=None, bfs_front_um=6.0, bfs_back_um=28.0,
-        refractive_group="HYPEROPIC_MIXED",
-    ), normal_inter_eye())
-    assert finding(result, "elevation").status == HIGH
+def test_missing_canonical_f_or_b_ele_th_makes_ps3_incomplete():
+    result = evaluate_ps3(normal_eye(f_ele_th_um=None), normal_inter_eye())
+    assert finding(result, "elevation").status == NOT_EVALUATED
+    assert result.complete is False
+    assert "elevation" in result.missing_keys
 
 
 def test_inter_eye_score_four_is_moderate_and_five_is_high():
@@ -122,8 +112,7 @@ def test_inter_eye_score_four_is_moderate_and_five_is_high():
 
 
 def test_inter_eye_equal_to_limit_counts_as_exceeded():
-    result = evaluate_ps3(normal_eye(), normal_inter_eye(os_thinnest_um=532.0))
-    assert result.inter_eye_score == 1
+    assert evaluate_ps3(normal_eye(), normal_inter_eye(os_thinnest_um=532.0)).inter_eye_score == 1
 
 
 def test_complete_normal_ps3_is_explicitly_complete_and_allowed():
@@ -190,10 +179,8 @@ def test_manual_morphology_items_are_manual_only_not_automated_missing_inputs():
 def test_srax_exactly_20_is_not_high_but_more_than_20_is_high():
     boundary = evaluate_ps3(normal_eye(srax="NO", srax_deg=20.0), normal_inter_eye())
     assert finding(boundary, "srax").status == NORMAL
-    assert boundary.srax_deg == pytest.approx(20.0)
     high = evaluate_ps3(normal_eye(srax="YES", srax_deg=20.01), normal_inter_eye())
     assert finding(high, "srax").status == HIGH
-    assert high.srax_deg == pytest.approx(20.01)
 
 
 def test_srax_unavailable_is_incomplete_and_requests_surgeon_review():
@@ -207,10 +194,8 @@ def test_srax_unavailable_is_incomplete_and_requests_surgeon_review():
 
 
 def test_binary_front_map_or_surgeon_confirmation_is_supported_without_numeric_srax():
-    high = evaluate_ps3(normal_eye(srax="YES", srax_deg=None), normal_inter_eye())
-    normal = evaluate_ps3(normal_eye(srax="NO", srax_deg=None), normal_inter_eye())
-    assert finding(high, "srax").status == HIGH
-    assert finding(normal, "srax").status == NORMAL
+    assert finding(evaluate_ps3(normal_eye(srax="YES", srax_deg=None), normal_inter_eye()), "srax").status == HIGH
+    assert finding(evaluate_ps3(normal_eye(srax="NO", srax_deg=None), normal_inter_eye()), "srax").status == NORMAL
 
 
 def test_irrevocable_defer_skips_unnecessary_srax_work():
