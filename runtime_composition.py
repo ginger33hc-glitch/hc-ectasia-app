@@ -2,9 +2,9 @@
 
 Clinical assessment is not assembled through runtime wrapper order;
 ``assessment_workflow`` calls the canonical runtime directly. This composition
-module installs extraction, transport, access, reporting, persistence, and the
-still-pending planning/report concerns that will be migrated in their ordered
-stages. Duplicate clinical scorers are not imported or installed here.
+module installs extraction, transport, access, reporting and persistence concerns.
+Planning/report modules are retained only when they do not wrap clinical scoring;
+full planning migration belongs to the ordered Stage 9.
 """
 import os
 
@@ -16,7 +16,6 @@ import merge_policy_base  # noqa: F401,E402
 import extraction_guard  # noqa: F401,E402
 import report_export_guard  # noqa: F401,E402
 import critical_score_highlight  # noqa: E402
-import microkeratome_planning_policy  # noqa: E402
 import erss_numeric_extraction_policy  # noqa: E402
 import ps3_extraction_policy  # noqa: E402
 import mandatory_source_set_policy  # noqa: E402
@@ -50,8 +49,8 @@ COMPOSITION_PHASES = {
         "mandatory_source_set_policy", "pentacam_targeted_reread",
         "rmin_front_source_policy", "geometric_srax_policy", "bad_display_source_policy",
     ),
-    "planning_and_reporting_pending_stage9_10": (
-        "microkeratome_planning_policy", "report_export_guard", "critical_score_highlight",
+    "reporting_pending_stage10": (
+        "report_export_guard", "critical_score_highlight",
         "ps3_report_policy", "microkeratome_report_policy",
     ),
     "canonical_workflow": ("assessment_workflow",),
@@ -72,14 +71,13 @@ def compose(version: str):
     core.app.title = f"CER-AI v{version}"
     reports.APP_VERSION = version
 
-    # Presentation/report concerns remain until Stage 10, but do not own clinical truth.
+    # Presentation/report concerns remain until Stage 10; they may not score.
     critical_score_highlight.install(core, reports)
     ps3_report_policy.install(reports)
     microkeratome_report_policy.install(reports)
 
     # Extraction/source wrappers remain only until Stages 2-3 flatten the source path.
     erss_numeric_extraction_policy.install(core)
-    microkeratome_planning_policy.install(core)
     pentacam_canonical_source_enforcement.install(core, pentacam_targeted_reread)
     ps3_extraction_policy.install(core)
     mandatory_source_set_policy.install(core)
