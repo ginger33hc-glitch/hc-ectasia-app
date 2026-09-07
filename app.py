@@ -3,6 +3,7 @@ import base64
 import json
 import mimetypes
 import os
+import sys
 from contextlib import asynccontextmanager
 from io import BytesIO
 from threading import RLock
