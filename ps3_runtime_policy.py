@@ -1,4 +1,8 @@
-"""Production adapter for the independent PS3 policy."""
+"""Temporary production adapter for the independent PS3 policy.
+
+This adapter remains only until the clean clinical pipeline is cut over. It does
+not own PS3 thresholds; it maps canonical fields into ``ps3_policy``.
+"""
 from dataclasses import asdict
 from ps3_policy import DEFER, PS3EyeInput, PS3InterEyeInput, evaluate_ps3
 
@@ -38,13 +42,6 @@ def _manifest_astig(plan):
     return abs(signed) if signed is not None else None
 
 
-def _refractive_group(plan):
-    explicit = str(plan.get("ps3_refractive_group") or "").upper()
-    if explicit in {"MYOPIC_EMMETROPIC", "HYPEROPIC_MIXED"}:
-        return explicit
-    return None
-
-
 def _inter_eye(source):
     if set(source) != {"OD", "OS"}:
         return None
@@ -78,9 +75,6 @@ def _surgeon_confirmed_srax(eye):
 
 
 def _eye_input(eye, plan):
-    # Numeric SRAX is source-locked by extraction to the Axial/Sagittal Curvature
-    # (Front) map. A categorical YES/NO without a numeric value is accepted only
-    # when it came from the explicit surgeon Front-map confirmation workflow.
     srax_deg = eye.get("srax_deg") if _finite(eye.get("srax_deg")) else None
     categorical_srax = None
     if srax_deg is None:
@@ -93,9 +87,10 @@ def _eye_input(eye, plan):
         manifest_astig_d=_manifest_astig(plan),
         manifest_axis_deg=_manifest_axis(plan),
         ppi_avg=eye.get("PPI_avg"),
+        f_ele_th_um=eye.get("F_Ele_Th_um"),
+        b_ele_th_um=eye.get("B_Ele_Th_um"),
         srax=categorical_srax,
         srax_deg=srax_deg,
-        refractive_group=_refractive_group(plan),
     )
 
 
@@ -182,8 +177,8 @@ def hc_engine_with_ps3(extracted, age, eye_plans, patient_modifiers, patient_met
         )
 
     decision["ps3_method_note"] = (
-        "PS3 is independent. SRAX is accepted only from the Axial/Sagittal Curvature (Front) map "
-        "or explicit surgeon confirmation; inverse-KISA SRAX is prohibited."
+        "PS3 is independent. F.Ele.Th/B.Ele.Th are read only from their canonical BAD Display box; "
+        "SRAX is accepted only from the Axial/Sagittal Curvature (Front) map or explicit surgeon confirmation."
     )
     return decision
 
