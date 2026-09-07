@@ -56,4 +56,12 @@ Retired files in this group:
 - `test_erss_topography_evidence_policy.py`
 - `test_morphology_retirement_lock.py`
 
+## Legacy PS3 runtime wrapper
+
+**Old rule / authority:** `ps3_runtime_policy.py` wrapped `core.hc_engine` to attach PS3 findings and escalate status after the legacy assessment.
+
+**New canonical rule / authority:** `ps3_policy.py` is the pure PS3 evaluator and `clinical_core.ps3` exposes it to `canonical_runtime_service`; final disposition is owned by `clinical_core.disposition`.
+
+**Why the old test is retired:** `test_ps3_runtime_policy.py` requires a deleted `hc_engine` wrapper and would preserve a second status-assignment path. PS3 thresholds, completeness, inter-eye logic, and procedure disposition remain covered by canonical PS3/core/runtime tests.
+
 No test is being retired because it is inconvenient. A test is retired only where its implementation has been explicitly superseded by the accepted canonical architecture.
