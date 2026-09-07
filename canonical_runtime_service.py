@@ -74,9 +74,8 @@ def _decision_reasons(core_result: Mapping[str, Any]) -> list[str]:
 def _missing(core_result: Mapping[str, Any], eligibility_missing=()) -> list[str]:
     missing = []
     erss = core_result.get("erss") or {}
-    for row, value in (erss.get("rows") or {}).items():
-        if value is None:
-            missing.append(f"Randleman: {row}")
+    for key in erss.get("missing") or []:
+        missing.append(f"Randleman: {key}")
     for field in (core_result.get("nice") or {}).get("missing") or []:
         missing.append(f"NICE: {field}")
     ps3 = core_result.get("ps3")
