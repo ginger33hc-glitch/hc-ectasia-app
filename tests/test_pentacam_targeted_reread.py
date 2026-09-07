@@ -1,8 +1,8 @@
-"""Current targeted-reread regression surface after the canonical source lock.
+"""Current targeted-reread regression surface after canonical extraction flattening.
 
 The historical module is retained only as a source of extraction-focused fixtures/tests.
-Wrapper-era completion tests that depended on removed morphology/NICE form IDs or the
-legacy HC-engine fixture are explicitly retired and replaced with canonical assertions below.
+Wrapper-era completion and NICE-side-channel tests are explicitly retired and replaced
+with direct canonical eye-field assertions below.
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 import canonical_engine
-from pentacam_canonical_source_lock import BAD_PPI
+from pentacam_canonical_source_lock import BAD_CENTER, BAD_PPI, FOUR_MAPS_LOWER_LEFT
 
 _LEGACY_PATH = Path(__file__).with_name("legacy_pentacam_targeted_reread_tests.py")
 _SPEC = importlib.util.spec_from_file_location("cerai_legacy_pentacam_targeted_reread_tests", _LEGACY_PATH)
@@ -27,6 +27,9 @@ _RETIRED = {
     "test_circle_marked_thinnest_location_is_retained_as_labeled_row",
     "test_unreadable_b_ele_th_box_region_is_shown_beside_surgeon_input",
     "test_targeted_tile_evidence_survives_canonical_merge",
+    "test_landmark_labels_and_existing_central_reading_control_targets",
+    "test_only_canonical_b_ele_th_reading_suppresses_targeted_reread",
+    "test_bad_display_b_ele_th_box_feeds_only_nice_posterior_input",
 }
 for _name in _RETIRED:
     if not hasattr(_legacy, _name):
@@ -44,7 +47,26 @@ Core = _legacy.Core
 assessment_workflow = _legacy.assessment_workflow
 
 
-def test_pupil_center_reread_uses_four_maps_lower_left_source_and_canonical_numeric_prompt():
+def test_canonical_eye_fields_suppress_duplicate_targeted_reread_requests():
+    result = pentacam_result()
+    eye = result["eyes"][0]
+    assert "central_pachy_um" in targeted.missing_targets_by_eye(result)["OD"]
+    assert "B_Ele_Th_um" in targeted.missing_targets_by_eye(result)["OD"]
+
+    eye["central_pachy_um"] = 542
+    eye["B_Ele_Th_um"] = 23
+    eye["table_verified_numeric_fields"] = ["central_pachy_um", "B_Ele_Th_um"]
+    eye["canonical_source_ids"] = {
+        "central_pachy_um": FOUR_MAPS_LOWER_LEFT,
+        "B_Ele_Th_um": BAD_CENTER,
+    }
+    remaining = targeted.missing_targets_by_eye(result).get("OD", [])
+    assert "central_pachy_um" not in remaining
+    assert "B_Ele_Th_um" not in remaining
+    assert not result.get("nice_readings")
+
+
+def test_pupil_center_reread_writes_direct_canonical_eye_field_and_numeric_prompt():
     result = pentacam_result()
     result["eyes"][0]["screen_types"] = ["FOUR_MAPS_REFRACTIVE"]
     requested = {"OD": ["central_pachy_um"]}
@@ -57,9 +79,11 @@ def test_pupil_center_reread_uses_four_maps_lower_left_source_and_canonical_nume
         "warnings": [],
     }
     targeted.apply_targeted_readings(Core, result, confident, requested, "od.png")
-    assert result["nice_readings"][-1]["central_pachy_um"] == 548
-    assert result["nice_readings"][-1]["central_status"] == "CONFIDENT"
-    assert result["nice_readings"][-1]["central_landmark"] == "PUPIL_CENTER_PLUS"
+    eye = result["eyes"][0]
+    assert eye["central_pachy_um"] == 548
+    assert eye["canonical_source_ids"]["central_pachy_um"] == FOUR_MAPS_LOWER_LEFT
+    assert "central_pachy_um" in eye["table_verified_numeric_fields"]
+    assert not result.get("nice_readings")
 
     unreadable = pentacam_result()
     unreadable["eyes"][0]["screen_types"] = ["FOUR_MAPS_REFRACTIVE"]
@@ -78,6 +102,24 @@ def test_pupil_center_reread_uses_four_maps_lower_left_source_and_canonical_nume
     assert item["destination"] == "measurement"
     assert item["source_region"] is True
     assert "form_id" not in item
+
+
+def test_bad_display_b_ele_th_reread_writes_direct_canonical_eye_field():
+    result = pentacam_result()
+    reread = {
+        "screen_family": "BAD_DISPLAY",
+        "readings": [reading(
+            "B_Ele_Th_um", 23, "B. Ele.Th", tile="LOWER_LEFT",
+            source_box=[120, 120, 880, 320],
+        )],
+        "warnings": [],
+    }
+    targeted.apply_targeted_readings(Core, result, reread, {"OD": ["B_Ele_Th_um"]}, "od.png")
+    eye = result["eyes"][0]
+    assert eye["B_Ele_Th_um"] == 23
+    assert eye["canonical_source_ids"]["B_Ele_Th_um"] == BAD_CENTER
+    assert "B_Ele_Th_um" in eye["table_verified_numeric_fields"]
+    assert not result.get("nice_readings")
 
 
 def test_unreadable_b_ele_th_uses_canonical_numeric_prompt_with_source_region():
