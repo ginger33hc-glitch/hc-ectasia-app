@@ -1,13 +1,14 @@
 """Direct case-level runtime for the CER-AI canonical clinical core.
 
 This module is the future authoritative clinical runtime boundary. It does not
-install or wrap application functions. It receives already-reconciled extraction
-and normalized surgeon plans, maps each virgin eye once into ``ClinicalCoreInput``,
-calls the pure clinical core once, and projects that result into the stable case
-decision payload consumed by workflow/report/archive.
+install or wrap application functions. It receives already-reconciled extraction,
+normalized surgeon plans, and documented patient modifiers; maps each virgin eye
+once into ``ClinicalCoreInput``; supplies pure eligibility findings; calls the
+canonical clinical core once; and projects that result into the stable case
+payload consumed by workflow/report/archive.
 
-No Pentacam reading, clinical threshold, score formula, or downstream correction
-belongs here.
+No Pentacam reading, clinical threshold table, score formula, or downstream
+correction belongs here.
 """
 from __future__ import annotations
 
@@ -26,6 +27,7 @@ from clinical_core.disposition import (
 from clinical_core.pipeline import evaluate_normalized_case
 from clinical_core.report_payload import build_report_payload
 from clinical_core.version import CLINICAL_POLICY_VERSION, SRAX_POLICY_VERSION
+from clinical_eligibility import evaluate_eligibility
 from pentacam_canonical_source_lock import POLICY_VERSION as SOURCE_REGISTRY_VERSION
 
 POST_REFRACTIVE = "POST-REFRACTIVE PATHWAY REQUIRED"
@@ -69,7 +71,7 @@ def _decision_reasons(core_result: Mapping[str, Any]) -> list[str]:
     return drivers
 
 
-def _missing(core_result: Mapping[str, Any]) -> list[str]:
+def _missing(core_result: Mapping[str, Any], eligibility_missing=()) -> list[str]:
     missing = []
     erss = core_result.get("erss") or {}
     for row, value in (erss.get("rows") or {}).items():
@@ -81,6 +83,10 @@ def _missing(core_result: Mapping[str, Any]) -> list[str]:
     if ps3 is not None:
         for key in getattr(ps3, "missing_keys", ()):
             missing.append(f"PS3: {key}")
+    for key in (core_result.get("procedural_safety") or {}).get("missing") or []:
+        missing.append(f"Safety: {key}")
+    for key in eligibility_missing or ():
+        missing.append(f"Clinical eligibility: {key}")
     return list(dict.fromkeys(missing))
 
 
@@ -135,6 +141,9 @@ def _virgin_eye_payload(
     source_eye: Mapping[str, Any],
     core_result: Mapping[str, Any],
     software_version: str | None,
+    *,
+    eligibility_missing=(),
+    eligibility_notes=(),
 ) -> dict[str, Any]:
     safety = core_result.get("procedural_safety") or {}
     status = str(core_result.get("status") or ASSESSMENT_INCOMPLETE)
@@ -156,7 +165,8 @@ def _virgin_eye_payload(
         "hard_stops": _hard_stop_reasons(safety),
         "reasons": _decision_reasons(core_result),
         "warnings": [],
-        "missing": _missing(core_result),
+        "clinical_modifiers": list(eligibility_notes or ()),
+        "missing": _missing(core_result, eligibility_missing),
         "report_payload": _report_payload(eye_name, source_eye, core_result, software_version),
         "canonical_result": _plain(core_result),
     }
@@ -176,6 +186,7 @@ def _post_refractive_eye_payload(eye_name: str) -> dict[str, Any]:
         "hard_stops": [],
         "reasons": ["Prior corneal refractive surgery requires a separate pathway."],
         "warnings": [],
+        "clinical_modifiers": [],
         "missing": [],
         "report_payload": None,
         "canonical_result": None,
@@ -200,11 +211,16 @@ def evaluate_case(
     extracted: Mapping[str, Any],
     age_years: Any,
     eye_plans: Mapping[str, Mapping[str, Any]],
+    patient_modifiers: Mapping[str, Any],
     *,
     software_version: str | None = None,
 ) -> dict[str, Any]:
     """Evaluate each classified eye exactly once through the canonical core."""
+    if not isinstance(patient_modifiers, Mapping):
+        raise TypeError("patient_modifiers must be a mapping")
+
     source = _eye_by_name(extracted)
+    bilateral = set(source) == {"OD", "OS"}
     results: list[dict[str, Any]] = []
 
     for eye_name in ("OD", "OS"):
@@ -231,19 +247,32 @@ def evaluate_case(
                 "hard_stops": [],
                 "reasons": ["Supported procedure is required."],
                 "warnings": [],
+                "clinical_modifiers": [],
                 "missing": ["procedure"],
                 "report_payload": None,
                 "canonical_result": None,
             })
             continue
+
+        eligibility = evaluate_eligibility(plan, patient_modifiers, bilateral=bilateral)
         normalized = build_clinical_core_input(
             eye,
             plan,
             age_years=age_years,
             extracted=extracted,
         )
-        core_result = evaluate_normalized_case(normalized)
-        results.append(_virgin_eye_payload(eye_name, eye, core_result, software_version))
+        core_result = evaluate_normalized_case(
+            normalized,
+            external_findings=eligibility.findings,
+        )
+        results.append(_virgin_eye_payload(
+            eye_name,
+            eye,
+            core_result,
+            software_version,
+            eligibility_missing=eligibility.missing,
+            eligibility_notes=eligibility.notes,
+        ))
 
     return {
         "status": _overall_status(results) if results else ASSESSMENT_INCOMPLETE,
