@@ -1,0 +1,49 @@
+name: Step 2B require exact source ids
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: monday-clean-architecture
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require exact source identity for every locked value
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import ast
+
+          path = Path('app.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''            source_ids = eye.get("canonical_source_ids")\n            if isinstance(source_ids, dict):\n                for field in LOCKED_FIELDS:\n                    if eye.get(field) is None:\n                        continue\n                    if source_ids.get(field) != canonical_source_id(field):\n                        eye[field] = None\n                        verified_set.discard(field)\n                        fallback_set.discard(field)\n                        missing.append(field)\n'''
+          new = '''            source_ids = eye.get("canonical_source_ids")\n            source_ids = source_ids if isinstance(source_ids, dict) else {}\n            for field in LOCKED_FIELDS:\n                if eye.get(field) is None:\n                    continue\n                if source_ids.get(field) != canonical_source_id(field):\n                    eye[field] = None\n                    verified_set.discard(field)\n                    fallback_set.discard(field)\n                    missing.append(field)\n'''
+          if text.count(old) != 1:
+              raise SystemExit(f'ABORT: expected exact-source optional block once, found {text.count(old)}')
+          text = text.replace(old, new, 1)
+          if 'if isinstance(source_ids, dict):' in text:
+              raise SystemExit('ABORT: optional source-id enforcement survived')
+          ast.parse(text, filename='app.py')
+          path.write_text(text, encoding='utf-8')
+          PY
+          python -m py_compile app.py
+          git diff --check
+      - name: Commit fail-closed exact source requirement
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py
+          git commit -m "Require exact source identity for locked Pentacam values"
+          git push origin HEAD:monday-clean-architecture
