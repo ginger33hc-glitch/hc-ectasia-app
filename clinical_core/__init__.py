@@ -1,11 +1,15 @@
-"""Pure launch-contract clinical rules for CER-AI.
+"""Side-effect-free CER-AI clinical core."""
 
-This package is intentionally side-effect free. It does not import the FastAPI
-application, mutate runtime functions, or participate in production composition
-until explicit equivalence gates are satisfied.
-"""
-
-from .disposition import combine_status, presentation_class
+from .disposition import (
+    ASSESSMENT_INCOMPLETE,
+    CAUTION,
+    PASS,
+    STOP_DEFER,
+    DecisionFinding,
+    FinalDisposition,
+    finalize_disposition,
+    presentation_class,
+)
 from .erss import (
     erss_disposition,
     erss_mrse_points,
@@ -35,7 +39,6 @@ from .rules import (
 from .safety import (
     estimated_final_kmean_d,
     final_kmean_hard_stop,
-    lasik_pta_hard_stop,
     lasik_pta_percent,
     lasik_rsb_hard_stop,
     lasik_rsb_um,
@@ -46,14 +49,19 @@ from .safety import (
 )
 
 __all__ = [
+    "ASSESSMENT_INCOMPLETE",
+    "CAUTION",
     "ClinicalCoreInput",
+    "DecisionFinding",
+    "FinalDisposition",
     "LASIK_PLANS",
     "LASIK_PTA_CUTOFF_PERCENT",
+    "PASS",
     "PIPELINE_ORDER",
     "PS3EyeInput",
     "PS3InterEyeInput",
+    "STOP_DEFER",
     "bad_d_classification",
-    "combine_status",
     "erss_age_points",
     "erss_disposition",
     "erss_mrse_points",
@@ -66,8 +74,8 @@ __all__ = [
     "evaluate_normalized_case",
     "evaluate_ps3",
     "final_kmean_hard_stop",
+    "finalize_disposition",
     "independent_hard_stop",
-    "lasik_pta_hard_stop",
     "lasik_pta_percent",
     "lasik_rsb_hard_stop",
     "lasik_rsb_um",
