@@ -2,6 +2,12 @@
 
 Pipeline stages calculate structured findings only. ``finalize_disposition`` is
 the sole owner of final PASS/CAUTION/STOP-DEFER/ASSESSMENT INCOMPLETE.
+
+External workflow boundaries remain deliberately outside this clinical core:
+readiness, identity/source validation, contact-lens washout, clinical eligibility,
+planning fallback orchestration, reporting/rendering, and archive persistence.
+Those concerns may consume canonical clinical outputs but may not recalculate or
+override clinical scores or final disposition.
 """
 from __future__ import annotations
 
@@ -150,11 +156,7 @@ def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
     pta = lasik_pta_percent(inp.thinnest_um, inp.flap_um, inp.ablation_um) if procedure == "LASIK" else None
 
     scalar_final_k_valid = intended_refraction is None or scalar_final_k_is_valid(intended_refraction)
-    final_k = (
-        estimated_final_kmean_d(inp.preop_kmean_d, inp.intended_mrse_d)
-        if scalar_final_k_valid
-        else None
-    )
+    final_k = estimated_final_kmean_d(inp.preop_kmean_d, inp.intended_mrse_d) if scalar_final_k_valid else None
 
     erss = None
     erss_status = PASS
@@ -192,15 +194,11 @@ def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
         inp.i_s_d,
     )
     nice_status = nice_disposition(nice["total"])
-    if nice_status == "DATA INSUFFICIENT":
-        nice_status = ASSESSMENT_INCOMPLETE
 
     ps3_result = evaluate_ps3(inp.ps3_eye, inp.ps3_inter_eye) if inp.ps3_eye is not None else None
     ps3_status = _ps3_procedure_disposition(ps3_result, procedure)
 
-    safety_status, safety_stops = _safety_status(
-        procedure, inp, rsb, rst, final_k, intended_group
-    )
+    safety_status, safety_stops = _safety_status(procedure, inp, rsb, rst, final_k, intended_group)
 
     safety_detail = "Independent tissue/refractive safety gates"
     if intended_group == MIXED:
