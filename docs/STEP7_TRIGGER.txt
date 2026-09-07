@@ -1,1 +1,0 @@
-Trigger guarded Step 7 completion-gate migration v2.
