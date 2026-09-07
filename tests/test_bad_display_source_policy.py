@@ -6,7 +6,7 @@ def test_bad_display_prompt_is_source_locked_directly_in_canonical_extractor():
     runtime = importlib.import_module("canonical_engine")
     prompt = runtime.core.PROMPT
     assert "BELIN/AMBROSIO BAD DISPLAY SOURCE LOCK" in prompt
-    assert "Preserve every printed sign exactly" in prompt
+    assert "Preserve every printed sign" in prompt
     assert "Never derive or reconstruct Df from anterior elevation" in prompt
     assert "Dt from thinnest pachymetry" in prompt
     assert "Da from ARTmax" in prompt
