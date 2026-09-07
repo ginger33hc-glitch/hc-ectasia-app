@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from math import isfinite
 from typing import Optional
 
+from .bad import final_bad_d_classification
 from .disposition import (
     ASSESSMENT_INCOMPLETE,
     CAUTION,
@@ -21,7 +22,6 @@ from .erss import erss_disposition, erss_total
 from .nice import nice_disposition, score_nice
 from .ps3 import PS3EyeInput, PS3InterEyeInput, evaluate_ps3
 from .refraction import MIXED, normalize_minus_cylinder, refractive_group, scalar_final_k_is_valid
-from .rules import bad_d_classification
 from .safety import (
     estimated_final_kmean_d,
     final_kmean_hard_stop,
@@ -160,7 +160,7 @@ def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
         )
         erss_status = erss_disposition(erss["total"])
 
-    bad_class = bad_d_classification(inp.final_bad_d)
+    bad_class = final_bad_d_classification(inp.final_bad_d)
     bad_status = _bad_d_disposition(bad_class)
 
     nice = score_nice(
