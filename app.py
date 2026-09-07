@@ -19,6 +19,7 @@ from openai import OpenAI
 import pentacam_targeted_reread
 import geometric_srax_policy
 
+import mandatory_source_set_policy
 from clinical_disposition import combine_status as combine_clinical_status
 from pentacam_canonical_source_lock import (
     CANONICAL_FIELD_SOURCES, LOCKED_FIELDS, canonical_source_id,
@@ -428,6 +429,7 @@ PROMPT += (
     "source id to a wrong-screen or inferred value.\n"
     + _CANONICAL_SOURCE_PROMPT
 )
+PROMPT += "\n" + mandatory_source_set_policy.BAD_DISPLAY_RECOGNITION_PROMPT
 
 
 def data_url(raw: bytes, filename: str) -> str:
@@ -1505,7 +1507,9 @@ async def _run_image_assessment(
 
     from assessment_workflow import begin
     import sys
+    mandatory_source_set = mandatory_source_set_policy.validate_source_set(extraction_results)
     extracted = merge_extractions(extraction_results)
+    extracted["mandatory_source_set"] = mandatory_source_set
     return begin(
         sys.modules[__name__], extracted, age, plans, modifiers, metadata,
         source_images=image_payloads,

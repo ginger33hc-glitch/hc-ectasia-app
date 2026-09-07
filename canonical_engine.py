@@ -11,6 +11,7 @@ import inspect
 import assessment_workflow
 import canonical_runtime_service
 import geometric_srax_policy
+import mandatory_source_set_policy
 import pentacam_targeted_reread
 import runtime_composition as composition
 from clinical_core.bad import final_bad_d_classification
@@ -88,6 +89,14 @@ def runtime_invariants():
     if "srax_completion_policy" in phase_names or "randleman_report_readiness_policy" in phase_names:
         errors.append("Retired workflow monkey-patch remains in production composition")
 
+    assessment_source = inspect.getsource(core._run_image_assessment)
+    if "mandatory_source_set_policy.validate_source_set(extraction_results)" not in assessment_source:
+        errors.append("Mandatory Pentacam source gate is not directly owned by app._run_image_assessment")
+    if callable(getattr(mandatory_source_set_policy, "install", None)):
+        errors.append("Mandatory Pentacam source policy must not expose a runtime installer")
+    if "mandatory_source_set_policy" in phase_names:
+        errors.append("Mandatory Pentacam source wrapper remains in runtime composition")
+
     extraction_source = inspect.getsource(core.extract_one_image)
     if "pentacam_targeted_reread.enrich_extraction(" not in extraction_source:
         errors.append("Targeted Pentacam reread is not directly owned by app.extract_one_image")
@@ -102,7 +111,6 @@ def runtime_invariants():
 
     # Extraction/transport/operational boundaries still required at this stage.
     for marker, message in (
-        ("_cerai_mandatory_source_set_installed", "Mandatory Pentacam source gate is not active"),
         ("_hc_readiness_installed", "Assessment workflow endpoints are not installed"),
         ("_cerai_report_builders_installed", "Report builders are not installed"),
         ("_cerai_named_user_access_installed", "Named-user access boundary is not active"),

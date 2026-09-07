@@ -15,7 +15,6 @@ import merge_policy_base  # noqa: F401,E402
 import extraction_guard  # noqa: F401,E402
 import report_export_guard  # noqa: F401,E402
 import critical_score_highlight  # noqa: E402
-import mandatory_source_set_policy  # noqa: E402
 import ps3_report_policy  # noqa: E402
 import microkeratome_report_policy  # noqa: E402
 
@@ -38,7 +37,6 @@ app = bootstrap.app
 COMPOSITION_PHASES = {
     "pentacam_extraction_pending_stage2_3": (
         "merge_policy_base", "extraction_guard",
-        "mandatory_source_set_policy",
     ),
     "reporting_pending_stage10": (
         "report_export_guard", "critical_score_highlight",
@@ -68,7 +66,6 @@ def compose(version: str):
     microkeratome_report_policy.install(reports)
 
     # Extraction/source wrappers remain only until Stages 2-3 flatten the source path.
-    mandatory_source_set_policy.install(core)
 
     # Canonical workflow calls canonical_runtime_service directly; no clinical scorer install.
     assessment_workflow.install(core)

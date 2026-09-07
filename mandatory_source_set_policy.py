@@ -7,7 +7,6 @@ internal merge utilities and isolated regression fixtures remain reusable.
 """
 from __future__ import annotations
 
-from contextvars import ContextVar
 import re
 import unicodedata
 from typing import Any
@@ -34,11 +33,6 @@ from an explicit visible OD/OS (or Right/Left) label on the page/maps and set
 both the eye item and document laterality consistently. Never infer laterality
 from upload order or neighboring files.
 """
-
-_previous_merge_extractions = None
-_previous_run_image_assessment = None
-_gate_active: ContextVar[bool] = ContextVar("cerai_mandatory_source_gate_active", default=False)
-
 
 def _norm(value: Any) -> str:
     text = unicodedata.normalize("NFKD", str(value or ""))
@@ -202,32 +196,3 @@ def validate_source_set(results: list[dict[str, Any]]) -> dict[str, Any]:
             + ". Upload the missing image(s) and run the assessment again. The excimer laser treatment card is optional.",
         )
     return summary
-
-
-def merge_extractions_with_mandatory_source_gate(results):
-    summary = validate_source_set(results) if _gate_active.get() else None
-    merged = _previous_merge_extractions(results)
-    if summary is not None:
-        merged["mandatory_source_set"] = summary
-    return merged
-
-
-async def run_image_assessment_with_mandatory_gate(*args, **kwargs):
-    token = _gate_active.set(True)
-    try:
-        return await _previous_run_image_assessment(*args, **kwargs)
-    finally:
-        _gate_active.reset(token)
-
-
-def install(core) -> None:
-    global _previous_merge_extractions, _previous_run_image_assessment
-    if getattr(core, "_cerai_mandatory_source_set_installed", False):
-        return
-    _previous_merge_extractions = core.merge_extractions
-    _previous_run_image_assessment = core._run_image_assessment
-    if BAD_DISPLAY_RECOGNITION_PROMPT not in core.PROMPT:
-        core.PROMPT += "\n" + BAD_DISPLAY_RECOGNITION_PROMPT
-    core.merge_extractions = merge_extractions_with_mandatory_source_gate
-    core._run_image_assessment = run_image_assessment_with_mandatory_gate
-    core._cerai_mandatory_source_set_installed = True
