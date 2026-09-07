@@ -901,15 +901,15 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             fallback_set -= verified_set  # A readable labeled table value always has priority.
             missing = list(eye.get("missing_or_unreadable", []))
             source_ids = eye.get("canonical_source_ids")
-            if isinstance(source_ids, dict):
-                for field in LOCKED_FIELDS:
-                    if eye.get(field) is None:
-                        continue
-                    if source_ids.get(field) != canonical_source_id(field):
-                        eye[field] = None
-                        verified_set.discard(field)
-                        fallback_set.discard(field)
-                        missing.append(field)
+            source_ids = source_ids if isinstance(source_ids, dict) else {}
+            for field in LOCKED_FIELDS:
+                if eye.get(field) is None:
+                    continue
+                if source_ids.get(field) != canonical_source_id(field):
+                    eye[field] = None
+                    verified_set.discard(field)
+                    fallback_set.discard(field)
+                    missing.append(field)
             for field in TABLE_NUMERIC_FIELDS:
                 if eye.get(field) is not None and field not in verified_set and field not in fallback_set:
                     eye[field] = None
