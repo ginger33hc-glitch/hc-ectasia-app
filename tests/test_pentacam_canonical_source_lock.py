@@ -31,6 +31,7 @@ def eye(**values):
         "map_fallback_numeric_fields": [],
         "keratometry_source": "NOT_SHOWN",
         "canonical_source_ids": {},
+        "_source_filename": "show2.png",
         "morphology": "UNCERTAIN",
         "morphology_evidence": [],
         "asymmetric_bow_tie": "UNCERTAIN",
@@ -137,6 +138,7 @@ def test_exact_source_metadata_keeps_matching_source_before_merge():
     od = merged["eyes"][0]
     assert od["I_S"] == -0.18
     assert od["field_provenance"]["I_S"][0]["source"] == SHOW_2_INDICES
+    assert od["field_provenance"]["I_S"][0]["file"] == "show2.png"
 
 
 def test_targeted_reread_uses_exact_subpanel_source_contract():
