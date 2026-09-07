@@ -66,19 +66,31 @@ def erss_topography_points(category: str) -> Optional[int]:
     }.get(category)
 
 
-def _topography_missing(i_s_d, derived_srax_deg) -> list[str]:
+def _topography_missing(i_s_d, derived_srax_deg, srax_gt20_confirmed) -> list[str]:
     if signed_i_s_category(i_s_d) == UNCERTAIN:
         return ["I_S"]
     i_s_category = signed_i_s_category(i_s_d)
     if i_s_category in {INFERIOR_STEEPENING_SRA, ABNORMAL_ECTATIC}:
         return []
-    if not _finite(derived_srax_deg):
+    if not _finite(derived_srax_deg) and not isinstance(srax_gt20_confirmed, bool):
         return ["SRAX"]
     return []
 
 
-def erss_total(age_years, thinnest_um, i_s_d, derived_srax_deg, rsb_um, manifest_mrse_d):
-    category = erss_topography_category(i_s_d, derived_srax_deg)
+def erss_total(
+    age_years,
+    thinnest_um,
+    i_s_d,
+    derived_srax_deg,
+    rsb_um,
+    manifest_mrse_d,
+    srax_gt20_confirmed: Optional[bool] = None,
+):
+    category = erss_topography_category(
+        i_s_d,
+        derived_srax_deg,
+        srax_gt20_confirmed,
+    )
     rows = {
         "topography": erss_topography_points(category),
         "RSB": erss_rsb_points(rsb_um),
@@ -86,7 +98,7 @@ def erss_total(age_years, thinnest_um, i_s_d, derived_srax_deg, rsb_um, manifest
         "pachymetry": erss_pachymetry_points(thinnest_um),
         "MRSE": erss_mrse_points(manifest_mrse_d),
     }
-    missing = _topography_missing(i_s_d, derived_srax_deg)
+    missing = _topography_missing(i_s_d, derived_srax_deg, srax_gt20_confirmed)
     if rows["RSB"] is None:
         missing.append("RSB")
     if rows["age"] is None:
