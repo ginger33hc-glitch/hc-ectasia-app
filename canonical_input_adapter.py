@@ -1,8 +1,8 @@
 """Canonical read-only adapter from reconciled data to ``ClinicalCoreInput``.
 
-This module owns treatment-role normalization exactly once. It performs no
-clinical scoring and owns no screen-specific readers. Source extraction is
-already complete before this boundary.
+This module owns treatment-role and plan-input normalization exactly once. It
+performs no clinical scoring and owns no screen-specific Pentacam readers.
+Source extraction is already complete before this boundary.
 
 Treatment-role precedence is explicit:
 1. surgeon-entered values for that role;
@@ -10,6 +10,10 @@ Treatment-role precedence is explicit:
 3. for intended treatment only, manifest refraction when the intended role is
    wholly blank.
 A partially entered role is never completed from another source.
+
+A conflict-free, directly displayed Alcon WaveLight EX500 Maximal Ablation is the
+canonical ablation input when available. Conflicting/uncertain EX500 values never
+overwrite the existing plan value.
 """
 from __future__ import annotations
 
@@ -51,7 +55,6 @@ def _role_supplied(plan: Mapping[str, Any], prefix: str) -> bool:
 
 def _raw_axis(mapping: Mapping[str, Any], prefix: str) -> Optional[float]:
     aliases = [f"{prefix}_axis_deg", f"{prefix}_entered_axis_deg"]
-    # The existing browser/API contract may provide one shared entered axis.
     aliases.append("entered_axis_deg")
     return _first_number(mapping, *aliases)
 
@@ -132,6 +135,62 @@ def _card_correction(extracted: Mapping[str, Any] | None, eye_name: str | None):
     return unique[0] if len(unique) == 1 else None
 
 
+def _ex500_ablation(
+    extracted: Mapping[str, Any] | None,
+    eye_name: str | None,
+) -> tuple[Optional[float], list[str]]:
+    """Resolve directly displayed EX500 Maximal Ablation without inference."""
+    if not isinstance(extracted, Mapping) or eye_name not in {"OD", "OS"}:
+        return None, []
+
+    candidates = [
+        item for item in extracted.get("laser_plans") or []
+        if isinstance(item, Mapping)
+        and item.get("eye") == eye_name
+        and str(item.get("platform") or "").upper() == "ALCON_WAVELIGHT_EX500"
+    ]
+    if not candidates:
+        return None, []
+
+    usable: list[float] = []
+    warnings: list[str] = []
+    for item in candidates:
+        value = item.get("max_ablation_um")
+        if str(item.get("max_ablation_status") or "").upper() != "CONFIDENT" or not _finite(value):
+            continue
+        value = float(value)
+        if not 0.0 <= value <= 400.0:
+            warnings.append(
+                f"{eye_name} EX500 Maximal Ablation is outside the accepted 0-400 µm input range; it was not used."
+            )
+            continue
+        profile = item.get("profile_max_ablation_um")
+        if (
+            str(item.get("profile_max_status") or "").upper() == "CONFIDENT"
+            and _finite(profile)
+            and abs(value - float(profile)) > 0.5
+        ):
+            warnings.append(
+                f"{eye_name} EX500 DATA CONFLICT: treatment-details Maximal Ablation {value:g} µm differs from ablation-profile max {float(profile):g} µm; neither value was used."
+            )
+            continue
+        usable.append(value)
+
+    distinct = sorted({round(value, 3) for value in usable})
+    if len(distinct) > 1:
+        warnings.append(
+            f"{eye_name} EX500 DATA CONFLICT: multiple confident Maximal Ablation values were extracted ({', '.join(f'{value:g}' for value in distinct)} µm); no machine value was used."
+        )
+        return None, list(dict.fromkeys(warnings))
+    if len(distinct) == 1:
+        return float(distinct[0]), list(dict.fromkeys(warnings))
+
+    warnings.append(
+        f"{eye_name} EX500 planning image did not provide one conflict-free confident Maximal Ablation value; the existing plan value is retained when available."
+    )
+    return None, list(dict.fromkeys(warnings))
+
+
 def _set_raw_role(plan: dict[str, Any], prefix: str, correction) -> None:
     sphere, cylinder, axis = correction
     plan[f"{prefix}_entered_sphere_D"] = sphere
@@ -191,6 +250,25 @@ def resolve_eye_plan(
             _copy_manifest_to_intended(resolved)
             if _role_supplied(resolved, "intended"):
                 resolved["intended_source"] = "DEFAULTED_FROM_MANIFEST"
+
+    ex500_value, ex500_warnings = _ex500_ablation(extracted, eye_name)
+    warnings = list(resolved.get("correction_warnings") or [])
+    warnings.extend(ex500_warnings)
+    if ex500_value is not None:
+        previous = _first_number(resolved, "max_ablation_um", "ablation_um")
+        if previous is not None and abs(previous - ex500_value) > 0.5:
+            warnings.append(
+                f"{eye_name} entered/calculated ablation {previous:g} µm was replaced by the directly displayed EX500 Maximal Ablation {ex500_value:g} µm."
+            )
+        resolved["max_ablation_um"] = ex500_value
+        resolved["ablation_um"] = ex500_value
+        resolved["ablation_source"] = "ALCON_WAVELIGHT_EX500_DISPLAYED_MAXIMAL_ABLATION"
+        resolved["laser_platform"] = "Alcon WaveLight EX500"
+        warnings.append(
+            f"{eye_name} maximum ablation uses the directly displayed Alcon WaveLight EX500 Maximal Ablation value ({ex500_value:g} µm); no value was reconstructed."
+        )
+    if warnings:
+        resolved["correction_warnings"] = list(dict.fromkeys(warnings))
 
     return resolved
 
