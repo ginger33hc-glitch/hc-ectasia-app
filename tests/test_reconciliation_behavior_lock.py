@@ -7,13 +7,59 @@ canonical.
 """
 import canonical_engine
 from pentacam_canonical_source_lock import LOCKED_FIELDS
-from tests.test_erss_runtime import eye, result
 
 core = canonical_engine.core
 
 
+def _eye():
+    return {
+        "eye": "OD",
+        "screen_types": [],
+        "quality": "ADEQUATE",
+        "missing_or_unreadable": [],
+        "table_verified_numeric_fields": [],
+        "map_fallback_numeric_fields": [],
+        "keratometry_source": "NOT_SHOWN",
+        "data_conflicts": [],
+        "field_provenance": {},
+        "morphology": "UNCERTAIN",
+        "morphology_confidence": "UNREADABLE",
+        "morphology_evidence": [],
+        "asymmetric_bow_tie": "UNCERTAIN",
+        "srax": "UNCERTAIN",
+        "srax_deg": None,
+        "inferior_opposite_steepening_D": None,
+        "anterior_pattern": "UNREADABLE",
+        "posterior_pattern": "UNREADABLE",
+    }
+
+
+def _result(eye, filename):
+    return {
+        "document_context": {
+            "document_type": "PENTACAM_TOPOGRAPHY",
+            "patient_id": "1",
+            "patient_last_name": "X",
+            "patient_first_name": "Y",
+            "patient_name": "Y X",
+            "patient_name_source": "PENTACAM_FIRST_LAST_NAME_FIELDS",
+            "patient_age_years": 30,
+            "exam_date": "2026-08-27",
+            "exam_time": "10:00",
+            "laterality": "OD",
+            "pentacam_qs": "OK",
+            "missing_or_unreadable": [],
+            "source_filename": filename,
+        },
+        "eyes": [eye],
+        "treatment_corrections": [],
+        "laser_plans": [],
+        "global_warnings": [],
+    }
+
+
 def _numeric_result(filename, field, value, screen, provenance="table"):
-    e = eye(True, "NORMAL_SYMMETRIC", filename)
+    e = _eye()
     e["screen_types"] = [screen]
     e["keratometry_source"] = (
         "SHOW_2_EXAMS_TOPOMETRIC_CORNEA_FRONT"
@@ -22,11 +68,10 @@ def _numeric_result(filename, field, value, screen, provenance="table"):
     e[field] = value
     e["table_verified_numeric_fields"] = [field] if provenance == "table" else []
     e["map_fallback_numeric_fields"] = [field] if provenance == "fallback" else []
-    return result(e, filename)
+    return _result(e, filename)
 
 
 def test_locked_fields_are_not_eligible_for_numeric_reconciliation():
-    # The full locked set is intentionally excluded from duplicate-tolerance logic.
     from extraction_guard import EXCLUSIVE_LABELED_BOX_FIELDS
     assert LOCKED_FIELDS - {"topometric_RMin"} <= EXCLUSIVE_LABELED_BOX_FIELDS
 
