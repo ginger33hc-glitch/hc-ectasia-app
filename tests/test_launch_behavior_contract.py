@@ -4,7 +4,7 @@ import canonical_engine
 import clinical_disposition
 import mandatory_source_set_policy
 from nice_scoring import score_nice
-from ps3_policy import ALLOWED, DEFER, PS3EyeInput, evaluate_ps3
+from ps3_policy import ALLOWED, DEFER, PS3EyeInput, PS3InterEyeInput, evaluate_ps3
 
 core = canonical_engine.core
 
@@ -72,9 +72,18 @@ def test_nice_golden_disposition_bands():
 def test_nice_missing_input_is_incomplete():
     r=score_nice(44.0,None,15.0,0.5);assert r["total"] is None;assert r["category"]=="INCOMPLETE";assert "central_pachy_um" in r["missing"]
 
+def _ps3_inter_eye():
+    return PS3InterEyeInput(
+        od_anterior_km_d=43.0,os_anterior_km_d=43.1,
+        od_posterior_km_d=-6.0,os_posterior_km_d=-6.05,
+        od_thinnest_um=520.0,os_thinnest_um=525.0,
+        od_front_elevation_thinnest_um=2.0,os_front_elevation_thinnest_um=3.0,
+        od_back_elevation_thinnest_um=5.0,os_back_elevation_thinnest_um=8.0,
+    )
+
 def _ps3_base(**changes):
     values=dict(anterior_km_d=47.0,thinnest_um=520.0,topographic_astig_d=1.0,topographic_steep_axis_deg=90.0,manifest_astig_d=1.0,manifest_axis_deg=90.0,ppi_avg=1.0,srax="NO",srax_deg=0.0,f_ele_th_um=10.0,b_ele_th_um=10.0)
-    values.update(changes);return evaluate_ps3(PS3EyeInput(**values))
+    values.update(changes);return evaluate_ps3(PS3EyeInput(**values),_ps3_inter_eye())
 
 def test_ps3_no_flags_allows_all_three_procedures():
     r=_ps3_base();assert r.high_count==0;assert r.moderate_count==0;assert (r.disposition.prk,r.disposition.smile,r.disposition.lasik)==(ALLOWED,ALLOWED,ALLOWED)
