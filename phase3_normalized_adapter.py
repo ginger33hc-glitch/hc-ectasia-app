@@ -1,8 +1,7 @@
-"""Read-only adapter from reconciled production data to ClinicalCoreInput.
+"""Read-only adapter from reconciled canonical data to ClinicalCoreInput.
 
-The adapter performs no clinical scoring. Refraction notation is normalized only
-through ``clinical_core.refraction``; it does not maintain duplicate MRSE or
-plus-cylinder formulas.
+The adapter performs no clinical scoring and owns no screen-specific readers.
+It maps already-reconciled canonical fields into the pure clinical core.
 """
 from __future__ import annotations
 
@@ -10,7 +9,6 @@ from typing import Any, Mapping, Optional
 
 from clinical_core.pipeline import ClinicalCoreInput
 from clinical_core.refraction import normalize_minus_cylinder
-import nice_policy
 import ps3_runtime_policy
 
 
@@ -55,10 +53,6 @@ def _front_map_srax(eye):
     return value if value is not None and 0.0 <= value <= 90.0 else None
 
 
-def _nice_values(eye, plan):
-    return nice_policy.evaluate(dict(eye), dict(plan))["values"]
-
-
 def build_inter_eye_ps3(extracted):
     source = {
         item.get("eye"): item
@@ -70,13 +64,11 @@ def build_inter_eye_ps3(extracted):
 
 def build_clinical_core_input(eye, plan, *, age_years, extracted=None):
     procedure = str(plan.get("procedure") or "").strip().upper()
-    nice_values = _nice_values(eye, plan)
     manifest = _refraction(plan, "manifest")
     intended = _refraction(plan, "intended")
     manifest_mrse = manifest.mrse_d if manifest is not None else _mrse(plan, "manifest")
     intended_mrse = intended.mrse_d if intended is not None else _mrse(plan, "intended")
 
-    # Preserve intended treatment separately from manifest refraction.
     intended_sphere = intended.sphere_d if intended is not None else _first_number(
         plan, "intended_sphere_D", "intended_entered_sphere_D"
     )
@@ -85,6 +77,10 @@ def build_clinical_core_input(eye, plan, *, age_years, extracted=None):
     )
     intended_axis = intended.axis_deg if intended is not None else _first_number(plan, "intended_axis_deg")
 
+    i_s = _first_number(plan, "surgeon_I_S_D")
+    if i_s is None:
+        i_s = _first_number(eye, "I_S")
+
     ps3_eye = ps3_runtime_policy._eye_input(dict(eye), dict(plan))
     ps3_inter_eye = build_inter_eye_ps3(extracted) if extracted is not None else None
 
@@ -92,12 +88,7 @@ def build_clinical_core_input(eye, plan, *, age_years, extracted=None):
         procedure=procedure,
         age_years=age_years,
         thinnest_um=_first_number(eye, "pachy_thinnest_um"),
-        i_s_d=(
-            _first_number(plan, "surgeon_I_S_D")
-            if _first_number(plan, "surgeon_I_S_D") is not None
-            else _first_number(eye, "I_S")
-        ),
-        # Compatibility field name; value is exclusively source-locked front-map SRAX.
+        i_s_d=i_s,
         derived_srax_deg=_front_map_srax(eye),
         manifest_mrse_d=manifest_mrse,
         intended_sphere_d=intended_sphere,
@@ -117,9 +108,10 @@ def build_clinical_core_input(eye, plan, *, age_years, extracted=None):
         ppi_min=_first_number(eye, "PPI_min"),
         ppi_avg=_first_number(eye, "PPI_avg"),
         ppi_max=_first_number(eye, "PPI_max"),
-        nice_k2_d=nice_values.get("K2_D"),
-        nice_central_pachy_um=nice_values.get("central_pachy_um"),
-        nice_b_ele_th_um=nice_values.get("B_Ele_Th_um"),
+        # NICE consumes the same canonical fields; there is no NICE-specific reader.
+        nice_k2_d=_first_number(eye, "K2_D"),
+        nice_central_pachy_um=_first_number(eye, "central_pachy_um"),
+        nice_b_ele_th_um=_first_number(eye, "B_Ele_Th_um"),
         ps3_eye=ps3_eye,
         ps3_inter_eye=ps3_inter_eye,
     )
