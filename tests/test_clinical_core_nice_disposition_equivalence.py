@@ -116,7 +116,10 @@ def test_presentation_class_uses_clean_core_statuses(status, expected):
 
 def test_importing_pure_core_does_not_mutate_runtime():
     core = canonical_engine.core
-    before = (core.assess_eye, core.hc_engine, core.merge_extractions)
+    before_merge = core.merge_extractions
+    assert not hasattr(core, "assess_eye")
+    assert not hasattr(core, "hc_engine")
     import clinical_core  # noqa: F401
-    after = (core.assess_eye, core.hc_engine, core.merge_extractions)
-    assert after == before
+    assert core.merge_extractions is before_merge
+    assert not hasattr(core, "assess_eye")
+    assert not hasattr(core, "hc_engine")
