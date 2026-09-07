@@ -84,6 +84,11 @@ def _reread_family_ok(screen_family: Any, field: str) -> bool:
 
 
 def _source_rejection_message(eye: Any, field: str, actual: Any) -> str:
+    if field == "B_Ele_Th_um":
+        return (
+            f"Targeted Pentacam reread rejected {eye} {field}: canonical source is the "
+            "verified BAD Display labeled B. Ele.Th box; alternate screens/maps are not accepted."
+        )
     return (
         f"Targeted Pentacam reread rejected {eye} {field}: source family "
         f"{actual or 'UNKNOWN'} is not canonical; required family is "
