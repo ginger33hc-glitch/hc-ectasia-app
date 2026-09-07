@@ -1,16 +1,18 @@
 import importlib
+from pathlib import Path
 
 
-def test_bad_display_prompt_is_source_locked():
+def test_bad_display_prompt_is_source_locked_directly_in_canonical_extractor():
     runtime = importlib.import_module("canonical_engine")
     prompt = runtime.core.PROMPT
-    assert "BELIN/AMBRÓSIO BAD DISPLAY SOURCE LOCK" in prompt
+    assert "BELIN/AMBROSIO BAD DISPLAY SOURCE LOCK" in prompt
     assert "Preserve every printed sign exactly" in prompt
     assert "Never derive or reconstruct Df from anterior elevation" in prompt
     assert "Dt from thinnest pachymetry" in prompt
     assert "Da from ARTmax" in prompt
-    assert "BAD_D from the five component values" in prompt
-    assert runtime.core._cerai_bad_display_source_lock_installed is True
+    assert "Final D from the component values" in prompt
+    assert not hasattr(runtime.core, "_cerai_bad_display_source_lock_installed")
+    assert not Path("bad_display_source_policy.py").exists()
 
 
 def test_source_lock_does_not_change_existing_tomography_flag_behavior():
