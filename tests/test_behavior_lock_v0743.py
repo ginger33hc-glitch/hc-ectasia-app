@@ -6,8 +6,8 @@ Step-60 retirement record:
 - New authority: ``clinical_core`` + ``canonical_runtime_service`` with one
   ``finalize_disposition`` owner.
 - Reason: the Monday clean-architecture specification explicitly supersedes the
-  wrapper-on-wrapper clinical runtime. Tests must protect the surviving canonical
-  behavior, not require removed wrappers to exist.
+  wrapper-on-wrapper clinical runtime. Tests protect the surviving canonical
+  behavior and explicitly reject retired clinical wrappers.
 """
 import hashlib
 import inspect
@@ -17,6 +17,7 @@ import sys
 
 import canonical_engine
 import assessment_workflow
+import runtime_composition
 from clinical_core.bad import final_bad_d_classification
 from clinical_core.disposition import (
     ASSESSMENT_INCOMPLETE,
@@ -132,11 +133,14 @@ def test_production_workflow_calls_direct_canonical_runtime_not_legacy_engine():
     assert assessment_workflow._respond.__module__ == "assessment_workflow"
 
 
+def test_retired_erss_clinical_wrappers_are_absent_from_composition():
+    names = {name for values in runtime_composition.COMPOSITION_PHASES.values() for name in values}
+    assert "erss_topography_evidence_policy" not in names
+    assert "erss_auto_read_policy" not in names
+
+
 def test_required_nonclinical_runtime_boundaries_are_installed():
-    # Clinical installer markers were intentionally retired. These remaining
-    # markers are extraction/workflow/operational boundaries, not score owners.
     assert core._cerai_erss_numeric_extraction_installed
-    assert core._erss_topography_evidence_policy_installed
     assert core._cerai_mandatory_source_set_installed
     assert core._hc_readiness_installed
     assert "ERSS VISUAL MORPHOLOGY DISABLED:" in core.PROMPT
