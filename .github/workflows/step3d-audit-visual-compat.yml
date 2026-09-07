@@ -1,0 +1,24 @@
+name: Step 3D audit visual compatibility
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: monday-clean-architecture
+          fetch-depth: 0
+      - name: Audit production callers of retired visual fields
+        shell: bash
+        run: |
+          echo '=== runtime imports/calls ==='
+          grep -RInE 'import inter_eye_tomography|from inter_eye_tomography|inter_eye_tomography\.|topography_classification|morphology_evidence|anterior_pattern|posterior_pattern|inferior_opposite_steepening_D|asymmetric_bow_tie' --include='*.py' . | grep -v '^./tests/' || true
+          echo '=== runtime composition ==='
+          grep -nE 'inter_eye|morphology|pattern' runtime_composition.py canonical_engine.py assessment_workflow.py canonical_runtime_service.py clinical_core/*.py || true
+          echo '=== report guard ==='
+          cat report_export_guard.py || true
