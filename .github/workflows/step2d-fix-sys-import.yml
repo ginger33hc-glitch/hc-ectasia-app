@@ -1,0 +1,43 @@
+name: Step 2D fix sys import
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: monday-clean-architecture
+          fetch-depth: 0
+      - name: Add module-scope sys import
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import ast
+          path = Path('app.py')
+          text = path.read_text(encoding='utf-8')
+          top = '\n'.join(text.splitlines()[:20])
+          if 'import sys' not in top:
+              if text.count('import os\n') != 1:
+                  raise SystemExit('ABORT: app os import marker ambiguous')
+              text = text.replace('import os\n', 'import os\nimport sys\n', 1)
+          ast.parse(text, filename='app.py')
+          path.write_text(text, encoding='utf-8')
+          PY
+          python -m py_compile app.py
+          git diff --check
+      - name: Commit sys import
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py
+          git commit -m "Fix direct image pipeline sys import"
+          git push origin HEAD:monday-clean-architecture
