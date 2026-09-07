@@ -69,7 +69,6 @@ def test_direct_enrichment_uses_geometry_not_model_visual_srax():
             "screen_types": ["FOUR_MAPS_REFRACTIVE"],
             "srax": "UNCERTAIN",
             "srax_deg": None,
-            "morphology_evidence": [],
         }],
         "global_warnings": [],
     }
@@ -79,6 +78,7 @@ def test_direct_enrichment_uses_geometry_not_model_visual_srax():
     assert eye["srax"] == "YES"
     assert eye["srax_deg"] > 20.0
     assert eye["field_provenance"]["srax"][0]["source"] == "AXIAL_SAGITTAL_CURVATURE_FRONT_GEOMETRIC"
-    assert "srax-geom-v1" in eye["morphology_evidence"][0]
+    assert eye["field_provenance"]["srax_deg"][0]["source"] == "AXIAL_SAGITTAL_CURVATURE_FRONT_GEOMETRIC"
+    assert "morphology_evidence" not in eye
     assert not hasattr(policy, "make_geometric_srax_extractor")
     assert not hasattr(policy, "install")
