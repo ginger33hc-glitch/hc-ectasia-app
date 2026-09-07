@@ -57,6 +57,8 @@ def normal_lasik(**overrides):
         derived_srax_deg=0.0,
         manifest_mrse_d=-3.0,
         intended_sphere_d=-3.0,
+        intended_cylinder_d=0.0,
+        intended_axis_deg=0.0,
         flap_um=100,
         ablation_um=60,
         preop_kmean_d=42.5,
