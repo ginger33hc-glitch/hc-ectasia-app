@@ -94,16 +94,16 @@ def signed_i_s_category(i_s_d) -> str:
 def erss_topography_category(i_s_d, derived_srax_deg=None) -> str:
     """Select one ERSS topography category from numeric authorities only.
 
-    Signed Topometric I-S and derived SRAX are the only authorities. The
-    original Randleman SRA/SRAX threshold is >=20 degrees. The higher-risk
-    single category wins; categories are never added together.
+    Signed Topometric I-S is evaluated first. Derived SRAX is considered only
+    as a possible higher single category when it is strictly greater than
+    20.0 degrees. Exactly 20.0 degrees is negative. Categories are never added.
     """
     candidates = []
     i_s_category = signed_i_s_category(i_s_d)
     if i_s_category != UNCERTAIN:
         candidates.append(i_s_category)
 
-    if _finite(derived_srax_deg) and float(derived_srax_deg) >= 20.0:
+    if _finite(derived_srax_deg) and float(derived_srax_deg) > 20.0:
         candidates.append(INFERIOR_STEEPENING_SRA)
 
     if not candidates:
