@@ -43,7 +43,7 @@ def image_bytes(width=1000, height=800):
     return output.getvalue()
 
 
-def test_morphology_completion_points_to_eye_specific_upper_left_axial_map():
+def test_morphology_region_hint_remains_available_for_source_review_only():
     extracted = extracted_with_eyes()
     od = region_hint(extracted, "OD", "surgeon_topography_category")
     os = region_hint(extracted, "OS", "surgeon_topography_category")
@@ -57,14 +57,13 @@ def test_morphology_completion_points_to_eye_specific_upper_left_axial_map():
     assert os["file"] != od["file"]
 
 
-def test_topography_request_carries_source_region_without_changing_form_contract():
+def test_retired_general_morphology_request_is_instruction_not_scoring_form():
     item = assessment_workflow._request(
         "OD", "Topography morphology category is required", extracted_with_eyes()
     )
-    assert item["kind"] == "form"
-    assert item["key"] == "surgeon_topography_category"
-    assert item["form_id"] == "od_surgeon_topography"
-    assert item["source_region"] is True
+    assert item["kind"] == "instruction"
+    assert item["destination"] == "source"
+    assert "form_id" not in item
 
 
 def test_unknown_or_cross_eye_morphology_source_is_not_shown():
@@ -119,7 +118,7 @@ def test_pattern_region_returns_each_same_eye_conflicting_source():
     assert all(item["printed_label"].startswith("Elevation (Back)") for item in hints)
 
 
-def test_pattern_conflict_is_a_completable_select_with_all_source_regions():
+def test_pattern_conflict_is_instruction_not_manual_clinical_select():
     extracted = extracted_with_eyes()
     extracted["eyes"][0]["field_provenance"] = {
         "anterior_pattern": [
@@ -127,24 +126,18 @@ def test_pattern_conflict_is_a_completable_select_with_all_source_regions():
             {"file": "od-b.png", "source": "VISUAL_CLASSIFICATION"},
         ]
     }
+    assert len(region_hints(extracted, "OD", "anterior_pattern")) == 2
     item = assessment_workflow._request(
         "OD",
         "unresolved multi-image conflict: anterior_pattern: BORDERLINE vs REASSURING",
         extracted,
     )
-    assert item["kind"] == "select"
-    assert item["key"] == "anterior_pattern"
-    assert item["source_region"] is True
-    assert item["source_region_count"] == 2
+    assert item["kind"] == "instruction"
+    assert "options" not in item
+    assert "form_id" not in item
 
 
 def test_quality_only_issue_is_filtered_from_completion_requests():
-    extracted = extracted_with_eyes()
-    extracted["eyes"][0]["quality_by_source"] = {
-        "od-limited.png": "LIMITED",
-        "od-inadequate.png": "INADEQUATE",
-        "od-adequate.png": "ADEQUATE",
-    }
     decision = {"eyes": [{"eye": "OD", "missing": ["adequate-quality tomography/topography"]}]}
     assert assessment_workflow.missing_items(decision) == []
 
@@ -167,7 +160,7 @@ def test_generic_unread_regions_survive_multi_image_merge():
     assert merged["eyes"][0]["unreadable_source_regions"]["ARTmax_um"] == region
 
 
-def test_morphology_source_endpoint_renders_the_canonical_panel():
+def test_morphology_source_endpoint_can_render_review_region():
     token = "synthetic-morphology-source-region-session"
     extracted = extracted_with_eyes()
     assessment_workflow._sessions[token] = {
