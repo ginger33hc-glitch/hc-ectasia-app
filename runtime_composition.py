@@ -33,9 +33,7 @@ import historical_report  # noqa: E402
 import research_export  # noqa: E402
 import named_user_ui  # noqa: E402
 import pentacam_targeted_reread  # noqa: E402
-import rmin_front_source_policy  # noqa: E402
 import geometric_srax_policy  # noqa: E402
-import pentacam_canonical_source_enforcement  # noqa: E402
 
 core = bootstrap.core
 app = bootstrap.app
@@ -43,9 +41,9 @@ app = bootstrap.app
 COMPOSITION_PHASES = {
     "pentacam_extraction_pending_stage2_3": (
         "merge_policy_base", "extraction_guard",
-        "pentacam_canonical_source_enforcement", "ps3_extraction_policy",
+        "ps3_extraction_policy",
         "mandatory_source_set_policy", "pentacam_targeted_reread",
-        "rmin_front_source_policy", "geometric_srax_policy",
+        "geometric_srax_policy",
     ),
     "reporting_pending_stage10": (
         "report_export_guard", "critical_score_highlight",
@@ -75,7 +73,6 @@ def compose(version: str):
     microkeratome_report_policy.install(reports)
 
     # Extraction/source wrappers remain only until Stages 2-3 flatten the source path.
-    pentacam_canonical_source_enforcement.install(core, pentacam_targeted_reread)
     ps3_extraction_policy.install(core)
     mandatory_source_set_policy.install(core)
 
@@ -103,8 +100,7 @@ def compose(version: str):
     named_user_ui.install(core)
 
     pentacam_targeted_reread.install(core)
-    rmin_front_source_policy.install(core, pentacam_targeted_reread)
-    geometric_srax_policy.install(core, rmin_front_source_policy)
+    geometric_srax_policy.install(core)
 
     app.state.cerai_canonical_runtime_ready = True
     core._cerai_runtime_composed = True

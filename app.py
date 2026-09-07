@@ -16,6 +16,9 @@ from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 
 from clinical_disposition import combine_status as combine_clinical_status
+from pentacam_canonical_source_lock import (
+    CANONICAL_FIELD_SOURCES, LOCKED_FIELDS, canonical_source_id,
+)
 from pentacam_field_registry import (
     CORNEA_FRONT_KERATOMETRY_FIELDS,
     CORNEA_FRONT_KERATOMETRY_SOURCE,
@@ -76,10 +79,9 @@ TABLE_NUMERIC_FIELDS = (
     "total_RMS_um", "spherical_aberration_um",
 )
 MAP_FALLBACK_NUMERIC_FIELDS = (
-    # These directly labeled local map values can represent the same named measurement when the
-    # corresponding edge/side box is unreadable. Calculated indices such as K1/K2, BAD, PPI,
-    # ARTmax, and topometric indices cannot be reconstructed from unlabeled map spots.
-    "Rmin_mm",
+    # Only explicitly marked elevation-at-thinnest values remain permitted local-map fallbacks.
+    # Locked printed outputs such as Rmin, K values, BAD, PPI, ARTmax, and topometric indices
+    # must be read from their exact canonical labeled source or left unreadable.
     "anterior_elevation_thinnest_um",
     "posterior_elevation_thinnest_um",
 )
@@ -254,6 +256,20 @@ SCHEMA = {
     "required": ["document_context", "eyes", "treatment_corrections", "global_warnings"],
 }
 
+_CANONICAL_SOURCE_ID_PROPERTIES = {
+    field: {"type": ["string", "null"], "enum": [source_id, None]}
+    for field, (source_id, _label) in CANONICAL_FIELD_SOURCES.items()
+}
+_eye_schema = SCHEMA["properties"]["eyes"]["items"]
+_eye_schema["properties"]["canonical_source_ids"] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": _CANONICAL_SOURCE_ID_PROPERTIES,
+    "required": list(CANONICAL_FIELD_SOURCES),
+}
+if "canonical_source_ids" not in _eye_schema["required"]:
+    _eye_schema["required"].append("canonical_source_ids")
+
 PROMPT = """You are a strict data-extraction component for preoperative corneal-refractive-surgery images.
 The image may be a Pentacam/topography screen, an Excimer Laser Follow-up Card (Excimer Laser Takip
 Karti), or another clinical document. Extract only values visibly supported by the supplied image.
@@ -306,10 +322,9 @@ If and only if the corresponding side/summary-table field is absent, obscured, o
 map number may be used as a second-priority fallback when it directly represents the same named
 measurement and that field is allowed by MAP_FALLBACK_NUMERIC_FIELDS. Record it in
 map_fallback_numeric_fields and not in table_verified_numeric_fields. The marker/location and map
-type must make the identity unambiguous. This fallback is limited to an explicitly labeled local Rmin
-measurement and the anterior/posterior elevation
-at that same marked thinnest point. A generic curvature-map spot is not Kmax or Rmin. If the identity
-or location is uncertain, return null.
+type must make the identity unambiguous. This fallback is limited to the explicitly marked anterior/posterior elevation
+at that same thinnest point. Rmin is never a map fallback. A generic curvature-map spot is not Kmax
+or Rmin. If the identity or location is uncertain, return null.
 
 EXCLUSIVE LABELED-BOX SOURCE LOCK:
 - K1_D, K1_axis_deg, K2_D, K2_axis_deg, and Kmean_D have exactly one accepted source:
@@ -321,6 +336,7 @@ EXCLUSIVE LABELED-BOX SOURCE LOCK:
   add them to table_verified_numeric_fields, and set keratometry_source to OTHER_PENTACAM_SOURCE,
   UNREADABLE, or NOT_SHOWN. Never use Cornea Back, True Net Power, Total Corneal Refractive Power,
   another map/display, a color-map number, Kmax, or another K/Km-like field for these outputs.
+- Rmin_mm: exactly one accepted source: "Show 2 Exams Topometric" -> panel headed "Cornea Back" -> printed Rmin row. Never use Cornea Front Rmin, the center topometric RMin index, Four Maps, a map spot, or any calculated value.
 - Kmax_D: use only the numeric value in the explicitly printed "KMax"/"Kmax" row.
 - ARTmax_um: use only the numeric value in the explicitly printed "ARTmax" row beneath the
   Progression Index panel.
@@ -376,6 +392,20 @@ image with no corneal tomography/topography data, return an empty eyes array. Fo
 image with no treatment card, return an empty treatment_corrections array. Downstream, a confident
 Duzeltme Miktari is treated as both preoperative manifest refraction and intended correction unless
 the clinician separately enters or otherwise explicitly identifies a different value for either role."""
+
+
+_CANONICAL_SOURCE_PROMPT = "\n".join(
+    f"- {field}: source_id={source_id}; printed label={label}"
+    for field, (source_id, label) in CANONICAL_FIELD_SOURCES.items()
+)
+PROMPT += (
+    "\n\nCANONICAL EXACT-SOURCE PROVENANCE — REQUIRED FOR EVERY LOCKED FIELD:\n"
+    "Return canonical_source_ids for every locked field. Use the exact source_id listed below only when "
+    "that field was transcribed from that exact screen/panel/box. Otherwise return null for both the "
+    "field source id and, if no canonical reading exists, the field value. Never assign a canonical "
+    "source id to a wrong-screen or inferred value.\n"
+    + _CANONICAL_SOURCE_PROMPT
+)
 
 
 def data_url(raw: bytes, filename: str) -> str:
@@ -870,6 +900,16 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             fallback_set &= set(MAP_FALLBACK_NUMERIC_FIELDS)
             fallback_set -= verified_set  # A readable labeled table value always has priority.
             missing = list(eye.get("missing_or_unreadable", []))
+            source_ids = eye.get("canonical_source_ids")
+            if isinstance(source_ids, dict):
+                for field in LOCKED_FIELDS:
+                    if eye.get(field) is None:
+                        continue
+                    if source_ids.get(field) != canonical_source_id(field):
+                        eye[field] = None
+                        verified_set.discard(field)
+                        fallback_set.discard(field)
+                        missing.append(field)
             for field in TABLE_NUMERIC_FIELDS:
                 if eye.get(field) is not None and field not in verified_set and field not in fallback_set:
                     eye[field] = None
@@ -948,9 +988,12 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     if eye.get(field) is not None:
                         targeted = list((eye.get("targeted_reread_evidence") or {}).get(field) or [])
                         source = (
-                            CORNEA_FRONT_KERATOMETRY_SOURCE
-                            if field in CORNEA_FRONT_KERATOMETRY_FIELDS
-                            else "LABELED_TABLE"
+                            (eye.get("canonical_source_ids") or {}).get(field)
+                            or (
+                                CORNEA_FRONT_KERATOMETRY_SOURCE
+                                if field in CORNEA_FRONT_KERATOMETRY_FIELDS
+                                else "LABELED_TABLE"
+                            )
                         )
                         eye["field_provenance"][field] = targeted or [
                             {"file": source_filename, "source": source}
@@ -974,6 +1017,10 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             target["source_files"] = sorted(set(target.get("source_files", []) + eye.get("source_files", [])))
             target.setdefault("quality_by_source", {}).update(eye.get("quality_by_source", {}))
             target.setdefault("field_provenance", {})
+            target.setdefault("canonical_source_ids", {})
+            for field, source_id in (eye.get("canonical_source_ids") or {}).items():
+                if source_id:
+                    target["canonical_source_ids"][field] = source_id
             for field, records in eye.get("field_provenance", {}).items():
                 if (
                     field in EXCLUSIVE_LABELED_BOX_FIELDS
@@ -1043,7 +1090,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     "morphology_evidence", "source_files", "quality_by_source", "_source_filename",
                     "_pentacam_qs", "pentacam_qs", "scoring_morphology", "field_provenance",
                     "planning_data_issues", "targeted_reread_evidence",
-                    "targeted_unreadable_regions",
+                    "canonical_source_ids", "targeted_unreadable_regions",
                     "unreadable_source_regions",
                 ):
                     continue

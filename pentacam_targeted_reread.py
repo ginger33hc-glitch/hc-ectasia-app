@@ -18,6 +18,10 @@ import re
 from typing import Any, Callable
 
 from PIL import Image, ImageOps
+from pentacam_canonical_source_lock import (
+    CANONICAL_FIELD_SOURCES, SHOW_2_CORNEA_BACK, SHOW_2_CORNEA_FRONT, SHOW_2_INDICES,
+    canonical_source_id, source_family,
+)
 from pentacam_field_registry import (
     CORNEA_FRONT_KERATOMETRY_FIELDS,
     CORNEA_FRONT_KERATOMETRY_SOURCE,
@@ -206,6 +210,18 @@ REQUESTED FIELDS BY EYE:
 """
 
 
+_REREAD_CANONICAL_SOURCE_LINES = "\n".join(
+    f"- {field}: {source_id} -> {label}"
+    for field, (source_id, label) in CANONICAL_FIELD_SOURCES.items()
+)
+REREAD_PROMPT += (
+    "\nCANONICAL EXACT-SOURCE REGISTRY:\n"
+    "A requested locked field is acceptable only from the exact source below. "
+    "Use the visible group heading to distinguish Cornea Front, Cornea Back, and the 8-mm Indices panel.\n"
+    + _REREAD_CANONICAL_SOURCE_LINES + "\n"
+)
+
+
 def _enabled() -> bool:
     return os.getenv("CERAI_TARGETED_REREAD_ENABLED", "1").strip() == "1"
 
@@ -363,6 +379,21 @@ def _normalize_label(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "", text)
 
 
+def source_supports_field(screen_family: Any, field: str, group_label: Any = None) -> bool:
+    required_family = source_family(field)
+    if required_family is not None and str(screen_family or "") != required_family:
+        return False
+    source_id = canonical_source_id(field)
+    group = _normalize_label(group_label)
+    if source_id == SHOW_2_CORNEA_FRONT:
+        return group == "corneafront"
+    if source_id == SHOW_2_CORNEA_BACK:
+        return group == "corneaback"
+    if source_id == SHOW_2_INDICES:
+        return any(token in group for token in ("indicesin8mmzone", "indices8mm", "indices"))
+    return True
+
+
 def label_supports_field(field: str, printed_label: Any, group_label: Any = None) -> bool:
     """Reject neighboring-number assignments before they enter the clinical audit."""
     raw_label = str(printed_label or "")
@@ -397,7 +428,11 @@ def label_supports_field(field: str, printed_label: Any, group_label: Any = None
         "IHA": {"iha"}, "K1_D": {"k1", "k1d"},
         "K2_D": {"k2", "k2d"},
         "Kmax_D": {"kmax", "kmaxd"}, "Kmean_D": {"km", "kmean", "kmeand"},
-        "Rmin_mm": {"rmin", "rminmm"},
+        "Rmin_mm": {"rmin", "rminmm"}, "topometric_RMin": {"rmin", "rminmm"},
+        "TKC": {"tkc"}, "F_Ele_Th_um": {"feleth", "felethum", "fronteleth"},
+        "posterior_Kmean_D": {"km", "kmean", "kmeand"},
+        "topographic_astig_D": {"astig", "astigd"},
+        "topographic_steep_axis_deg": {"axis", "axissteep", "steepaxis"},
         "B_Ele_Th_um": {"beleth", "belethum", "backeleth"},
     }
     if field in exact:
@@ -452,22 +487,13 @@ def apply_targeted_readings(
         eye_id, field = reading.get("eye"), reading.get("field")
         if eye_id not in requested or field not in requested.get(eye_id, []):
             continue
-        if field in CORNEA_FRONT_KERATOMETRY_FIELDS and (
-            reread.get("screen_family") != "SHOW_2_EXAMS_TOPOMETRIC"
-            or _normalize_label(reading.get("group_label")) != "corneafront"
+        if not source_supports_field(
+            reread.get("screen_family"), field, reading.get("group_label")
         ):
             if reading.get("status") == "CONFIDENT" and core.is_number(reading.get("value")):
                 result.setdefault("global_warnings", []).append(
                     f"Targeted Pentacam reread rejected {eye_id} {field} in {filename}: "
-                    "K1/K2/Km and their axes are accepted only from the Cornea Front panel "
-                    "on Show 2 Exams Topometric."
-                )
-            continue
-        if field == "B_Ele_Th_um" and reread.get("screen_family") != "BAD_DISPLAY":
-            if reading.get("status") == "CONFIDENT" and core.is_number(reading.get("value")):
-                result.setdefault("global_warnings", []).append(
-                    f"Targeted Pentacam reread rejected {eye_id} {field} in {filename}: "
-                    "B. Ele.Th is accepted only from a verified BAD Display page."
+                    "the returned screen/panel was not the field's canonical source."
                 )
             continue
         if not label_supports_field(field, reading.get("printed_label"), reading.get("group_label")):
@@ -525,6 +551,9 @@ def apply_targeted_readings(
             verified = set(eye.get("table_verified_numeric_fields") or [])
             verified.add(field)
             eye["table_verified_numeric_fields"] = sorted(verified)
+            source_id = canonical_source_id(field)
+            if source_id:
+                eye.setdefault("canonical_source_ids", {})[field] = source_id
         eye["missing_or_unreadable"] = [
             item for item in eye.get("missing_or_unreadable") or [] if item != field
         ]
