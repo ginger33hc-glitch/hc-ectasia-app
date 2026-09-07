@@ -3,6 +3,9 @@ name: Step 1 guarded app cleanup
 on:
   push:
     branches: [monday-clean-architecture]
+  pull_request:
+    branches: [main]
+    types: [synchronize]
 
 # One-shot Step 1 trigger. Remove this workflow after successful guarded cleanup.
 permissions:
