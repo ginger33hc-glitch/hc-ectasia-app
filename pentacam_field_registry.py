@@ -33,7 +33,9 @@ EXCLUSIVE_LABELED_BOX_FIELDS = frozenset({
 })
 
 COMPLETION_NUMERIC_FIELDS = {
-    "pachy_thinnest_um": "Thinnest pachymetry (µm)", "BAD_D": "Final BAD-D",
+    "pachy_thinnest_um": "Thinnest pachymetry (µm)",
+    "central_pachy_um": "Pupil Center (+) pachymetry (µm; 4 Maps Refractive)",
+    "BAD_D": "Final BAD-D",
     "Df": "BAD Df", "Db": "BAD Db", "Dp": "BAD Dp", "Dt": "BAD Dt", "Da": "BAD Da",
     "ARTmax_um": "ARTmax (µm)", "PPI_min": "PPI minimum", "PPI_avg": "PPI average", "PPI_max": "PPI maximum",
     "K1_D": "K1 (D)", "K2_D": "K2 (D; not Kmax)", "Kmean_D": "Preoperative Kmean (D)",
@@ -45,6 +47,7 @@ COMPLETION_NUMERIC_FIELDS = {
     "topographic_steep_axis_deg": "Topographic Axis (steep) (degrees; Cornea Front)",
     "posterior_Kmean_D": "Posterior Km (D; Cornea Back)",
     "F_Ele_Th_um": "F. Ele.Th (µm; BAD Display labeled box)",
+    "B_Ele_Th_um": "B. Ele.Th (µm; BAD Display labeled box)",
 }
 
 
