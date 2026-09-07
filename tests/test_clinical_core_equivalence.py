@@ -1,6 +1,13 @@
-"""Boundary gates for the pure CER-AI clinical core."""
+"""Boundary gates for the authoritative CER-AI clinical core.
 
-import canonical_engine
+Step-60 retirement note:
+Old rule/test authority -> base ``app.py`` age/pachymetry/BAD helper functions.
+New canonical authority -> ``clinical_core`` rule modules.
+Why retired -> production assessment no longer executes the base clinical scorer;
+comparing canonical rules to that dormant implementation would force duplicate
+clinical truth back into the runtime.
+"""
+
 from clinical_core.bad import final_bad_d_classification
 from clinical_core.rules import (
     UNCERTAIN,
@@ -10,23 +17,21 @@ from clinical_core.rules import (
     signed_i_s_category,
 )
 
-core = canonical_engine.core
 
-
-def test_age_points_match_current_production_boundaries():
+def test_canonical_age_points_boundaries():
     values = (17, 18, 18.999, 19, 20, 20.999, 21, 35)
-    assert [erss_age_points(x) for x in values] == [core.age_points(x) for x in values]
+    assert [erss_age_points(x) for x in values] == [None, 3, 3, 2, 2, 2, 0, 0]
 
 
-def test_pachymetry_points_match_current_production_boundaries():
+def test_canonical_pachymetry_points_boundaries():
     values = (479, 480, 499, 500, 509, 510, 560)
-    assert [erss_pachymetry_points(x) for x in values] == [core.lasik_pachy_points(x) for x in values]
+    assert [erss_pachymetry_points(x) for x in values] == [None, 2, 2, 1, 1, 0, 0]
 
 
-def test_final_bad_d_matches_current_production_boundaries():
+def test_canonical_final_bad_d_boundaries():
     values = (1.0, 1.6, 1.6001, 2.5999, 2.6, 3.0)
     assert [final_bad_d_classification(x) for x in values] == [
-        core.bad_classification(x, final=True) for x in values
+        "NORMAL", "NORMAL", "SUSPICIOUS", "SUSPICIOUS", "ABNORMAL", "ABNORMAL"
     ]
 
 
@@ -42,6 +47,11 @@ def test_signed_i_s_monday_boundaries():
         1.40: "ABNORMAL_ECTATIC",
     }
     assert {value: signed_i_s_category(value) for value in expected} == expected
+
+
+def test_negative_i_s_has_no_artificial_lower_ast_limit():
+    for value in (-0.51, -1.0, -1.5, -3.0):
+        assert signed_i_s_category(value) == "ASYMMETRIC_BOWTIE"
 
 
 def test_srax_boundary_is_strictly_greater_than_20_degrees():
