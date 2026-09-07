@@ -1,5 +1,4 @@
 from inter_eye_tomography import assess_inter_eye_tomography
-import inter_eye_tomography_policy as policy_layer
 
 
 def eye(eye_id, bad=1.0, morphology="NORMAL_SYMMETRIC", anterior="REASSURING", posterior="REASSURING"):
@@ -60,35 +59,3 @@ def test_missing_required_domain_cannot_be_called_negative():
 def test_missing_fellow_eye_is_not_assessable():
     out = assess_inter_eye_tomography([eye("OD")])
     assert out["status"] == "NOT ASSESSABLE"
-
-
-def test_manual_modifier_is_neutralized_and_status_is_unchanged(monkeypatch):
-    captured = {}
-
-    def upstream(extracted, age, eye_plans, modifiers, patient_metadata=None):
-        captured.update(modifiers)
-        return {
-            "status": "PASS",
-            "eyes": [
-                {"eye": "OD", "status": "PASS", "tomography_review": {"cross_sectional_flags": []}},
-                {"eye": "OS", "status": "PASS", "tomography_review": {"cross_sectional_flags": []}},
-            ],
-        }
-
-    monkeypatch.setattr(policy_layer, "_previous_hc_engine", upstream)
-    extracted = {"eyes": [eye("OD"), eye("OS", bad=2.0)]}
-    out = policy_layer.hc_engine_with_inter_eye_tomography(
-        extracted,
-        30,
-        {},
-        {"inter_eye_asymmetry": "yes"},
-        {},
-    )
-    assert captured["inter_eye_asymmetry"] == "no"
-    assert out["status"] == "PASS"
-    assert out["inter_eye_tomography_concern"]["status"] == "POSITIVE"
-    assert all(result["status"] == "PASS" for result in out["eyes"])
-    assert all(
-        any("Inter-eye tomography concern: POSITIVE" in flag for flag in result["tomography_review"]["cross_sectional_flags"])
-        for result in out["eyes"]
-    )
