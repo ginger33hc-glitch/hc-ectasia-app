@@ -1,0 +1,205 @@
+name: Step 2B exact-source code migration
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: monday-clean-architecture
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Guard and migrate exact source ownership
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import ast
+
+          root = Path('.')
+          app_path = root / 'app.py'
+          reread_path = root / 'pentacam_targeted_reread.py'
+          composition_path = root / 'runtime_composition.py'
+          test_path = root / 'tests/test_rmin_front_source_policy.py'
+          app = app_path.read_text(encoding='utf-8')
+          reread = reread_path.read_text(encoding='utf-8')
+          composition = composition_path.read_text(encoding='utf-8')
+
+          retired = {'pentacam_canonical_source_enforcement', 'rmin_front_source_policy'}
+          allowed = {composition_path, root / 'pentacam_canonical_source_enforcement.py', root / 'rmin_front_source_policy.py'}
+          refs = {}
+          for path in root.rglob('*.py'):
+              if path in allowed or any(part in {'.git', '.github', 'tests', 'docs'} for part in path.parts):
+                  continue
+              tree = ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      for alias in node.names:
+                          base = alias.name.split('.')[0]
+                          if base in retired:
+                              refs.setdefault(base, []).append(str(path))
+                  elif isinstance(node, ast.ImportFrom) and node.module:
+                      base = node.module.split('.')[0]
+                      if base in retired:
+                          refs.setdefault(base, []).append(str(path))
+          if refs:
+              raise SystemExit(f'ABORT: source wrappers still have production importers: {refs}')
+
+          import_marker = 'from pentacam_field_registry import (\n'
+          source_import = (
+              'from pentacam_canonical_source_lock import (\n'
+              '    CANONICAL_FIELD_SOURCES, LOCKED_FIELDS, canonical_source_id,\n'
+              ')\n'
+          )
+          if import_marker not in app:
+              raise SystemExit('ABORT: app field-registry import marker missing')
+          if source_import not in app:
+              app = app.replace(import_marker, source_import + import_marker, 1)
+
+          fallback_old = '''MAP_FALLBACK_NUMERIC_FIELDS = (\n    # These directly labeled local map values can represent the same named measurement when the\n    # corresponding edge/side box is unreadable. Calculated indices such as K1/K2, BAD, PPI,\n    # ARTmax, and topometric indices cannot be reconstructed from unlabeled map spots.\n    "Rmin_mm",\n    "anterior_elevation_thinnest_um",\n    "posterior_elevation_thinnest_um",\n)'''
+          fallback_new = '''MAP_FALLBACK_NUMERIC_FIELDS = (\n    # Only explicitly marked elevation-at-thinnest values remain permitted local-map fallbacks.\n    # Locked printed outputs such as Rmin, K values, BAD, PPI, ARTmax, and topometric indices\n    # must be read from their exact canonical labeled source or left unreadable.\n    "anterior_elevation_thinnest_um",\n    "posterior_elevation_thinnest_um",\n)'''
+          if fallback_old not in app:
+              raise SystemExit('ABORT: Rmin fallback block missing')
+          app = app.replace(fallback_old, fallback_new, 1)
+
+          schema_marker = '\nPROMPT = """You are a strict data-extraction component'
+          schema_block = '''\n_CANONICAL_SOURCE_ID_PROPERTIES = {\n    field: {"type": ["string", "null"], "enum": [source_id, None]}\n    for field, (source_id, _label) in CANONICAL_FIELD_SOURCES.items()\n}\n_eye_schema = SCHEMA["properties"]["eyes"]["items"]\n_eye_schema["properties"]["canonical_source_ids"] = {\n    "type": "object",\n    "additionalProperties": False,\n    "properties": _CANONICAL_SOURCE_ID_PROPERTIES,\n    "required": list(CANONICAL_FIELD_SOURCES),\n}\nif "canonical_source_ids" not in _eye_schema["required"]:\n    _eye_schema["required"].append("canonical_source_ids")\n'''
+          if schema_marker not in app:
+              raise SystemExit('ABORT: schema/PROMPT boundary missing')
+          if '_CANONICAL_SOURCE_ID_PROPERTIES' not in app:
+              app = app.replace(schema_marker, schema_block + schema_marker, 1)
+
+          old_fallback_prompt = '''This fallback is limited to an explicitly labeled local Rmin\nmeasurement and the anterior/posterior elevation\nat that same marked thinnest point. A generic curvature-map spot is not Kmax or Rmin. If the identity\nor location is uncertain, return null.'''
+          new_fallback_prompt = '''This fallback is limited to the explicitly marked anterior/posterior elevation\nat that same thinnest point. Rmin is never a map fallback. A generic curvature-map spot is not Kmax\nor Rmin. If the identity or location is uncertain, return null.'''
+          if old_fallback_prompt not in app:
+              raise SystemExit('ABORT: old Rmin fallback prompt missing')
+          app = app.replace(old_fallback_prompt, new_fallback_prompt, 1)
+
+          kmax_marker = '- Kmax_D: use only the numeric value in the explicitly printed "KMax"/"Kmax" row.\n'
+          rmin_rule = (
+              '- Rmin_mm: exactly one accepted source: "Show 2 Exams Topometric" -> panel headed "Cornea Back" '
+              '-> printed Rmin row. Never use Cornea Front Rmin, the center topometric RMin index, Four Maps, '
+              'a map spot, or any calculated value.\n'
+          )
+          if kmax_marker not in app:
+              raise SystemExit('ABORT: Kmax prompt marker missing')
+          if rmin_rule not in app:
+              app = app.replace(kmax_marker, rmin_rule + kmax_marker, 1)
+
+          prompt_end_marker = '\n\ndef data_url(raw: bytes, filename: str) -> str:'
+          source_prompt = '''\n\n_CANONICAL_SOURCE_PROMPT = "\\n".join(\n    f"- {field}: source_id={source_id}; printed label={label}"\n    for field, (source_id, label) in CANONICAL_FIELD_SOURCES.items()\n)\nPROMPT += (\n    "\\n\\nCANONICAL EXACT-SOURCE PROVENANCE — REQUIRED FOR EVERY LOCKED FIELD:\\n"\n    "Return canonical_source_ids for every locked field. Use the exact source_id listed below only when "\n    "that field was transcribed from that exact screen/panel/box. Otherwise return null for both the "\n    "field source id and, if no canonical reading exists, the field value. Never assign a canonical "\n    "source id to a wrong-screen or inferred value.\\n"\n    + _CANONICAL_SOURCE_PROMPT\n)\n'''
+          if prompt_end_marker not in app:
+              raise SystemExit('ABORT: prompt end marker missing')
+          if '_CANONICAL_SOURCE_PROMPT' not in app:
+              app = app.replace(prompt_end_marker, source_prompt + prompt_end_marker, 1)
+
+          norm_marker = '''            missing = list(eye.get("missing_or_unreadable", []))\n            for field in TABLE_NUMERIC_FIELDS:\n'''
+          norm_block = '''            missing = list(eye.get("missing_or_unreadable", []))\n            source_ids = eye.get("canonical_source_ids")\n            if isinstance(source_ids, dict):\n                for field in LOCKED_FIELDS:\n                    if eye.get(field) is None:\n                        continue\n                    if source_ids.get(field) != canonical_source_id(field):\n                        eye[field] = None\n                        verified_set.discard(field)\n                        fallback_set.discard(field)\n                        missing.append(field)\n            for field in TABLE_NUMERIC_FIELDS:\n'''
+          if norm_marker not in app:
+              raise SystemExit('ABORT: normalization marker missing')
+          app = app.replace(norm_marker, norm_block, 1)
+
+          prov_old = '''                        source = (\n                            CORNEA_FRONT_KERATOMETRY_SOURCE\n                            if field in CORNEA_FRONT_KERATOMETRY_FIELDS\n                            else "LABELED_TABLE"\n                        )\n'''
+          prov_new = '''                        source = (\n                            (eye.get("canonical_source_ids") or {}).get(field)\n                            or (\n                                CORNEA_FRONT_KERATOMETRY_SOURCE\n                                if field in CORNEA_FRONT_KERATOMETRY_FIELDS\n                                else "LABELED_TABLE"\n                            )\n                        )\n'''
+          if prov_old not in app:
+              raise SystemExit('ABORT: provenance marker missing')
+          app = app.replace(prov_old, prov_new, 1)
+
+          merge_meta_marker = '''            target.setdefault("field_provenance", {})\n            for field, records in eye.get("field_provenance", {}).items():\n'''
+          merge_meta_new = '''            target.setdefault("field_provenance", {})\n            target.setdefault("canonical_source_ids", {})\n            for field, source_id in (eye.get("canonical_source_ids") or {}).items():\n                if source_id:\n                    target["canonical_source_ids"][field] = source_id\n            for field, records in eye.get("field_provenance", {}).items():\n'''
+          if merge_meta_marker not in app:
+              raise SystemExit('ABORT: merge metadata marker missing')
+          app = app.replace(merge_meta_marker, merge_meta_new, 1)
+
+          skip_marker = '''                    "planning_data_issues", "targeted_reread_evidence",\n                    "targeted_unreadable_regions",\n'''
+          skip_new = '''                    "planning_data_issues", "targeted_reread_evidence",\n                    "canonical_source_ids", "targeted_unreadable_regions",\n'''
+          if skip_marker not in app:
+              raise SystemExit('ABORT: merge skip marker missing')
+          app = app.replace(skip_marker, skip_new, 1)
+
+          reread_import_marker = 'from pentacam_field_registry import (\n'
+          source_import_reread = '''from pentacam_canonical_source_lock import (\n    CANONICAL_FIELD_SOURCES, SHOW_2_CORNEA_BACK, SHOW_2_CORNEA_FRONT, SHOW_2_INDICES,\n    canonical_source_id, source_family,\n)\n'''
+          if reread_import_marker not in reread:
+              raise SystemExit('ABORT: reread import marker missing')
+          if source_import_reread not in reread:
+              reread = reread.replace(reread_import_marker, source_import_reread + reread_import_marker, 1)
+
+          label_func_marker = '\ndef label_supports_field(field: str, printed_label: Any, group_label: Any = None) -> bool:\n'
+          source_helper = '''\ndef source_supports_field(screen_family: Any, field: str, group_label: Any = None) -> bool:\n    required_family = source_family(field)\n    if required_family is not None and str(screen_family or "") != required_family:\n        return False\n    source_id = canonical_source_id(field)\n    group = _normalize_label(group_label)\n    if source_id == SHOW_2_CORNEA_FRONT:\n        return group == "corneafront"\n    if source_id == SHOW_2_CORNEA_BACK:\n        return group == "corneaback"\n    if source_id == SHOW_2_INDICES:\n        return any(token in group for token in ("indicesin8mmzone", "indices8mm", "indices"))\n    return True\n\n'''
+          if label_func_marker not in reread:
+              raise SystemExit('ABORT: label function marker missing')
+          if 'def source_supports_field(' not in reread:
+              reread = reread.replace(label_func_marker, source_helper + label_func_marker, 1)
+
+          exact_old = '''        "IHA": {"iha"}, "K1_D": {"k1", "k1d"},\n        "K2_D": {"k2", "k2d"},\n        "Kmax_D": {"kmax", "kmaxd"}, "Kmean_D": {"km", "kmean", "kmeand"},\n        "Rmin_mm": {"rmin", "rminmm"},\n        "B_Ele_Th_um": {"beleth", "belethum", "backeleth"},\n'''
+          exact_new = '''        "IHA": {"iha"}, "K1_D": {"k1", "k1d"},\n        "K2_D": {"k2", "k2d"},\n        "Kmax_D": {"kmax", "kmaxd"}, "Kmean_D": {"km", "kmean", "kmeand"},\n        "Rmin_mm": {"rmin", "rminmm"}, "topometric_RMin": {"rmin", "rminmm"},\n        "TKC": {"tkc"}, "F_Ele_Th_um": {"feleth", "felethum", "fronteleth"},\n        "posterior_Kmean_D": {"km", "kmean", "kmeand"},\n        "topographic_astig_D": {"astig", "astigd"},\n        "topographic_steep_axis_deg": {"axis", "axissteep", "steepaxis"},\n        "B_Ele_Th_um": {"beleth", "belethum", "backeleth"},\n'''
+          if exact_old not in reread:
+              raise SystemExit('ABORT: exact-label block missing')
+          reread = reread.replace(exact_old, exact_new, 1)
+
+          source_checks_start = '''        if field in CORNEA_FRONT_KERATOMETRY_FIELDS and (\n            reread.get("screen_family") != "SHOW_2_EXAMS_TOPOMETRIC"\n            or _normalize_label(reading.get("group_label")) != "corneafront"\n        ):\n'''
+          source_checks_end = '''        if not label_supports_field(field, reading.get("printed_label"), reading.get("group_label")):\n'''
+          start = reread.find(source_checks_start)
+          end = reread.find(source_checks_end, start)
+          if start < 0 or end < 0:
+              raise SystemExit('ABORT: legacy reread source checks missing')
+          generic_check = '''        if not source_supports_field(\n            reread.get("screen_family"), field, reading.get("group_label")\n        ):\n            if reading.get("status") == "CONFIDENT" and core.is_number(reading.get("value")):\n                result.setdefault("global_warnings", []).append(\n                    f"Targeted Pentacam reread rejected {eye_id} {field} in {filename}: "\n                    "the returned screen/panel was not the field's canonical source."\n                )\n            continue\n'''
+          reread = reread[:start] + generic_check + reread[end:]
+
+          accepted_marker = '''            verified = set(eye.get("table_verified_numeric_fields") or [])\n            verified.add(field)\n            eye["table_verified_numeric_fields"] = sorted(verified)\n'''
+          accepted_new = '''            verified = set(eye.get("table_verified_numeric_fields") or [])\n            verified.add(field)\n            eye["table_verified_numeric_fields"] = sorted(verified)\n            source_id = canonical_source_id(field)\n            if source_id:\n                eye.setdefault("canonical_source_ids", {})[field] = source_id\n'''
+          if accepted_marker not in reread:
+              raise SystemExit('ABORT: accepted field marker missing')
+          reread = reread.replace(accepted_marker, accepted_new, 1)
+
+          reread_prompt_end = '\n\ndef _enabled() -> bool:'
+          reread_source_prompt = '''\n\n_REREAD_CANONICAL_SOURCE_LINES = "\\n".join(\n    f"- {field}: {source_id} -> {label}"\n    for field, (source_id, label) in CANONICAL_FIELD_SOURCES.items()\n)\nREREAD_PROMPT += (\n    "\\nCANONICAL EXACT-SOURCE REGISTRY:\\n"\n    "A requested locked field is acceptable only from the exact source below. "\n    "Use the visible group heading to distinguish Cornea Front, Cornea Back, and the 8-mm Indices panel.\\n"\n    + _REREAD_CANONICAL_SOURCE_LINES + "\\n"\n)\n'''
+          if reread_prompt_end not in reread:
+              raise SystemExit('ABORT: reread prompt boundary missing')
+          if '_REREAD_CANONICAL_SOURCE_LINES' not in reread:
+              reread = reread.replace(reread_prompt_end, reread_source_prompt + reread_prompt_end, 1)
+
+          for line in (
+              'import pentacam_canonical_source_enforcement  # noqa: E402\n',
+              'import rmin_front_source_policy  # noqa: E402\n',
+              '    pentacam_canonical_source_enforcement.install(core, pentacam_targeted_reread)\n',
+              '    rmin_front_source_policy.install(core, pentacam_targeted_reread)\n',
+          ):
+              if line not in composition:
+                  raise SystemExit(f'ABORT: composition line missing: {line.strip()}')
+              composition = composition.replace(line, '')
+          composition = composition.replace('"pentacam_canonical_source_enforcement", "ps3_extraction_policy",\n', '"ps3_extraction_policy",\n')
+          composition = composition.replace('"rmin_front_source_policy", "geometric_srax_policy",\n', '"geometric_srax_policy",\n')
+          composition = composition.replace('    geometric_srax_policy.install(core, rmin_front_source_policy)\n', '    geometric_srax_policy.install(core)\n')
+          if any(name in composition for name in retired):
+              raise SystemExit('ABORT: retired wrapper survived composition')
+
+          test_path.write_text('''from pathlib import Path\n\nimport canonical_engine\nimport pentacam_targeted_reread as reread\nfrom pentacam_canonical_source_lock import SHOW_2_CORNEA_BACK, canonical_source_id\n\n\ndef test_rmin_has_one_canonical_source_and_no_map_fallback():\n    assert canonical_source_id("Rmin_mm") == SHOW_2_CORNEA_BACK\n    assert "Rmin_mm" not in canonical_engine.core.MAP_FALLBACK_NUMERIC_FIELDS\n    assert not Path("rmin_front_source_policy.py").exists()\n\n\ndef test_canonical_prompt_locks_rmin_to_show2_cornea_back():\n    prompt = canonical_engine.core.PROMPT\n    assert "Rmin_mm: exactly one accepted source" in prompt\n    assert "Cornea Back" in prompt\n    assert "Rmin is never a map fallback" in prompt\n\n\ndef test_targeted_reread_rejects_cornea_front_rmin_source():\n    assert not reread.source_supports_field("SHOW_2_EXAMS_TOPOMETRIC", "Rmin_mm", "Cornea Front")\n    assert reread.source_supports_field("SHOW_2_EXAMS_TOPOMETRIC", "Rmin_mm", "Cornea Back")\n\n\ndef test_targeted_reread_distinguishes_topometric_rmin_from_cornea_back_rmin():\n    assert reread.source_supports_field("SHOW_2_EXAMS_TOPOMETRIC", "topometric_RMin", "Indices (in 8 mm zone)")\n    assert not reread.source_supports_field("SHOW_2_EXAMS_TOPOMETRIC", "topometric_RMin", "Cornea Back")\n''', encoding='utf-8')
+
+          ast.parse(app, filename='app.py')
+          ast.parse(reread, filename='pentacam_targeted_reread.py')
+          ast.parse(composition, filename='runtime_composition.py')
+          app_path.write_text(app, encoding='utf-8')
+          reread_path.write_text(reread, encoding='utf-8')
+          composition_path.write_text(composition, encoding='utf-8')
+          PY
+          python -m py_compile app.py pentacam_targeted_reread.py runtime_composition.py
+          git rm pentacam_canonical_source_enforcement.py rmin_front_source_policy.py
+          git diff --check
+      - name: Commit exact-source code migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py pentacam_targeted_reread.py runtime_composition.py tests/test_rmin_front_source_policy.py
+          git commit -m "Flatten exact Pentacam source enforcement"
+          git push origin HEAD:monday-clean-architecture
