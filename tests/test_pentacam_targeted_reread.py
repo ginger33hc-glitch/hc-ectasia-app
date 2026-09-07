@@ -1,8 +1,8 @@
 """Current targeted-reread regression surface after canonical extraction flattening.
 
 The historical module is retained only as a source of extraction-focused fixtures/tests.
-Wrapper-era completion and NICE-side-channel tests are explicitly retired and replaced
-with direct canonical eye-field assertions below.
+Wrapper-era completion, NICE-side-channel, and extractor-wrapper tests are explicitly
+retired and replaced with direct canonical enrichment assertions below.
 """
 from __future__ import annotations
 
@@ -30,6 +30,8 @@ _RETIRED = {
     "test_landmark_labels_and_existing_central_reading_control_targets",
     "test_only_canonical_b_ele_th_reading_suppresses_targeted_reread",
     "test_bad_display_b_ele_th_box_feeds_only_nice_posterior_input",
+    "test_wrapper_runs_for_missing_age_even_when_no_eye_numeric_field_is_missing",
+    "test_wrapper_fails_open_to_original_extraction_when_crop_decode_fails",
 }
 for _name in _RETIRED:
     if not hasattr(_legacy, _name):
@@ -186,6 +188,48 @@ def test_targeted_tile_evidence_survives_canonical_merge_without_legacy_hc_fixtu
     })
     merged_eye = canonical_engine.core.merge_extractions([result])["eyes"][0]
     assert merged_eye["field_provenance"]["PPI_max"] == eye["targeted_reread_evidence"]["PPI_max"]
+
+
+def test_direct_enrichment_runs_for_missing_age_without_missing_eye_numeric_fields(monkeypatch):
+    original = pentacam_result()
+    original["document_context"]["patient_age_years"] = None
+    for field in targeted.TARGET_FIELDS:
+        original["eyes"][0][field] = 1.0
+    payload = {
+        "screen_family": "BAD_DISPLAY",
+        "readings": [],
+        "patient_age_reading": {
+            "value": 61,
+            "status": "CONFIDENT",
+            "printed_label": "Age",
+            "source_tile": "TOP_HEADER",
+            "source_box": [0, 0, 100, 100],
+        },
+        "pentacam_qs_reading": {
+            "value": None,
+            "status": "NOT_SHOWN",
+            "printed_label": None,
+            "source_tile": "ORIGINAL",
+            "source_box": None,
+        },
+        "warnings": [],
+    }
+    monkeypatch.setattr(targeted, "targeted_reread", lambda *args: payload)
+    result = targeted.enrich_extraction(Core, original, b"not-an-image", "od.png")
+    assert result is original
+    assert result["document_context"]["patient_age_years"] == 61
+
+
+def test_direct_enrichment_fails_open_when_crop_decode_fails():
+    original = pentacam_result()
+    result = targeted.enrich_extraction(Core, original, b"not-an-image", "od.png")
+    assert result is original
+    assert any(
+        "targeted pentacam numeric reread failed" in warning.casefold()
+        for warning in result["global_warnings"]
+    )
+    assert not hasattr(targeted, "make_targeted_extractor")
+    assert not hasattr(targeted, "install")
 
 
 PENTACAM_SOURCE_LOCK_RETIRED_TARGETED_TESTS = tuple(sorted(_RETIRED))
