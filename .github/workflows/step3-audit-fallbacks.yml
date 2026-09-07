@@ -1,0 +1,44 @@
+name: Step 3 audit obsolete fallback paths
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: monday-clean-architecture
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Audit fallback and derived references
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          terms = [
+              'anterior_elevation_thinnest_um',
+              'posterior_elevation_thinnest_um',
+              'MAP_FALLBACK_NUMERIC_FIELDS',
+              'map_fallback_numeric_fields',
+              'inferior_opposite_steepening_D',
+              'morphology',
+              'anterior_pattern',
+              'posterior_pattern',
+              'numeric_reconciliation',
+              'reconciled_multi_image_values',
+          ]
+          for term in terms:
+              print(f'=== {term} ===')
+              for path in sorted(Path('.').rglob('*.py')):
+                  if '.git' in path.parts or '.github' in path.parts:
+                      continue
+                  text = path.read_text(errors='ignore')
+                  for i,line in enumerate(text.splitlines(),1):
+                      if term in line:
+                          print(f'{path}:{i}: {line.strip()}')
+          PY
