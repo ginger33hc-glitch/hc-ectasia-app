@@ -69,6 +69,12 @@ def runtime_invariants():
     if CANONICAL_FIELD_SOURCES.get("posterior_Kmean_D", (None,))[0] != SHOW_2_CORNEA_BACK:
         errors.append("Posterior Km is not source-locked to Show 2 Exams Cornea Back")
 
+    bootstrap_source = inspect.getsource(composition.bootstrap)
+    if "SCHEMA[" in bootstrap_source or "PROMPT +=" in bootstrap_source or "merge_extractions =" in bootstrap_source:
+        errors.append("Bootstrap still owns or mutates extraction policy")
+    if composition.bootstrap.core is not core:
+        errors.append("Bootstrap compatibility alias does not reference canonical app module")
+
     # Workflow must call the direct canonical runtime, never the legacy clinical engine.
     workflow_source = inspect.getsource(assessment_workflow._respond)
     if "evaluate_case(" not in workflow_source:
