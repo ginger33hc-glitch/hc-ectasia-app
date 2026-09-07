@@ -43,13 +43,10 @@ class PS3EyeInput:
     manifest_astig_d: Optional[float] = None
     manifest_axis_deg: Optional[float] = None
     ppi_avg: Optional[float] = None
+    f_ele_th_um: Optional[float] = None
+    b_ele_th_um: Optional[float] = None
     srax: Optional[str] = None
     srax_deg: Optional[float] = None
-    bfs_front_um: Optional[float] = None
-    bfs_back_um: Optional[float] = None
-    bfte_front_um: Optional[float] = None
-    bfte_back_um: Optional[float] = None
-    refractive_group: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -136,35 +133,25 @@ def _inter_eye_score(inp):
 
 
 def _elevation_finding(inp):
-    bfs_front, bfs_back, bfte_front, bfte_back = map(
-        _num, (inp.bfs_front_um, inp.bfs_back_um, inp.bfte_front_um, inp.bfte_back_um)
-    )
-    group = str(inp.refractive_group or "").upper()
-    high_reasons = []
-    if group == "MYOPIC_EMMETROPIC":
-        if bfs_front is not None and bfs_front >= 8:
-            high_reasons.append(f"BFS front {bfs_front:g} µm >= 8")
-        if bfs_back is not None and bfs_back >= 18:
-            high_reasons.append(f"BFS back {bfs_back:g} µm >= 18")
-    elif group == "HYPEROPIC_MIXED":
-        if bfs_front is not None and bfs_front >= 7:
-            high_reasons.append(f"BFS front {bfs_front:g} µm >= 7")
-        if bfs_back is not None and bfs_back >= 28:
-            high_reasons.append(f"BFS back {bfs_back:g} µm >= 28")
-    if bfte_front is not None and bfte_front > 12:
-        high_reasons.append(f"BFTE front {bfte_front:g} µm > 12")
-    if bfte_back is not None and bfte_back > 15:
-        high_reasons.append(f"BFTE back {bfte_back:g} µm > 15")
-    if high_reasons:
-        return PS3Finding("elevation", HIGH, "; ".join(high_reasons) + ".")
-    bfte_complete = None not in (bfte_front, bfte_back)
-    bfs_complete = group in {"MYOPIC_EMMETROPIC", "HYPEROPIC_MIXED"} and None not in (bfs_front, bfs_back)
-    if bfte_complete or bfs_complete:
+    """Use only canonical BAD Display F.Ele.Th/B.Ele.Th values."""
+    front = _num(inp.f_ele_th_um)
+    back = _num(inp.b_ele_th_um)
+    if front is None or back is None:
         return PS3Finding(
-            "elevation", NORMAL,
-            "Available elevation criteria are below PS3 high-risk thresholds.",
+            "elevation", NOT_EVALUATED,
+            "Canonical BAD F.Ele.Th and/or B.Ele.Th is unavailable.",
         )
-    return PS3Finding("elevation", NOT_EVALUATED, "Required PS3 elevation values are incomplete.")
+    reasons = []
+    if front > 12:
+        reasons.append(f"F.Ele.Th {front:g} µm > 12")
+    if back > 15:
+        reasons.append(f"B.Ele.Th {back:g} µm > 15")
+    if reasons:
+        return PS3Finding("elevation", HIGH, "; ".join(reasons) + ".")
+    return PS3Finding(
+        "elevation", NORMAL,
+        f"F.Ele.Th {front:g} µm <=12 and B.Ele.Th {back:g} µm <=15.",
+    )
 
 
 def _count(findings):
@@ -246,7 +233,6 @@ def evaluate_ps3(eye, inter_eye=None):
     inter_eye_score, inter_eye_finding = _inter_eye_score(inter_eye)
     findings.append(inter_eye_finding)
 
-    # SRAX is not requested when the already-evaluated PS3 findings irrevocably defer all procedures.
     moderate_before_srax, high_before_srax = _count(findings)
     srax_deg = _num(eye.srax_deg)
     if high_before_srax >= 1 or moderate_before_srax >= 2:
