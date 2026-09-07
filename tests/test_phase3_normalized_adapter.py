@@ -12,6 +12,7 @@ def _eye(name="OD"):
         "eye": name,
         "Kmean_D": 44.0,
         "K2_D": 44.5,
+        "central_pachy_um": 535.0,
         "pachy_thinnest_um": 530.0,
         "BAD_D": 1.2,
         "I_S": 0.4,
@@ -22,22 +23,23 @@ def _eye(name="OD"):
         "PPI_avg": 1.0,
         "posterior_Kmean_D": -6.0,
         "F_Ele_Th_um": 2.0,
-        "B_Ele_Th_um": 4.0,
-        "table_verified_numeric_fields": ["K2_D", "I_S"],
+        "B_Ele_Th_um": 10.0,
+        "table_verified_numeric_fields": ["K2_D", "I_S", "central_pachy_um", "B_Ele_Th_um"],
         "surgeon_verified_numeric_fields": [],
         "data_conflicts": [],
-        "nice_raw_k2_readings": [44.5],
+        # Legacy NICE-specific candidates deliberately disagree and must be ignored by this adapter.
+        "nice_raw_k2_readings": [47.5],
         "nice_candidates": [
             {
                 "eye": name,
-                "central_pachy_um": 535.0,
+                "central_pachy_um": 499.0,
                 "central_status": "CONFIDENT",
                 "central_landmark": "PUPIL_CENTER_PLUS",
-                "B_Ele_Th_um": 10.0,
+                "B_Ele_Th_um": 25.0,
                 "b_ele_th_status": "CONFIDENT",
                 "b_ele_th_landmark": "B_ELE_TH_LABELED_BOX",
                 "b_ele_th_page": "BAD_DISPLAY",
-                "evidence": "test",
+                "evidence": "legacy candidate that must not be consumed",
             }
         ],
     }
@@ -59,7 +61,7 @@ def _plan():
     }
 
 
-def test_adapter_maps_reconciled_production_values_to_linear_input():
+def test_adapter_maps_reconciled_canonical_values_to_linear_input():
     od = _eye("OD")
     os = _eye("OS")
     extracted = {"eyes": [od, os]}
@@ -84,6 +86,14 @@ def test_adapter_maps_reconciled_production_values_to_linear_input():
     assert inp.ps3_eye.anterior_km_d == 44.0
     assert inp.ps3_inter_eye.od_anterior_km_d == 44.0
     assert inp.ps3_inter_eye.os_anterior_km_d == 44.0
+
+
+def test_legacy_nice_specific_candidates_cannot_override_canonical_fields():
+    eye = _eye()
+    inp = build_clinical_core_input(eye, _plan(), age_years=30)
+    assert inp.nice_k2_d == 44.5
+    assert inp.nice_central_pachy_um == 535.0
+    assert inp.nice_b_ele_th_um == 10.0
 
 
 def test_plus_cylinder_is_normalized_once_before_core_input():
