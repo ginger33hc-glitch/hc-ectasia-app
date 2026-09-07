@@ -67,7 +67,31 @@ def test_case_runtime_evaluates_od_then_os_and_returns_json_safe_payload():
     assert all(eye["status"] == "PASS" for eye in result["eyes"])
     assert result["engine"] == "CERAI_CANONICAL_CLINICAL_CORE"
     assert result["version"] == "test"
+    assert set(result["policy_versions"]) == {"clinical", "source_registry", "srax"}
     json.dumps(result)
+
+
+def test_runtime_creates_one_renderer_neutral_report_payload_from_same_assessment():
+    result = evaluate_case(_case(), 35, {"OD": _plan(), "OS": _plan()}, software_version="v-test")
+    od = result["eyes"][0]
+    report = od["report_payload"]
+    assert report["eye"] == "OD"
+    assert report["status"] == od["status"] == "PASS"
+    assert report["randleman"]["total"] == od["score"]["total"]
+    assert report["nice"]["total"] == od["nice"]["total"]
+    assert report["bad"]["final_d"] == od["bad_summary"]["value"]
+    assert report["tissue_safety"]["LASIK_RSB_um"] == od["values"]["LASIK_RSB_um"]
+    assert report["versions"]["software"] == "v-test"
+    assert report["versions"]["clinical_policy"] == result["policy_versions"]["clinical"]
+    assert report["versions"]["source_registry"] == result["policy_versions"]["source_registry"]
+    assert report["versions"]["srax_algorithm"] == result["policy_versions"]["srax"]
+
+
+def test_surgeon_correction_is_labeled_in_canonical_report_payload():
+    od = _eye("OD", surgeon_corrections=[{"field": "I_S", "original": 0.9, "value": 0.0}])
+    result = evaluate_case(_case(od=od), 35, {"OD": _plan(), "OS": _plan()})
+    corrections = result["eyes"][0]["report_payload"]["manual_corrections"]
+    assert corrections == [{"field": "I_S", "original": 0.9, "value": 0.0, "label": "SURGEON_CONFIRMED"}]
 
 
 def test_abnormal_od_cannot_be_diluted_by_normal_os():
@@ -78,6 +102,7 @@ def test_abnormal_od_cannot_be_diluted_by_normal_os():
     assert by_eye["OS"]["status"] == "PASS"
     assert result["status"] == "STOP-DEFER"
     assert by_eye["OD"]["bad_summary"] == {"value": 2.6, "category": "ABNORMAL"}
+    assert by_eye["OD"]["report_payload"]["status"] == "STOP-DEFER"
 
 
 def test_missing_od_value_never_cross_fills_from_os():
@@ -100,6 +125,7 @@ def test_prior_refractive_surgery_never_enters_virgin_core():
     by_eye = {eye["eye"]: eye for eye in result["eyes"]}
     assert by_eye["OD"]["status"] == POST_REFRACTIVE
     assert by_eye["OD"]["canonical_result"] is None
+    assert by_eye["OD"]["report_payload"] is None
     assert by_eye["OS"]["status"] == "PASS"
     assert result["status"] == POST_REFRACTIVE
 
