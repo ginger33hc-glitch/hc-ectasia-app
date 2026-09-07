@@ -163,7 +163,10 @@ def test_erss_rsb_and_mrse_points_match_current_production_functions():
 
 
 def test_importing_pipeline_does_not_mutate_production_runtime():
-    before = (core.assess_eye, core.hc_engine, core.merge_extractions)
+    before_merge = core.merge_extractions
+    assert not hasattr(core, "assess_eye")
+    assert not hasattr(core, "hc_engine")
     import clinical_core.pipeline  # noqa: F401
-    after = (core.assess_eye, core.hc_engine, core.merge_extractions)
-    assert after == before
+    assert core.merge_extractions is before_merge
+    assert not hasattr(core, "assess_eye")
+    assert not hasattr(core, "hc_engine")
