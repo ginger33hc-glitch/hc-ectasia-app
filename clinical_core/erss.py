@@ -1,7 +1,8 @@
 """Pure Randleman/ERSS scoring for the CER-AI clinical core.
 
 This module contains no runtime mutation and no presentation or persistence
-behavior. Randleman returns structured rows plus one canonical disposition.
+behavior. Randleman returns structured rows, explicit missing dependencies, and
+one canonical disposition.
 """
 from __future__ import annotations
 
@@ -14,9 +15,11 @@ from .rules import (
     ASYMMETRIC_BOWTIE,
     INFERIOR_STEEPENING_SRA,
     NORMAL_SYMMETRIC,
+    UNCERTAIN,
     erss_age_points,
     erss_pachymetry_points,
     erss_topography_category,
+    signed_i_s_category,
 )
 
 
@@ -63,6 +66,17 @@ def erss_topography_points(category: str) -> Optional[int]:
     }.get(category)
 
 
+def _topography_missing(i_s_d, derived_srax_deg) -> list[str]:
+    if signed_i_s_category(i_s_d) == UNCERTAIN:
+        return ["I_S"]
+    i_s_category = signed_i_s_category(i_s_d)
+    if i_s_category in {INFERIOR_STEEPENING_SRA, ABNORMAL_ECTATIC}:
+        return []
+    if not _finite(derived_srax_deg):
+        return ["SRAX"]
+    return []
+
+
 def erss_total(age_years, thinnest_um, i_s_d, derived_srax_deg, rsb_um, manifest_mrse_d):
     category = erss_topography_category(i_s_d, derived_srax_deg)
     rows = {
@@ -72,8 +86,18 @@ def erss_total(age_years, thinnest_um, i_s_d, derived_srax_deg, rsb_um, manifest
         "pachymetry": erss_pachymetry_points(thinnest_um),
         "MRSE": erss_mrse_points(manifest_mrse_d),
     }
-    total = None if any(value is None for value in rows.values()) else int(sum(rows.values()))
-    return {"category": category, "rows": rows, "total": total}
+    missing = _topography_missing(i_s_d, derived_srax_deg)
+    if rows["RSB"] is None:
+        missing.append("RSB")
+    if rows["age"] is None:
+        missing.append("age")
+    if rows["pachymetry"] is None:
+        missing.append("pachymetry")
+    if rows["MRSE"] is None:
+        missing.append("MRSE")
+    missing = list(dict.fromkeys(missing))
+    total = None if missing else int(sum(rows.values()))
+    return {"category": category, "rows": rows, "total": total, "missing": missing}
 
 
 def erss_disposition(total) -> str:
