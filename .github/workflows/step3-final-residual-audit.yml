@@ -1,0 +1,28 @@
+name: Step 3 final residual audit
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: monday-clean-architecture
+          fetch-depth: 0
+      - name: Audit obsolete derivation and compatibility paths
+        shell: bash
+        run: |
+          echo '=== reverse / derived SRAX and KISA ==='
+          grep -RInE 'reverse.?srax|retrograde.?srax|kisa.*srax|srax.*kisa|derive.?srax|derived.?srax' --include='*.py' . || true
+          echo '=== visual morphology/pattern decision paths ==='
+          grep -RInE 'morphology_rank|posterior_rank|anterior_pattern|posterior_pattern|inferior_opposite_steepening_D|topography_classification' --include='*.py' . || true
+          echo '=== reconciliation / first-wins / conservative conflict paths ==='
+          grep -RInE 'first value retained|conservative limiting value retained|more concerning visible category retained|numeric_tolerance|safety-limiting' --include='*.py' . || true
+          echo '=== legacy elevation / fallback / side-channel ==='
+          grep -RInE 'anterior_elevation_thinnest_um|posterior_elevation_thinnest_um|map_fallback_numeric_fields|nice_readings|BFS|BFTE' --include='*.py' . || true
+          echo '=== duplicate scorer names ==='
+          grep -RInE 'def (bad_classification|lasik_topography_points|scoring_morphology|hc_engine|assess_eye|required_tomography_missing)\b' --include='*.py' . || true
