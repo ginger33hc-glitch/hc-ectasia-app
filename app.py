@@ -182,20 +182,8 @@ SCHEMA = {
                     "Kmean_D": {"type": ["number", "null"]},
                     "total_RMS_um": {"type": ["number", "null"]},
                     "spherical_aberration_um": {"type": ["number", "null"]},
-                    "morphology": {"type": "string", "enum": list(MORPHOLOGY)},
-                    "morphology_evidence": {"type": "array", "items": {"type": "string"}},
-                    "asymmetric_bow_tie": {"type": "string", "enum": ["YES", "NO", "UNCERTAIN"]},
                     "srax": {"type": "string", "enum": ["YES", "NO", "UNCERTAIN"]},
                     "srax_deg": {"type": ["number", "null"]},
-                    "inferior_opposite_steepening_D": {"type": ["number", "null"]},
-                    "anterior_pattern": {
-                        "type": "string",
-                        "enum": ["REASSURING", "BORDERLINE", "ABNORMAL", "UNREADABLE"],
-                    },
-                    "posterior_pattern": {
-                        "type": "string",
-                        "enum": ["REASSURING", "BORDERLINE", "ABNORMAL", "UNREADABLE"],
-                    },
                 },
                 "required": [
                     "eye", "screen_types", "quality", "missing_or_unreadable",
@@ -209,10 +197,7 @@ SCHEMA = {
                     "total_RMS_um", "spherical_aberration_um",
                     "central_pachy_um", "B_Ele_Th_um", "F_Ele_Th_um", "posterior_Kmean_D",
                     "topographic_astig_D", "topographic_steep_axis_deg", "topometric_RMin", "TKC",
-                    "morphology",
-                    "morphology_evidence", "asymmetric_bow_tie", "srax", "srax_deg",
-                    "inferior_opposite_steepening_D",
-                    "anterior_pattern", "posterior_pattern",
+                    "srax", "srax_deg",
                 ],
             },
         },
@@ -393,9 +378,7 @@ Do not visually estimate SRAX, return a numeric srax_deg from map appearance, or
 KISA, Kmax, I-S, astigmatism tables, K1/K2/global Axis, BAD values, elevation, pachymetry, or any surrogate.
 For every image handled by this model, return srax=UNCERTAIN and srax_deg=null. The deterministic
 geometry layer may replace those values only when the correct Front map and both hemimeridian axes
-are resolved with adequate confidence. General morphology outputs remain morphology=UNCERTAIN,
-morphology_evidence=[], asymmetric_bow_tie=UNCERTAIN, and inferior_opposite_steepening_D=null.
-Anterior/posterior tomography pattern fields remain separate non-ERSS review inputs.
+are resolved with adequate confidence. Anterior/posterior tomography pattern fields remain separate non-ERSS review inputs.
 
 BELIN/AMBROSIO BAD DISPLAY SOURCE LOCK:
 BAD_D, Df, Db, Dp, Dt, and Da may be transcribed ONLY from the explicitly labeled bottom BAD-D
@@ -611,14 +594,9 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         "PPI_avg": "max", "PPI_min": "max", "ISV": "max", "IVA": "max",
         "KI": "max", "CKI": "max", "IHD": "max", "I_S": "max", "KISA": "max",
         "IHA": "max", "Rmin_mm": "min", "RMS_HOA_um": "max", "vertical_coma_um": "max",
-        "srax_deg": "max", "inferior_opposite_steepening_D": "max",
-    }
-    morphology_rank = {
-        "UNCERTAIN": 0, "NORMAL_SYMMETRIC": 1, "ASYMMETRIC_BOWTIE": 2,
-        "INFERIOR_STEEPENING_SRA": 3, "ABNORMAL_ECTATIC": 4,
+        "srax_deg": "max",
     }
     quality_rank = {"INADEQUATE": 0, "LIMITED": 1, "ADEQUATE": 2}
-    posterior_rank = {"UNREADABLE": 0, "REASSURING": 1, "BORDERLINE": 2, "ABNORMAL": 3}
     # Descriptive values that do not drive a CER-AI decision must never become unresolved conflicts
     # that prohibit PASS. Canonical numeric disagreements are never tolerance-reconciled.
     non_decision_conflict_fields = {
@@ -736,9 +714,6 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                         eye["field_provenance"][field] = targeted or [
                             {"file": source_filename, "source": source}
                         ]
-                for field in ("morphology", "anterior_pattern", "posterior_pattern", "asymmetric_bow_tie", "srax"):
-                    if eye.get(field) is not None:
-                        eye["field_provenance"][field] = [{"file": source_filename, "source": "VISUAL_CLASSIFICATION"}]
             if eye_id not in by_eye:
                 by_eye[eye_id] = dict(eye)
                 continue
@@ -767,9 +742,6 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 target["keratometry_source"] = CORNEA_FRONT_KERATOMETRY_SOURCE
             elif not target.get("keratometry_source"):
                 target["keratometry_source"] = eye.get("keratometry_source")
-            target["morphology_evidence"] = list(
-                dict.fromkeys(target.get("morphology_evidence", []) + eye.get("morphology_evidence", []))
-            )
             target.setdefault("targeted_reread_evidence", {})
             for field, records in (eye.get("targeted_reread_evidence") or {}).items():
                 combined = target["targeted_reread_evidence"].setdefault(field, []) + list(records or [])
@@ -805,7 +777,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     "eye", "screen_types", "quality", "missing_or_unreadable",
                     "table_verified_numeric_fields",
                     "keratometry_source",
-                    "morphology_evidence", "source_files", "quality_by_source", "_source_filename",
+                    "source_files", "quality_by_source", "_source_filename",
                     "_pentacam_qs", "pentacam_qs", "scoring_morphology", "field_provenance",
                     "planning_data_issues", "targeted_reread_evidence",
                     "canonical_source_ids", "targeted_unreadable_regions",
@@ -825,33 +797,6 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     continue
                 if value is None or old == value:
                     continue
-
-                # Missing/uncertain information on a page that lacks the relevant map is not
-                # contradictory evidence against a readable observation on another page.
-                if key == "morphology":
-                    if old == "UNCERTAIN" and value != "UNCERTAIN":
-                        target[key] = value
-                        continue
-                    if value == "UNCERTAIN":
-                        continue
-                elif key in ("anterior_pattern", "posterior_pattern"):
-                    if old == "UNREADABLE" and value != "UNREADABLE":
-                        target[key] = value
-                        continue
-                    if value == "UNREADABLE":
-                        continue
-                elif key in ("asymmetric_bow_tie", "srax"):
-                    if old == "UNCERTAIN" and value != "UNCERTAIN":
-                        target[key] = value
-                        continue
-                    if value == "UNCERTAIN":
-                        continue
-
-                if key in LOCKED_FIELDS:
-                    target["data_conflicts"].append(f"{key}: {old} vs {value}")
-                    target[key] = None
-                    continue
-
                 if key in planning_conflict_fields:
                     target[key] = None
                     target.setdefault("planning_data_issues", []).append(
@@ -868,22 +813,6 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     merged["global_warnings"].append(
                         f"Conflicting {key} values for {eye_id}; conservative limiting value retained."
                     )
-                elif key == "morphology":
-                    target[key] = max((old, value), key=lambda item: morphology_rank.get(item, 0))
-                    merged["global_warnings"].append(
-                        f"Conflicting morphology classifications for {eye_id}; more concerning visible category retained."
-                    )
-                elif key == "posterior_pattern":
-                    target[key] = max((old, value), key=lambda item: posterior_rank.get(item, 0))
-                elif key == "anterior_pattern":
-                    target[key] = max((old, value), key=lambda item: posterior_rank.get(item, 0))
-                elif key in ("asymmetric_bow_tie", "srax"):
-                    if "YES" in (old, value):
-                        target[key] = "YES"
-                    elif "UNCERTAIN" in (old, value):
-                        target[key] = "UNCERTAIN"
-                    else:
-                        target[key] = "NO"
                 elif old != value:
                     merged["global_warnings"].append(
                         f"Conflicting {key} values for {eye_id}: {old} vs {value}; first value retained."

@@ -226,12 +226,6 @@ def enrich_extraction(result: dict[str, Any], raw: bytes, filename: str) -> dict
 
     eye["srax"] = measurement["srax"]
     eye["srax_deg"] = measurement["srax_deg"]
-    eye.setdefault("morphology_evidence", []).append(
-        "Deterministic Front-map SRAX geometry "
-        f"({ALGORITHM_VERSION}): superior axis {measurement['superior_axis_deg']:.1f}°, "
-        f"inferior axis {measurement['inferior_axis_deg']:.1f}°, "
-        f"SRAX {measurement['srax_deg']:.1f}°; strict >20° criterion."
-    )
     provenance = eye.setdefault("field_provenance", {})
     provenance["srax"] = [
         {"source": "AXIAL_SAGITTAL_CURVATURE_FRONT_GEOMETRIC", "file": filename}

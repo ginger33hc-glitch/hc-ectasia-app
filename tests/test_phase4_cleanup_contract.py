@@ -61,6 +61,8 @@ def test_app_no_longer_defines_or_calls_legacy_clinical_engine():
     assert "MAP_FALLBACK_NUMERIC_FIELDS" not in text
     assert "map_fallback_numeric_fields" not in text
     assert "numeric_tolerance" not in text
+    for retired in ("morphology_rank", "posterior_rank", "inferior_opposite_steepening_D", "anterior_pattern", "posterior_pattern", "asymmetric_bow_tie", "morphology_evidence"):
+        assert retired not in text
     assert "EXCLUSIVE_LABELED_BOX_FIELDS" not in text
     retired_helpers = {
         "bad_classification", "lasik_topography_points", "scoring_morphology",
