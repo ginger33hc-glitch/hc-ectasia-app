@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import asdict, is_dataclass
 from typing import Any, Mapping
 
+from canonical_input_adapter import build_clinical_core_input
 from clinical_core.disposition import (
     ASSESSMENT_INCOMPLETE,
     CAUTION,
@@ -23,7 +24,6 @@ from clinical_core.disposition import (
     finalize_disposition,
 )
 from clinical_core.pipeline import evaluate_normalized_case
-from phase3_normalized_adapter import build_clinical_core_input
 
 POST_REFRACTIVE = "POST-REFRACTIVE PATHWAY REQUIRED"
 SUPPORTED_PROCEDURES = frozenset({"LASIK", "PRK", "SMILE"})
