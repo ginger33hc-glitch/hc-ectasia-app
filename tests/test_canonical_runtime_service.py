@@ -46,6 +46,24 @@ def _plan(procedure="LASIK", **overrides):
         "intended_entered_sphere_D": -2.0,
         "intended_cylinder_signed_D": -1.0,
         "intended_axis_deg": 90.0,
+        "stable": "yes",
+        "progression": "no",
+        "cdva_below_20_20": "no",
+    }
+    values.update(overrides)
+    return values
+
+
+def _modifiers(**overrides):
+    values = {
+        "eye_rubbing": "no",
+        "family_history": "no",
+        "inter_eye_asymmetry": "no",
+        "pregnancy_nursing": "no",
+        "collagen_tissue_disease": "no",
+        "drug_usage": "no",
+        "dry_eye": "no",
+        "systemic_disease": "no",
     }
     values.update(overrides)
     return values
@@ -55,13 +73,18 @@ def _case(od=None, os=None):
     return {"eyes": [od or _eye("OD"), os or _eye("OS")]}
 
 
-def test_case_runtime_evaluates_od_then_os_and_returns_json_safe_payload():
-    result = evaluate_case(
-        _case(),
+def _evaluate(extracted=None, plans=None, modifiers=None, **kwargs):
+    return evaluate_case(
+        extracted or _case(),
         35,
-        {"OD": _plan(), "OS": _plan()},
-        software_version="test",
+        plans or {"OD": _plan(), "OS": _plan()},
+        modifiers or _modifiers(),
+        **kwargs,
     )
+
+
+def test_case_runtime_evaluates_od_then_os_and_returns_json_safe_payload():
+    result = _evaluate(software_version="test")
     assert [eye["eye"] for eye in result["eyes"]] == ["OD", "OS"]
     assert result["status"] == "PASS"
     assert all(eye["status"] == "PASS" for eye in result["eyes"])
@@ -72,7 +95,7 @@ def test_case_runtime_evaluates_od_then_os_and_returns_json_safe_payload():
 
 
 def test_runtime_creates_one_renderer_neutral_report_payload_from_same_assessment():
-    result = evaluate_case(_case(), 35, {"OD": _plan(), "OS": _plan()}, software_version="v-test")
+    result = _evaluate(software_version="v-test")
     od = result["eyes"][0]
     report = od["report_payload"]
     assert report["eye"] == "OD"
@@ -89,14 +112,14 @@ def test_runtime_creates_one_renderer_neutral_report_payload_from_same_assessmen
 
 def test_surgeon_correction_is_labeled_in_canonical_report_payload():
     od = _eye("OD", surgeon_corrections=[{"field": "I_S", "original": 0.9, "value": 0.0}])
-    result = evaluate_case(_case(od=od), 35, {"OD": _plan(), "OS": _plan()})
+    result = _evaluate(extracted=_case(od=od))
     corrections = result["eyes"][0]["report_payload"]["manual_corrections"]
     assert corrections == [{"field": "I_S", "original": 0.9, "value": 0.0, "label": "SURGEON_CONFIRMED"}]
 
 
 def test_abnormal_od_cannot_be_diluted_by_normal_os():
     od = _eye("OD", BAD_D=2.6)
-    result = evaluate_case(_case(od=od), 35, {"OD": _plan(), "OS": _plan()})
+    result = _evaluate(extracted=_case(od=od))
     by_eye = {eye["eye"]: eye for eye in result["eyes"]}
     assert by_eye["OD"]["status"] == "STOP-DEFER"
     assert by_eye["OS"]["status"] == "PASS"
@@ -108,7 +131,7 @@ def test_abnormal_od_cannot_be_diluted_by_normal_os():
 def test_missing_od_value_never_cross_fills_from_os():
     od = _eye("OD", I_S=None)
     os = _eye("OS", I_S=0.0)
-    result = evaluate_case(_case(od=od, os=os), 35, {"OD": _plan(), "OS": _plan()})
+    result = _evaluate(extracted=_case(od=od, os=os))
     by_eye = {eye["eye"]: eye for eye in result["eyes"]}
     assert by_eye["OD"]["status"] == "ASSESSMENT INCOMPLETE"
     assert "Randleman: topography" in by_eye["OD"]["missing"]
@@ -117,11 +140,7 @@ def test_missing_od_value_never_cross_fills_from_os():
 
 
 def test_prior_refractive_surgery_never_enters_virgin_core():
-    result = evaluate_case(
-        _case(),
-        35,
-        {"OD": _plan(prior="PRK"), "OS": _plan()},
-    )
+    result = _evaluate(plans={"OD": _plan(prior="PRK"), "OS": _plan()})
     by_eye = {eye["eye"]: eye for eye in result["eyes"]}
     assert by_eye["OD"]["status"] == POST_REFRACTIVE
     assert by_eye["OD"]["canonical_result"] is None
@@ -131,10 +150,58 @@ def test_prior_refractive_surgery_never_enters_virgin_core():
 
 
 def test_unsupported_procedure_is_incomplete_not_pass():
-    result = evaluate_case(_case(), 35, {"OD": _plan(procedure="OTHER"), "OS": _plan()})
+    result = _evaluate(plans={"OD": _plan(procedure="OTHER"), "OS": _plan()})
     by_eye = {eye["eye"]: eye for eye in result["eyes"]}
     assert by_eye["OD"]["status"] == "ASSESSMENT INCOMPLETE"
     assert by_eye["OD"]["missing"] == ["procedure"]
+
+
+def test_eligibility_stop_enters_same_eye_final_disposition():
+    result = _evaluate(plans={"OD": _plan(stable="no"), "OS": _plan()})
+    by_eye = {eye["eye"]: eye for eye in result["eyes"]}
+    assert by_eye["OD"]["status"] == "STOP-DEFER"
+    assert by_eye["OS"]["status"] == "PASS"
+    assert any("Refractive instability" in reason for reason in by_eye["OD"]["reasons"])
+
+
+def test_eligibility_cautions_do_not_auto_stop():
+    result = _evaluate(
+        plans={"OD": _plan(cdva_below_20_20="yes"), "OS": _plan()},
+        modifiers=_modifiers(dry_eye="yes"),
+    )
+    by_eye = {eye["eye"]: eye for eye in result["eyes"]}
+    assert by_eye["OD"]["status"] == "CAUTION"
+    assert by_eye["OS"]["status"] == "CAUTION"
+    assert result["status"] == "CAUTION"
+
+
+def test_missing_eligibility_documentation_is_explicitly_incomplete():
+    result = _evaluate(modifiers=_modifiers(dry_eye="unknown"))
+    assert result["status"] == "ASSESSMENT INCOMPLETE"
+    assert all("Clinical eligibility: dry_eye" in eye["missing"] for eye in result["eyes"])
+
+
+def test_eye_rubbing_and_family_history_remain_notes_only():
+    result = _evaluate(modifiers=_modifiers(eye_rubbing="yes", family_history="yes"))
+    assert result["status"] == "PASS"
+    assert all(len(eye["clinical_modifiers"]) == 2 for eye in result["eyes"])
+
+
+def test_missing_safety_dependency_is_exposed_in_runtime_missing_list():
+    plans = {"OD": _plan(intended_cylinder_signed_D=None), "OS": _plan()}
+    result = _evaluate(plans=plans)
+    od = result["eyes"][0]
+    assert od["status"] == "ASSESSMENT INCOMPLETE"
+    assert "Safety: intended_cylinder_d" in od["missing"]
+
+
+def test_patient_modifiers_are_required_not_silently_assumed_reassuring():
+    try:
+        evaluate_case(_case(), 35, {"OD": _plan(), "OS": _plan()}, None)
+    except TypeError as exc:
+        assert "patient_modifiers" in str(exc)
+    else:
+        raise AssertionError("Missing patient modifiers must not be treated as reassuring")
 
 
 def test_runtime_service_contains_no_installer_or_clinical_threshold_table():
