@@ -1,13 +1,14 @@
-"""Pure Randleman/ERSS scoring for the CER-AI launch contract.
+"""Pure Randleman/ERSS scoring for the CER-AI clinical core.
 
 This module contains no runtime mutation and no presentation or persistence
-behavior.  It is intentionally limited to the frozen LASIK ERSS pathway.
+behavior. Randleman returns structured rows plus one canonical disposition.
 """
 from __future__ import annotations
 
 from math import isfinite
 from typing import Optional
 
+from .disposition import ASSESSMENT_INCOMPLETE, CAUTION, PASS, STOP_DEFER
 from .rules import (
     ABNORMAL_ECTATIC,
     ASYMMETRIC_BOWTIE,
@@ -71,18 +72,15 @@ def erss_total(age_years, thinnest_um, i_s_d, derived_srax_deg, rsb_um, manifest
         "pachymetry": erss_pachymetry_points(thinnest_um),
         "MRSE": erss_mrse_points(manifest_mrse_d),
     }
-    if any(value is None for value in rows.values()):
-        total = None
-    else:
-        total = int(sum(rows.values()))
+    total = None if any(value is None for value in rows.values()) else int(sum(rows.values()))
     return {"category": category, "rows": rows, "total": total}
 
 
 def erss_disposition(total) -> str:
     if total is None:
-        return "DATA INSUFFICIENT"
+        return ASSESSMENT_INCOMPLETE
     if total >= 4:
-        return "STOP-DEFER"
+        return STOP_DEFER
     if total == 3:
-        return "CAUTION"
-    return "PASS"
+        return CAUTION
+    return PASS
