@@ -1,7 +1,7 @@
 """Safety locks for PHI-free Phase 3 shadow diagnostics."""
 
 from clinical_core.pipeline import ClinicalCoreInput, evaluate_normalized_case
-from ps3_policy import PS3EyeInput
+from clinical_core.ps3 import PS3EyeInput, PS3InterEyeInput
 import phase3_shadow_diagnostics as diagnostics
 
 
@@ -21,11 +21,40 @@ def _normalized():
         nice_k2_d=44.0,
         nice_central_pachy_um=540,
         nice_b_ele_th_um=10.0,
-        ps3_eye=PS3EyeInput(anterior_km_d=44.0, thinnest_um=540),
+        ps3_eye=PS3EyeInput(
+            anterior_km_d=44.0,
+            thinnest_um=540,
+            topographic_astig_d=1.0,
+            topographic_steep_axis_deg=90.0,
+            manifest_astig_d=1.0,
+            manifest_axis_deg=90.0,
+            ppi_avg=1.0,
+            f_ele_th_um=10.0,
+            b_ele_th_um=10.0,
+            srax="NO",
+            srax_deg=0.0,
+        ),
+        ps3_inter_eye=PS3InterEyeInput(
+            od_anterior_km_d=44.0,
+            os_anterior_km_d=44.1,
+            od_posterior_km_d=-6.0,
+            os_posterior_km_d=-6.05,
+            od_thinnest_um=540.0,
+            os_thinnest_um=545.0,
+            od_front_elevation_thinnest_um=2.0,
+            os_front_elevation_thinnest_um=3.0,
+            od_back_elevation_thinnest_um=5.0,
+            os_back_elevation_thinnest_um=8.0,
+        ),
     )
 
 
 def _production_from_linear(linear):
+    ps3_selected = {
+        "PASS": "ALLOWED",
+        "STOP-DEFER": "DEFER",
+        "ASSESSMENT INCOMPLETE": "INCOMPLETE",
+    }[linear["ps3_status"]]
     return {
         "status": linear["status"],
         "score": {"total": linear["erss"]["total"]},
@@ -33,7 +62,7 @@ def _production_from_linear(linear):
         "nice": {"total": linear["nice"]["total"]},
         "ps3": {
             "disposition": {
-                "lasik": "ALLOWED" if linear["ps3_status"] == "PASS" else "DEFER",
+                "lasik": ps3_selected,
                 "prk": "ALLOWED",
                 "smile": "ALLOWED",
             }
@@ -43,7 +72,6 @@ def _production_from_linear(linear):
             "LASIK_PTA_percent": linear["procedural_safety"]["LASIK_PTA_percent"],
             "estimated_final_Kmean_D": linear["procedural_safety"]["estimated_final_Kmean_D"],
         },
-        # Deliberate identifying/clinical-looking fields must never enter snapshot.
         "patient_name": "SHOULD_NOT_BE_STORED",
         "clinical_secret": 12345.678,
     }
