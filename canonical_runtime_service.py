@@ -73,14 +73,20 @@ def _decision_reasons(core_result: Mapping[str, Any]) -> list[str]:
 
 def _missing(core_result: Mapping[str, Any], eligibility_missing=()) -> list[str]:
     missing = []
+    final = core_result.get("final_disposition")
+    irrevocable_stop = getattr(final, "status", None) == STOP_DEFER
     erss = core_result.get("erss") or {}
     for key in erss.get("missing") or []:
+        if irrevocable_stop and key == "SRAX":
+            continue
         missing.append(f"Randleman: {key}")
     for field in (core_result.get("nice") or {}).get("missing") or []:
         missing.append(f"NICE: {field}")
     ps3 = core_result.get("ps3")
     if ps3 is not None:
         for key in getattr(ps3, "missing_keys", ()):
+            if irrevocable_stop and key == "srax":
+                continue
             missing.append(f"PS3: {key}")
     for key in (core_result.get("procedural_safety") or {}).get("missing") or []:
         missing.append(f"Safety: {key}")

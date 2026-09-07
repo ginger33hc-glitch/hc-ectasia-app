@@ -142,6 +142,7 @@ def _request(eye, message, extracted):
         "nice: k2_d": "K2_D",
         "nice: central_pachy_um": "central_pachy_um",
         "nice: b_ele_th_um": "B_Ele_Th_um",
+        "ps3: ppi_average": "PPI_avg",
         "randleman: pachymetry": "pachy_thinnest_um",
         "safety: thinnest_um": "pachy_thinnest_um",
         "safety: preop_kmean_d": "Kmean_D",

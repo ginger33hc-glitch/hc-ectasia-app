@@ -30,7 +30,6 @@ COMPLETION_NUMERIC_FIELDS = {
     "ARTmax_um": "ARTmax (µm)", "PPI_min": "PPI minimum", "PPI_avg": "PPI average", "PPI_max": "PPI maximum",
     "K1_D": "K1 (D)", "K2_D": "K2 (D; not Kmax)", "Kmean_D": "Preoperative Kmean (D)",
     "Kmax_D": "Kmax (D)", "srax_deg": "SRAX (degrees)",
-    "inferior_opposite_steepening_D": "Inferior-opposite steepening (D)",
     "Rmin_mm": "Cornea Back Rmin (mm)", "topometric_RMin": "Topometric RMin (8 mm indices)",
     "I_S": "Signed I-S (D; not ISV/IVA)", "TKC": "TKC (Show 2 Exams center indices)",
     "topographic_astig_D": "Topographic Astig. (D; Cornea Front)",
