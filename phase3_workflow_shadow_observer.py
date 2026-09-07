@@ -1,21 +1,20 @@
 """Temporary Phase 3 observer for completed CER-AI assessments.
 
 This module runs non-authoritative linear-pipeline diagnostics only after the
-legacy readiness workflow has produced a READY response.  It returns the exact
+legacy readiness workflow has produced a READY response. It returns the exact
 legacy response object and never writes shadow data into the response, report
 snapshot, archive, audit record, or patient metadata.
 
-The observer is intentionally isolated and removable.  It exists only during
-the guarded Phase 3 cutover period.
+The observer is intentionally isolated and removable. It exists only during the
+guarded migration period and is not part of the target production architecture.
 """
 from __future__ import annotations
 
 from typing import Any
 
 import assessment_workflow
-from phase3_normalized_adapter import build_clinical_core_input
+from canonical_input_adapter import build_clinical_core_input
 from phase3_shadow_diagnostics import observe_shadow_parity
-
 
 _previous_respond = None
 
@@ -67,7 +66,6 @@ def _observe_ready_response(response: Any, *, age, plans) -> None:
 
 
 def respond_with_phase3_shadow_observer(core, token, session, age, plans, modifiers, metadata, overrides):
-    """Return the legacy workflow response unchanged, then observe parity."""
     if _previous_respond is None:
         raise RuntimeError("Phase 3 workflow shadow observer was not initialized")
 
@@ -75,8 +73,7 @@ def respond_with_phase3_shadow_observer(core, token, session, age, plans, modifi
     try:
         _observe_ready_response(response, age=age, plans=plans)
     except Exception:
-        # Shadow diagnostics are explicitly non-authoritative.  No observer
-        # failure may alter or block a clinical response during Phase 3.
+        # Temporary diagnostics are non-authoritative by design.
         pass
     return response
 
