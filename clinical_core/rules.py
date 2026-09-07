@@ -68,15 +68,19 @@ def erss_topography_category(i_s_d, derived_srax_deg=None) -> str:
 
     I-S is mandatory and evaluated first. If I-S already gives inferior
     steepening (3 points) or abnormal/ectatic topography (4 points), SRAX is not
-    needed and is not consulted. Only when I-S is <= +1.00 D may SRAX increase
-    the category to inferior-steepening/SRA. SRAX is positive only when >20.0°;
-    exactly 20.0° is negative. I-S and SRAX are never added.
+    needed and is not consulted. When I-S is <= +1.00 D, SRAX must be known
+    because a value >20.0° escalates the same single topography row to the
+    inferior-steepening/SRA category. Missing SRAX is therefore UNCERTAIN, not
+    silently equivalent to a negative SRAX finding. Exact 20.0° is negative.
+    I-S and SRAX are never added.
     """
     i_s_category = signed_i_s_category(i_s_d)
     if i_s_category == UNCERTAIN:
         return UNCERTAIN
     if i_s_category in {INFERIOR_STEEPENING_SRA, ABNORMAL_ECTATIC}:
         return i_s_category
-    if _finite(derived_srax_deg) and float(derived_srax_deg) > 20.0:
+    if not _finite(derived_srax_deg):
+        return UNCERTAIN
+    if float(derived_srax_deg) > 20.0:
         return INFERIOR_STEEPENING_SRA
     return i_s_category
