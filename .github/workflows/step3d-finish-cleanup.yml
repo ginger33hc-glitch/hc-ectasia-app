@@ -1,4 +1,4 @@
-# trigger
+# trigger: retry after whitespace cleanup
 name: Step 3D finish cleanup
 on:
   pull_request:
@@ -22,7 +22,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          import ast,re
+          import ast
           p=Path('app.py')
           t=p.read_text()
           block='''MORPHOLOGY = (\n    "NORMAL_SYMMETRIC",\n    "ASYMMETRIC_BOWTIE",\n    "INFERIOR_STEEPENING_SRA",\n    "ABNORMAL_ECTATIC",\n    "UNCERTAIN",\n)\n'''
@@ -33,6 +33,7 @@ jobs:
           if sentence not in t:
               raise SystemExit('obsolete pattern prompt sentence not found')
           t=t.replace(sentence,'',1)
+          t='\n'.join(line.rstrip() for line in t.splitlines())+'\n'
           ast.parse(t)
           p.write_text(t)
           PY
