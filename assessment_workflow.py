@@ -1,16 +1,20 @@
-"""Server-authoritative readiness and resumable completion, outside the scoring engines.
+"""Server-authoritative CER-AI assessment workflow.
 
-Only canonical missing-data results decide readiness; no duplicated clinical score table.
-Opaque random tokens reference bounded, expiring in-memory snapshots. They are never put in URLs.
-Process restart/expiry requires a new upload, never trusts a client-supplied report as evidence.
+This module owns transport/session/readiness/completion only. Clinical scoring is
+performed exactly once by ``canonical_runtime_service.evaluate_case``. No clinical
+threshold, score formula, or downstream disposition correction belongs here.
 """
 from copy import deepcopy
+from math import isfinite
 from threading import RLock
 from time import monotonic
+import re
 import secrets
 
-from fastapi import HTTPException, Body, Response
-from nice_scoring import finite
+from fastapi import Body, HTTPException, Response
+
+from canonical_readiness import evaluate_precore_readiness
+from canonical_runtime_service import evaluate_case
 from pentacam_field_registry import COMPLETION_NUMERIC_FIELDS
 from pentacam_quality_policy import is_quality_only_issue
 from pentacam_source_regions import region_hints
@@ -21,14 +25,15 @@ TTL_SECONDS = 3600
 MAX_SESSIONS = 64
 
 NUMERIC_FIELDS = COMPLETION_NUMERIC_FIELDS
-PATTERNS = {"anterior_pattern": ["REASSURING", "BORDERLINE", "ABNORMAL"],
-            "posterior_pattern": ["REASSURING", "BORDERLINE", "ABNORMAL"]}
+SELECT_FIELDS = {"srax": ("YES", "NO")}
 
-SOFT_CONTACT_LENS_WASHOUT_DAYS = 10
-RIGID_CONTACT_LENS_WASHOUT_DAYS = 21
-_LEGACY_SOFT_CONTACT_LENS_MESSAGE = (
-    "source-study imaging criterion: soft contact lens discontinued for at least 14 days"
-)
+
+def _finite(value):
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and isfinite(float(value))
+    )
 
 
 def _prune():
@@ -41,111 +46,30 @@ def _prune():
 def _session(token):
     _prune()
     if not isinstance(token, str) or token not in _sessions:
-        raise HTTPException(410, "Assessment session expired or restarted. Upload the images again; entered form values can be retained.")
+        raise HTTPException(
+            410,
+            "Assessment session expired or restarted. Upload the images again; entered form values can be retained.",
+        )
     return _sessions[token]
 
 
-def _contact_lens_washout(modifiers):
-    """Return a blocking readiness result before any clinical score is computed."""
-    lens_type = str((modifiers or {}).get("contact_lens_type") or "UNKNOWN").upper()
-    days = (modifiers or {}).get("contact_lens_discontinuation_days")
-    if lens_type == "NONE":
-        return None
-    if lens_type not in {"SOFT", "RIGID"}:
-        return {
-            "type": lens_type,
-            "days": days,
-            "required_days": None,
-            "message": "Contact-lens type must be documented before CER-AI can proceed.",
-            "form_id": "contact_lens_type",
-        }
-    required = SOFT_CONTACT_LENS_WASHOUT_DAYS if lens_type == "SOFT" else RIGID_CONTACT_LENS_WASHOUT_DAYS
-    if not finite(days) or isinstance(days, bool) or int(days) != days:
-        return {
-            "type": lens_type,
-            "days": days,
-            "required_days": required,
-            "message": f"Document the number of full days {lens_type.lower()} contact lenses were discontinued before Pentacam. Required washout: at least {required} days.",
-            "form_id": "contact_lens_days",
-        }
-    days = int(days)
-    if days < required:
-        remaining = required - days
-        lens_name = "soft contact lenses" if lens_type == "SOFT" else "rigid / RGP contact lenses"
-        return {
-            "type": lens_type,
-            "days": days,
-            "required_days": required,
-            "remaining_days": remaining,
-            "message": (
-                f"Do not proceed with CER-AI assessment. The patient used {lens_name} and stopped only {days} day(s) before Pentacam. "
-                f"Wait until at least {required} full days off lenses have elapsed, then repeat Pentacam and reassess."
-            ),
-            "form_id": "contact_lens_days",
-        }
-    return None
-
-
-def _remove_superseded_contact_lens_missing(decision, modifiers):
-    """The readiness gate supersedes the legacy 14-day soft-lens criterion in app.py."""
-    lens_type = str((modifiers or {}).get("contact_lens_type") or "UNKNOWN").upper()
-    days = (modifiers or {}).get("contact_lens_discontinuation_days")
-    if lens_type != "SOFT" or not finite(days) or float(days) < SOFT_CONTACT_LENS_WASHOUT_DAYS:
-        return decision
+def missing_items(decision, extracted=None):
+    """Collect source-validation and canonical-runtime missing dependencies."""
+    items = []
+    if isinstance(extracted, dict):
+        items.extend(
+            ("GLOBAL", str(issue))
+            for issue in extracted.get("critical_input_issues") or []
+            if not is_quality_only_issue(issue)
+        )
     for eye in decision.get("eyes") or []:
-        eye["missing"] = [
-            item for item in eye.get("missing") or []
-            if str(item) != _LEGACY_SOFT_CONTACT_LENS_MESSAGE
-        ]
-    return decision
-
-
-def missing_items(decision):
-    items = [
-        ("GLOBAL", str(x)) for x in decision.get("critical_input_issues") or []
-        if not is_quality_only_issue(x)
-    ]
-    for eye in decision.get("eyes") or []:
+        eye_id = eye.get("eye", "GLOBAL")
         for message in eye.get("missing") or []:
-            if is_quality_only_issue(message):
-                continue
-            text = str(message)
-            normalized = text.lower()
-            if normalized == "age" or "age within" in normalized:
-                items.append(("PATIENT", "age"))
-            else:
-                items.append((eye.get("eye", "GLOBAL"), text))
+            if not is_quality_only_issue(message):
+                items.append((eye_id, str(message)))
     if not decision.get("eyes"):
         items.append(("GLOBAL", "No classifiable OD/OS tomography was extracted."))
     return list(dict.fromkeys(items))
-
-
-def completion_items(items, plans):
-    """Ask only for manifest when a wholly blank intended role will default to it."""
-    result = []
-    for eye, message in items:
-        message_text = str(message)
-        if eye == "GLOBAL" and message_text.startswith(("OD extraction validation: ", "OS extraction validation: ")):
-            audit_eye = message_text[:2]
-            underlying = message_text.split(" extraction validation: ", 1)[1]
-            if (audit_eye, underlying) in items:
-                continue
-        plan = plans.get(eye, {}) if eye in {"OD", "OS"} else {}
-        intended_supplied = any(plan.get(field) is not None for field in (
-            "intended_entered_sphere_D", "intended_cylinder_signed_D",
-            "intended_sphere_D", "intended_cylinder_magnitude_D",
-        ))
-        eye_messages = [str(text).lower() for item_eye, text in items if item_eye == eye]
-        manifest_requested = any("preoperative manifest" in text for text in eye_messages)
-        if (
-            eye in {"OD", "OS"}
-            and not intended_supplied
-            and manifest_requested
-            and str(message).lower().startswith("intended ")
-        ):
-            continue
-        result.append((eye, message))
-    return result
 
 
 def _with_region(item, extracted):
@@ -155,115 +79,250 @@ def _with_region(item, extracted):
     return item
 
 
-def _request(eye, message, extracted):
-    if eye == "GLOBAL" and message[:2] in {"OD", "OS"}:
-        eye = message[:2]
-        message = message[3:] if message.startswith(f"{eye} ") else message
-    prefix = eye.lower()
-    item = {"eye": eye, "label": message, "kind": "instruction", "key": message,
-            "destination": "source", "help": "Correct the clinical form or upload a clearer/correct source image."}
-    exact = {
-        "NICE: central_pachy_um": ("surgeon_nice_central_um", "Central pachymetry (µm; not thinnest)", "nice_central"),
-        "NICE: B_Ele_Th_um": ("surgeon_nice_pe_um", "B. Ele.Th (µm; BAD Display labeled box only)", "nice_pe"),
-        "NICE: I_S_D": ("surgeon_I_S_D", "Signed I-S (D)", "surgeon_i_s"),
+def _source_number_request(eye, key, label, extracted):
+    return _with_region(
+        {
+            "eye": eye,
+            "label": label,
+            "kind": "number",
+            "key": key,
+            "destination": "measurement",
+            "help": "Enter the value only after confirming the indicated canonical Pentacam source box.",
+        },
+        extracted,
+    )
+
+
+def _srax_request(eye):
+    return {
+        "eye": eye,
+        "label": "Is SRAX / skewed axis >20° on the Axial/Sagittal Curvature (Front) map?",
+        "kind": "select",
+        "key": "srax",
+        "destination": "measurement",
+        "options": ["YES", "NO"],
+        "help": (
+            "Inspect only the Axial/Sagittal Curvature (Front) map. Choose YES only when the skew amount is greater than 20°. "
+            "Exact 20.0° is NO. Do not infer SRAX from KISA, I-S, Kmax, BAD-D, elevation, or another surrogate."
+        ),
     }
-    if message in exact:
-        key, label, suffix = exact[message]
-        return _with_region({**item, "key": key, "label": label, "kind": "form", "form_id": f"{prefix}_{suffix}"}, extracted)
-    text = message.lower()
-    if "i-s" in text or "i_s" in text:
-        return _with_region({**item, "key": "surgeon_I_S_D", "kind": "form", "form_id": f"{prefix}_surgeon_i_s"}, extracted)
-    if "topograph" in text and ("category" in text or "morphology" in text):
-        return _with_region({
-            **item,
-            "key": "surgeon_topography_category",
-            "kind": "form",
-            "form_id": f"{prefix}_surgeon_topography",
-        }, extracted)
-    for term, suffix in (("manifest sphere", "manifest_sphere"), ("manifest cylinder magnitude", "manifest_cylinder"),
-                         ("intended sphere", "sphere"), ("intended cylinder magnitude", "cylinder"),
-                         ("cylinder axis", "axis"), ("optical zone", "optical"), ("transition zone", "transition"),
-                         ("flap thickness", "flap"), ("ablation", "ablation"), ("refractive stability", "stable"),
-                         ("progression status", "progression"), ("cdva", "cdva"), ("enhancement", "enhancement"),
-                         ("prior corneal", "prior")):
-        if term in text:
-            return {**item, "kind": "form", "form_id": f"{prefix}_{suffix}"}
-    if "age" == text or "age within" in text or "age conflicts" in text:
-        return _with_region({
-            **item,
-            "eye": "PATIENT" if eye != "GLOBAL" else eye,
-            "key": "age",
-            "label": "Patient age (years)",
-            "kind": "form",
-            "form_id": "age",
-        }, extracted)
-    if "contact lens" in text or "contact-lens" in text:
-        return {**item, "kind": "form", "form_id": "contact_lens_days" if "discontinued" in text else "contact_lens_type"}
-    if "preoperative kmean" in text:
-        message = "Kmean_D"
-    # Exact field tokens, not arbitrary substring replacement (Db must not match BAD_D).
-    import re
-    fields = [key for key in NUMERIC_FIELDS if re.search(r"(?<![A-Za-z0-9_])" + re.escape(key) + r"(?![A-Za-z0-9_])", message)]
-    if message == "NICE: K2_D":
-        fields = ["K2_D"]
+
+
+def _request(eye, message, extracted):
+    if eye == "GLOBAL" and str(message)[:2] in {"OD", "OS"}:
+        eye = str(message)[:2]
+        message = str(message)[3:] if str(message).startswith(f"{eye} ") else str(message)
+    prefix = str(eye).lower()
+    text = str(message)
+    lower = text.lower()
+
+    if eye == "PATIENT" and (lower == "age" or "patient age" in lower):
+        return {
+            "eye": "PATIENT", "label": "Patient age (years)", "kind": "form",
+            "key": "age", "destination": "source", "form_id": "age",
+            "help": "Enter the patient's age in whole years.",
+        }
+
+    if "contact lens" in lower or "contact-lens" in lower:
+        form_id = "contact_lens_days" if "day" in lower or "discontinu" in lower else "contact_lens_type"
+        return {
+            "eye": "PATIENT", "label": text, "kind": "form",
+            "key": "contact_lens_discontinuation_days" if form_id == "contact_lens_days" else "contact_lens_type",
+            "destination": "source", "form_id": form_id,
+            "help": "Complete the contact-lens washout documentation before assessment.",
+        }
+
+    if lower in {"randleman: srax", "ps3: srax"} or ("srax" in lower and "20" in lower):
+        return _srax_request(eye)
+
+    if lower in {"randleman: i_s", "nice: i_s_d"} or "signed i-s" in lower:
+        return _source_number_request(eye, "I_S", "Signed I-S (D) — Show 2 Exams center indices", extracted)
+
+    exact_source_fields = {
+        "nice: k2_d": "K2_D",
+        "nice: central_pachy_um": "central_pachy_um",
+        "nice: b_ele_th_um": "B_Ele_Th_um",
+        "randleman: pachymetry": "pachy_thinnest_um",
+        "safety: thinnest_um": "pachy_thinnest_um",
+        "safety: preop_kmean_d": "Kmean_D",
+    }
+    if lower in exact_source_fields:
+        key = exact_source_fields[lower]
+        return _source_number_request(eye, key, NUMERIC_FIELDS[key], extracted)
+
+    plan_missing = {
+        "safety: intended_sphere_d": ("intended_sphere_D", "Intended sphere", f"{prefix}_sphere"),
+        "safety: intended_cylinder_d": ("intended_cylinder_signed_D", "Intended cylinder", f"{prefix}_cylinder"),
+        "safety: intended_axis_deg": ("intended_axis_deg", "Intended cylinder axis", f"{prefix}_axis"),
+        "safety: ablation_um": ("ablation_um", "Maximum ablation depth", f"{prefix}_ablation"),
+        "safety: flap_um": ("flap_um", "LASIK flap thickness", f"{prefix}_flap"),
+        "randleman: rsb": ("flap_um", "Complete LASIK flap thickness / ablation inputs for RSB", f"{prefix}_flap"),
+        "randleman: mrse": ("manifest_entered_sphere_D", "Complete preoperative manifest refraction for MRSE", f"{prefix}_manifest_sphere"),
+    }
+    if lower in plan_missing:
+        key, label, form_id = plan_missing[lower]
+        return {
+            "eye": eye, "label": label, "kind": "form", "key": key,
+            "destination": "source", "form_id": form_id,
+            "help": "Complete the treatment/refraction input required by the canonical calculation.",
+        }
+
+    if lower.startswith("clinical eligibility: "):
+        key = text.split(":", 1)[1].strip()
+        per_eye_forms = {
+            "stable": "stable", "progression": "progression", "cdva_below_20_20": "cdva",
+        }
+        form_id = f"{prefix}_{per_eye_forms[key]}" if key in per_eye_forms else key
+        return {
+            "eye": eye if key in per_eye_forms else "PATIENT",
+            "label": f"Clinical eligibility: document {key.replace('_', ' ')}",
+            "kind": "form", "key": key, "destination": "source", "form_id": form_id,
+            "help": "Document this clinical eligibility item before a final assessment can be issued.",
+        }
+
+    if lower == "procedure" or "select lasik, prk, or smile" in lower:
+        return {
+            "eye": eye, "label": "Procedure", "kind": "form", "key": "procedure",
+            "destination": "source", "form_id": f"{prefix}_procedure",
+            "help": "Select LASIK, PRK, or SMILE.",
+        }
+    if lower == "prior" or "prior corneal refractive" in lower:
+        return {
+            "eye": eye, "label": "Prior corneal refractive surgery", "kind": "form", "key": "prior",
+            "destination": "source", "form_id": f"{prefix}_prior",
+            "help": "Document prior PRK/LASIK/SMILE status.",
+        }
+
+    # Canonical Pentacam field token, not arbitrary substring matching.
+    fields = [
+        key for key in NUMERIC_FIELDS
+        if re.search(r"(?<![A-Za-z0-9_])" + re.escape(key) + r"(?![A-Za-z0-9_])", text)
+    ]
     if len(fields) == 1 and eye in {"OD", "OS"}:
         key = fields[0]
-        return _with_region({**item, "kind": "number", "key": key, "destination": "measurement", "label": NUMERIC_FIELDS[key] + " — " + item["label"]}, extracted)
-    for key in PATTERNS:
-        if (
-            message == "readable " + key.replace("_", " ")
-            or text.startswith(f"unresolved multi-image conflict: {key}:")
-            or text.startswith(f"extraction validation: unresolved multi-image conflict: {key}:")
-        ):
-            return _with_region({
-                **item, "kind": "select", "key": key,
-                "destination": "measurement", "options": PATTERNS[key],
-            }, extracted)
-    return item
+        return _source_number_request(eye, key, NUMERIC_FIELDS[key], extracted)
+
+    return {
+        "eye": eye,
+        "label": text,
+        "kind": "instruction",
+        "key": text,
+        "destination": "source",
+        "help": "Correct the clinical input or upload/inspect the canonical source identified by CER-AI.",
+    }
+
+
+def _dedupe_requests(requests):
+    result = []
+    seen = set()
+    for item in requests:
+        identity = (item.get("eye"), item.get("key"), item.get("form_id"))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        result.append(item)
+    return result
 
 
 def _overrides(extracted, overrides):
-    """Explicit surgeon corrections; preserve original readings and re-run the audit."""
+    """Apply explicit surgeon confirmations while preserving original audit history."""
     from extraction_guard import _audit_eye
+
     working = deepcopy(extracted)
     if not isinstance(overrides, dict) or set(overrides) - {"OD", "OS"}:
         raise HTTPException(422, "Invalid eye-specific completion inputs.")
+
     for eye in working.get("eyes", []):
-        values = overrides.get(eye["eye"], {})
+        eye_id = eye.get("eye")
+        values = overrides.get(eye_id, {})
         if not isinstance(values, dict):
             raise HTTPException(422, "Completion values must be objects.")
+
         for key, value in values.items():
             if key in NUMERIC_FIELDS:
-                if not finite(value):
-                    raise HTTPException(422, f"{eye['eye']} {key}: a finite numeric value is required.")
-            elif key in PATTERNS:
-                if value not in PATTERNS[key]:
-                    raise HTTPException(422, f"Invalid {key}.")
+                if not _finite(value):
+                    raise HTTPException(422, f"{eye_id} {key}: a finite numeric value is required.")
+            elif key in SELECT_FIELDS:
+                if value not in SELECT_FIELDS[key]:
+                    raise HTTPException(422, f"{eye_id} {key}: choose one of {', '.join(SELECT_FIELDS[key])}.")
             else:
-                raise HTTPException(422, f"Manual override of {key} is not supported; upload the correct source.")
-            eye.setdefault("surgeon_corrections", []).append({"field": key, "original": eye.get(key), "value": value})
+                raise HTTPException(422, f"Manual override of {key} is not supported; use the canonical source/form input.")
+
+            eye.setdefault("surgeon_corrections", []).append(
+                {"field": key, "original": eye.get(key), "value": value}
+            )
             eye[key] = value
+            eye.setdefault("field_provenance", {})[key] = [{"source": "SURGEON_CONFIRMED"}]
             if key in NUMERIC_FIELDS:
-                eye["surgeon_verified_numeric_fields"] = sorted(set(eye.get("surgeon_verified_numeric_fields") or []) | {key})
-                eye.setdefault("field_provenance", {})[key] = [{"source": "SURGEON_CONFIRMED"}]
-            elif key in PATTERNS:
-                eye.setdefault("field_provenance", {})[key] = [{"source": "SURGEON_CONFIRMED"}]
-            resolved = [x for x in eye.get("data_conflicts") or [] if str(x).split(":", 1)[0].strip() == key]
+                eye["surgeon_verified_numeric_fields"] = sorted(
+                    set(eye.get("surgeon_verified_numeric_fields") or []) | {key}
+                )
+
+            resolved = [
+                item for item in eye.get("data_conflicts") or []
+                if str(item).split(":", 1)[0].strip() == key
+            ]
             eye.setdefault("surgeon_resolved_conflicts", []).extend(resolved)
-            eye["data_conflicts"] = [x for x in eye.get("data_conflicts") or [] if x not in resolved]
+            eye["data_conflicts"] = [
+                item for item in eye.get("data_conflicts") or [] if item not in resolved
+            ]
+
         if values:
             old_audit = eye.get("extraction_validation") or {}
-            old_messages = {f"{eye['eye']} extraction validation: {x}" for x in old_audit.get("issues") or []}
-            working["critical_input_issues"] = [x for x in working.get("critical_input_issues") or [] if x not in old_messages]
+            old_messages = {
+                f"{eye_id} extraction validation: {item}"
+                for item in old_audit.get("issues") or []
+            }
+            working["critical_input_issues"] = [
+                item for item in working.get("critical_input_issues") or []
+                if item not in old_messages
+            ]
             audit = _audit_eye(eye)
             eye["extraction_validation"] = audit
-            working.setdefault("extraction_validation", {})[eye["eye"]] = audit
-            working.setdefault("critical_input_issues", []).extend(f"{eye['eye']} extraction validation: {x}" for x in audit["issues"])
+            working.setdefault("extraction_validation", {})[eye_id] = audit
+            working.setdefault("critical_input_issues", []).extend(
+                f"{eye_id} extraction validation: {item}" for item in audit["issues"]
+            )
+
     working["critical_input_issues"] = [
         issue for issue in working.get("critical_input_issues") or []
         if not is_quality_only_issue(issue)
     ]
     return working
+
+
+def _precore_response(token, session, readiness, plans):
+    blockers = readiness.get("blockers") or []
+    lens = readiness.get("contact_lens_washout")
+    requests = _dedupe_requests([
+        _request(item.get("eye", "GLOBAL"), item.get("message", item.get("key", "")), session["extracted"])
+        for item in blockers
+    ])
+    status = "CONTACT_LENS_WASHOUT_REQUIRED" if lens else "NEEDS_INPUT"
+    response = {
+        "assessment_token": token,
+        "extracted": deepcopy(session["extracted"]),
+        "effective_eye_plans": deepcopy(plans),
+        "workflow_status": status,
+        "missing": [
+            {"eye": item.get("eye", "GLOBAL"), "message": item.get("message", item.get("key", ""))}
+            for item in blockers
+        ],
+        "input_requests": requests,
+        "report_token": None,
+        "message": (
+            lens.get("message") if lens
+            else "Complete the required pre-assessment information before canonical clinical evaluation."
+        ),
+    }
+    if lens:
+        response["contact_lens_washout"] = lens
+    session["ready"] = None
+    session["region_requests"] = {
+        (item.get("eye"), item.get("key")) for item in requests if item.get("source_region")
+    }
+    session["expires"] = monotonic() + TTL_SECONDS
+    return response
 
 
 def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
@@ -272,71 +331,69 @@ def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
             raise HTTPException(422, "Clinical inputs must be objects.")
     if set(plans) - {"OD", "OS"} or any(not isinstance(value, dict) for value in plans.values()):
         raise HTTPException(422, "Plans must contain OD/OS objects.")
-    if age is not None and (not finite(age) or int(age) != age):
-        raise HTTPException(422, "Age must be a whole number.")
     overrides = deepcopy(overrides)
     if not isinstance(overrides, dict) or any(not isinstance(value, dict) for value in overrides.values()):
         raise HTTPException(422, "Clinical overrides must be an object.")
 
-    lens_block = _contact_lens_washout(modifiers)
-    if lens_block:
-        session["ready"] = None
-        session["expires"] = monotonic() + TTL_SECONDS
-        request = {
-            "eye": "PATIENT",
-            "label": lens_block["message"],
-            "kind": "form",
-            "key": "contact_lens_discontinuation_days" if lens_block["form_id"] == "contact_lens_days" else "contact_lens_type",
-            "destination": "source",
-            "form_id": lens_block["form_id"],
-            "help": "Complete the required contact-lens washout and repeat Pentacam before CER-AI assessment.",
-        }
-        return {
-            "assessment_token": token,
-            "extracted": deepcopy(session["extracted"]),
-            "effective_eye_plans": {},
-            "workflow_status": "CONTACT_LENS_WASHOUT_REQUIRED",
-            "missing": [{"eye": "PATIENT", "message": lens_block["message"]}],
-            "input_requests": [request],
-            "report_token": None,
-            "contact_lens_washout": lens_block,
-            "message": lens_block["message"],
-        }
+    readiness = evaluate_precore_readiness(
+        age_years=age,
+        eye_plans=plans,
+        patient_modifiers=modifiers,
+    )
+    if not readiness["ready"]:
+        return _precore_response(token, session, readiness, plans)
 
-    # A surgeon-confirmed I-S resolves the same source conflict for BOTH ERSS and NICE.
-    for eye, plan in plans.items():
+    # A surgeon-entered I-S uses the same canonical correction/provenance path as image-derived I-S.
+    for eye_id, plan in plans.items():
         if plan.get("surgeon_I_S_D") is not None:
-            overrides.setdefault(eye, {})["I_S"] = plan["surgeon_I_S_D"]
+            overrides.setdefault(eye_id, {})["I_S"] = plan["surgeon_I_S_D"]
+
     extracted = _overrides(session["extracted"], overrides)
-    for eye in extracted.get("eyes", []):
-        plan = plans.get(eye["eye"], {})
-        category = plan.get("surgeon_topography_category")
-        if plan.get("procedure") == "PRK" and category in core.MORPHOLOGY and category != "UNCERTAIN" and eye.get("morphology") in {None, "UNCERTAIN"}:
-            eye["morphology"] = category
-            eye.setdefault("morphology_evidence", []).append("Category explicitly confirmed by surgeon during input completion.")
-    effective = core.apply_extracted_corrections(deepcopy(extracted), deepcopy(plans))
-    decision = core.hc_engine(deepcopy(extracted), age, effective, modifiers, metadata)
-    decision = _remove_superseded_contact_lens_missing(decision, modifiers)
-    missing = completion_items(missing_items(decision), plans)
-    response = {"assessment_token": token, "extracted": extracted, "effective_eye_plans": effective,
-                "workflow_status": "NEEDS_INPUT" if missing else "READY", "missing": [],
-                "input_requests": [], "report_token": None}
+    decision = evaluate_case(
+        deepcopy(extracted),
+        age,
+        deepcopy(plans),
+        deepcopy(modifiers),
+        software_version=getattr(core, "APP_VERSION", None),
+    )
+    effective = deepcopy(decision.get("effective_eye_plans") or {})
+    missing = missing_items(decision, extracted)
+    requests = _dedupe_requests([
+        _request(eye, message, extracted) for eye, message in missing
+    ])
+
+    response = {
+        "assessment_token": token,
+        "extracted": extracted,
+        "effective_eye_plans": effective,
+        "workflow_status": "NEEDS_INPUT" if missing else "READY",
+        "missing": [],
+        "input_requests": [],
+        "report_token": None,
+    }
     session["ready"] = None
+
     if missing:
-        response["missing"] = [{"eye": eye, "message": message} for eye, message in missing]
-        response["input_requests"] = [_request(eye, message, extracted) for eye, message in missing]
-        response["message"] = "Complete all required information below before any clinical report can be produced."
+        response["missing"] = [
+            {"eye": eye, "message": message} for eye, message in missing
+        ]
+        response["input_requests"] = requests
+        response["message"] = "Complete all decision-critical information before a clinical report can be produced."
     else:
         report_token = secrets.token_urlsafe(32)
-        session["ready"] = {"report_token": report_token, "patient": deepcopy(metadata),
-                            "decision": deepcopy(decision), "extracted": deepcopy(extracted)}
+        session["ready"] = {
+            "report_token": report_token,
+            "patient": deepcopy(metadata),
+            "decision": deepcopy(decision),
+            "extracted": deepcopy(extracted),
+        }
         response.update({"decision": decision, "report_token": report_token})
+
     session["region_requests"] = {
         (item.get("eye"), item.get("key"))
         for item in response["input_requests"]
         if item.get("source_region")
     }
-    # Preserve corrections across resume attempts, but never overwrite the original image values silently.
     session["extracted"] = extracted
     session["expires"] = monotonic() + TTL_SECONDS
     return response
@@ -366,27 +423,39 @@ def complete(core, payload):
     with _lock:
         token = payload.get("assessment_token")
         session = _session(token)
-        # Invalidate any earlier ready snapshot before accepting edits, including invalid edits.
         session["ready"] = None
-        return _respond(core, token, session, payload.get("age"), payload.get("eye_plans", {}),
-                        payload.get("patient_modifiers", {}), payload.get("patient_metadata", {}),
-                        payload.get("clinical_overrides", {}))
+        return _respond(
+            core,
+            token,
+            session,
+            payload.get("age"),
+            payload.get("eye_plans", {}),
+            payload.get("patient_modifiers", {}),
+            payload.get("patient_metadata", {}),
+            payload.get("clinical_overrides", {}),
+        )
 
 
 def export_payload(payload):
     with _lock:
         session = _session(payload.get("assessment_token"))
         ready = session.get("ready")
-        if not ready or not secrets.compare_digest(str(payload.get("report_token") or ""), ready["report_token"]):
-            raise HTTPException(409, "Complete all required inputs and obtain a current ready assessment before exporting.")
+        if not ready or not secrets.compare_digest(
+            str(payload.get("report_token") or ""), ready["report_token"]
+        ):
+            raise HTTPException(
+                409,
+                "Complete all required inputs and obtain a current ready assessment before exporting.",
+            )
         exported = deepcopy(ready)
-        # Locale is presentation-only and may be selected after the locked
-        # clinical assessment. Never copy decision data from the export request.
-        exported["locale"] = "tr" if str(payload.get("locale") or "").lower().startswith("tr") else "en"
+        exported["locale"] = (
+            "tr" if str(payload.get("locale") or "").lower().startswith("tr") else "en"
+        )
         return exported
 
 
 def install(core):
+    """Install transport endpoints only; no clinical function is replaced."""
     if getattr(core, "_hc_readiness_installed", False):
         return
 
@@ -427,4 +496,5 @@ def install(core):
             media_type="image/png",
             headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
         )
+
     core._hc_readiness_installed = True
