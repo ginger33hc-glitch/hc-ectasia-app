@@ -116,7 +116,7 @@ def test_two_moderates_defer_selected_prk():
     assert decision["eyes"][0]["status"] == "STOP-DEFER"
 
 
-def test_f_ele_th_and_b_ele_th_are_not_reused_as_main_ps3_elevation_thresholds():
+def test_f_ele_th_and_b_ele_th_are_canonical_ps3_elevation_inputs():
     core = SimpleNamespace(hc_engine=_base_engine, combine_status=_combine)
     ps3_runtime_policy.install(core)
     od = _eye("OD")
@@ -127,10 +127,11 @@ def test_f_ele_th_and_b_ele_th_are_not_reused_as_main_ps3_elevation_thresholds()
     os["B_Ele_Th_um"] = 50
     decision = core.hc_engine({"eyes": [od, os]}, 35, {"OD": _plan(), "OS": _plan()}, {})
     elevation = next(f for f in decision["eyes"][0]["ps3"]["findings"] if f["key"] == "elevation")
-    assert elevation["status"] == "NOT_EVALUATED"
+    assert elevation["status"] == "HIGH"
+    assert decision["eyes"][0]["status"] == "STOP-DEFER"
 
 
-def test_runtime_marks_three_unread_morphology_domains_for_surgeon_review():
+def test_runtime_marks_three_morphology_domains_as_manual_only():
     core = SimpleNamespace(hc_engine=_base_engine, combine_status=_combine)
     ps3_runtime_policy.install(core)
     decision = core.hc_engine(
@@ -141,7 +142,8 @@ def test_runtime_marks_three_unread_morphology_domains_for_surgeon_review():
     )
     notes = decision["eyes"][0]["ps3"]["review_notes"]
     assert len(notes) == 3
-    assert all("surgeon review required" in note.lower() for note in notes)
+    assert all("manual surgeon review only" in note.lower() for note in notes)
+    assert all("not counted in automated ps3" in note.lower() for note in notes)
 
 
 def test_front_map_srax_more_than_20_is_high_and_defers_selected_prk():
