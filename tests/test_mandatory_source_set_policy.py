@@ -1,6 +1,7 @@
 import pytest
 from fastapi import HTTPException
 
+import canonical_engine
 import mandatory_source_set_policy as policy
 
 
@@ -90,17 +91,9 @@ def test_legacy_bad_component_signature_recognizes_od_page_even_if_screen_type_i
     assert summary["present"]["OD Belin/Ambrosio Display"] is True
 
 
-def test_mandatory_install_adds_explicit_legacy_bad_display_recognition_prompt(monkeypatch):
-    class Core:
-        PROMPT = "base"
-        merge_extractions = staticmethod(lambda results: {})
-
-        async def _run_image_assessment(self, *args, **kwargs):
-            return None
-
-    core = Core()
-    monkeypatch.setattr(policy, "_previous_merge_extractions", None)
-    monkeypatch.setattr(policy, "_previous_run_image_assessment", None)
-    policy.install(core)
-    assert "Belin/Ambrosio Display" in core.PROMPT
-    assert "BELIN_AMBROSIO_DISPLAY" in core.PROMPT
+def test_direct_prompt_owns_explicit_legacy_bad_display_recognition_rule():
+    prompt = canonical_engine.core.PROMPT
+    assert "Belin/Ambrosio Display" in prompt
+    assert "BELIN_AMBROSIO_DISPLAY" in prompt
+    assert policy.BAD_DISPLAY_RECOGNITION_PROMPT in prompt
+    assert not callable(getattr(policy, "install", None))
