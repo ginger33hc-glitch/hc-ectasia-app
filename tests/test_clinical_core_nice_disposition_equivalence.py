@@ -1,10 +1,17 @@
-"""Phase 2 equivalence tests for pure NICE and disposition rules."""
+"""Pure NICE and single-final-disposition tests."""
 
 import pytest
 
 import canonical_engine
-import clinical_disposition as production_disposition
-from clinical_core.disposition import combine_status, presentation_class
+from clinical_core.disposition import (
+    ASSESSMENT_INCOMPLETE,
+    CAUTION,
+    PASS,
+    STOP_DEFER,
+    DecisionFinding,
+    finalize_disposition,
+    presentation_class,
+)
 from clinical_core.nice import nice_disposition, score_nice
 from nice_scoring import score_nice as production_score_nice
 
@@ -28,7 +35,7 @@ from nice_scoring import score_nice as production_score_nice
         (44.0, 520, 301, 1.0),
     ],
 )
-def test_pure_nice_matches_production(k2, central, pe, i_s):
+def test_pure_nice_matches_numeric_scoring_reference(k2, central, pe, i_s):
     expected = production_score_nice(k2, central, pe, i_s)
     actual = score_nice(k2, central, pe, i_s)
     assert actual["total"] == expected["total"]
@@ -41,31 +48,55 @@ def test_pure_nice_matches_production(k2, central, pe, i_s):
 @pytest.mark.parametrize(
     "total,expected",
     [
-        (4, "PASS"),
-        (5, "CAUTION"),
-        (8, "CAUTION"),
-        (9, "STOP-DEFER"),
-        (12, "STOP-DEFER"),
+        (4, PASS),
+        (5, CAUTION),
+        (8, CAUTION),
+        (9, STOP_DEFER),
+        (12, STOP_DEFER),
         (None, "DATA INSUFFICIENT"),
     ],
 )
-def test_nice_specific_disposition_is_launch_frozen(total, expected):
+def test_nice_specific_disposition(total, expected):
     assert nice_disposition(total) == expected
 
 
-def test_pure_status_rank_matches_production():
-    statuses = tuple(production_disposition.STATUS_RANK)
-    for current in statuses:
-        for new in statuses:
-            assert combine_status(current, new) == production_disposition.combine_status(current, new)
+def test_single_finalizer_stop_dominates_and_retains_all_stop_drivers():
+    final = finalize_disposition((
+        DecisionFinding("bad_d", STOP_DEFER),
+        DecisionFinding("safety", STOP_DEFER),
+        DecisionFinding("nice", CAUTION),
+    ))
+    assert final.status == STOP_DEFER
+    assert {item.key for item in final.stop_drivers} == {"bad_d", "safety"}
+
+
+def test_single_finalizer_multiple_cautions_remain_caution():
+    final = finalize_disposition((
+        DecisionFinding("bad_d", CAUTION),
+        DecisionFinding("nice", CAUTION),
+    ))
+    assert final.status == CAUTION
+
+
+def test_single_finalizer_incomplete_is_never_pass():
+    final = finalize_disposition((
+        DecisionFinding("nice", ASSESSMENT_INCOMPLETE),
+        DecisionFinding("bad_d", PASS),
+    ))
+    assert final.status == ASSESSMENT_INCOMPLETE
 
 
 @pytest.mark.parametrize(
-    "status",
-    ["PASS", "CAUTION", "STOP-DEFER", "DATA INSUFFICIENT", "POST-REFRACTIVE PATHWAY REQUIRED"],
+    "status,expected",
+    [
+        (PASS, "pass"),
+        (CAUTION, "caution"),
+        (STOP_DEFER, "fail"),
+        (ASSESSMENT_INCOMPLETE, "insufficient"),
+    ],
 )
-def test_presentation_class_matches_production(status):
-    assert presentation_class(status) == production_disposition.presentation_class(status)
+def test_presentation_class_uses_clean_core_statuses(status, expected):
+    assert presentation_class(status) == expected
 
 
 def test_importing_pure_core_does_not_mutate_runtime():
