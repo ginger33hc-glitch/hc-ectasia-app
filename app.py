@@ -66,13 +66,6 @@ PRK_EPITHELIUM_UM = 50
 CORNEAL_EFFECT_PER_INTENDED_MRSE_D = 0.8
 FINAL_KMEAN_MIN_D = 36.0
 FINAL_KMEAN_MAX_D = 48.0
-MORPHOLOGY = (
-    "NORMAL_SYMMETRIC",
-    "ASYMMETRIC_BOWTIE",
-    "INFERIOR_STEEPENING_SRA",
-    "ABNORMAL_ECTATIC",
-    "UNCERTAIN",
-)
 TABLE_NUMERIC_FIELDS = (
     "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmax_D", "corneal_diameter_mm",
     "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp",
@@ -378,8 +371,7 @@ Do not visually estimate SRAX, return a numeric srax_deg from map appearance, or
 KISA, Kmax, I-S, astigmatism tables, K1/K2/global Axis, BAD values, elevation, pachymetry, or any surrogate.
 For every image handled by this model, return srax=UNCERTAIN and srax_deg=null. The deterministic
 geometry layer may replace those values only when the correct Front map and both hemimeridian axes
-are resolved with adequate confidence. Anterior/posterior tomography pattern fields remain separate non-ERSS review inputs.
-
+are resolved with adequate confidence.
 BELIN/AMBROSIO BAD DISPLAY SOURCE LOCK:
 BAD_D, Df, Db, Dp, Dt, and Da may be transcribed ONLY from the explicitly labeled bottom BAD-D
 component strip on a visible Belin/Ambrosio Display for the same eye. Preserve every printed sign
