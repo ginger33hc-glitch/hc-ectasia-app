@@ -61,25 +61,24 @@ def test_exact_threshold_rule_is_strictly_greater_than_20():
     assert (20.1 > policy.SRAX_THRESHOLD_DEG) is True
 
 
-def test_extractor_uses_geometry_not_model_visual_srax():
+def test_direct_enrichment_uses_geometry_not_model_visual_srax():
     raw = _synthetic_four_maps(80.0, 230.0)
+    result = {
+        "eyes": [{
+            "eye": "OS",
+            "screen_types": ["FOUR_MAPS_REFRACTIVE"],
+            "srax": "UNCERTAIN",
+            "srax_deg": None,
+            "morphology_evidence": [],
+        }],
+        "global_warnings": [],
+    }
 
-    def previous(_raw, _filename):
-        return {
-            "eyes": [{
-                "eye": "OS",
-                "screen_types": ["FOUR_MAPS_REFRACTIVE"],
-                "srax": "UNCERTAIN",
-                "srax_deg": None,
-                "morphology_evidence": [],
-            }],
-            "global_warnings": [],
-        }
-
-    extractor = policy.make_geometric_srax_extractor(object(), previous)
-    result = extractor(raw, "synthetic.png")
+    result = policy.enrich_extraction(result, raw, "synthetic.png")
     eye = result["eyes"][0]
     assert eye["srax"] == "YES"
     assert eye["srax_deg"] > 20.0
     assert eye["field_provenance"]["srax"][0]["source"] == "AXIAL_SAGITTAL_CURVATURE_FRONT_GEOMETRIC"
     assert "srax-geom-v1" in eye["morphology_evidence"][0]
+    assert not hasattr(policy, "make_geometric_srax_extractor")
+    assert not hasattr(policy, "install")
