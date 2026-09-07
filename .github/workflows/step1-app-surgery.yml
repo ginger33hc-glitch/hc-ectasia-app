@@ -33,18 +33,30 @@ jobs:
           app_path = root / 'app.py'
           text = app_path.read_text(encoding='utf-8')
 
-          targets = ('assess_eye', 'hc_engine', 'apply_extracted_corrections')
+          targets = {'assess_eye', 'hc_engine', 'apply_extracted_corrections'}
           production_refs = {}
           excluded_dirs = {'.git', '.github', 'tests', 'docs'}
+
+          # Fail closed only on executable symbol references. String literals used by
+          # architecture invariants (for example "core.hc_engine") are not callers.
           for path in root.rglob('*.py'):
               if path == app_path or any(part in excluded_dirs for part in path.parts):
                   continue
               source = path.read_text(encoding='utf-8')
-              for name in targets:
-                  if name in source:
-                      production_refs.setdefault(name, []).append(str(path))
+              try:
+                  tree = ast.parse(source, filename=str(path))
+              except SyntaxError as exc:
+                  raise SystemExit(f'ABORT: cannot AST-parse {path}: {exc}') from exc
+              refs = set()
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) and node.id in targets:
+                      refs.add(node.id)
+                  elif isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Load) and node.attr in targets:
+                      refs.add(node.attr)
+              for name in refs:
+                  production_refs.setdefault(name, []).append(str(path))
           if production_refs:
-              raise SystemExit(f'ABORT: legacy functions still have production references: {production_refs}')
+              raise SystemExit(f'ABORT: legacy functions still have executable production references: {production_refs}')
 
           old = '''    from nice_policy import attach_readings\n    from assessment_workflow import begin\n    import sys\n    extracted = attach_readings(merge_extractions(extraction_results), extraction_results)\n'''
           new = '''    from assessment_workflow import begin\n    import sys\n    extracted = merge_extractions(extraction_results)\n'''
@@ -60,8 +72,8 @@ jobs:
               for node in tree.body
               if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in targets
           }
-          if set(nodes) != set(targets):
-              raise SystemExit(f'ABORT: expected exact legacy functions not found: {set(targets) - set(nodes)}')
+          if set(nodes) != targets:
+              raise SystemExit(f'ABORT: expected exact legacy functions not found: {targets - set(nodes)}')
 
           lines = text.splitlines(keepends=True)
           spans = sorted(
@@ -79,6 +91,8 @@ jobs:
                   raise SystemExit(f'ABORT: {name} definition survived cleanup')
           if 'from nice_policy import attach_readings' in cleaned or 'attach_readings(' in cleaned:
               raise SystemExit('ABORT: legacy NICE attach-readings path survived cleanup')
+          if 'def merge_extractions(' not in cleaned:
+              raise SystemExit('ABORT: canonical extraction merge function was unexpectedly removed')
           app_path.write_text(cleaned, encoding='utf-8')
           PY
           python -m py_compile app.py
