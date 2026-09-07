@@ -1,0 +1,126 @@
+name: Step 3B remove fallback infrastructure
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  clean:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: monday-clean-architecture
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Guard and remove fallback infrastructure
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import ast
+
+          app = Path('app.py').read_text()
+          guard = Path('extraction_guard.py').read_text()
+          rmin_test = Path('tests/test_rmin_front_source_policy.py').read_text()
+          cleanup_test = Path('tests/test_phase4_cleanup_contract.py').read_text()
+
+          assert 'MAP_FALLBACK_NUMERIC_FIELDS = ()' in app
+          assert '"map_fallback_numeric_fields": {' in app
+          assert 'PERMITTED_MAP_FALLBACK' in app
+          assert 'PERMITTED_MAP_FALLBACK' in guard
+
+          app = app.replace('MAP_FALLBACK_NUMERIC_FIELDS = ()\n\n', '', 1)
+          schema_block = '''                    "map_fallback_numeric_fields": {\n                        "type": "array",\n                        "items": {"type": "string", "enum": list(MAP_FALLBACK_NUMERIC_FIELDS)},\n                    },\n'''
+          assert schema_block in app
+          app = app.replace(schema_block, '', 1)
+          app = app.replace(
+              '                    "table_verified_numeric_fields", "map_fallback_numeric_fields", "keratometry_source",\n',
+              '                    "table_verified_numeric_fields", "keratometry_source",\n', 1,
+          )
+
+          old_norm = '''            fallback_set = set(eye.get("map_fallback_numeric_fields", []))\n            fallback_set &= set(MAP_FALLBACK_NUMERIC_FIELDS)\n            fallback_set -= verified_set  # A readable labeled table value always has priority.\n            missing = list(eye.get("missing_or_unreadable", []))\n'''
+          assert old_norm in app
+          app = app.replace(old_norm, '            missing = list(eye.get("missing_or_unreadable", []))\n', 1)
+          app = app.replace('                    fallback_set.discard(field)\n', '', 1)
+          app = app.replace(
+              '                if eye.get(field) is not None and field not in verified_set and field not in fallback_set:\n',
+              '                if eye.get(field) is not None and field not in verified_set:\n', 1,
+          )
+          app = app.replace('            eye["map_fallback_numeric_fields"] = sorted(fallback_set)\n', '', 1)
+
+          provenance_block = '''                for field in eye.get("map_fallback_numeric_fields", []):\n                    if eye.get(field) is not None:\n                        eye["field_provenance"][field] = [{"file": source_filename, "source": "PERMITTED_MAP_FALLBACK"}]\n'''
+          assert provenance_block in app
+          app = app.replace(provenance_block, '', 1)
+          app = app.replace('            target_map_sources = set(target.get("map_fallback_numeric_fields", []))\n', '', 1)
+          app = app.replace('            incoming_map_sources = set(eye.get("map_fallback_numeric_fields", []))\n', '', 1)
+          aggregate_block = '''            target["map_fallback_numeric_fields"] = sorted(\n                (\n                    set(target.get("map_fallback_numeric_fields", []))\n                    | set(eye.get("map_fallback_numeric_fields", []))\n                )\n                - set(target["table_verified_numeric_fields"])\n            )\n'''
+          assert aggregate_block in app
+          app = app.replace(aggregate_block, '', 1)
+          app = app.replace('                    "table_verified_numeric_fields", "map_fallback_numeric_fields",\n', '                    "table_verified_numeric_fields",\n', 1)
+          fallback_merge = '''                if key in TABLE_NUMERIC_FIELDS:\n                    if key in incoming_table_sources and key in target_map_sources and key not in target_table_sources:\n                        target[key] = value\n                        continue\n                    if key in target_table_sources and key in incoming_map_sources:\n                        continue\n                    if key in target_map_sources and key in incoming_map_sources:\n                        # Same-parameter local readings are a lower-priority substitute for one\n                        # unreadable edge box. Preserve the safety-limiting value but do not label\n                        # this permitted fallback-source merge as an unresolved clinical conflict.\n                        if key in conservative and is_number(old) and is_number(value):\n                            target[key] = min(old, value) if conservative[key] == "min" else max(old, value)\n                        merged["global_warnings"].append(\n                            f"Multiple permitted local-map {key} readings for {eye_id}; "\n                            "a conservative value was retained without creating an unresolved conflict."\n                        )\n                        continue\n\n'''
+          assert fallback_merge in app
+          app = app.replace(fallback_merge, '', 1)
+
+          guard = guard.replace(
+              '- For non-locked numeric parameters, readings from multiple valid sources of the same provenance\n  class may use the historical <=1% reconciliation rule.\n',
+              '- For non-locked numeric parameters, repeated labeled-table readings may use the historical <=1% reconciliation rule.\n',
+          )
+          guard = guard.replace(
+              '''def _source_class(raw_eye: Dict[str, Any], field: str) -> str:\n    if field in set(raw_eye.get("table_verified_numeric_fields") or []):\n        return "LABELED_TABLE"\n    if field in set(raw_eye.get("map_fallback_numeric_fields") or []):\n        return "PERMITTED_MAP_FALLBACK"\n    return "UNVERIFIED"\n''',
+              '''def _source_class(raw_eye: Dict[str, Any], field: str) -> str:\n    if field in set(raw_eye.get("table_verified_numeric_fields") or []):\n        return "LABELED_TABLE"\n    return "UNVERIFIED"\n''',
+              1,
+          )
+          guard = guard.replace(
+              '            values = classes.get("LABELED_TABLE") or classes.get("PERMITTED_MAP_FALLBACK") or []\n',
+              '            values = classes.get("LABELED_TABLE") or []\n', 1,
+          )
+          guard = guard.replace('    fallback = set(eye.get("map_fallback_numeric_fields") or [])\n', '', 1)
+          guard = guard.replace(
+              '        if field not in verified and field not in fallback and field not in surgeon_verified:\n            issues.append(f"{field}: decision-critical value has no accepted labeled-field/map-fallback provenance")\n',
+              '        if field not in verified and field not in surgeon_verified:\n            issues.append(f"{field}: decision-critical value has no accepted labeled-field provenance")\n',
+              1,
+          )
+          guard = guard.replace('    fallback_count = sum(1 for field in DECISION_FIELDS if field in fallback and _num(eye.get(field)))\n', '', 1)
+          guard = guard.replace('        "decision_fields_from_permitted_map_fallback": fallback_count,\n', '', 1)
+
+          rmin_test = rmin_test.replace(
+              '    assert "Rmin_mm" not in canonical_engine.core.MAP_FALLBACK_NUMERIC_FIELDS\n',
+              '    assert not hasattr(canonical_engine.core, "MAP_FALLBACK_NUMERIC_FIELDS")\n', 1,
+          )
+
+          needle = '    assert "def merge_extractions(" in text\n'
+          assert needle in cleanup_test
+          cleanup_test = cleanup_test.replace(
+              needle,
+              needle + '    assert "MAP_FALLBACK_NUMERIC_FIELDS" not in text\n    assert "map_fallback_numeric_fields" not in text\n',
+              1,
+          )
+
+          for name,text in {
+              'app.py': app,
+              'extraction_guard.py': guard,
+              'tests/test_rmin_front_source_policy.py': rmin_test,
+              'tests/test_phase4_cleanup_contract.py': cleanup_test,
+          }.items():
+              ast.parse(text)
+              Path(name).write_text(text)
+
+          prod = Path('app.py').read_text() + Path('extraction_guard.py').read_text()
+          assert 'MAP_FALLBACK_NUMERIC_FIELDS' not in prod
+          assert 'map_fallback_numeric_fields' not in prod
+          assert 'PERMITTED_MAP_FALLBACK' not in prod
+          PY
+      - name: Commit Step 3B cleanup
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app.py extraction_guard.py tests/test_rmin_front_source_policy.py tests/test_phase4_cleanup_contract.py
+          git commit -m "Remove obsolete numeric fallback infrastructure"
+          git push origin HEAD:monday-clean-architecture
