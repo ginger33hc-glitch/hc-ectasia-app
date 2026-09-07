@@ -72,4 +72,17 @@ Retired files in this group:
 
 **Why the old test is retired:** `test_nice_workflow.py` imports the duplicate scorer/wrapper and legacy HC-engine fixtures. Keeping that test would require retaining two NICE implementations and a second status mutation path. NICE boundary, incompleteness, disposition, pipeline, and report-payload behavior remain covered by canonical clinical-core/runtime tests.
 
+## Monolithic legacy HC-engine regression suite
+
+**Old rule / authority:** `tests/legacy_hc_engine_tests.py` and its collector `tests/test_hc_engine.py` execute `app.assess_eye` and `app.hc_engine`, including obsolete PRK-EWSS, tomography escalation, LASIK fallback, report-generation, and legacy readiness assumptions.
+
+**New canonical rule / authority:** clinical assessment is executed only by `assessment_workflow -> canonical_runtime_service -> clinical_core`. Randleman/ERSS, NICE, BAD, PS3, tissue safety, final disposition, canonical input resolution, workflow readiness, and report-payload behavior each have dedicated canonical tests.
+
+**Why the old tests are retired:** the remaining failures in this suite are not regressions in the canonical runtime; they assert behavior of the superseded engine itself (for example old LASIK planning-sequence fields and legacy readiness fixtures). Repairing those expectations would preserve `app.assess_eye/app.hc_engine` as a second clinical authority. The suite is therefore retired as a unit rather than patched piecemeal.
+
+Retired files:
+
+- `tests/test_hc_engine.py`
+- `tests/legacy_hc_engine_tests.py`
+
 No test is being retired because it is inconvenient. A test is retired only where its implementation has been explicitly superseded by the accepted canonical architecture.
