@@ -15,7 +15,7 @@ def test_canonical_prompt_locks_rmin_to_show2_cornea_back():
     prompt = canonical_engine.core.PROMPT
     assert "Rmin_mm: exactly one accepted source" in prompt
     assert "Cornea Back" in prompt
-    assert "Rmin is never a map fallback" in prompt
+    assert "No numeric map fallback is permitted" in prompt
 
 
 def test_targeted_reread_rejects_cornea_front_rmin_source():
