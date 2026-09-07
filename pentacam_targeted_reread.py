@@ -423,8 +423,6 @@ def label_supports_field(field: str, printed_label: Any, group_label: Any = None
         "pachy_thinnest_um": (("thinnestlocat", "thinnestlocation"),),
         "central_pachy_um": (("pupilcenter",),),
         "ARTmax_um": (("artmax", "ambrosiorelationalthicknessmax"),),
-        "anterior_elevation_thinnest_um": (("anteriorelevation", "frontelevation"), ("thin", "thinnest")),
-        "posterior_elevation_thinnest_um": (("posteriorelevation", "backelevation"), ("thin", "thinnest")),
         "thinnest_x_mm": (("thinnestx", "thinlocationx", "pachythinx"),),
         "thinnest_y_mm": (("thinnesty", "thinlocationy", "pachythiny"),),
         "corneal_volume_mm3": (("cornealvolume", "corneavolume"),),

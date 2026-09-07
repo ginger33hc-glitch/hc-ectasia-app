@@ -278,8 +278,6 @@ def _tomography_rows(extracted: Dict[str, Any], eye_id: str, locale: str = "en")
         ("IHA", "IHA", "", 3), ("IHD", "IHD", "", 3),
         ("I-S", "I_S", " D", 2), ("KISA", "KISA", "%", 1),
         ("Rmin", "Rmin_mm", " mm", 2), ("SRAX", "srax_deg", " degrees", 1),
-        ("Anterior elevation at TP", "anterior_elevation_thinnest_um", " um", 1),
-        ("Posterior elevation at TP", "posterior_elevation_thinnest_um", " um", 1),
         ("Thinnest X", "thinnest_x_mm", " mm", 2), ("Thinnest Y", "thinnest_y_mm", " mm", 2),
         ("Corneal volume", "corneal_volume_mm3", " mm3", 2),
         ("RMS-HOA", "RMS_HOA_um", " um", 3), ("Vertical coma", "vertical_coma_um", " um", 3),

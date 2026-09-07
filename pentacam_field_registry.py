@@ -11,8 +11,7 @@ TARGET_FIELDS = (
     "corneal_diameter_mm", "pachy_thinnest_um", "central_pachy_um", "F_Ele_Th_um", "B_Ele_Th_um", "BAD_D", "Df", "Db",
     "Dp", "Dt", "Da", "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um",
     "ISV", "IVA", "KI", "CKI", "IHD", "I_S", "KISA", "IHA", "TKC", "topometric_RMin",
-    "Rmin_mm", "anterior_elevation_thinnest_um",
-    "posterior_elevation_thinnest_um", "thinnest_x_mm", "thinnest_y_mm",
+    "Rmin_mm", "thinnest_x_mm", "thinnest_y_mm",
     "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um", "Kmean_D",
     "total_RMS_um", "spherical_aberration_um",
 )

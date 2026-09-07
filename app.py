@@ -78,20 +78,13 @@ TABLE_NUMERIC_FIELDS = (
     "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmax_D", "corneal_diameter_mm",
     "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp",
     "Dt", "Da", "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI",
-    "CKI", "IHD", "I_S", "KISA", "IHA", "Rmin_mm", "anterior_elevation_thinnest_um",
-    "posterior_elevation_thinnest_um", "thinnest_x_mm", "thinnest_y_mm",
+    "CKI", "IHD", "I_S", "KISA", "IHA", "Rmin_mm", "thinnest_x_mm", "thinnest_y_mm",
     "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um", "Kmean_D",
     "total_RMS_um", "spherical_aberration_um",
     "central_pachy_um", "B_Ele_Th_um", "F_Ele_Th_um", "posterior_Kmean_D",
     "topographic_astig_D", "topographic_steep_axis_deg", "topometric_RMin", "TKC",
 )
-MAP_FALLBACK_NUMERIC_FIELDS = (
-    # Only explicitly marked elevation-at-thinnest values remain permitted local-map fallbacks.
-    # Locked printed outputs such as Rmin, K values, BAD, PPI, ARTmax, and topometric indices
-    # must be read from their exact canonical labeled source or left unreadable.
-    "anterior_elevation_thinnest_um",
-    "posterior_elevation_thinnest_um",
-)
+MAP_FALLBACK_NUMERIC_FIELDS = ()
 
 SCHEMA = {
     "type": "object",
@@ -188,8 +181,6 @@ SCHEMA = {
                     "KISA": {"type": ["number", "null"]},
                     "IHA": {"type": ["number", "null"]},
                     "Rmin_mm": {"type": ["number", "null"]},
-                    "anterior_elevation_thinnest_um": {"type": ["number", "null"]},
-                    "posterior_elevation_thinnest_um": {"type": ["number", "null"]},
                     "thinnest_x_mm": {"type": ["number", "null"]},
                     "thinnest_y_mm": {"type": ["number", "null"]},
                     "corneal_volume_mm3": {"type": ["number", "null"]},
@@ -220,8 +211,7 @@ SCHEMA = {
                     "K2_D", "K2_axis_deg", "Kmax_D", "corneal_diameter_mm", "pachy_thinnest_um",
                     "BAD_D", "Df", "Db", "Dp", "Dt", "Da",
                     "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI", "CKI", "IHD",
-                    "I_S", "KISA", "IHA", "Rmin_mm", "anterior_elevation_thinnest_um",
-                    "posterior_elevation_thinnest_um", "thinnest_x_mm", "thinnest_y_mm",
+                    "I_S", "KISA", "IHA", "Rmin_mm", "thinnest_x_mm", "thinnest_y_mm",
                     "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um", "Kmean_D",
                     "total_RMS_um", "spherical_aberration_um",
                     "central_pachy_um", "B_Ele_Th_um", "F_Ele_Th_um", "posterior_Kmean_D",
@@ -362,13 +352,7 @@ from the Pentacam Topometric/Keratoconus panel headed "Indices (in 8 mm zone)". 
 sign. Never substitute ISV, IVA, IHD, IHA, KISA, Q-value, a color, or a curvature-map spot for I_S.
 If the IS label, sign, digits, or eye laterality is uncertain, return I_S=null; never calculate I-S.
 
-If and only if the corresponding side/summary-table field is absent, obscured, or unreadable, a local
-map number may be used as a second-priority fallback when it directly represents the same named
-measurement and that field is allowed by MAP_FALLBACK_NUMERIC_FIELDS. Record it in
-map_fallback_numeric_fields and not in table_verified_numeric_fields. The marker/location and map
-type must make the identity unambiguous. This fallback is limited to the explicitly marked anterior/posterior elevation
-at that same thinnest point. Rmin is never a map fallback. A generic curvature-map spot is not Kmax
-or Rmin. If the identity or location is uncertain, return null.
+No numeric map fallback is permitted. If the authoritative labeled field is absent, obscured, or unreadable, return null. Never substitute a local map number, color-scale value, or neighboring measurement.
 
 EXCLUSIVE LABELED-BOX SOURCE LOCK:
 - K1_D, K1_axis_deg, K2_D, K2_axis_deg, and Kmean_D have exactly one accepted source:
@@ -633,8 +617,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         "Dp": "max", "Dt": "max", "Da": "max", "PPI_max": "max",
         "PPI_avg": "max", "PPI_min": "max", "ISV": "max", "IVA": "max",
         "KI": "max", "CKI": "max", "IHD": "max", "I_S": "max", "KISA": "max",
-        "IHA": "max", "Rmin_mm": "min", "anterior_elevation_thinnest_um": "max",
-        "posterior_elevation_thinnest_um": "max", "RMS_HOA_um": "max", "vertical_coma_um": "max",
+        "IHA": "max", "Rmin_mm": "min", "RMS_HOA_um": "max", "vertical_coma_um": "max",
         "srax_deg": "max", "inferior_opposite_steepening_D": "max",
     }
     morphology_rank = {

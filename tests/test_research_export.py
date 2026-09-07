@@ -105,8 +105,6 @@ def assessment(*, patient_id="P-123", patient_name="Şule Işık", report_date="
                     "PPI_min": 0.8,
                     "PPI_avg": 1.0,
                     "PPI_max": 1.3,
-                    "anterior_elevation_thinnest_um": 5,
-                    "posterior_elevation_thinnest_um": 12,
                     "source_files": ["private-patient-file.png"],
                 },
                 {
@@ -121,8 +119,6 @@ def assessment(*, patient_id="P-123", patient_name="Şule Işık", report_date="
                     "PPI_min": 0.9,
                     "PPI_avg": 1.1,
                     "PPI_max": 1.4,
-                    "anterior_elevation_thinnest_um": 6,
-                    "posterior_elevation_thinnest_um": 14,
                     "source_files": ["private-patient-file.png"],
                 },
             ],
