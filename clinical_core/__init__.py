@@ -1,5 +1,6 @@
 """Side-effect-free CER-AI clinical core."""
 
+from .bad import BADContext, BADResult, evaluate_bad, final_bad_d_classification
 from .disposition import (
     ASSESSMENT_INCOMPLETE,
     CAUTION,
@@ -43,7 +44,6 @@ from .refraction import (
     scalar_final_k_is_valid,
 )
 from .rules import (
-    bad_d_classification,
     erss_age_points,
     erss_pachymetry_points,
     erss_topography_category,
@@ -63,6 +63,8 @@ from .safety import (
 
 __all__ = [
     "ASSESSMENT_INCOMPLETE",
+    "BADContext",
+    "BADResult",
     "CAUTION",
     "ClinicalCoreInput",
     "DecisionFinding",
@@ -85,7 +87,6 @@ __all__ = [
     "PlanningResult",
     "Refraction",
     "STOP_DEFER",
-    "bad_d_classification",
     "erss_age_points",
     "erss_disposition",
     "erss_mrse_points",
@@ -95,8 +96,10 @@ __all__ = [
     "erss_topography_points",
     "erss_total",
     "estimated_final_kmean_d",
+    "evaluate_bad",
     "evaluate_normalized_case",
     "evaluate_ps3",
+    "final_bad_d_classification",
     "final_kmean_hard_stop",
     "finalize_disposition",
     "lasik_pta_percent",
