@@ -64,4 +64,12 @@ Retired files in this group:
 
 **Why the old test is retired:** `test_ps3_runtime_policy.py` requires a deleted `hc_engine` wrapper and would preserve a second status-assignment path. PS3 thresholds, completeness, inter-eye logic, and procedure disposition remain covered by canonical PS3/core/runtime tests.
 
+## Duplicate NICE runtime/scorer
+
+**Old rule / authority:** `nice_scoring.py` duplicated NICE thresholds and `nice_policy.py` wrapped `core.hc_engine` to calculate NICE and mutate final status.
+
+**New canonical rule / authority:** `clinical_core.nice.score_nice` is the sole four-input NICE scorer and `clinical_core.nice.nice_disposition` provides the NICE-specific finding consumed by the single canonical final disposition path.
+
+**Why the old test is retired:** `test_nice_workflow.py` imports the duplicate scorer/wrapper and legacy HC-engine fixtures. Keeping that test would require retaining two NICE implementations and a second status mutation path. NICE boundary, incompleteness, disposition, pipeline, and report-payload behavior remain covered by canonical clinical-core/runtime tests.
+
 No test is being retired because it is inconvenient. A test is retired only where its implementation has been explicitly superseded by the accepted canonical architecture.
