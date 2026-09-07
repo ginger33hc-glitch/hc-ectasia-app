@@ -1,6 +1,8 @@
 """Phase 3 locks for the production-to-linear normalized adapter."""
 from copy import deepcopy
 
+import pytest
+
 from clinical_core.pipeline import evaluate_normalized_case
 from phase3_normalized_adapter import build_clinical_core_input
 
@@ -49,10 +51,11 @@ def _plan():
         "ablation_um": 80.0,
         "manifest_entered_sphere_D": -2.0,
         "manifest_cylinder_signed_D": -1.0,
+        "manifest_axis_deg": 90.0,
         "intended_entered_sphere_D": -2.0,
         "intended_cylinder_signed_D": -1.0,
+        "intended_axis_deg": 90.0,
         "manifest_cylinder_magnitude_D": 1.0,
-        "manifest_axis_deg": 90.0,
     }
 
 
@@ -69,6 +72,8 @@ def test_adapter_maps_reconciled_production_values_to_linear_input():
     assert inp.manifest_mrse_d == -2.5
     assert inp.intended_mrse_d == -2.5
     assert inp.intended_sphere_d == -2.0
+    assert inp.intended_cylinder_d == -1.0
+    assert inp.intended_axis_deg == 90.0
     assert inp.flap_um == 100.0
     assert inp.ablation_um == 80.0
     assert inp.preop_kmean_d == 44.0
@@ -79,6 +84,24 @@ def test_adapter_maps_reconciled_production_values_to_linear_input():
     assert inp.ps3_eye.anterior_km_d == 44.0
     assert inp.ps3_inter_eye.od_anterior_km_d == 44.0
     assert inp.ps3_inter_eye.os_anterior_km_d == 44.0
+
+
+def test_plus_cylinder_is_normalized_once_before_core_input():
+    plan = _plan()
+    plan.update({
+        "manifest_entered_sphere_D": -4.0,
+        "manifest_cylinder_signed_D": +2.0,
+        "manifest_axis_deg": 10.0,
+        "intended_entered_sphere_D": -4.0,
+        "intended_cylinder_signed_D": +2.0,
+        "intended_axis_deg": 10.0,
+    })
+    inp = build_clinical_core_input(_eye(), plan, age_years=30)
+    assert inp.manifest_mrse_d == pytest.approx(-3.0)
+    assert inp.intended_mrse_d == pytest.approx(-3.0)
+    assert inp.intended_sphere_d == pytest.approx(-2.0)
+    assert inp.intended_cylinder_d == pytest.approx(-2.0)
+    assert inp.intended_axis_deg == pytest.approx(100.0)
 
 
 def test_surgeon_confirmed_i_s_overrides_extracted_i_s_for_core_input():
@@ -93,9 +116,7 @@ def test_adapter_does_not_mutate_production_payloads():
     plan = _plan()
     extracted = {"eyes": [eye, _eye("OS")]}
     before = deepcopy((eye, plan, extracted))
-
     build_clinical_core_input(eye, plan, age_years=30, extracted=extracted)
-
     assert (eye, plan, extracted) == before
 
 
@@ -105,4 +126,4 @@ def test_adapter_output_can_run_through_linear_pipeline_without_transport_state(
     inp = build_clinical_core_input(eye, _plan(), age_years=30, extracted=extracted)
     result = evaluate_normalized_case(inp)
     assert result["procedure"] == "LASIK"
-    assert result["status"] in {"PASS", "CAUTION", "STOP-DEFER", "DATA INSUFFICIENT"}
+    assert result["status"] in {"PASS", "CAUTION", "STOP-DEFER", "ASSESSMENT INCOMPLETE"}
