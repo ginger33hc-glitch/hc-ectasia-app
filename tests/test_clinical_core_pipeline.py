@@ -99,7 +99,9 @@ def test_reassuring_normalized_lasik_case_passes_only_when_all_decision_inputs_c
 def test_independent_bad_d_abnormal_outranks_reassuring_erss():
     result = evaluate_normalized_case(normal_lasik(final_bad_d=2.6))
     assert result["erss_status"] == "PASS"
-    assert result["bad_d"] == {"classification": "ABNORMAL", "status": STOP_DEFER}
+    assert result["bad_d"]["classification"] == "ABNORMAL"
+    assert result["bad_d"]["status"] == STOP_DEFER
+    assert result["bad_d"]["result"].final_d == 2.6
     assert result["status"] == STOP_DEFER
     assert {driver.key for driver in result["final_disposition"].stop_drivers} == {"bad_d"}
 
@@ -109,6 +111,7 @@ def test_tissue_hard_stop_outranks_incomplete_randleman_row():
         thinnest_um=479,
         ps3_eye=complete_ps3_eye(thinnest_um=479),
     ))
+    assert result["erss_status"] == ASSESSMENT_INCOMPLETE
     assert result["procedural_safety"]["hard_stops"]["preop_thickness"] is True
     assert result["procedural_safety"]["status"] == STOP_DEFER
     assert result["status"] == STOP_DEFER
