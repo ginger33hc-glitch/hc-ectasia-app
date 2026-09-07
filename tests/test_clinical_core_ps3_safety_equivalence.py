@@ -2,7 +2,6 @@
 
 from dataclasses import asdict
 
-import canonical_engine
 import ps3_policy
 from clinical_core.ps3 import PS3EyeInput, PS3InterEyeInput, evaluate_ps3
 from clinical_core.safety import (
@@ -21,8 +20,6 @@ from clinical_core.safety import (
     sphere_magnitude_hard_stop,
 )
 
-core = canonical_engine.core
-
 
 def complete_eye(**overrides):
     values = dict(
@@ -33,11 +30,10 @@ def complete_eye(**overrides):
         manifest_astig_d=1.0,
         manifest_axis_deg=90.0,
         ppi_avg=1.0,
+        f_ele_th_um=10.0,
+        b_ele_th_um=12.0,
         srax="NO",
         srax_deg=0.0,
-        bfte_front_um=10.0,
-        bfte_back_um=12.0,
-        refractive_group="MYOPIC_EMMETROPIC",
     )
     values.update(overrides)
     return PS3EyeInput(**values)
