@@ -34,4 +34,12 @@ The following `clean_engine`-specific test files are therefore retired rather th
 - `test_clean_migration_seam.py`
 - `test_clean_production_isolation.py`
 
-No test is being retired because it is inconvenient. It is retired because the entire implementation it tests is explicitly superseded and must be deleted to satisfy Step 1.
+## Legacy microkeratome runtime wrapper
+
+**Old rule / authority:** `microkeratome_planning_policy.py` wrapped `core.hc_engine` after clinical assessment and `test_microkeratome_runtime_policy.py` required that wrapper to be installed.
+
+**New canonical rule / authority:** clinical assessment never runs through an `hc_engine` wrapper. Pure microkeratome calculations remain in `planning/microkeratome.py`; canonical procedure-planning integration is deferred to the ordered Monday planning stage (Step 9).
+
+**Why the old test is retired:** requiring the wrapper to be installed would recreate a second downstream clinical path and violate Step 1. The pure planning calculations are preserved for their later canonical integration.
+
+No test is being retired because it is inconvenient. A test is retired only where its implementation has been explicitly superseded by the accepted canonical architecture.
