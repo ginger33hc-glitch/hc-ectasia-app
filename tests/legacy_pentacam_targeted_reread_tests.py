@@ -415,7 +415,7 @@ def test_elevation_back_map_cannot_substitute_for_b_ele_th_box():
         Core, result, reread, {"OD": ["B_Ele_Th_um"]}, "od.png"
     )
     assert not result.get("nice_readings")
-    assert any("verified BAD Display" in warning for warning in result["global_warnings"])
+    assert any("canonical source" in warning for warning in result["global_warnings"])
 
 
 def test_unreadable_b_ele_th_box_region_is_shown_beside_surgeon_input():
