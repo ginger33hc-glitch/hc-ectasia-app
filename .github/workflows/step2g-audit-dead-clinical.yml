@@ -25,7 +25,7 @@ jobs:
               'bad_classification','lasik_topography_points','scoring_morphology',
               'lasik_rsb_points','age_points','lasik_pachy_points','lasik_mrse_points',
               'prk_morphology_points','prk_pachy_points','score_category','tomography_review',
-              'estimate_ablation','refractive_pattern',
+              'estimate_ablation','refractive_pattern','required_tomography_missing',
           }
           for name in sorted(names):
               hits=[]
