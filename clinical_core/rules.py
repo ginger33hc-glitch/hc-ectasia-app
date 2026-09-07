@@ -1,16 +1,13 @@
-"""Pure CER-AI clinical rules.
+"""Pure CER-AI ERSS/topography rules.
 
 No runtime mutation, application imports, presentation behavior, or downstream
-correction layers belong here. Clinical thresholds are changed at this source.
+correction layers belong here. BAD, NICE, PS3, safety and planning rules live in
+their own canonical modules.
 """
 from __future__ import annotations
 
 from math import isfinite
 from typing import Optional
-
-NORMAL = "NORMAL"
-SUSPICIOUS = "SUSPICIOUS"
-ABNORMAL = "ABNORMAL"
 
 NORMAL_SYMMETRIC = "NORMAL_SYMMETRIC"
 ASYMMETRIC_BOWTIE = "ASYMMETRIC_BOWTIE"
@@ -50,17 +47,6 @@ def erss_pachymetry_points(thinnest_um) -> Optional[int]:
     if value < 510:
         return 1
     return 0
-
-
-def bad_d_classification(value) -> str:
-    if not _finite(value):
-        return "UNAVAILABLE"
-    value = float(value)
-    if value <= 1.60:
-        return NORMAL
-    if value < 2.60:
-        return SUSPICIOUS
-    return ABNORMAL
 
 
 def signed_i_s_category(i_s_d) -> str:
