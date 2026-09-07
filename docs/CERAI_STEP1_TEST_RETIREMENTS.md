@@ -42,4 +42,18 @@ The following `clean_engine`-specific test files are therefore retired rather th
 
 **Why the old test is retired:** requiring the wrapper to be installed would recreate a second downstream clinical path and violate Step 1. The pure planning calculations are preserved for their later canonical integration.
 
+## Legacy ERSS runtime-wrapper and visual-morphology tests
+
+**Old rule / authority:** `erss_auto_read_policy.py`, `erss_topography_evidence_policy.py`, `erss_topography_guard.py`, and `erss_visual_morphology_policy.py` modified `core.hc_engine`, `core.assess_eye`, `core.scoring_morphology`, or readiness behavior and allowed a visual morphology pathway to participate in Randleman/ERSS classification.
+
+**New canonical rule / authority:** `clinical_core.rules.erss_topography_category` and `clinical_core.erss` own the Randleman topography rule. Signed I-S is canonical numeric evidence; SRAX is used only from the approved front-map geometry/surgeon-confirmed source according to the Monday matrix. General visual morphology is not an automated Randleman scoring pathway.
+
+**Why the old tests are retired:** tests that import or require those deleted wrappers would preserve the superseded runtime chain. Canonical I-S/SRAX boundaries, missing-data behavior, and non-additive topography scoring are now locked by the clinical-core and canonical-runtime test suites.
+
+Retired files in this group:
+
+- `test_erss_auto_read_policy.py`
+- `test_erss_topography_evidence_policy.py`
+- `test_morphology_retirement_lock.py`
+
 No test is being retired because it is inconvenient. A test is retired only where its implementation has been explicitly superseded by the accepted canonical architecture.
