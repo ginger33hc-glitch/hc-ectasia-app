@@ -1,9 +1,9 @@
 """Boundary gates for the pure CER-AI clinical core."""
 
 import canonical_engine
+from clinical_core.bad import final_bad_d_classification
 from clinical_core.rules import (
     UNCERTAIN,
-    bad_d_classification,
     erss_age_points,
     erss_pachymetry_points,
     erss_topography_category,
@@ -25,7 +25,7 @@ def test_pachymetry_points_match_current_production_boundaries():
 
 def test_final_bad_d_matches_current_production_boundaries():
     values = (1.0, 1.6, 1.6001, 2.5999, 2.6, 3.0)
-    assert [bad_d_classification(x) for x in values] == [
+    assert [final_bad_d_classification(x) for x in values] == [
         core.bad_classification(x, final=True) for x in values
     ]
 
