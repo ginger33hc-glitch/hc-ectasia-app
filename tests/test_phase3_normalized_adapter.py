@@ -3,7 +3,11 @@ from copy import deepcopy
 
 import pytest
 
-from canonical_input_adapter import build_clinical_core_input
+from canonical_input_adapter import (
+    build_clinical_core_input,
+    resolve_case_plans,
+    resolve_eye_plan,
+)
 from clinical_core.pipeline import evaluate_normalized_case
 
 
@@ -60,6 +64,21 @@ def _plan():
     }
 
 
+def _card(eye="OD", sphere=-3.0, cylinder=-1.5, axis=80.0, *, axis_status="CONFIDENT"):
+    return {
+        "eye": eye,
+        "source_document": "EXCIMER_LASER_FOLLOW_UP_CARD",
+        "source_label": "DUZELTME_MIKTARI",
+        "sphere_D": sphere,
+        "cylinder_D": cylinder,
+        "axis_deg": axis,
+        "sphere_cylinder_status": "CONFIDENT",
+        "axis_status": axis_status,
+        "raw_text": None,
+        "missing_or_unreadable": [],
+    }
+
+
 def test_adapter_maps_reconciled_canonical_values_to_linear_input():
     od = _eye("OD")
     os = _eye("OS")
@@ -111,6 +130,104 @@ def test_plus_cylinder_is_normalized_once_before_core_input():
     assert inp.intended_sphere_d == pytest.approx(-2.0)
     assert inp.intended_cylinder_d == pytest.approx(-2.0)
     assert inp.intended_axis_deg == pytest.approx(100.0)
+
+
+def test_confident_treatment_card_defaults_both_roles_when_surrounding_plan_is_blank():
+    plan = {"procedure": "LASIK", "prior": "no", "flap_um": 100.0, "ablation_um": 80.0}
+    extracted = {"eyes": [_eye("OD")], "treatment_corrections": [_card()]}
+    resolved = resolve_eye_plan(plan, extracted=extracted, eye_name="OD")
+    assert resolved["manifest_entered_sphere_D"] == -3.0
+    assert resolved["manifest_cylinder_signed_D"] == -1.5
+    assert resolved["manifest_axis_deg"] == 80.0
+    assert resolved["intended_entered_sphere_D"] == -3.0
+    assert resolved["intended_cylinder_signed_D"] == -1.5
+    assert resolved["intended_axis_deg"] == 80.0
+    assert resolved["manifest_source"] == "TREATMENT_CARD_DUZELTME_MIKTARI"
+    assert resolved["intended_source"] == "TREATMENT_CARD_DUZELTME_MIKTARI"
+
+
+def test_explicit_intended_role_outranks_treatment_card_for_that_role_only():
+    plan = {
+        "procedure": "LASIK",
+        "prior": "no",
+        "flap_um": 100.0,
+        "ablation_um": 80.0,
+        "intended_entered_sphere_D": -2.0,
+        "intended_cylinder_signed_D": -0.5,
+        "intended_axis_deg": 70.0,
+    }
+    extracted = {"eyes": [_eye("OD")], "treatment_corrections": [_card()]}
+    resolved = resolve_eye_plan(plan, extracted=extracted, eye_name="OD")
+    assert resolved["manifest_entered_sphere_D"] == -3.0
+    assert resolved["intended_entered_sphere_D"] == -2.0
+    assert resolved["intended_cylinder_signed_D"] == -0.5
+    assert resolved["intended_axis_deg"] == 70.0
+    assert "intended_source" not in resolved
+
+
+def test_wholly_blank_intended_role_defaults_from_manifest_without_card():
+    plan = _plan()
+    for key in (
+        "intended_entered_sphere_D",
+        "intended_cylinder_signed_D",
+        "intended_axis_deg",
+    ):
+        plan.pop(key)
+    resolved = resolve_eye_plan(plan, extracted={"eyes": [_eye()]}, eye_name="OD")
+    assert resolved["intended_entered_sphere_D"] == plan["manifest_entered_sphere_D"]
+    assert resolved["intended_cylinder_signed_D"] == plan["manifest_cylinder_signed_D"]
+    assert resolved["intended_axis_deg"] == plan["manifest_axis_deg"]
+    assert resolved["intended_source"] == "DEFAULTED_FROM_MANIFEST"
+
+
+def test_partial_intended_role_never_falls_back_to_manifest_or_card():
+    plan = _plan()
+    plan["intended_entered_sphere_D"] = -1.5
+    plan.pop("intended_cylinder_signed_D")
+    plan.pop("intended_axis_deg")
+    extracted = {"eyes": [_eye()], "treatment_corrections": [_card()]}
+    resolved = resolve_eye_plan(plan, extracted=extracted, eye_name="OD")
+    assert resolved["intended_entered_sphere_D"] == -1.5
+    assert "intended_cylinder_signed_D" not in resolved
+    inp = build_clinical_core_input(_eye(), plan, age_years=30, extracted=extracted)
+    assert inp.intended_mrse_d is None
+
+
+def test_ambiguous_multiple_card_corrections_are_not_silently_selected():
+    plan = {"procedure": "LASIK", "prior": "no", "flap_um": 100.0, "ablation_um": 80.0}
+    extracted = {
+        "eyes": [_eye()],
+        "treatment_corrections": [_card(sphere=-3.0), _card(sphere=-4.0)],
+    }
+    resolved = resolve_eye_plan(plan, extracted=extracted, eye_name="OD")
+    assert "manifest_entered_sphere_D" not in resolved
+    assert "intended_entered_sphere_D" not in resolved
+
+
+def test_card_axis_uncertainty_preserves_sphere_cylinder_but_remains_incomplete_for_nonzero_cylinder():
+    plan = {"procedure": "LASIK", "prior": "no", "flap_um": 100.0, "ablation_um": 80.0}
+    extracted = {"eyes": [_eye()], "treatment_corrections": [_card(axis_status="UNCERTAIN")]}
+    resolved = resolve_eye_plan(plan, extracted=extracted, eye_name="OD")
+    assert resolved["manifest_entered_sphere_D"] == -3.0
+    assert resolved["manifest_cylinder_signed_D"] == -1.5
+    assert "manifest_axis_deg" not in resolved
+    inp = build_clinical_core_input(_eye(), plan, age_years=30, extracted=extracted)
+    assert inp.manifest_mrse_d is None
+    assert inp.intended_mrse_d is None
+
+
+def test_resolve_case_plans_is_eye_specific_and_does_not_cross_fill():
+    plans = {
+        "OD": {"procedure": "LASIK", "prior": "no", "flap_um": 100.0, "ablation_um": 80.0},
+        "OS": {"procedure": "LASIK", "prior": "no", "flap_um": 100.0, "ablation_um": 80.0},
+    }
+    extracted = {
+        "eyes": [_eye("OD"), _eye("OS")],
+        "treatment_corrections": [_card("OD", sphere=-3.0), _card("OS", sphere=-5.0)],
+    }
+    resolved = resolve_case_plans(extracted, plans)
+    assert resolved["OD"]["manifest_entered_sphere_D"] == -3.0
+    assert resolved["OS"]["manifest_entered_sphere_D"] == -5.0
 
 
 def test_surgeon_confirmed_i_s_overrides_extracted_i_s_for_core_input():
