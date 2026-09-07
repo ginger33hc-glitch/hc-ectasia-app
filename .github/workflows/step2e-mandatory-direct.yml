@@ -1,0 +1,133 @@
+name: Step 2E direct mandatory source gate
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  flatten:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: monday-clean-architecture
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Guard and flatten mandatory source gate
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import ast
+
+          app_path = Path('app.py')
+          policy_path = Path('mandatory_source_set_policy.py')
+          composition_path = Path('runtime_composition.py')
+          engine_path = Path('canonical_engine.py')
+
+          app = app_path.read_text(encoding='utf-8')
+          policy = policy_path.read_text(encoding='utf-8')
+          composition = composition_path.read_text(encoding='utf-8')
+          engine = engine_path.read_text(encoding='utf-8')
+
+          # App owns the source-recognition prompt and explicit validation call.
+          import_marker = 'import geometric_srax_policy\n\n'
+          direct_import = 'import mandatory_source_set_policy\n'
+          if direct_import not in app:
+              if app.count(import_marker) != 1:
+                  raise SystemExit('ABORT: app enrichment import marker ambiguous')
+              app = app.replace(import_marker, import_marker + direct_import, 1)
+
+          prompt_marker = '''PROMPT += (\n    "\\n\\nCANONICAL EXACT-SOURCE PROVENANCE — REQUIRED FOR EVERY LOCKED FIELD:\\n"\n'''
+          prompt_end = '''    + _CANONICAL_SOURCE_PROMPT\n)\n'''
+          if app.count(prompt_marker) != 1 or app.count(prompt_end) != 1:
+              raise SystemExit('ABORT: canonical prompt block markers ambiguous')
+          direct_prompt = prompt_end + 'PROMPT += "\\n" + mandatory_source_set_policy.BAD_DISPLAY_RECOGNITION_PROMPT\n'
+          if 'mandatory_source_set_policy.BAD_DISPLAY_RECOGNITION_PROMPT' not in app:
+              app = app.replace(prompt_end, direct_prompt, 1)
+
+          merge_marker = '''    from assessment_workflow import begin\n    import sys\n    extracted = merge_extractions(extraction_results)\n'''
+          merge_new = '''    from assessment_workflow import begin\n    import sys\n    mandatory_source_set = mandatory_source_set_policy.validate_source_set(extraction_results)\n    extracted = merge_extractions(extraction_results)\n    extracted["mandatory_source_set"] = mandatory_source_set\n'''
+          if app.count(merge_marker) != 1:
+              raise SystemExit(f'ABORT: assessment merge marker count={app.count(merge_marker)}')
+          app = app.replace(merge_marker, merge_new, 1)
+
+          # Mandatory source policy becomes a pure classifier/validator.
+          cut = policy.find('\n_previous_merge_extractions = None')
+          if cut < 0:
+              raise SystemExit('ABORT: mandatory wrapper state boundary missing')
+          # Keep everything before wrapper state, then restore pure helper definitions that occur below.
+          helper_start = policy.find('\ndef _norm(', cut)
+          if helper_start < 0:
+              raise SystemExit('ABORT: mandatory pure helper boundary missing')
+          pure = policy[:cut] + policy[helper_start:]
+          wrapper_start = pure.find('\ndef merge_extractions_with_mandatory_source_gate(')
+          if wrapper_start < 0:
+              raise SystemExit('ABORT: mandatory merge wrapper boundary missing after reconstruction')
+          pure = pure[:wrapper_start].rstrip() + '\n'
+          pure = pure.replace('from contextvars import ContextVar\n', '')
+          if any(token in pure for token in (
+              'def install(', '_previous_merge_extractions', '_previous_run_image_assessment',
+              '_gate_active', 'merge_extractions_with_mandatory_source_gate',
+              'run_image_assessment_with_mandatory_gate',
+          )):
+              raise SystemExit('ABORT: mandatory wrapper state survived')
+          policy = pure
+
+          # Runtime composition no longer installs or owns the mandatory gate.
+          for line in (
+              'import mandatory_source_set_policy  # noqa: E402\n',
+              '    mandatory_source_set_policy.install(core)\n',
+          ):
+              if composition.count(line) != 1:
+                  raise SystemExit(f'ABORT: composition mandatory line count={composition.count(line)}')
+              composition = composition.replace(line, '', 1)
+          composition = composition.replace(
+              '        "merge_policy_base", "extraction_guard",\n        "mandatory_source_set_policy",\n',
+              '        "merge_policy_base", "extraction_guard",\n',
+              1,
+          )
+          if 'mandatory_source_set_policy' in composition:
+              raise SystemExit('ABORT: mandatory source gate survived runtime composition')
+
+          # Startup invariants require direct assessment ownership and forbid installer API.
+          engine_import_marker = 'import geometric_srax_policy\n'
+          engine_direct_import = 'import mandatory_source_set_policy\n'
+          if engine_direct_import not in engine:
+              if engine.count(engine_import_marker) != 1:
+                  raise SystemExit('ABORT: canonical engine import marker ambiguous')
+              engine = engine.replace(engine_import_marker, engine_import_marker + engine_direct_import, 1)
+          marker_line = '        ("_cerai_mandatory_source_set_installed", "Mandatory Pentacam source gate is not active"),\n'
+          if engine.count(marker_line) != 1:
+              raise SystemExit('ABORT: mandatory runtime marker invariant ambiguous')
+          engine = engine.replace(marker_line, '', 1)
+          invariant_marker = '''    extraction_source = inspect.getsource(core.extract_one_image)\n'''
+          direct_check = '''    assessment_source = inspect.getsource(core._run_image_assessment)\n    if "mandatory_source_set_policy.validate_source_set(extraction_results)" not in assessment_source:\n        errors.append("Mandatory Pentacam source gate is not directly owned by app._run_image_assessment")\n    if callable(getattr(mandatory_source_set_policy, "install", None)):\n        errors.append("Mandatory Pentacam source policy must not expose a runtime installer")\n    if "mandatory_source_set_policy" in phase_names:\n        errors.append("Mandatory Pentacam source wrapper remains in runtime composition")\n\n    extraction_source = inspect.getsource(core.extract_one_image)\n'''
+          if engine.count(invariant_marker) != 1:
+              raise SystemExit('ABORT: direct pipeline invariant marker ambiguous')
+          engine = engine.replace(invariant_marker, direct_check, 1)
+
+          for text, name in ((app, 'app.py'), (policy, 'mandatory_source_set_policy.py'),
+                             (composition, 'runtime_composition.py'), (engine, 'canonical_engine.py')):
+              ast.parse(text, filename=name)
+
+          app_path.write_text(app, encoding='utf-8')
+          policy_path.write_text(policy, encoding='utf-8')
+          composition_path.write_text(composition, encoding='utf-8')
+          engine_path.write_text(engine, encoding='utf-8')
+          PY
+          python -m py_compile app.py mandatory_source_set_policy.py runtime_composition.py canonical_engine.py
+          git diff --check
+      - name: Commit direct mandatory source gate
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py mandatory_source_set_policy.py runtime_composition.py canonical_engine.py
+          git commit -m "Flatten mandatory Pentacam source gate"
+          git push origin HEAD:monday-clean-architecture
