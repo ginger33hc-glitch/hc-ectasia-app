@@ -77,6 +77,8 @@ TABLE_NUMERIC_FIELDS = (
     "posterior_elevation_thinnest_um", "thinnest_x_mm", "thinnest_y_mm",
     "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um", "Kmean_D",
     "total_RMS_um", "spherical_aberration_um",
+    "central_pachy_um", "B_Ele_Th_um", "F_Ele_Th_um", "posterior_Kmean_D",
+    "topographic_astig_D", "topographic_steep_axis_deg", "topometric_RMin", "TKC",
 )
 MAP_FALLBACK_NUMERIC_FIELDS = (
     # Only explicitly marked elevation-at-thinnest values remain permitted local-map fallbacks.
@@ -152,6 +154,14 @@ SCHEMA = {
                     "K2_D": {"type": ["number", "null"]},
                     "K2_axis_deg": {"type": ["number", "null"]},
                     "Kmax_D": {"type": ["number", "null"]},
+                    "central_pachy_um": {"type": ["number", "null"]},
+                    "B_Ele_Th_um": {"type": ["number", "null"]},
+                    "F_Ele_Th_um": {"type": ["number", "null"]},
+                    "posterior_Kmean_D": {"type": ["number", "null"]},
+                    "topographic_astig_D": {"type": ["number", "null"]},
+                    "topographic_steep_axis_deg": {"type": ["number", "null"]},
+                    "topometric_RMin": {"type": ["number", "null"]},
+                    "TKC": {"type": ["number", "null"]},
                     "corneal_diameter_mm": {"type": ["number", "null"]},
                     "pachy_thinnest_um": {"type": ["number", "null"]},
                     "BAD_D": {"type": ["number", "null"]},
@@ -208,7 +218,10 @@ SCHEMA = {
                     "I_S", "KISA", "IHA", "Rmin_mm", "anterior_elevation_thinnest_um",
                     "posterior_elevation_thinnest_um", "thinnest_x_mm", "thinnest_y_mm",
                     "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um", "Kmean_D",
-                    "total_RMS_um", "spherical_aberration_um", "morphology",
+                    "total_RMS_um", "spherical_aberration_um",
+                    "central_pachy_um", "B_Ele_Th_um", "F_Ele_Th_um", "posterior_Kmean_D",
+                    "topographic_astig_D", "topographic_steep_axis_deg", "topometric_RMin", "TKC",
+                    "morphology",
                     "morphology_evidence", "asymmetric_bow_tie", "srax", "srax_deg",
                     "inferior_opposite_steepening_D",
                     "anterior_pattern", "posterior_pattern",
@@ -337,6 +350,11 @@ EXCLUSIVE LABELED-BOX SOURCE LOCK:
   UNREADABLE, or NOT_SHOWN. Never use Cornea Back, True Net Power, Total Corneal Refractive Power,
   another map/display, a color-map number, Kmax, or another K/Km-like field for these outputs.
 - Rmin_mm: exactly one accepted source: "Show 2 Exams Topometric" -> panel headed "Cornea Back" -> printed Rmin row. Never use Cornea Front Rmin, the center topometric RMin index, Four Maps, a map spot, or any calculated value.
+- central_pachy_um: use only 4 Maps Refractive lower-left Pupil Center (+) pachymetry.
+- B_Ele_Th_um and F_Ele_Th_um: use only the BAD Display central labeled B.Ele.Th/F.Ele.Th boxes.
+- posterior_Kmean_D: use only Show 2 Exams Topometric -> Cornea Back -> printed Km.
+- topographic_astig_D and topographic_steep_axis_deg: use only Show 2 Exams Topometric -> Cornea Front.
+- topometric_RMin and TKC: use only Show 2 Exams Topometric center Indices (in 8 mm zone).
 - Kmax_D: use only the numeric value in the explicitly printed "KMax"/"Kmax" row.
 - ARTmax_um: use only the numeric value in the explicitly printed "ARTmax" row beneath the
   Progression Index panel.

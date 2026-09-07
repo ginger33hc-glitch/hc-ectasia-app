@@ -247,28 +247,9 @@ def missing_targets_by_eye(result: dict[str, Any]) -> dict[str, list[str]]:
         eye_id = eye.get("eye")
         if eye_id not in {"OD", "OS"}:
             continue
-        central_present = any(
-            reading.get("eye") == eye_id
-            and reading.get("central_status") == "CONFIDENT"
-            and reading.get("central_landmark") == "PUPIL_CENTER_PLUS"
-            and reading.get("central_pachy_um") is not None
-            for reading in result.get("nice_readings") or []
-            if isinstance(reading, dict)
-        )
-        b_ele_th_present = any(
-            reading.get("eye") == eye_id
-            and reading.get("b_ele_th_status") == "CONFIDENT"
-            and reading.get("b_ele_th_landmark") == "B_ELE_TH_LABELED_BOX"
-            and reading.get("b_ele_th_page") == "BAD_DISPLAY"
-            and reading.get("B_Ele_Th_um") is not None
-            for reading in result.get("nice_readings") or []
-            if isinstance(reading, dict)
-        )
         missing = [
             field for field in TARGET_FIELDS
-            if not (field == "central_pachy_um" and central_present)
-            and not (field == "B_Ele_Th_um" and b_ele_th_present)
-            and not (
+            if not (
                 field in CORNEA_FRONT_KERATOMETRY_FIELDS
                 and eye.get("keratometry_source") != CORNEA_FRONT_KERATOMETRY_SOURCE
             )
@@ -518,7 +499,7 @@ def apply_targeted_readings(
 
     for (eye_id, field), readings in candidates.items():
         eye = eyes.get(eye_id)
-        if eye is None or (field not in {"central_pachy_um", "B_Ele_Th_um"} and eye.get(field) is not None):
+        if eye is None or eye.get(field) is not None:
             continue
         values = [float(item["value"]) for item in readings]
         if not _same_number(values):
@@ -528,32 +509,15 @@ def apply_targeted_readings(
             )
             continue
         retained = values[0]
-        if field in {"central_pachy_um", "B_Ele_Th_um"}:
-            central_value = retained if field == "central_pachy_um" else None
-            b_ele_th_value = retained if field == "B_Ele_Th_um" else None
-            result.setdefault("nice_readings", []).append({
-                "eye": eye_id,
-                "central_pachy_um": central_value,
-                "central_status": "CONFIDENT" if field == "central_pachy_um" else "NOT_SHOWN",
-                "central_landmark": "PUPIL_CENTER_PLUS" if field == "central_pachy_um" else "UNREADABLE",
-                "B_Ele_Th_um": b_ele_th_value,
-                "b_ele_th_status": "CONFIDENT" if field == "B_Ele_Th_um" else "NOT_SHOWN",
-                "b_ele_th_landmark": "B_ELE_TH_LABELED_BOX" if field == "B_Ele_Th_um" else "UNREADABLE",
-                "b_ele_th_page": "BAD_DISPLAY" if field == "B_Ele_Th_um" else "UNREADABLE",
-                "evidence": (
-                    f"Targeted labeled-box reread: {readings[0].get('printed_label')} = {retained:g} µm"
-                ),
-            })
-        else:
-            eye[field] = retained
-            if field in CORNEA_FRONT_KERATOMETRY_FIELDS:
-                eye["keratometry_source"] = CORNEA_FRONT_KERATOMETRY_SOURCE
-            verified = set(eye.get("table_verified_numeric_fields") or [])
-            verified.add(field)
-            eye["table_verified_numeric_fields"] = sorted(verified)
-            source_id = canonical_source_id(field)
-            if source_id:
-                eye.setdefault("canonical_source_ids", {})[field] = source_id
+        eye[field] = retained
+        if field in CORNEA_FRONT_KERATOMETRY_FIELDS:
+            eye["keratometry_source"] = CORNEA_FRONT_KERATOMETRY_SOURCE
+        verified = set(eye.get("table_verified_numeric_fields") or [])
+        verified.add(field)
+        eye["table_verified_numeric_fields"] = sorted(verified)
+        source_id = canonical_source_id(field)
+        if source_id:
+            eye.setdefault("canonical_source_ids", {})[field] = source_id
         eye["missing_or_unreadable"] = [
             item for item in eye.get("missing_or_unreadable") or [] if item != field
         ]

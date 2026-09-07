@@ -125,9 +125,6 @@ def _has_show_two_numeric_signature(result: dict[str, Any]) -> bool:
 
 
 def _has_bad_display_signature(result: dict[str, Any]) -> bool:
-    for reading in result.get("nice_readings") or []:
-        if reading.get("b_ele_th_page") == "BAD_DISPLAY":
-            return True
     bad_fields = {"BAD_D", "Df", "Db", "Dp", "Dt", "Da"}
     for eye in result.get("eyes") or []:
         verified = set(eye.get("table_verified_numeric_fields") or [])
