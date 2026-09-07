@@ -17,6 +17,7 @@ import sys
 
 import canonical_engine
 import assessment_workflow
+import mandatory_source_set_policy
 import runtime_composition
 from clinical_core.bad import final_bad_d_classification
 from clinical_core.disposition import (
@@ -143,7 +144,12 @@ def test_retired_erss_clinical_wrappers_are_absent_from_composition():
 def test_required_nonclinical_runtime_boundaries_are_installed():
     assert not hasattr(core, "_cerai_erss_numeric_extraction_installed")
     assert not Path("erss_numeric_extraction_policy.py").exists()
-    assert core._cerai_mandatory_source_set_installed
+    assessment_source = inspect.getsource(core._run_image_assessment)
+    assert "mandatory_source_set_policy.validate_source_set(extraction_results)" in assessment_source
+    assert not callable(getattr(mandatory_source_set_policy, "install", None))
+    assert "mandatory_source_set_policy" not in {
+        name for values in runtime_composition.COMPOSITION_PHASES.values() for name in values
+    }
     assert core._hc_readiness_installed
     assert "ERSS VISUAL MORPHOLOGY DISABLED:" in core.PROMPT
 
