@@ -59,6 +59,7 @@ class ClinicalCoreInput:
     thinnest_um: Optional[float] = None
     i_s_d: Optional[float] = None
     derived_srax_deg: Optional[float] = None
+    srax_gt20_confirmed: Optional[bool] = None
     manifest_mrse_d: Optional[float] = None
     intended_sphere_d: Optional[float] = None
     intended_cylinder_d: Optional[float] = None
@@ -202,6 +203,7 @@ def evaluate_normalized_case(
             inp.derived_srax_deg,
             rsb,
             inp.manifest_mrse_d,
+            inp.srax_gt20_confirmed,
         )
         erss_status = erss_disposition(erss["total"])
 
