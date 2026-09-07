@@ -1,4 +1,5 @@
 """Step-1 cleanup contract for physically retired legacy clinical paths."""
+import ast
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -42,6 +43,21 @@ def test_deleted_runtime_wrappers_are_not_present():
     )
     for path in retired:
         assert not (REPO / path).exists(), path
+
+
+def test_app_no_longer_defines_or_calls_legacy_clinical_engine():
+    app_path = REPO / "app.py"
+    text = app_path.read_text(encoding="utf-8")
+    tree = ast.parse(text, filename=str(app_path))
+    top_level_functions = {
+        node.name
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    assert {"assess_eye", "hc_engine", "apply_extracted_corrections"}.isdisjoint(top_level_functions)
+    assert "from nice_policy import attach_readings" not in text
+    assert "attach_readings(" not in text
+    assert "def merge_extractions(" in text
 
 
 def test_retirement_record_exists_and_names_canonical_authority():
