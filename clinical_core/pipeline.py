@@ -6,14 +6,15 @@ the sole owner of final PASS/CAUTION/STOP-DEFER/ASSESSMENT INCOMPLETE.
 External workflow boundaries remain deliberately outside this clinical core:
 readiness, identity/source validation, contact-lens washout, clinical eligibility,
 planning fallback orchestration, reporting/rendering, and archive persistence.
-Those concerns may consume canonical clinical outputs but may not recalculate or
-override clinical scores or final disposition.
+External clinical findings may be supplied to the finalizer, but this module does
+not calculate those external rules and no downstream layer may override the final
+canonical disposition.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from math import isfinite
-from typing import Optional
+from typing import Iterable, Optional
 
 from .bad import BADContext, evaluate_bad
 from .disposition import (
@@ -174,7 +175,11 @@ def _safety_status(
     return PASS, hard_stops, []
 
 
-def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
+def evaluate_normalized_case(
+    inp: ClinicalCoreInput,
+    *,
+    external_findings: Iterable[DecisionFinding] = (),
+) -> dict:
     procedure = (inp.procedure or "").strip().upper()
 
     intended_refraction = _intended_refraction(inp)
@@ -235,13 +240,17 @@ def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
     if intended_group == MIXED:
         safety_detail += "; scalar MRSE/Kmean final-K model prohibited for mixed astigmatism"
 
-    findings = (
+    core_findings = (
         DecisionFinding("randleman_erss", erss_status, "LASIK ERSS" if procedure == "LASIK" else "Not applicable"),
         DecisionFinding("bad_d", bad_status, f"Final BAD-D: {bad.classification}"),
         DecisionFinding("nice", nice_status, f"NICE total: {nice.get('total')!r}"),
         DecisionFinding("ps3", ps3_status, "PS3 procedure disposition"),
         DecisionFinding("procedural_safety", safety_status, safety_detail),
     )
+    supplied_findings = tuple(external_findings)
+    if any(not isinstance(item, DecisionFinding) for item in supplied_findings):
+        raise TypeError("external_findings must contain DecisionFinding objects only")
+    findings = core_findings + supplied_findings
     final = finalize_disposition(findings)
 
     return {
@@ -266,6 +275,7 @@ def evaluate_normalized_case(inp: ClinicalCoreInput) -> dict:
             "status": safety_status,
         },
         "decision_findings": findings,
+        "external_findings": supplied_findings,
         "final_disposition": final,
         "status": final.status,
     }
