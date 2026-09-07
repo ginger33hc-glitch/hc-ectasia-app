@@ -118,7 +118,7 @@ def runtime_invariants():
     merge_source = inspect.getsource(core.merge_extractions)
     if core.merge_extractions.__module__ != "app":
         errors.append("Canonical merge_extractions is not owned directly by app.py")
-    if "apply_extraction_validation(merged, results)" not in merge_source:
+    if "apply_extraction_validation(merged)" not in merge_source:
         errors.append("Canonical merge does not directly invoke extraction validation")
     if "merge_policy_base" in phase_names or "extraction_guard" in phase_names:
         errors.append("Retired merge wrapper remains in runtime composition")

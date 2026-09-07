@@ -27,7 +27,6 @@ from pentacam_canonical_source_lock import (
 from pentacam_field_registry import (
     CORNEA_FRONT_KERATOMETRY_FIELDS,
     CORNEA_FRONT_KERATOMETRY_SOURCE,
-    EXCLUSIVE_LABELED_BOX_FIELDS,
     KERATOMETRY_SOURCE_VALUES,
 )
 from pentacam_quality_policy import is_quality_only_issue, warnings_for_extracted
@@ -620,13 +619,8 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
     quality_rank = {"INADEQUATE": 0, "LIMITED": 1, "ADEQUATE": 2}
     posterior_rank = {"UNREADABLE": 0, "REASSURING": 1, "BORDERLINE": 2, "ABNORMAL": 3}
-    numeric_tolerance = {
-        "K1_D": 0.25, "K2_D": 0.25,
-        "K1_axis_deg": 2.0, "K2_axis_deg": 2.0, "corneal_diameter_mm": 0.10,
-    }
     # Descriptive values that do not drive a CER-AI decision must never become unresolved conflicts
-    # that prohibit PASS. Across overlapping Pentacam screens, preserve source priority
-    # (labeled table over permitted map fallback); at equal priority retain the first reading.
+    # that prohibit PASS. Canonical numeric disagreements are never tolerance-reconciled.
     non_decision_conflict_fields = {
         "thinnest_x_mm", "thinnest_y_mm", "morphology_confidence"
     }
@@ -750,8 +744,6 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 continue
             target = by_eye[eye_id]
             target.setdefault("data_conflicts", [])
-            target_table_sources = set(target.get("table_verified_numeric_fields", []))
-            incoming_table_sources = set(eye.get("table_verified_numeric_fields", []))
             target["screen_types"] = sorted(set(target.get("screen_types", []) + eye.get("screen_types", [])))
             target["source_files"] = sorted(set(target.get("source_files", []) + eye.get("source_files", [])))
             target.setdefault("quality_by_source", {}).update(eye.get("quality_by_source", {}))
@@ -761,12 +753,6 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 if source_id:
                     target["canonical_source_ids"][field] = source_id
             for field, records in eye.get("field_provenance", {}).items():
-                if (
-                    field in EXCLUSIVE_LABELED_BOX_FIELDS
-                    and field in target_table_sources
-                    and target.get(field) is not None
-                ):
-                    continue
                 combined_records = target["field_provenance"].setdefault(field, []) + records
                 target["field_provenance"][field] = [
                     dict(item) for item in {
@@ -826,21 +812,18 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     "unreadable_source_regions",
                 ):
                     continue
+                # Once a locked canonical field conflicts, no later duplicate may silently refill it.
+                existing_locked_conflict = key in LOCKED_FIELDS and any(
+                    str(item).split(":", 1)[0].strip() == key
+                    for item in target.get("data_conflicts", [])
+                )
+                if existing_locked_conflict:
+                    continue
                 old = target.get(key)
                 if old is None and value is not None:
                     target[key] = value
                     continue
                 if value is None or old == value:
-                    continue
-
-                if (
-                    key in EXCLUSIVE_LABELED_BOX_FIELDS
-                    and key in target_table_sources
-                    and key in incoming_table_sources
-                ):
-                    # This field is owned by its explicitly labeled Pentacam box. Retain the
-                    # first valid same-eye box transcription; duplicate screens are not a
-                    # consensus source and must not manufacture a conflict.
                     continue
 
                 # Missing/uncertain information on a page that lacks the relevant map is not
@@ -864,12 +847,9 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     if value == "UNCERTAIN":
                         continue
 
-                if (
-                    key in numeric_tolerance
-                    and is_number(old)
-                    and is_number(value)
-                    and abs(float(old) - float(value)) <= numeric_tolerance[key]
-                ):
+                if key in LOCKED_FIELDS:
+                    target["data_conflicts"].append(f"{key}: {old} vs {value}")
+                    target[key] = None
                     continue
 
                 if key in planning_conflict_fields:
@@ -1020,7 +1000,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     # One explicit post-merge extraction audit; this helper never owns or replaces merge_extractions.
     from extraction_guard import apply_extraction_validation
-    return apply_extraction_validation(merged, results)
+    return apply_extraction_validation(merged)
 
 
 @app.get("/")

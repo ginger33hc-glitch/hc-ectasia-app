@@ -4,16 +4,10 @@ This module does not extract or infer clinical values. It audits the merged extr
 records provenance/coverage, and flags implausible or internally inconsistent transcriptions before
 the CER-AI engine consumes them.
 
-Multi-image numeric reconciliation policy:
-- The owner-defined canonical Pentacam fields are NEVER reconciled here. They are direct
-  single-source transcriptions and fail closed when their canonical source is unreadable.
-- For non-locked numeric parameters, repeated labeled-table readings may use the historical <=1% reconciliation rule.
+Canonical numeric disagreements are not reconciled here. They remain explicit conflicts until resolved.
 """
-import re
 from typing import Any, Dict, List
 
-from pentacam_field_registry import EXCLUSIVE_LABELED_BOX_FIELDS
-from pentacam_canonical_source_lock import LOCKED_FIELDS
 
 DECISION_FIELDS = (
     "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp", "Dt", "Da", "ARTmax_um", "PPI_max"
@@ -28,94 +22,7 @@ PLAUSIBLE = {
     "ARTmax_um": (1.0, 1000.0), "PPI_min": (0.01, 10.0),
     "PPI_avg": (0.01, 10.0), "PPI_max": (0.01, 10.0), "Rmin_mm": (3.0, 15.0),
 }
-LOWER_IS_SAFETY_LIMITING = {"Rmin_mm"}
 NON_BLOCKING_CONFLICT_FIELDS = {"morphology_confidence"}
-
-_CONFLICT_RE = re.compile(
-    r"^(?P<field>[A-Za-z0-9_]+):\s*"
-    r"(?P<a>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s+vs\s+"
-    r"(?P<b>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)$"
-)
-
-
-def _num(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
-
-
-def _within_one_percent(values: List[float]) -> bool:
-    if len(values) < 2:
-        return False
-    low, high = min(values), max(values)
-    denominator = max(abs(v) for v in values)
-    if denominator == 0:
-        return low == high
-    return abs(high - low) / denominator <= 0.01 + 1e-12
-
-
-def _source_class(raw_eye: Dict[str, Any], field: str) -> str:
-    if field in set(raw_eye.get("table_verified_numeric_fields") or []):
-        return "LABELED_TABLE"
-    return "UNVERIFIED"
-
-
-def _safety_limiting_value(field: str, values: List[float]) -> float:
-    return min(values) if field in LOWER_IS_SAFETY_LIMITING else max(values)
-
-
-def _reconcile_one_percent(merged: Dict[str, Any], results: List[Dict[str, Any]]) -> None:
-    """Historical duplicate tolerance for NON-LOCKED fields only."""
-    observations: Dict[str, Dict[str, Dict[str, List[float]]]] = {}
-    for result in results:
-        for raw_eye in result.get("eyes", []):
-            if not isinstance(raw_eye, dict):
-                continue
-            eye_id = raw_eye.get("eye")
-            if not eye_id:
-                continue
-            for field, value in raw_eye.items():
-                if field in LOCKED_FIELDS or field in EXCLUSIVE_LABELED_BOX_FIELDS:
-                    continue
-                if not _num(value):
-                    continue
-                source_class = _source_class(raw_eye, field)
-                if source_class == "UNVERIFIED":
-                    continue
-                observations.setdefault(eye_id, {}).setdefault(field, {}).setdefault(source_class, []).append(float(value))
-
-    for eye in merged.get("eyes", []):
-        if not isinstance(eye, dict):
-            continue
-        eye_id = eye.get("eye")
-        accepted_fields = set()
-        for field, classes in observations.get(eye_id, {}).items():
-            values = classes.get("LABELED_TABLE") or []
-            if _within_one_percent(values):
-                retained = _safety_limiting_value(field, values)
-                eye[field] = retained
-                accepted_fields.add(field)
-                eye.setdefault("numeric_reconciliation", {})[field] = {
-                    "rule": "RELATIVE_SPREAD_LE_1_PERCENT_USE_SAFETY_LIMITING",
-                    "direction": "LOWER" if field in LOWER_IS_SAFETY_LIMITING else "HIGHER",
-                    "values": sorted(set(values)), "retained": retained,
-                }
-        if not accepted_fields:
-            continue
-        kept_conflicts = []
-        for item in list(eye.get("data_conflicts") or []):
-            match = _CONFLICT_RE.match(str(item).strip())
-            if match and match.group("field") in accepted_fields:
-                a, b = float(match.group("a")), float(match.group("b"))
-                if _within_one_percent([a, b]):
-                    continue
-            kept_conflicts.append(item)
-        eye["data_conflicts"] = kept_conflicts
-        for field in sorted(accepted_fields):
-            details = eye["numeric_reconciliation"][field]
-            merged.setdefault("global_warnings", []).append(
-                f"{eye_id} {field}: duplicate numeric readings within 1% were accepted; "
-                f"safety-limiting {details['direction'].lower()} value {details['retained']:g} retained."
-            )
-
 
 def _audit_eye(eye: Dict[str, Any]) -> Dict[str, Any]:
     provenance = eye.get("field_provenance") or {}
@@ -155,9 +62,8 @@ def _audit_eye(eye: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def apply_extraction_validation(merged, results):
+def apply_extraction_validation(merged):
     """Audit one already-canonical merged payload without replacing merge ownership."""
-    _reconcile_one_percent(merged, results)
     audit = {}
     for eye in merged.get("eyes", []):
         eye_id = eye.get("eye", "UNKNOWN")

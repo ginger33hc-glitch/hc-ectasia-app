@@ -22,15 +22,6 @@ KERATOMETRY_SOURCE_VALUES = (
     CORNEA_FRONT_KERATOMETRY_SOURCE, "OTHER_PENTACAM_SOURCE", "UNREADABLE", "NOT_SHOWN",
 )
 
-EXCLUSIVE_LABELED_BOX_FIELDS = frozenset({
-    *CORNEA_FRONT_KERATOMETRY_FIELDS,
-    "Kmax_D", "ARTmax_um", "pachy_thinnest_um", "central_pachy_um", "B_Ele_Th_um",
-    "topographic_astig_D", "topographic_steep_axis_deg", "posterior_Kmean_D", "F_Ele_Th_um",
-    "ISV", "IVA", "KI", "CKI", "IHD", "I_S", "KISA", "IHA", "TKC", "topometric_RMin",
-    "Rmin_mm", "corneal_diameter_mm", "PPI_min", "PPI_avg", "PPI_max",
-    "BAD_D", "Df", "Db", "Dp", "Dt", "Da",
-})
-
 COMPLETION_NUMERIC_FIELDS = {
     "pachy_thinnest_um": "Thinnest pachymetry (µm)",
     "central_pachy_um": "Pupil Center (+) pachymetry (µm; 4 Maps Refractive)",
