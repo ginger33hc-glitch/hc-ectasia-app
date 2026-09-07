@@ -60,9 +60,15 @@ def test_missing_i_s_does_not_disappear_behind_srax():
     assert erss_topography_category(None, 30.0) == UNCERTAIN
 
 
+def test_missing_srax_is_not_treated_as_negative_when_i_s_is_below_three_point_band():
+    assert erss_topography_category(0.0, None) == UNCERTAIN
+    assert erss_topography_category(0.8, None) == UNCERTAIN
+    assert erss_topography_category(-0.8, None) == UNCERTAIN
+
+
 def test_i_s_and_srax_are_one_category_never_additive():
     assert erss_topography_category(0.51, 20.1) == "INFERIOR_STEEPENING_SRA"
 
 
 def test_visual_morphology_is_not_an_input_to_pure_topography_rule():
-    assert erss_topography_category(0.0, None) == "NORMAL_SYMMETRIC"
+    assert erss_topography_category(0.0, 0.0) == "NORMAL_SYMMETRIC"
