@@ -5,6 +5,8 @@ import subprocess
 
 import pytest
 
+import assessment_workflow
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -78,9 +80,17 @@ assert.equal(fields.od_cylinder.value,'-2.00');
 
 
 def test_patient_age_completion_uses_one_shared_field():
-    workflow = (ROOT / 'assessment_workflow.py').read_text()
+    item = assessment_workflow._request('PATIENT', 'age', {})
     readiness = (ROOT / 'static/assessment-readiness.js').read_text()
-    assert 'items.append(("PATIENT", "age"))' in workflow
+    assert item == {
+        'eye': 'PATIENT',
+        'label': 'Patient age (years)',
+        'kind': 'form',
+        'key': 'age',
+        'destination': 'source',
+        'form_id': 'age',
+        'help': "Enter the patient's age in whole years.",
+    }
     assert 'item.form_id===\'age\'' in readiness
     assert 'originalRow.hidden=true' in readiness
     assert 'original.required=false;input.required=true' in readiness
