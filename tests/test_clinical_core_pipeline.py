@@ -26,9 +26,8 @@ def complete_ps3_eye(**overrides):
         ppi_avg=1.0,
         srax="NO",
         srax_deg=10.0,
-        bfte_front_um=8.0,
-        bfte_back_um=10.0,
-        refractive_group="MYOPIC_EMMETROPIC",
+        f_ele_th_um=8.0,
+        b_ele_th_um=10.0,
     )
     values.update(overrides)
     return PS3EyeInput(**values)
