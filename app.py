@@ -877,7 +877,7 @@ def required_tomography_missing(eye: Dict[str, Any]) -> List[str]:
 
 def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     merged: Dict[str, Any] = {
-        "eyes": [], "treatment_corrections": [], "global_warnings": [], "identity_warnings": [],
+        "eyes": [], "treatment_corrections": [], "laser_plans": [], "global_warnings": [], "identity_warnings": [],
         "document_contexts": [], "critical_input_issues": [], "extraction_models": [],
     }
     by_eye: Dict[str, Dict[str, Any]] = {}
@@ -986,7 +986,11 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     "PATIENT IDENTITY NOT VERIFIED: patient name/ID is not visible or readable in "
                     f"{context.get('source_filename', 'an uploaded source')}. Surgeon confirmation is required."
                 )
-            if not result.get("eyes") and not result.get("treatment_corrections"):
+            if (
+                not result.get("eyes")
+                and not result.get("treatment_corrections")
+                and not result.get("laser_plans")
+            ):
                 merged["critical_input_issues"].append(
                     f"Uploaded source yielded no usable eye or treatment data: {context.get('source_filename', 'unknown file')}."
                 )
@@ -994,6 +998,11 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         merged["treatment_corrections"].extend(
             item for item in result.get("treatment_corrections", []) if isinstance(item, dict)
         )
+        for item in result.get("laser_plans", []):
+            if isinstance(item, dict):
+                copied = dict(item)
+                copied["source_filename"] = (context or {}).get("source_filename") if isinstance(context, dict) else None
+                merged["laser_plans"].append(copied)
         for raw_eye in result.get("eyes", []):
             source_eye = dict(raw_eye)
             if isinstance(context, dict) and context.get("document_type") == "PENTACAM_TOPOGRAPHY":
@@ -1327,7 +1336,10 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     merged["identity_warnings"] = sorted(set(merged["identity_warnings"]))
     merged["critical_input_issues"] = sorted(set(merged["critical_input_issues"]))
     merged["extraction_models"] = sorted(set(merged["extraction_models"]))
-    return merged
+
+    # One explicit post-merge extraction audit; this helper never owns or replaces merge_extractions.
+    from extraction_guard import apply_extraction_validation
+    return apply_extraction_validation(merged, results)
 
 
 @app.get("/")

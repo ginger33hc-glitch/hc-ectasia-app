@@ -13,12 +13,8 @@ Multi-image numeric reconciliation policy:
 import re
 from typing import Any, Dict, List
 
-import bootstrap
 from pentacam_field_registry import EXCLUSIVE_LABELED_BOX_FIELDS
 from pentacam_canonical_source_lock import LOCKED_FIELDS
-
-core = bootstrap.core
-_original_merge = core.merge_extractions
 
 DECISION_FIELDS = (
     "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp", "Dt", "Da", "ARTmax_um", "PPI_max"
@@ -44,7 +40,7 @@ _CONFLICT_RE = re.compile(
 
 
 def _num(value: Any) -> bool:
-    return core.is_number(value)
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _within_one_percent(values: List[float]) -> bool:
@@ -165,8 +161,8 @@ def _audit_eye(eye: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def merge_extractions_guarded(results):
-    merged = _original_merge(results)
+def apply_extraction_validation(merged, results):
+    """Audit one already-canonical merged payload without replacing merge ownership."""
     _reconcile_one_percent(merged, results)
     audit = {}
     for eye in merged.get("eyes", []):
@@ -187,5 +183,3 @@ def merge_extractions_guarded(results):
     merged["global_warnings"] = list(dict.fromkeys(merged.get("global_warnings", [])))
     return merged
 
-
-core.merge_extractions = merge_extractions_guarded
