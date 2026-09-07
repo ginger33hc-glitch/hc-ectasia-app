@@ -24,6 +24,11 @@ PLAUSIBLE = {
 }
 NON_BLOCKING_CONFLICT_FIELDS = {"morphology_confidence"}
 
+
+def _num(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
 def _audit_eye(eye: Dict[str, Any]) -> Dict[str, Any]:
     provenance = eye.get("field_provenance") or {}
     verified = set(eye.get("table_verified_numeric_fields") or [])
@@ -82,4 +87,3 @@ def apply_extraction_validation(merged):
     merged["critical_input_issues"] = sorted(set(merged.get("critical_input_issues", [])))
     merged["global_warnings"] = list(dict.fromkeys(merged.get("global_warnings", [])))
     return merged
-
