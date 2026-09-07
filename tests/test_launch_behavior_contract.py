@@ -73,7 +73,7 @@ def test_nice_missing_input_is_incomplete():
     r=score_nice(44.0,None,15.0,0.5);assert r["total"] is None;assert r["category"]=="INCOMPLETE";assert "central_pachy_um" in r["missing"]
 
 def _ps3_base(**changes):
-    values=dict(anterior_km_d=47.0,thinnest_um=520.0,topographic_astig_d=1.0,topographic_steep_axis_deg=90.0,manifest_astig_d=1.0,manifest_axis_deg=90.0,ppi_avg=1.0,srax="NO",srax_deg=0.0,bfte_front_um=10.0,bfte_back_um=10.0)
+    values=dict(anterior_km_d=47.0,thinnest_um=520.0,topographic_astig_d=1.0,topographic_steep_axis_deg=90.0,manifest_astig_d=1.0,manifest_axis_deg=90.0,ppi_avg=1.0,srax="NO",srax_deg=0.0,f_ele_th_um=10.0,b_ele_th_um=10.0)
     values.update(changes);return evaluate_ps3(PS3EyeInput(**values))
 
 def test_ps3_no_flags_allows_all_three_procedures():
