@@ -1,0 +1,131 @@
+name: Step 2E flatten merge chain
+
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  flatten:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: monday-clean-architecture
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Guard and flatten canonical merge ownership
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import ast
+
+          app = Path('app.py').read_text()
+          bootstrap = Path('bootstrap.py').read_text()
+          guard = Path('extraction_guard.py').read_text()
+          composition = Path('runtime_composition.py').read_text()
+          engine = Path('canonical_engine.py').read_text()
+          ci = Path('.github/workflows/canonical-runtime.yml').read_text()
+
+          # Guard expected architecture before editing.
+          assert 'def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:' in app
+          assert 'core.merge_extractions = merge_extractions_reconciled' in bootstrap
+          assert 'core.merge_extractions = merge_extractions_guarded' in guard
+          assert 'import merge_policy_base' in composition
+          assert 'import extraction_guard' in composition
+          assert Path('merge_policy_base.py').exists()
+
+          # 1) Canonical app merge owns EX500 aggregation directly.
+          app = app.replace(
+              '"eyes": [], "treatment_corrections": [], "global_warnings": [], "identity_warnings": [],\n        "document_contexts": [], "critical_input_issues": [], "extraction_models": [],\n',
+              '"eyes": [], "treatment_corrections": [], "laser_plans": [], "global_warnings": [], "identity_warnings": [],\n        "document_contexts": [], "critical_input_issues": [], "extraction_models": [],\n',
+              1,
+          )
+          old = '''            if not result.get("eyes") and not result.get("treatment_corrections"):\n                merged["critical_input_issues"].append(\n                    f"Uploaded source yielded no usable eye or treatment data: {context.get('source_filename', 'unknown file')}."\n                )\n        merged["global_warnings"].extend(result.get("global_warnings", []))\n        merged["treatment_corrections"].extend(\n            item for item in result.get("treatment_corrections", []) if isinstance(item, dict)\n        )\n'''
+          new = '''            if (\n                not result.get("eyes")\n                and not result.get("treatment_corrections")\n                and not result.get("laser_plans")\n            ):\n                merged["critical_input_issues"].append(\n                    f"Uploaded source yielded no usable eye or treatment data: {context.get('source_filename', 'unknown file')}."\n                )\n        merged["global_warnings"].extend(result.get("global_warnings", []))\n        merged["treatment_corrections"].extend(\n            item for item in result.get("treatment_corrections", []) if isinstance(item, dict)\n        )\n        for item in result.get("laser_plans", []):\n            if isinstance(item, dict):\n                copied = dict(item)\n                copied["source_filename"] = (context or {}).get("source_filename") if isinstance(context, dict) else None\n                merged["laser_plans"].append(copied)\n'''
+          assert old in app
+          app = app.replace(old, new, 1)
+
+          old_end = '''    merged["global_warnings"] = sorted(set(merged["global_warnings"]))\n    merged["identity_warnings"] = sorted(set(merged["identity_warnings"]))\n    merged["critical_input_issues"] = sorted(set(merged["critical_input_issues"]))\n    merged["extraction_models"] = sorted(set(merged["extraction_models"]))\n    return merged\n'''
+          new_end = '''    merged["global_warnings"] = sorted(set(merged["global_warnings"]))\n    merged["identity_warnings"] = sorted(set(merged["identity_warnings"]))\n    merged["critical_input_issues"] = sorted(set(merged["critical_input_issues"]))\n    merged["extraction_models"] = sorted(set(merged["extraction_models"]))\n\n    # One explicit post-merge extraction audit; this helper never owns or replaces merge_extractions.\n    from extraction_guard import apply_extraction_validation\n    return apply_extraction_validation(merged, results)\n'''
+          assert old_end in app
+          app = app.replace(old_end, new_end, 1)
+
+          # 2) Bootstrap retains EX500 schema/prompt only; it may not replace merge behavior.
+          marker = '\n_original_merge_extractions = core.merge_extractions\n'
+          assert marker in bootstrap
+          prefix = bootstrap.split(marker, 1)[0]
+          bootstrap = prefix.rstrip() + '\n\n# EX500 schema/prompt extension only. Canonical merge ownership remains in app.py.\napp = core.app\n'
+
+          # 3) Extraction guard becomes a pure helper, no bootstrap/core dependency.
+          guard = guard.replace('import bootstrap\n', '')
+          guard = guard.replace('core = bootstrap.core\n_original_merge = core.merge_extractions\n\n', '')
+          guard = guard.replace(
+              'def _num(value: Any) -> bool:\n    return core.is_number(value)\n',
+              'def _num(value: Any) -> bool:\n    return isinstance(value, (int, float)) and not isinstance(value, bool)\n',
+          )
+          start = 'def merge_extractions_guarded(results):\n    merged = _original_merge(results)\n'
+          assert start in guard
+          guard = guard.replace(
+              start,
+              'def apply_extraction_validation(merged, results):\n    """Audit one already-canonical merged payload without replacing merge ownership."""\n',
+              1,
+          )
+          assert '\n\ncore.merge_extractions = merge_extractions_guarded\n' in guard
+          guard = guard.replace('\n\ncore.merge_extractions = merge_extractions_guarded\n', '\n')
+
+          # 4) Runtime composition no longer imports merge wrappers.
+          composition = composition.replace('import merge_policy_base  # noqa: F401,E402\n', '')
+          composition = composition.replace('import extraction_guard  # noqa: F401,E402\n', '')
+          composition = composition.replace(
+              '''    "pentacam_extraction_pending_stage2_3": (\n        "merge_policy_base", "extraction_guard",\n    ),\n''',
+              '',
+          )
+          composition = composition.replace(
+              '    # Extraction/source wrappers remain only until Stages 2-3 flatten the source path.\n\n',
+              '',
+          )
+
+          # 5) Startup invariants protect direct merge ownership.
+          needle = '    # Extraction/transport/operational boundaries still required at this stage.\n'
+          assert needle in engine
+          insert = '''    merge_source = inspect.getsource(core.merge_extractions)\n    if core.merge_extractions.__module__ != "app":\n        errors.append("Canonical merge_extractions is not owned directly by app.py")\n    if "apply_extraction_validation(merged, results)" not in merge_source:\n        errors.append("Canonical merge does not directly invoke extraction validation")\n    if "merge_policy_base" in phase_names or "extraction_guard" in phase_names:\n        errors.append("Retired merge wrapper remains in runtime composition")\n\n'''
+          engine = engine.replace(needle, insert + needle, 1)
+
+          # 6) CI must not compile a deleted wrapper file.
+          ci = ci.replace(' merge_policy_base.py extraction_guard.py', ' extraction_guard.py')
+
+          for name, text in {
+              'app.py': app,
+              'bootstrap.py': bootstrap,
+              'extraction_guard.py': guard,
+              'runtime_composition.py': composition,
+              'canonical_engine.py': engine,
+              '.github/workflows/canonical-runtime.yml': ci,
+          }.items():
+              ast.parse(text) if name.endswith('.py') else None
+              Path(name).write_text(text)
+
+          Path('merge_policy_base.py').unlink()
+
+          # Post-cutover architecture guards.
+          assert 'core.merge_extractions =' not in Path('bootstrap.py').read_text()
+          assert 'core.merge_extractions =' not in Path('extraction_guard.py').read_text()
+          assert 'merge_policy_base' not in Path('runtime_composition.py').read_text()
+          assert 'extraction_guard' not in Path('runtime_composition.py').read_text()
+          assert 'apply_extraction_validation(merged, results)' in Path('app.py').read_text()
+          assert not Path('merge_policy_base.py').exists()
+          PY
+      - name: Commit direct canonical merge
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app.py bootstrap.py extraction_guard.py runtime_composition.py canonical_engine.py .github/workflows/canonical-runtime.yml merge_policy_base.py
+          git commit -m "Flatten canonical extraction merge chain"
+          git push origin HEAD:monday-clean-architecture
