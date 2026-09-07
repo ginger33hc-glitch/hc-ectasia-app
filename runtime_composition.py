@@ -1,8 +1,9 @@
-"""Ordered production composition for the canonical CER-AI runtime.
+"""Ordered production composition for CER-AI operational concerns.
 
-This is the only module that assembles production concerns. Leaf modules own
-one topic and may expose compatibility symbols for tests, but they must not
-decide installation order by importing unrelated policy modules.
+Clinical assessment is no longer assembled through runtime wrapper order;
+``assessment_workflow`` calls the canonical runtime directly. This composition
+module installs extraction, transport, access, reporting and persistence concerns
+while clinical wrapper modules are retired in dependency order.
 """
 import os
 
@@ -31,8 +32,6 @@ import microkeratome_report_policy  # noqa: E402
 
 import nice_policy  # noqa: E402
 import assessment_workflow  # noqa: E402
-import srax_completion_policy  # noqa: E402
-import randleman_report_readiness_policy  # noqa: E402
 import user_access  # noqa: E402
 import operational_security  # noqa: E402
 import public_site  # noqa: E402
@@ -49,14 +48,12 @@ import rmin_front_source_policy  # noqa: E402
 import geometric_srax_policy  # noqa: E402
 import erss_auto_read_policy  # noqa: E402
 import pentacam_canonical_source_enforcement  # noqa: E402
-import phase3_runtime_seam  # noqa: E402
-import phase3_workflow_shadow_observer  # noqa: E402
 
 core = bootstrap.core
 app = bootstrap.app
 
 COMPOSITION_PHASES = {
-    "clinical_policy": (
+    "clinical_policy_legacy_pending_retirement": (
         "hc_age_policy", "hc_bad_final_policy", "pachymetry_policy",
         "randleman_bad_independence", "hc_final_decision_policy",
         "inter_eye_tomography_policy", "microkeratome_planning_policy",
@@ -71,20 +68,18 @@ COMPOSITION_PHASES = {
     ),
     "reporting_and_readiness": (
         "report_export_guard", "critical_score_highlight", "ps3_report_policy",
-        "microkeratome_report_policy", "assessment_workflow", "srax_completion_policy",
-        "randleman_report_readiness_policy",
+        "microkeratome_report_policy", "assessment_workflow",
     ),
     "access_and_persistence": (
         "user_access", "operational_security", "public_site", "analysis_job_service",
         "mobile_install_section", "case_archive", "audit_log", "case_catalog",
         "historical_report", "research_export", "named_user_ui",
     ),
-    "phase3_cutover": ("phase3_runtime_seam", "phase3_workflow_shadow_observer"),
 }
 
 
 def compose(version: str):
-    """Install the complete production runtime once and return archive state."""
+    """Install the production runtime once and return archive state."""
     if getattr(core, "_cerai_runtime_composed", False):
         return getattr(core, "_cerai_case_archive_runtime", None)
 
@@ -92,6 +87,8 @@ def compose(version: str):
     core.app.title = f"CER-AI v{version}"
     reports.APP_VERSION = version
 
+    # Legacy clinical installers remain temporarily only for non-workflow callers
+    # during the deletion stage. assessment_workflow does not call core.hc_engine.
     hc_age_policy.install(core, score_audit_owner=bootstrap)
     critical_score_highlight.install(core, reports)
     ps3_report_policy.install(reports)
@@ -102,18 +99,12 @@ def compose(version: str):
     microkeratome_planning_policy.install(core)
     nice_policy.install(core)
 
-    # Source lock is installed before the PS3 merge adapter so the required
-    # runtime chain remains: mandatory gate -> PS3 merge -> canonical source lock.
-    # This preserves the established startup invariants while making every older
-    # source/fallback path subordinate to the owner-defined canonical source set.
     pentacam_canonical_source_enforcement.install(core, pentacam_targeted_reread)
     ps3_extraction_policy.install(core)
     mandatory_source_set_policy.install(core)
 
     ps3_runtime_policy.install(core)
     assessment_workflow.install(core)
-    srax_completion_policy.install(assessment_workflow)
-    randleman_report_readiness_policy.install(assessment_workflow)
     user_access.install(core)
     operational_security.install(core)
     public_site.install(core)
@@ -125,7 +116,9 @@ def compose(version: str):
     if archive_enabled:
         archive_runtime = case_archive.install(core)
     else:
-        archive_runtime = case_archive.install(core, runtime=case_archive.CaseArchiveRuntime(None, required=False))
+        archive_runtime = case_archive.install(
+            core, runtime=case_archive.CaseArchiveRuntime(None, required=False)
+        )
 
     audit_log.install(core, archive_runtime)
     case_catalog.install(core, archive_runtime)
@@ -137,9 +130,6 @@ def compose(version: str):
     geometric_srax_policy.install(core, rmin_front_source_policy)
     erss_auto_read_policy.install(core)
     bad_display_source_policy.install(core)
-
-    phase3_runtime_seam.install(core)
-    phase3_workflow_shadow_observer.install(core)
 
     app.state.cerai_canonical_runtime_ready = True
     core._cerai_runtime_composed = True
