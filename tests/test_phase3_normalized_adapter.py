@@ -1,10 +1,10 @@
-"""Phase 3 locks for the production-to-linear normalized adapter."""
+"""Acceptance locks for the reconciled-data canonical input adapter."""
 from copy import deepcopy
 
 import pytest
 
+from canonical_input_adapter import build_clinical_core_input
 from clinical_core.pipeline import evaluate_normalized_case
-from phase3_normalized_adapter import build_clinical_core_input
 
 
 def _eye(name="OD"):
@@ -27,7 +27,6 @@ def _eye(name="OD"):
         "table_verified_numeric_fields": ["K2_D", "I_S", "central_pachy_um", "B_Ele_Th_um"],
         "surgeon_verified_numeric_fields": [],
         "data_conflicts": [],
-        # Legacy NICE-specific candidates deliberately disagree and must be ignored by this adapter.
         "nice_raw_k2_readings": [47.5],
         "nice_candidates": [
             {
