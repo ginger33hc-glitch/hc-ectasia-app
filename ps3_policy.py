@@ -38,6 +38,7 @@ class PS3EyeInput:
     ppi_avg: Optional[float] = None
     f_ele_th_um: Optional[float] = None
     b_ele_th_um: Optional[float] = None
+    i_s_d: Optional[float] = None
     srax: Optional[str] = None
     srax_deg: Optional[float] = None
 
@@ -203,7 +204,14 @@ def evaluate_ps3(eye, inter_eye=None):
 
     srax_deg = _num(eye.srax_deg)
     srax_state = str(eye.srax or "UNCERTAIN").upper()
-    if srax_deg is not None:
+    i_s_d = _num(eye.i_s_d)
+    if i_s_d is not None and i_s_d < 0.0:
+        measured = f"{srax_deg:.1f}°" if srax_deg is not None else "not required"
+        findings.append(PS3Finding(
+            "srax", NORMAL,
+            f"Front-map SRAX {measured}; signed I-S {i_s_d:g} D is negative (superior asymmetry), so SRAX does not create an inferior-steepening PS3 factor.",
+        ))
+    elif srax_deg is not None:
         status = HIGH if srax_deg > 20 else NORMAL
         relation = ">" if srax_deg > 20 else "<="
         findings.append(PS3Finding(

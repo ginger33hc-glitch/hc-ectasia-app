@@ -91,7 +91,7 @@ The highest applicable **single** topography category wins. Categories are never
 
 `geometric_srax_policy.measure_srax` is the single image-geometry implementation. Reverse-KISA calculation and model-estimated geometry are retired. SRAX >20.0° is positive; exactly 20.0° is negative. Uncertain geometry requests surgeon confirmation rather than inventing degrees.
 
-ERSS uses this evidence within its single topography component when I-S does not already establish the higher category. PS3 always consumes the shared SRAX evidence, even when another PS3 factor already defers the procedure. A page with no SRAX observation must not erase a valid measured observation; a true conflict remains unresolved.
+ERSS uses this evidence within its single topography component only when signed I-S is from 0.00 through +1.00 D and does not already establish a higher category. A negative I-S represents superior rather than inferior asymmetry and cannot be relabeled as inferior steepening by SRAX; its signed I-S category is final and SRAX is not required for ERSS completion. PS3 retains a measured SRAX value as visible evidence, but when signed I-S is negative it records the SRAX factor as normal and cannot defer a procedure on that basis. A page with no SRAX observation must not erase a valid measured observation; a true conflict remains unresolved when SRAX is applicable.
 
 ## 5. Approved ERSS component policy
 

@@ -98,6 +98,13 @@ def test_srax_runtime_boundary_is_strictly_greater_than_20():
     assert actual == expected
 
 
+def test_negative_i_s_stays_non_inferior_even_with_large_srax():
+    od = _evaluate(-0.94, 45.0)
+    assert od["score"]["category"] == "ASYMMETRIC_BOWTIE"
+    assert od["score"]["rows"]["topography"] == 1
+    assert "Randleman: SRAX" not in od["missing"]
+
+
 def test_i_s_and_srax_remain_one_topography_row_not_additive():
     od = _evaluate(0.51, 20.1)
     assert od["score"]["rows"]["topography"] == 3

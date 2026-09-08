@@ -72,9 +72,11 @@ def erss_topography_category(
 
     I-S is mandatory and evaluated first. If I-S already gives inferior
     steepening (3 points) or abnormal/ectatic topography (4 points), SRAX is not
-    needed and is not consulted. When I-S is <= +1.00 D, SRAX must be known
-    because a value >20.0° escalates the same single topography row to the
-    inferior-steepening/SRA category.
+    needed and is not consulted. A negative I-S represents superior rather
+    than inferior asymmetry, so SRAX cannot relabel it as inferior steepening;
+    its signed I-S category is final. For I-S from 0.00 through +1.00 D, SRAX
+    must be known because a value >20.0° escalates the same single topography
+    row to the inferior-steepening/SRA category.
 
     SRAX evidence has two non-interchangeable canonical channels:
     - a directly measured geometric degree value; or
@@ -88,6 +90,8 @@ def erss_topography_category(
     if i_s_category == UNCERTAIN:
         return UNCERTAIN
     if i_s_category in {INFERIOR_STEEPENING_SRA, ABNORMAL_ECTATIC}:
+        return i_s_category
+    if float(i_s_d) < 0.0:
         return i_s_category
 
     if _finite(derived_srax_deg):

@@ -134,7 +134,9 @@ Individual ERSS/NICE/PS3 scoring and procedural hard stops remain unchanged.
 - The canonical signed I-S and independent geometric SRAX feed one non-additive ERSS topography
   component. General visual morphology scoring is retired; no image-model morphology category
   may create points or an independent override. Numeric categories are not relabeled as a
-  definitive diagnosis. SRAX >20.0° is positive; exactly 20.0° is negative.
+  definitive diagnosis. Negative I-S retains its signed category and cannot be converted to
+  inferior steepening by SRAX in ERSS or PS3; a measured SRAX remains visible but does not create
+  an inferior-risk factor. SRAX >20.0° is positive when signed I-S is nonnegative; exactly 20.0° is negative.
 - Final BAD-D is the sole BAD disposition authority. Df/Db/Dp/Dt/Da, PPI and ARTmax
   contextual colors do not independently add points, CAUTION or STOP-DEFER.
 - PPI/ARTmax reference display bands are defined once in `clinical_core.bad`, using

@@ -162,3 +162,12 @@ def test_ps3_runtime_srax_exact_20_is_negative_but_20_1_is_high():
     assert finding_20_1["status"] == "HIGH"
     assert over_20["OD"]["status"] == "STOP-DEFER"
     assert result["status"] == "STOP-DEFER"
+
+
+def test_ps3_runtime_negative_i_s_prevents_false_srax_defer():
+    result, by_eye = _evaluate(procedure="PRK", od=_eye("OD", I_S=-1.04, srax_deg=20.5))
+    item = next(f for f in by_eye["OD"]["ps3"]["findings"] if f["key"] == "srax")
+    assert item["status"] == "NORMAL"
+    assert "SRAX 20.5°" in item["detail"]
+    assert by_eye["OD"]["ps3"]["disposition"]["prk"] == "ALLOWED"
+    assert result["status"] != "STOP-DEFER"

@@ -169,6 +169,16 @@ def test_srax_exactly_20_is_not_high_but_more_than_20_is_high():
     assert finding(high, "srax").status == HIGH
 
 
+def test_negative_i_s_keeps_large_srax_visible_without_inferior_risk_factor():
+    result = evaluate_ps3(normal_eye(i_s_d=-1.04, srax="YES", srax_deg=20.5), normal_inter_eye())
+    item = finding(result, "srax")
+    assert item.status == NORMAL
+    assert "SRAX 20.5°" in item.detail
+    assert "signed I-S -1.04 D is negative" in item.detail
+    assert result.high_count == 0
+    assert result.disposition.prk == ALLOWED
+
+
 def test_srax_unavailable_is_incomplete_and_requests_surgeon_review():
     result = evaluate_ps3(normal_eye(srax="UNCERTAIN", srax_deg=None), normal_inter_eye())
     item = finding(result, "srax")
