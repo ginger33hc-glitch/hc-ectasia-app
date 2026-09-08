@@ -131,7 +131,7 @@
 </main>
 <footer class="app-legal-footer">Developed by Hüseyin Cengiz, MD. All rights reserved. Final responsibility rests with the surgeon at all times and under all circumstances.</footer>
 
-<script src="/static/i18n.js?v=7"></script>
+<script src="/static/i18n.js?v=8"></script>
 <script src="/static/assessment-readiness.js?v=5"></script>
 <script>
 const i18n=window.CERAI_I18N;
@@ -293,7 +293,7 @@ function renderSourceSetStatus(summary){
     `${i18n.translate(item.label)}: ${i18n.translate(item.present?"present":"missing")}`
   );
   const card=summary.optional_treatment_card||{};
-  const cardState=card.present?"present":"not provided";
+  const cardState=card.status==="UNREADABLE"?"unreadable — enter refraction":card.present?"present":"not provided";
   sourceSetStatus.textContent=`${i18n.translate("Required image confirmation")}: ${required.join(" • ")} • ${i18n.translate("Optional treatment card")}: ${i18n.translate(cardState)}`;
   sourceSetStatus.className=summary.confirmed?"note":"alert";
   sourceSetStatus.hidden=false;
@@ -744,7 +744,11 @@ f.addEventListener("submit", async (e) => {
       if(errorDetail?.code==="MANDATORY_SOURCE_SET_INCOMPLETE"){
         message=i18n.translate("Upload each missing required image before assessment.");
       }else if(errorDetail?.code==="PREASSESSMENT_REFRACTION_REQUIRED"){
-        message=i18n.translate("No treatment card was provided. Enter complete manifest and intended refraction values for both eyes before assessment.");
+        message=i18n.translate(
+          errorDetail.refraction_reason==="UNREADABLE"
+            ?"The optional treatment card was unreadable. Enter complete manifest and intended refraction values for both eyes before assessment."
+            :"No treatment card was provided. Enter complete manifest and intended refraction values for both eyes before assessment."
+        );
         const firstMissing=errorDetail.missing_refraction?.[0];
         const input=firstMissing?.form_id?document.getElementById(firstMissing.form_id):null;
         if(input){input.scrollIntoView({behavior:"smooth",block:"center"});input.focus();}

@@ -510,6 +510,9 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         context = result.get("document_context")
         if isinstance(context, dict):
             context = dict(context)
+            passive_unreadable_card = (
+                context.get("optional_treatment_card_status") == "UNREADABLE"
+            )
             context["extracted_eyes"] = sorted({
                 eye.get("eye") for eye in result.get("eyes", [])
                 if isinstance(eye, dict) and eye.get("eye") in EYES
@@ -533,7 +536,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     f"{', '.join(missing_name_fields)} field(s) could not be read in "
                     f"{context.get('source_filename', 'an uploaded source')}. Surgeon confirmation is required."
                 )
-            if context.get("document_type") in ("UNKNOWN", "OTHER"):
+            if context.get("document_type") in ("UNKNOWN", "OTHER") and not passive_unreadable_card:
                 merged["critical_input_issues"].append(
                     f"Unclassified uploaded source: {context.get('source_filename', 'unknown file')}."
                 )
@@ -548,9 +551,14 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 not result.get("eyes")
                 and not result.get("treatment_corrections")
                 and not result.get("laser_plans")
+                and not passive_unreadable_card
             ):
                 merged["critical_input_issues"].append(
                     f"Uploaded source yielded no usable eye or treatment data: {context.get('source_filename', 'unknown file')}."
+                )
+            if passive_unreadable_card:
+                merged["global_warnings"].append(
+                    "Optional treatment card was unreadable; surgeon-entered manifest and intended refraction were used."
                 )
         merged["global_warnings"].extend(result.get("global_warnings", []))
         merged["treatment_corrections"].extend(
