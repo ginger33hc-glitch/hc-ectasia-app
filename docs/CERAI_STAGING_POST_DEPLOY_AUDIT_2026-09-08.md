@@ -1,43 +1,56 @@
-# CER-AI Monday Master Order — 66-Item Evidence Matrix
+# CER-AI staging deployment and 66-item re-audit — 8 September 2026
 
-Audit date: 2026-09-08  
-Checkpoint branch: `staging/canonical-validation-2026-09-08`
+## Outcome and scope
 
-Deployed staging commit: `4d068e06c02af8163d5f24a3cc7d6b79364a62d0`
+Staging deployed successfully. Production was not modified. All 66 acceptance items were reviewed against the amended matrix, canonical source owners, fresh regression results, exact-commit CI, deployment configuration and available live behavior. This is a software verification record, not a claim of clinical validation.
 
-Original accepted checkpoint: `0d36e06981b48d1147eb2123c2b46a0df077f70a`
-Scope: repository architecture, local runtime, automated regression, and explicit external blockers
+- Staging branch: `staging/canonical-validation-2026-09-08`.
+- Deployed commit: `4d068e06c02af8163d5f24a3cc7d6b79364a62d0`.
+- Source tree: `ce0f29a2bc16030b8962594af2b0615ea4f48db7` (local tested tree and fetched GitHub commit match exactly).
+- Railway deployment: `9741f77e-4c03-44ab-8773-925491068534`, SUCCESS at 11:33:28 UTC.
+- App: https://cer-ai-staging-staging.up.railway.app/app
+- App label: `0.7.71`; source policy: `CER-AI-2026-09-08-SHARED-PTA-LT40`. No separate live policy/version endpoint was verified; deployment identity is established by Railway commit metadata.
+- Production before and after: `main` at `7b157014c507a83865d7d8332c71c324aa792456`, deployment `1581f239-cce7-410a-9c20-892fff1bbc4f`, SUCCESS. Rechecked after staging deployment.
+- Only the staging branch reference was advanced (non-forced update). No service, model, access, archive configuration or production branch was changed.
 
-Status meanings:
+## Fresh verification evidence
 
-- **PASS (LOCAL):** implementation and local automated evidence agree with the accepted rule.
-- **PARTIAL:** implementation/automated evidence exists, but the required physical environment was not tested.
-- **BLOCKED:** a required prerequisite, environment configuration, or authorization is unavailable; no pass is claimed.
+- Full suite: **708 passed**, one existing Starlette/AnyIO deprecation warning, 18.41 seconds, Python 3.12 in the local audit environment. No tests skipped in this run.
+- Critical static checks: `python -m ruff check --select E9,F63,F7,F82 .` — PASS.
+- Canonical startup invariants — PASS.
+- [Exact-commit Canonical Runtime Safety](https://github.com/ginger33hc-glitch/hc-ectasia-app/actions/runs/34220591929) — SUCCESS. Job 102042522794 confirms dependency audit, static checks, startup invariants, all clinical/workflow/archive/mobile/architecture stages, 708 tests, and independent-process test files all succeeded. CI used Python 3.13; logs report no known dependency vulnerabilities.
+- [Exact-commit branding verification](https://github.com/ginger33hc-glitch/hc-ectasia-app/actions/runs/34220591946) — SUCCESS.
+- Canonical safety inspection confirms one PTA calculation and one threshold; pipeline uses flap for LASIK and fixed 50 µm epithelium for PRK. Both direct PRK and automatic fallback boundary tests passed at 39.99%, 40%, and 40.01%.
+- Accepted Word/PDF layout evidence is carried forward from the prior eight-page review. The PTA amendment did not change the renderer; report tests passed again. This turn did not repeat page-by-page visual report QA.
 
-This audit contains all **66** numbered items in the supplied master order. Local success is not
-represented as known-image, real-case, Railway, mobile-device, or production validation.
+## Live staging checks after deployment
 
-## Canonical architecture map
+- Railway reports successful application startup and serving on port 8080.
+- `/app`: HTTP 200. Browser reload opens the clinical form without username/password prompts.
+- `/static/manifest.webmanifest` and `/sw.js`: HTTP 200. `/openapi.json` returned 404; it is not used as a health or version signal.
+- OD and OS: selecting PRK changes the LASIK flap control to **None**, empty value, disabled.
+- Submitting the empty form keeps assessment blocked, focuses the missing image field, displays “Please complete the required field highlighted by the browser,” and leaves the assessment button enabled. No report is produced.
+- App branding, OD-before-OS order and surgeon responsibility notice are visible.
+- Browser log inspection returned extension metadata errors, not application-script errors. This is limited to this smoke session.
+- No real patient images were uploaded, no clinical case was signed off, and no archive records were created in this turn.
 
-| Concept | Surviving authoritative implementation | Obsolete paths removed / prohibited |
-|---|---|---|
-| Pentacam source truth | `pentacam_canonical_source_lock.py` | source-enforcement wrapper, front-Rmin policy, alternate/fallback source policies |
-| Image extraction | `app.extract_one_image` → direct targeted reread and geometric SRAX calls | per-image install wrappers and prompt/schema patch modules |
-| Locked-field merge/conflict | `app.merge_extractions` + direct extraction validation | first/highest/lowest/most-concerning/tolerance reconciliation and merge wrappers |
-| ERSS/Randleman | `clinical_core/erss.py` + `clinical_core/rules.py` | HC engine, visual-morphology scorer, ERSS wrappers and duplicate topography scorers |
-| NICE | `clinical_core/nice.py` | `nice_scoring.py`, NICE runtime wrapper, duplicate NICE value side channel |
-| PS3 | `ps3_policy.py` exposed through `clinical_core/ps3.py` | PS3 runtime/report/merge modifiers |
-| BAD-D | `clinical_core/bad.py` | component-derived Final D and report-side interpretation |
-| Tissue safety | `clinical_core/safety.py` | duplicate thresholds/formulas in application and planning modules |
-| Final disposition | `clinical_core/disposition.py` | later status overrides and legacy HC final-decision logic |
-| Procedure planning | `clinical_core/planning.py` + canonical runtime; ML7 in `planning/microkeratome.py` | LASIK planning wrapper and report recalculation |
-| Readiness/completion | `canonical_readiness.py`, `clinical_core/readiness.py`, `assessment_workflow.py` | report shortcuts and clinical UI scoring |
-| Report | `clinical_core/report_payload.py` → `reports.py` | report policy wrappers and browser-injected clinical reference/recalculation module |
-| Archive/access | `case_archive.py`, `case_catalog.py`, `historical_report.py`, `user_access.py` | workflow/report replacement wrappers |
+## Remaining defects and acceptance limits
 
-## Item-by-item result
+**Presentation defect:** the live form says “Preoperative manifest refraction is used only for LASIK ERSS MRSE.” `clinical_core/pipeline.py` applies ERSS and manifest MRSE to both LASIK and PRK under the approved amendment. That sentence is stale. Scoring behavior passed regression; the explanatory copy requires correction. No clinical behavior was changed during the audit.
 
-| # | Requirement | Status | Evidence / exact finding |
+**61 items retain local/automated acceptance; five release items are partial or blocked:** 57, 63, 64, 65 and 66. Local acceptance does not establish successful image extraction, real patient outcomes, or all workflows on the deployed service.
+
+- 57: physical phone install/share/upload/report/archive cycle remains untested.
+- 63: complete field-by-field source comparison for the exact deployed candidate remains unverified. Historical known-image/SRAX evidence is retained with its original provenance, not represented as a new extraction run.
+- 64: full real-case completion/report/archive/reopen and attribution remain incomplete. Staging has no configured archive backend. Local archive tests use their test infrastructure and do not establish persistent staging operation.
+- 65: staging deployment and exact commit verification complete; production promotion intentionally pending.
+- 66: production smoke testing intentionally not performed; production changes remain unauthorized.
+
+## All 66 items
+
+PASS below means local/automated acceptance unless explicit live evidence is stated. Historical known-image evidence is carried forward; it was not repeated. The new full-suite run supports existing test contracts, not untested physical or real-case claims.
+
+| # | Requirement | Re-audit status | Evidence and scope |
 |---:|---|---|---|
 | 1 | One canonical clinical engine | **PASS (LOCAL)** | Production path is `assessment_workflow → canonical_runtime_service → clinical_core`; parallel `clean_engine`, HC engine, and clinical wrappers are absent. Locked by `test_phase4_cleanup_contract.py` and `test_step14_architecture_acceptance.py`. |
 | 2 | Architecture inventory before clinical changes | **PASS (LOCAL)** | Stage-1 inventory and Step-2 pre-flattening map record old implementation → surviving owner → deletion. This file records the current-state map. |
@@ -105,34 +118,3 @@ represented as known-image, real-case, Railway, mobile-device, or production val
 | 64 | Real-case end-to-end validation | **PARTIAL / ARCHIVE BLOCKED** | Accepted sample-report review and staging analysis/completion transport evidence exist; they do not establish complete clinical input sign-off or archive/reopen success. Staging rendered variable names contain no archive backend configuration. Complete source comparison, confirmed eligibility/treatment inputs, and deployed report/archive/reopen attribution still require evidence. |
 | 65 | Merge/Railway deployment/SHA/version verification | **PARTIAL — STAGING VERIFIED** | Staging deployment 9741f77e-4c03-44ab-8773-925491068534 is SUCCESS at 4d068e06c02af8163d5f24a3cc7d6b79364a62d0 (2026-09-08 11:33:28 UTC). Post-deployment /app, service worker and manifest returned HTTP 200; app startup completed. Production remains 7b157014c507a83865d7d8332c71c324aa792456. Production promotion is pending validation and explicit authorization. Application label 0.7.71 alone does not identify the release; record SHA and policy version. |
 | 66 | Production smoke test, including mobile repeat | **BLOCKED — NOT AUTHORIZED** | Requires approved production promotion, known-case source comparison, report/archive access and physical mobile repeat. Not performed. |
-
-## Approved amendments after the original matrix
-
-These amendments are carried forward from the checkpoint protocol, test-retirement record,
-source registry, canonical owners and associated regression tests. They are operational CER-AI
-policies, not new claims of clinical validation.
-
-- Final disposition counts completed ERSS/NICE/PS3/Final BAD-D systems once: zero or one caution = PASS, two = PASS WITH CAUTION, three/four = CAUTION. Independent caution, incompleteness and STOP-DEFER gates retain their precedence.
-- PS3 astigmatism comparison activates only if either magnitude exceeds 3.00 D; both at/below 3.00 D add no factor. Its axis comes only from the BAD flat Axis beside K1. Shared SRAX is always evaluated by PS3, even after other deferring factors.
-- ERSS and PS3 use the shared independent geometric SRAX evidence with a strict >20.0° boundary. Reverse-KISA and older inclusive-20/separate-22 rules are retired.
-- PRK includes canonical ERSS using residual stroma; LASIK and PRK share requested myopic ablation resolution. Definitive LASIK failure evaluates PRK once per failed eye, retaining LASIK history and all shared safety/completion gates.
-- ML7 uses dedicated BAD K1/K2 fields and verified Four Maps HWTW. General scoring K and axis source locks stay independent.
-- Final BAD-D owns BAD disposition. D components and PPI/ARTmax bands are informational in BAD; PS3 retains its separate PPI Average criterion. Accepted report formatting and contextual display are preserved.
-- SRAX is retained across pages without an observation; true conflicting observations remain unresolved. The same source validator runs before targeted reread and merge.
-- Age is calculated from birth/examination dates with provenance and surgeon-entered precedence. Patient name uses one OD Four Maps header, OS only if OD Four Maps is absent; unreadable selected name requests completion.
-- Word presentation now matches the approved PDF; 697 tests and eight-page Word visual QA are accepted checkpoint evidence.
-
-## Honest release conclusion
-
-Local canonical-engine work and accepted report formatting remain complete. The staging deployment
-is verified, while production remains unchanged. Items 57, 63 and 64 need their remaining evidence;
-item 65 is only staging-complete, and item 66 waits for explicitly authorized production promotion.
-The PRK PTA policy conflict is resolved by the September 8 surgeon instruction: “for prk,too,
-same pta rule as lasik shall apply.” Direct PRK and automatic LASIK→PRK now require PTA `<40%`,
-with STOP-DEFER at exact 40% or higher. The 35.28% cohort maximum has no separate operational
-flag. This amendment supersedes the checkpoint behavior and is deployed to staging only. Production remains untouched by explicit instruction.
-See `CERAI_PRODUCTION_REVIEW_2026-09-08.md` for the concrete release sequence and blockers.
-
-## Post-deployment verification
-
-See `CERAI_STAGING_POST_DEPLOY_AUDIT_2026-09-08.md` for all 66 results, fresh test evidence, live browser checks, and evidence limits. The live UI still says manifest refraction is used only for LASIK ERSS; this explanatory sentence is stale because canonical ERSS also runs for PRK. It is recorded as a presentation defect, not a scoring failure.
