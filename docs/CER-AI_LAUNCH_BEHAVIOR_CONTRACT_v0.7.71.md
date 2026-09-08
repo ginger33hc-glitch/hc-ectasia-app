@@ -1,8 +1,8 @@
 # CER-AI Launch Behavior Contract — v0.7.71
 
-Status: **Phase 1 behavior freeze**
+Status: **Reconciled with the approved September 8, 2026 staging checkpoint**
 
-Purpose: this document defines the observable production behavior that must remain unchanged during the pre-launch architectural refactor unless a clinical policy change is explicitly approved. It is a behavior contract, not a description of the current wrapper implementation.
+Purpose: this document describes the approved canonical candidate at staging commit `0d36e06981b48d1147eb2123c2b46a0df077f70a`. It does not claim this candidate is deployed to production. The 66-item evidence matrix records acceptance; later approved amendments in the protocol and test-retirement record supersede the original Phase 1 freeze. Clinical changes require explicit approval and direct changes to the owning implementation.
 
 ## 1. Canonical production flow
 
@@ -12,7 +12,7 @@ A clinical request must behave as the following ordered pipeline:
 2. Upload admission and security checks.
 3. Image extraction for each uploaded source.
 4. Mandatory source-set validation.
-5. Source-aware reconciliation and provenance checks.
+5. Canonical source validation, conflict detection, and provenance checks.
 6. Patient/eye identity reconciliation.
 7. Readiness and completion workflow for genuinely missing decision-critical inputs.
 8. Independent per-eye clinical pathways:
@@ -56,11 +56,13 @@ Decision-critical values must retain source provenance. Source locks include:
 - Signed I-S: explicitly labeled I-S/IS value; no map reconstruction.
 - NICE posterior elevation: **B. Ele.Th labeled box on BAD Display** only.
 - NICE central pachymetry: **Pupil Center (+)** only.
-- Rmin: designated Cornea Front source policy only.
+- Posterior Rmin: **Show 2 Exams Topometric → Cornea Back** only; the center 8-mm topometric RMin is a separate field.
+- PS3 prescription comparison: `bad_flat_axis_deg` from the **BAD upper-middle Axis box beside K1** only.
+- ML7 keratometry: dedicated `ml7_bad_k1_d` / `ml7_bad_k2_d` from **BAD upper-middle K1/K2** only; no scoring-K or Kmax fallback.
 - Thinnest pachymetry: circle-marked Thinnest Location source.
 - Final BAD-D and components: their own labeled boxes only.
 
-Unresolved conflicts in decision-critical values must not be silently averaged or guessed.
+Locked-field disagreement remains unresolved. Do not reconcile by tolerance, first value, minimum, maximum, or most-concerning value. Wrong-source values are rejected. `pentacam_canonical_source_lock.py` owns the registry.
 
 ## 4. ERSS / Randleman topography contract
 
@@ -69,7 +71,7 @@ Visual morphology is not an ERSS scoring authority and must not create score poi
 The two authoritative numeric topography channels are:
 
 1. signed Topometric I-S;
-2. CER-AI derived SRAX.
+2. independent geometric SRAX from the anterior Axial/Sagittal Curvature map.
 
 The highest applicable **single** topography category wins. Categories are never added together.
 
@@ -81,19 +83,13 @@ The highest applicable **single** topography category wins. Categories are never
 - > +1.00 and < +1.40 D → Inferior steepening / SRA category → 3 points.
 - >= +1.40 D → Abnormal category → 4 points.
 
-### Derived SRAX
+### Geometric SRAX
 
-CER-AI operational derivation:
+`geometric_srax_policy.measure_srax` is the single image-geometry implementation. Reverse-KISA calculation and model-estimated geometry are retired. SRAX >20.0° is positive; exactly 20.0° is negative. Uncertain geometry requests surgeon confirmation rather than inventing degrees.
 
-`SRAX = (KISA% × 3) / (max(1, Kmax-47.2) × max(1, |I-S|) × max(1, |topographic astigmatism|))`
+ERSS uses this evidence within its single topography component when I-S does not already establish the higher category. PS3 always consumes the shared SRAX evidence, even when another PS3 factor already defers the procedure. A page with no SRAX observation must not erase a valid measured observation; a true conflict remains unresolved.
 
-For ERSS, the original Randleman threshold is retained:
-
-- derived SRAX >=20° → Inferior steepening / SRA category → 3 points.
-
-Derived SRAX is not represented as directly reported by Pentacam.
-
-## 5. ERSS component policy currently frozen
+## 5. Approved ERSS component policy
 
 ### Age — CER-AI modification
 
@@ -115,6 +111,8 @@ Derived SRAX is not represented as directly reported by Pentacam.
 - total >=4 → STOP-DEFER
 
 ERSS remains independent of BAD-D, NICE, and PS3.
+
+PRK uses the same canonical ERSS thresholds, with PRK residual stroma supplying the tissue component. Full PRK reports require complete ERSS; do not label it not applicable.
 
 ## 6. Final BAD-D contract
 
@@ -158,12 +156,9 @@ Disposition rule:
 - exactly 1 MODERATE finding → PRK/SMILE allowed by PS3; LASIK deferred by PS3
 - >=2 MODERATE findings or >=1 HIGH finding → PRK/SMILE/LASIK deferred by PS3
 
-PS3 derived SRAX retains its own PS3 threshold:
+PS3 uses the shared geometric SRAX: >20.0° → HIGH; exactly 20.0° is not HIGH. Missing SRAX remains incomplete, even when other findings already defer surgery.
 
-- >22° → HIGH
-- <=22° → not HIGH from that item
-
-The ERSS >=20° threshold and PS3 >22° threshold are deliberately separate rules.
+Manifest/topographic astigmatism discrepancy activates only when either absolute manifest cylinder or topographic astigmatism is >3.00 D. When both are <=3.00 D this factor adds no risk; missing magnitudes are not assumed low. Active comparisons retain >1.00 D magnitude or >10° axis discrepancy thresholds. The axis source is the directly read BAD flat meridian, compared with normalized minus-cylinder manifest axis modulo 180°; no steep-axis substitution or extra transposition is permitted.
 
 PS3 morphologic items that are not reliably machine-readable remain NOT_EVALUATED and are not silently counted as normal.
 
@@ -177,7 +172,7 @@ Independent hard-stop / safety rules include at least:
 - intended myopic sphere beyond -10.00 D → STOP-DEFER
 - intended hyperopic sphere beyond +6.00 D → STOP-DEFER
 - estimated postoperative Kmean outside 36–48 D → STOP-DEFER
-- LASIK PTA policy remains independently enforced
+- LASIK PTA >=40.0% fails the evaluated candidate; evaluate A→B→C and retain the first candidate satisfying every applicable requirement
 - PRK epithelium convention = 50 µm
 
 PRK selection must not retain an active LASIK flap plan.
@@ -194,7 +189,9 @@ It must not:
 - cancel or override any independent hard stop;
 - appear as a fifth ectasia-risk scoring system in the final clinical architecture.
 
-PRK remains governed by BAD-D, NICE, PS3, tissue/procedure safety, readiness, and other explicitly retained clinical rules.
+PRK is governed by canonical ERSS, BAD-D, NICE, PS3, tissue/procedure safety, readiness, and clinical eligibility. Requested myopic ablation uses the shared estimator when no entered maximum ablation is supplied; entered ablation takes precedence. PRK residual stroma is thinnest pachymetry minus 50 µm epithelium minus maximum stromal ablation.
+
+A definitive LASIK STOP-DEFER triggers one PRK evaluation for that eye through the same canonical core. Preserve the LASIK assessment and candidate history. Incomplete LASIK alone does not trigger PRK; shared stops and missing inputs remain effective. A successful fellow-eye LASIK result is retained.
 
 ## 11. Contact-lens readiness contract
 
@@ -219,11 +216,11 @@ Clinical categories are exactly:
 Workflow/routing states are separate:
 
 - POST-REFRACTIVE PATHWAY REQUIRED
-- DATA INSUFFICIENT
+- ASSESSMENT INCOMPLETE (`DATA_INSUFFICIENT` is a compatibility name for the same state)
 
 Restrictiveness order:
 
-`PASS < PASS WITH CAUTION < CAUTION < POST-REFRACTIVE PATHWAY REQUIRED < DATA INSUFFICIENT < STOP-DEFER`
+Clinical ordering: `PASS < PASS WITH CAUTION < CAUTION < STOP-DEFER`. Incompleteness blocks favorable completion; prior refractive surgery routes out of the virgin-cornea engine rather than being treated as another clinical score.
 
 For each eye, count CAUTION results from the completed ERSS, NICE, PS3 and Final BAD-D systems:
 zero or one yields PASS; two yields PASS WITH CAUTION; three or four yields CAUTION. Count systems, not individual findings. Independent

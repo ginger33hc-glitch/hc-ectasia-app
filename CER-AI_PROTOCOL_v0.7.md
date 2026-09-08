@@ -1,6 +1,6 @@
 # CER-AI Preoperative Ectasia Risk Assessment — Software Rule Specification v0.7
 
-Effective date: 26 August 2026
+Original effective date: 26 August 2026. Reconciled with approved staging amendments: 8 September 2026.
 
 This file is the code-aligned operational rule specification. Published evidence, provisional
 triage, CER-AI operational policy, imaging-quality criteria, and general clinical eligibility are kept
@@ -22,11 +22,9 @@ as separate layers. No rule in one layer is silently presented as a validated ru
   Non-OK/unconfirmed QS and limited/inadequate quality do not alone suppress a report when required
   clinical measurements are readable; they generate a prominent surgeon-attention warning at the
   bottom of the browser, PDF, and Word reports. They are never silently changed to `OK`.
-- Record field-level provenance as labeled table, permitted map fallback, or visual classification.
-- Same-field readings from one accepted provenance class reconcile only when their full relative
-  spread is `<=1%`. Retain the lower value for pachymetry, ARTmax, and Rmin; retain the higher value
-  for BAD-D, Kmax, elevation, PPI, and other supported ectasia indices. Larger differences remain
-  unresolved conflicts.
+- Record field-level canonical source and surgeon-confirmation provenance. Locked fields have
+  no alternative-source fallback. Same-source disagreement clears the field and requests
+  resolution; no tolerance, first/minimum/maximum, or most-concerning selection is permitted.
 
 ## Clinical disposition contract
 
@@ -35,7 +33,7 @@ as separate layers. No rule in one layer is silently presented as a validated ru
   uses this category.
 - `STOP-DEFER` means surgery must not proceed unless the stated stop/defer condition is resolved.
   NICE ≥9, independent hard stops, and explicit defer rules use this category.
-- `DATA INSUFFICIENT` and `POST-REFRACTIVE PATHWAY REQUIRED` remain workflow states, not additional
+- `ASSESSMENT INCOMPLETE` and `POST-REFRACTIVE PATHWAY REQUIRED` remain workflow states, not additional
   clinical result categories.
 
 ## Pathway gate
@@ -120,9 +118,10 @@ Individual ERSS/NICE/PS3 scoring and procedural hard stops remain unchanged.
   defer, and ≥4 is STOP-DEFER.
 - PRK uses the same canonical ERSS component thresholds and includes its disposition in
   the four-system result; its residual stroma supplies the tissue component.
-- A single numeric Placido criterion may support the published ERSS topography category but is not
-  relabeled as definite keratoconus. A definite visible KC/FFKC/PMD/ectatic morphology remains a
-  separate override.
+- The canonical signed I-S and independent geometric SRAX feed one non-additive ERSS topography
+  component. General visual morphology scoring is retired; no image-model morphology category
+  may create points or an independent override. Numeric categories are not relabeled as a
+  definitive diagnosis. SRAX >20.0° is positive; exactly 20.0° is negative.
 - Final BAD-D is the sole BAD disposition authority. Df/Db/Dp/Dt/Da, PPI and ARTmax
   contextual colors do not independently add points, CAUTION or STOP-DEFER.
 - PPI/ARTmax reference display bands are defined once in `clinical_core.bad`, using
@@ -140,8 +139,9 @@ Individual ERSS/NICE/PS3 scoring and procedural hard stops remain unchanged.
 - Unexplained CDVA below 20/20, inter-eye asymmetry, collagen/connective-tissue disease, relevant
   medication, dry eye, or other systemic disease: `CAUTION` with explicit surgeon review.
 - These modifiers do not add invented ectasia-score points.
-- Soft contact lens ≥14 days and rigid/RGP ≥21 days are supplied source-study imaging criteria, not
-  universal ectasia cutoffs. Insufficient documentation prohibits automatic PASS.
+- The server readiness gate uses soft contact lens washout ≥10 full days and rigid/RGP ≥21 full
+  days, as recorded in the launch contract and owned by `clinical_core.readiness`. Missing or
+  insufficient washout blocks assessment. These operational criteria are not ectasia score points.
 
 ## Output semantics
 

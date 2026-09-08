@@ -1,14 +1,16 @@
 # CER-AI Monday Master Order — 66-Item Evidence Matrix
 
 Audit date: 2026-09-08  
-Branch: `monday-clean-architecture`  
+Checkpoint branch: `staging/canonical-validation-2026-09-08`
+
+Checkpoint commit: `0d36e06981b48d1147eb2123c2b46a0df077f70a`
 Scope: repository architecture, local runtime, automated regression, and explicit external blockers
 
 Status meanings:
 
 - **PASS (LOCAL):** implementation and local automated evidence agree with the accepted rule.
 - **PARTIAL:** implementation/automated evidence exists, but the required physical environment was not tested.
-- **BLOCKED:** the required real image, real case, deployment access, or production environment is not present; no pass is claimed.
+- **BLOCKED:** a required prerequisite, environment configuration, or authorization is unavailable; no pass is claimed.
 
 This audit contains all **66** numbered items in the supplied master order. Local success is not
 represented as known-image, real-case, Railway, mobile-device, or production validation.
@@ -43,7 +45,7 @@ represented as known-image, real-case, Railway, mobile-device, or production val
 | 6 | Posterior Rmin from Show 2 Cornea Back | **PASS (LOCAL)** | `Rmin_mm` is locked to Cornea Back; front source is rejected; obsolete `rmin_front_source_policy.py` is absent. |
 | 7 | Topometric indices from center 8-mm box | **PASS (LOCAL)** | ISV/IVA/KI/CKI/IHA/IHD/topometric RMin/TKC/KISA/I-S are locked to `SHOW_2_INDICES`; no derivation is allowed. |
 | 8 | Keep posterior and topometric RMin distinct | **PASS (LOCAL)** | Separate fields and separate source IDs; explicit cross-source rejection in `test_source_interchange_regression.py`. |
-| 9 | Signed I-S classification, unlimited negative AST | **PASS (LOCAL)** | Canonical rule classifies every value ≤−0.51 D as AST; −1.00/−1.50/−3.00 and all positive boundaries are tested. |
+| 9 | Signed I-S classification, unlimited negative AST | **PASS (LOCAL)** | Canonical rule classifies every value <−0.50 D as AST; −1.00/−1.50/−3.00 and positive boundaries are tested. Exactly −0.50 is normal. |
 | 10 | Four Maps lower-left numerical box | **PASS (LOCAL)** | Pupil Center, Thinnest, Kmax, and HWTW are locked to the labeled lower-left box; label interchange tests prevent Pupil Center/Thinnest and K/Kmax swaps. |
 | 11 | BAD central F.Ele.Th and B.Ele.Th | **PASS (LOCAL)** | Both fields are direct BAD-center values; label/source locks reject neighboring or map values. |
 | 12 | BAD PPI section | **PASS (LOCAL)** | PPI Min/Avg/Max and ARTmax are direct `BAD_PPI` reads; no CTSP/PTI reconstruction path exists. |
@@ -71,7 +73,7 @@ represented as known-image, real-case, Railway, mobile-device, or production val
 | 34 | PRK MMC sign-safe rule | **PASS (LOCAL)** | Myopic magnitude 3.99 recommended/4.00 mandatory; hyperopic mandatory; normalized refractive group prevents signed-comparison errors. |
 | 35 | PRK selection clears LASIK flap | **PASS (LOCAL)** | Plan resolution forces `flap_um=None` and `NOT_APPLICABLE`; frontend and runtime tests prevent residual-flap conflicts. |
 | 36 | Prior refractive surgery separate pathway | **PASS (LOCAL)** | Previous LASIK/PRK/SMILE returns `POST-REFRACTIVE PATHWAY REQUIRED` and cannot obtain a virgin-cornea report token. |
-| 37 | ML7/microkeratome planning audit | **PASS (LOCAL)** | HWTW, K axes, flap, ring/vacuum/blade/hinge, RSB/PTA, and plan data flow through canonical planning; shared RSB/PTA constants are imported from safety. |
+| 37 | ML7/microkeratome planning audit | **PASS (LOCAL)** | Dedicated BAD upper-middle K1/K2 supply ML7 keratometry; HWTW remains Four Maps lower-left. No general-scoring K or Kmax fallback. Canonical planning owns flap/ring/vacuum/blade/hinge and imports safety constants. |
 | 38 | One surgeon-completion mechanism with provenance | **PASS (LOCAL)** | `assessment_workflow` creates standardized requests and applies corrections once; report payload labels corrections `SURGEON_CONFIRMED`. |
 | 39 | Mandatory source-set gate | **PASS (LOCAL)** | OD/OS Four Maps, OD/OS BAD, and Show 2 are required by direct workflow validation; treatment card is optional and missing screens are not inferred. |
 | 40 | Laterality never from upload order | **PASS (LOCAL)** | Explicit visible OD/OS is required; UNKNOWN or inconsistent laterality is blocked. Mandatory-source and extraction tests protect this. |
@@ -79,7 +81,7 @@ represented as known-image, real-case, Railway, mobile-device, or production val
 | 42 | One visible Pentacam QS policy | **PASS (LOCAL)** | `pentacam_quality_policy.py` owns the non-silent quality warning behavior used by extraction/workflow/report; UI displays quality warnings. |
 | 43 | Analyze workflow completeness diagnostics | **PASS (LOCAL)** | Analyze re-enables after incomplete responses and identifies source/manual/flap/scoring blockers; PRK flap=None and historical disabled-button regressions are tested. |
 | 44 | Generate Report gate | **PASS (LOCAL)** | No report token/action until applicable ERSS + NICE + PS3 are complete; hard-stop summary is a distinct response. |
-| 45 | Randleman report | **PASS (LOCAL)** | Every final LASIK report shows five components, points, total, category, and disposition; non-LASIK explicitly shows the section as not applicable rather than omitting it. |
+| 45 | Randleman report | **PASS (LOCAL)** | Full LASIK and PRK reports show five components, points, total, category, and disposition. Approved PRK amendment uses residual stroma for the tissue component and requires complete ERSS; the earlier non-LASIK-not-applicable statement is retired. |
 | 46 | NICE report | **PASS (LOCAL)** | Shows four inputs, four component scores, total, classification, and status from canonical payload; incomplete reports are rejected. |
 | 47 | PS3 report | **PASS (LOCAL)** | Shows every finding, status, exact detail, moderate/high counts, final procedure disposition, and missing state; unexplained-high-risk regression is covered. |
 | 48 | BAD-D report without recalculation | **PASS (LOCAL)** | Final D, all five D components, interpretation, context, and source provenance are copied from the canonical payload; renderer imports no scorer. |
@@ -92,19 +94,39 @@ represented as known-image, real-case, Railway, mobile-device, or production val
 | 55 | Retrospective research data | **PASS (LOCAL)** | Encrypted catalog search and pseudonymized research export support later queries outside the clinical engine; access controls are tested. |
 | 56 | User/surgeon access and attribution | **PASS (LOCAL)** | OWNER/DOCTOR scope, authenticated reviewer binding, report/archive attribution, and job ownership are tested without clinical mutation. |
 | 57 | Physical mobile/PWA test | **PARTIAL** | Manifest/share-target/service-worker/mobile layout, first-attempt retry, completion/report/archive flows pass automated browser/Node contracts. No physical phone installation/share/report/archive run was performed. |
-| 58 | Current branding only | **PASS (LOCAL)** | Displayed app/public site/title/footer use `CER-AI — Cornea Ectasia Risk Assessment Intelligence`; old expansion/history text and the obsolete raster logo were removed. |
+| 58 | Current branding only | **PASS (LOCAL)** | The staging app/public site/title/footer use `CER-AI — Cornea Ectasia Risk Assessment Intelligence`; accepted branding is retained. No new branding change is authorized by this audit. |
 | 59 | Surgeon responsibility notice | **PASS (LOCAL)** | Visible in application, reports, public site, and localization; remains presentation/legal content, separate from assessment findings. |
 | 60 | Test retirement discipline | **PASS (LOCAL)** | `CERAI_STEP1_TEST_RETIREMENTS.md` records old rule → new owner/rule → reason, including the 2026-09-07 PTA clarification. |
-| 61 | Complete local regression suite | **PASS (LOCAL)** | Dependency audit, critical Ruff, compile, startup invariants, all phase/stage/clinical/archive/security tests, full pytest, and independent per-file runs are required by CI and were run locally for this audit; final counts are recorded in Stage 14 acceptance. |
+| 61 | Complete local regression suite | **PASS (LOCAL, ACCEPTED CHECKPOINT)** | Latest accepted checkpoint: 697 tests passed. Stage 14 records the earlier dependency/static/compile/startup and independent-process checks. Eight sample Word pages were visually checked and accepted. No full-suite or visual-QA rerun is claimed by this documentation reconciliation. Exact-head GitHub Actions acceptance remains a release gate. |
 | 62 | Architecture acceptance matrix | **PASS (LOCAL)** | `test_step14_architecture_acceptance.py` locks one runtime, no parallel engine, no browser clinical override, no report-side scoring, no reconciliation, PTA boundary, and current branding. |
-| 63 | 30-target validation on real Pentacam screenshots | **PARTIAL** | The supplied bilateral Show 2/Four Maps/BAD set was manually transcribed from every canonical box and direct SRAX geometry ran on both Four Maps images. K1 axis remains UNREADABLE because it is not directly displayed and cannot be derived. Actual model-extraction equality remains blocked by the absent configured model credential. See `CERAI_KNOWN_IMAGE_VALIDATION_2026-09-08.md`. |
-| 64 | Real-case end-to-end validation | **PARTIAL** | Verified transcription plus supplied treatment inputs ran through the canonical runtime and exposed/fixed spherical-axis PS3 and upstream-RSB completeness defects. Actual Upload extraction, surgeon eligibility confirmation, PDF inspection, archive, and reopen remain outstanding. |
-| 65 | Merge/Railway deployment/SHA/version verification | **BLOCKED** | Acceptance items 63–64 are incomplete, and no merge/deployment was performed. A Git commit or GitHub merge is not represented as deployment. |
-| 66 | Production smoke test, including mobile repeat | **BLOCKED** | Requires completed deployment plus production credentials, known case, manual source comparison, archive access, and a physical mobile run. Not performed. |
+| 63 | 30-target validation on real Pentacam screenshots | **PARTIAL** | Historical canonical-box transcription and bilateral geometric SRAX checks exist. Subsequent staging model extraction is evidenced by recovered responses and Railway logs. Complete field-by-field equality/sign-off for the exact release candidate is not established. Dedicated PS3 BAD flat axis is distinct from the historical unreadable Show 2 K1 axis. |
+| 64 | Real-case end-to-end validation | **PARTIAL / ARCHIVE BLOCKED** | Accepted sample-report review and staging analysis/completion transport evidence exist; they do not establish complete clinical input sign-off or archive/reopen success. Staging rendered variable names contain no archive backend configuration. Complete source comparison, confirmed eligibility/treatment inputs, and deployed report/archive/reopen attribution still require evidence. |
+| 65 | Merge/Railway deployment/SHA/version verification | **PARTIAL — STAGING VERIFIED** | Staging deployment a4fa9194-f66f-4f6b-ae6b-2ea053457bf7 is SUCCESS at 0d36e06981b48d1147eb2123c2b46a0df077f70a. Production remains 7b157014c507a83865d7d8332c71c324aa792456. Production promotion is pending validation and explicit authorization. Application label 0.7.71 alone does not identify the release; record SHA and policy version. |
+| 66 | Production smoke test, including mobile repeat | **BLOCKED — NOT AUTHORIZED** | Requires approved production promotion, known-case source comparison, report/archive access and physical mobile repeat. Not performed. |
+
+## Approved amendments after the original matrix
+
+These amendments are carried forward from the checkpoint protocol, test-retirement record,
+source registry, canonical owners and associated regression tests. They are operational CER-AI
+policies, not new claims of clinical validation.
+
+- Final disposition counts completed ERSS/NICE/PS3/Final BAD-D systems once: zero or one caution = PASS, two = PASS WITH CAUTION, three/four = CAUTION. Independent caution, incompleteness and STOP-DEFER gates retain their precedence.
+- PS3 astigmatism comparison activates only if either magnitude exceeds 3.00 D; both at/below 3.00 D add no factor. Its axis comes only from the BAD flat Axis beside K1. Shared SRAX is always evaluated by PS3, even after other deferring factors.
+- ERSS and PS3 use the shared independent geometric SRAX evidence with a strict >20.0° boundary. Reverse-KISA and older inclusive-20/separate-22 rules are retired.
+- PRK includes canonical ERSS using residual stroma; LASIK and PRK share requested myopic ablation resolution. Definitive LASIK failure evaluates PRK once per failed eye, retaining LASIK history and all shared safety/completion gates.
+- ML7 uses dedicated BAD K1/K2 fields and verified Four Maps HWTW. General scoring K and axis source locks stay independent.
+- Final BAD-D owns BAD disposition. D components and PPI/ARTmax bands are informational in BAD; PS3 retains its separate PPI Average criterion. Accepted report formatting and contextual display are preserved.
+- SRAX is retained across pages without an observation; true conflicting observations remain unresolved. The same source validator runs before targeted reread and merge.
+- Age is calculated from birth/examination dates with provenance and surgeon-entered precedence. Patient name uses one OD Four Maps header, OS only if OD Four Maps is absent; unreadable selected name requests completion.
+- Word presentation now matches the approved PDF; 697 tests and eight-page Word visual QA are accepted checkpoint evidence.
 
 ## Honest release conclusion
 
-The local canonical-engine refactor and automated architecture/regression acceptance can close.
-The overall Monday master order cannot be called deployment-complete until the remaining portions
-of items 63–66 are performed in sequence. Item 57 also remains partial until its physical-phone
-checks are completed.
+Local canonical-engine work and accepted report formatting remain complete. The staging deployment
+is verified, while production remains unchanged. Items 57, 63 and 64 need their remaining evidence;
+item 65 is only staging-complete, and item 66 waits for explicitly authorized production promotion.
+One newly identified policy conflict remains open: the old compliance audit required a standalone
+PRK PTA >35.28% CAUTION, whereas the current canonical runtime contains no such gate. No explicit
+approval for this isolated flag's retirement/retention was recovered. Local test passes do not
+resolve that discrepancy; clinical behavior remains unchanged pending surgeon clarification.
+See `CERAI_PRODUCTION_REVIEW_2026-09-08.md` for the concrete release sequence and blockers.
