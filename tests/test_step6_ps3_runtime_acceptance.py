@@ -54,7 +54,6 @@ def _modifiers():
     return {
         "eye_rubbing": "no",
         "family_history": "no",
-        "inter_eye_asymmetry": "no",
         "pregnancy_nursing": "no",
         "collagen_tissue_disease": "no",
         "drug_usage": "no",

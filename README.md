@@ -133,7 +133,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Optical-zone selection is limited to `6.0`, `6.5`, or `7.0 mm`; transition-zone selection is limited to `8.0`, `8.5`, or `9.0 mm`.
 - The visible laser-platform field is fixed and read-only as `Alcon EX500` for both eyes; the optical zone remains an explicit eye-specific input.
 - Planned LASIK flap thickness is selected per eye from `90`, `100`, `110`, or `120 µm`; PRK plans leave the flap selection blank.
-- Refraction stability, documented progression, unexplained CDVA loss, and anticipated enhancement remain separate eye-specific values inside one compact clinical-eligibility dropdown box.
+- Refraction stability, documented progression, and unexplained CDVA loss remain separate eye-specific values inside one compact clinical-eligibility dropdown box.
 - PRK epithelial thickness is shown per eye as a fixed, read-only `50 µm` CER-AI value and is used in the PRK RST/PTA calculations.
 - Procedure-correct PTA formulas for LASIK and PRK share one safety limit: PTA must be `<40%`;
   `>=40%` fails the evaluated plan. LASIK planning evaluates A→B→C and retains the first safe
@@ -149,8 +149,8 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Expanded extraction/reporting of anterior and posterior elevation, pachymetric progression,
   topometric, thinnest-point location, corneal-volume, and HOA/coma fields when visibly available.
 - Required clinical modifiers and treatment-plan inputs; missing/unreadable critical data prohibit PASS.
-- One multi-select clinical-eligibility control records eye rubbing/ocular trauma, family history, inter-eye asymmetry, pregnancy/nursing, collagen/connective-tissue disease, medication, dry eye, and systemic disease. These create separate defer/review dispositions without invented ectasia-score points.
-- Contact-lens type and washout are documented. The supplied source-study acquisition criterion (soft ≥14 days; rigid ≥21 days) is an imaging-data gate, not an ectasia score or universal safety cutoff.
+- One multi-select clinical-eligibility control records eye rubbing/ocular trauma, family history, pregnancy/nursing, collagen/connective-tissue disease, medication, dry eye, and systemic disease. Eye rubbing and family history produce CAUTION; pregnancy/nursing and collagen/connective-tissue disease produce STOP-DEFER; medication, dry eye, and systemic disease produce CAUTION. These findings do not add ectasia-score points. Inter-eye asymmetry remains owned by PS3 and is not duplicated here.
+- Contact-lens type and washout are documented. The operational gate requires soft-lens washout ≥10 full days and rigid/RGP washout ≥21 full days; it is not an ectasia score.
 - CAUTION requires explicit surgeon review but does not automatically defer surgery. STOP-DEFER
   retains all true hard-stop and explicit defer actions.
 - Formal clinical report with patient/reviewer metadata, restrained decision colors (PASS green,

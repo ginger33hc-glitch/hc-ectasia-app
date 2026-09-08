@@ -38,8 +38,6 @@ def _tri(value: Any) -> str:
 def evaluate_eligibility(
     plan: Mapping[str, Any] | None,
     patient_modifiers: Mapping[str, Any] | None,
-    *,
-    bilateral: bool,
 ) -> EligibilityResult:
     """Return documented non-tomographic eligibility findings for one eye."""
     plan = plan or {}
@@ -50,7 +48,6 @@ def evaluate_eligibility(
     cdva = _tri(plan.get("cdva_below_20_20"))
     eye_rubbing = _tri(modifiers.get("eye_rubbing"))
     family_history = _tri(modifiers.get("family_history"))
-    inter_eye = _tri(modifiers.get("inter_eye_asymmetry"))
     pregnancy = _tri(modifiers.get("pregnancy_nursing"))
     collagen = _tri(modifiers.get("collagen_tissue_disease"))
     drug_usage = _tri(modifiers.get("drug_usage"))
@@ -69,8 +66,6 @@ def evaluate_eligibility(
         "dry_eye": dry_eye,
         "systemic_disease": systemic,
     }
-    if bilateral:
-        required["marked_inter_eye_asymmetry"] = inter_eye
     missing = tuple(key for key, value in required.items() if value == "unknown")
 
     findings: list[DecisionFinding] = []
@@ -94,11 +89,17 @@ def evaluate_eligibility(
             CAUTION,
             "Unexplained preoperative CDVA below 20/20 requires investigation.",
         ))
-    if bilateral and inter_eye == "yes":
+    if eye_rubbing == "yes":
         findings.append(DecisionFinding(
-            "clinical_inter_eye_asymmetry",
+            "eye_rubbing_or_ocular_trauma",
             CAUTION,
-            "Marked inter-eye asymmetry requires escalated surgeon review.",
+            "Chronic eye rubbing/repetitive ocular trauma requires caution and surgeon review.",
+        ))
+    if family_history == "yes":
+        findings.append(DecisionFinding(
+            "family_history_keratoconus",
+            CAUTION,
+            "Family history of keratoconus requires caution and surgeon review.",
         ))
     if pregnancy == "yes":
         findings.append(DecisionFinding(
@@ -106,8 +107,13 @@ def evaluate_eligibility(
             STOP_DEFER,
             "Pregnancy or nursing requires separate refractive-surgery eligibility review.",
         ))
+    if collagen == "yes":
+        findings.append(DecisionFinding(
+            "collagen_tissue_disease",
+            STOP_DEFER,
+            "Collagen/connective-tissue disease requires STOP-DEFER and separate eligibility review.",
+        ))
     for key, value, detail in (
-        ("collagen_tissue_disease", collagen, "Collagen/connective-tissue disease requires separate eligibility review."),
         ("relevant_medication", drug_usage, "Relevant medication/drug usage requires medication-specific review."),
         ("dry_eye", dry_eye, "Dry-eye disease requires ocular-surface optimization and eligibility review."),
         ("systemic_disease", systemic, "Systemic disease requires disease-specific refractive-surgery eligibility review."),

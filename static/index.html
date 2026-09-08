@@ -66,7 +66,6 @@
           <div class="multi-options">
             <label class="multi-option"><input type="checkbox" name="patient_modifier" value="eye_rubbing"><span>Chronic eye rubbing / repetitive ocular trauma</span></label>
             <label class="multi-option"><input type="checkbox" name="patient_modifier" value="family_history"><span>Family history of keratoconus</span></label>
-            <label class="multi-option"><input type="checkbox" name="patient_modifier" value="inter_eye_asymmetry"><span>Marked inter-eye asymmetry</span></label>
             <label class="multi-option"><input type="checkbox" name="patient_modifier" value="pregnancy_nursing"><span>Pregnancy or nursing</span></label>
             <label class="multi-option"><input type="checkbox" name="patient_modifier" value="collagen_tissue_disease"><span>Collagen / connective-tissue disease</span></label>
             <label class="multi-option"><input type="checkbox" name="patient_modifier" value="drug_usage"><span>Relevant medication / drug usage</span></label>
@@ -180,7 +179,6 @@ const eyeTemplate = (eye) => `
       <div class="row"><label>Refraction stable?</label><select id="${eye}_stable"><option value="yes" selected>Yes</option><option value="no">No</option><option value="unknown">Unknown</option></select></div>
       <div class="row"><label>Documented progression?</label><select id="${eye}_progression"><option value="no" selected>No</option><option value="yes">Yes</option><option value="unknown">Unknown</option></select></div>
       <div class="row"><label>Unexplained CDVA &lt;20/20?</label><select id="${eye}_cdva"><option value="no" selected>No</option><option value="yes">Yes</option><option value="unknown">Unknown</option></select></div>
-      <div class="row"><label>Enhancement anticipated?</label><select id="${eye}_enhancement"><option value="no" selected>No</option><option value="yes">Yes</option><option value="unknown">Unknown</option></select></div>
     </div>
   </details>`;
 document.querySelector("#od-fields").innerHTML = eyeTemplate("od");
@@ -468,7 +466,7 @@ imageInput.addEventListener("change",()=>{
 
 const modifierLabels={
   eye_rubbing:"Eye rubbing / ocular trauma",family_history:"Family history",
-  inter_eye_asymmetry:"Inter-eye asymmetry",pregnancy_nursing:"Pregnancy / nursing",
+  pregnancy_nursing:"Pregnancy / nursing",
   collagen_tissue_disease:"Collagen-tissue disease",drug_usage:"Medication / drug usage",
   dry_eye:"Dry-eye disease",systemic_disease:"Systemic disease",
   none:"None",unknown:"Not documented"
@@ -489,7 +487,7 @@ modifierInputs.forEach(input=>input.addEventListener("change",()=>{
 function patientModifiers(){
   const selected=selectedModifierValues();
   if(!selected.length)throw new Error("Select patient-level modifiers, None, or Not documented.");
-  const keys=["eye_rubbing","family_history","inter_eye_asymmetry","pregnancy_nursing","collagen_tissue_disease","drug_usage","dry_eye","systemic_disease"];
+  const keys=["eye_rubbing","family_history","pregnancy_nursing","collagen_tissue_disease","drug_usage","dry_eye","systemic_disease"];
   const state=selected.includes("unknown")?"unknown":"no";
   const result=Object.fromEntries(keys.map(key=>[key,state]));
   if(!selected.includes("unknown")&&!selected.includes("none"))selected.forEach(key=>{if(keys.includes(key))result[key]="yes"});
@@ -512,7 +510,7 @@ function plan(prefix){
   transition_zone_mm:numberOrNull(`${prefix}_transition`), transition_zone_not_applicable:"no",
   surgeon_I_S_D:numberOrNull(`${prefix}_surgeon_i_s`),
   stable:value(`${prefix}_stable`), progression:value(`${prefix}_progression`),
-  cdva_below_20_20:value(`${prefix}_cdva`), enhancement_anticipated:value(`${prefix}_enhancement`)
+  cdva_below_20_20:value(`${prefix}_cdva`)
 }}
 
 function statusClass(s){

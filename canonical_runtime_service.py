@@ -544,7 +544,6 @@ def evaluate_case(
     source = _eye_by_name(extracted)
     resolved_plans = resolve_case_plans(extracted, eye_plans)
     effective_plans = {eye: dict(plan) for eye, plan in resolved_plans.items()}
-    bilateral = set(source) == {"OD", "OS"}
     results: list[dict[str, Any]] = []
     procedure_transitions = []
 
@@ -579,7 +578,7 @@ def evaluate_case(
             })
             continue
 
-        eligibility = evaluate_eligibility(plan, patient_modifiers, bilateral=bilateral)
+        eligibility = evaluate_eligibility(plan, patient_modifiers)
         normalized = build_clinical_core_input(
             eye, plan, age_years=age_years, extracted=extracted, plan_already_resolved=True,
         )

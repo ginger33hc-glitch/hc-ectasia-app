@@ -84,7 +84,7 @@ def _plan(**overrides):
 def _modifiers(**overrides):
     values = {
         "contact_lens_type": "NONE", "eye_rubbing": "no", "family_history": "no",
-        "inter_eye_asymmetry": "no", "pregnancy_nursing": "no",
+        "pregnancy_nursing": "no",
         "collagen_tissue_disease": "no", "drug_usage": "no", "dry_eye": "no",
         "systemic_disease": "no",
     }

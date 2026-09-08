@@ -60,7 +60,6 @@ def _modifiers(**overrides):
     values = {
         "eye_rubbing": "no",
         "family_history": "no",
-        "inter_eye_asymmetry": "no",
         "pregnancy_nursing": "no",
         "collagen_tissue_disease": "no",
         "drug_usage": "no",
@@ -184,10 +183,16 @@ def test_missing_eligibility_documentation_is_explicitly_incomplete():
     assert all("Clinical eligibility: dry_eye" in eye["missing"] for eye in result["eyes"])
 
 
-def test_eye_rubbing_and_family_history_remain_notes_only():
+def test_eye_rubbing_and_family_history_are_cautions():
     result = _evaluate(modifiers=_modifiers(eye_rubbing="yes", family_history="yes"))
-    assert result["status"] == "PASS"
+    assert result["status"] == "CAUTION"
     assert all(len(eye["clinical_modifiers"]) == 2 for eye in result["eyes"])
+
+
+def test_collagen_connective_tissue_disease_is_stop_defer():
+    result = _evaluate(modifiers=_modifiers(collagen_tissue_disease="yes"))
+    assert result["status"] == "STOP-DEFER"
+    assert all(eye["status"] == "STOP-DEFER" for eye in result["eyes"])
 
 
 def test_missing_safety_dependency_is_exposed_in_runtime_missing_list():

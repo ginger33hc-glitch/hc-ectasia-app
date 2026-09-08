@@ -147,8 +147,12 @@ Individual ERSS/NICE/PS3 scoring and procedural hard stops remain unchanged.
 - Instability or documented progression: `STOP-DEFER`, repeat relevant assessment and
   reassess after at least six months.
 - Pregnancy/nursing: `STOP-DEFER`.
-- Unexplained CDVA below 20/20, inter-eye asymmetry, collagen/connective-tissue disease, relevant
-  medication, dry eye, or other systemic disease: `CAUTION` with explicit surgeon review.
+- Collagen/connective-tissue disease: `STOP-DEFER`.
+- Eye rubbing/repetitive ocular trauma, family history of keratoconus, unexplained CDVA below
+  20/20, relevant medication, dry eye, or other systemic disease: `CAUTION` with explicit
+  surgeon review.
+- Marked inter-eye asymmetry is evaluated by PS3 and is not duplicated as a patient-level
+  clinical modifier. Anticipated enhancement is not part of the eligibility contract.
 - These modifiers do not add invented ectasia-score points.
 - The server readiness gate uses soft contact lens washout ≥10 full days and rigid/RGP ≥21 full
   days, as recorded in the launch contract and owned by `clinical_core.readiness`. Missing or

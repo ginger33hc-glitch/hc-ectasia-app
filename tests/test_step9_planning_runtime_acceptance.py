@@ -45,7 +45,7 @@ def _plan(procedure="LASIK", **overrides):
 
 def _modifiers():
     return {
-        "eye_rubbing": "no", "family_history": "no", "inter_eye_asymmetry": "no",
+        "eye_rubbing": "no", "family_history": "no",
         "pregnancy_nursing": "no", "collagen_tissue_disease": "no", "drug_usage": "no",
         "dry_eye": "no", "systemic_disease": "no",
     }

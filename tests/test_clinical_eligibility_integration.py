@@ -59,7 +59,6 @@ def _modifiers(**overrides):
     values = {
         "eye_rubbing": "no",
         "family_history": "no",
-        "inter_eye_asymmetry": "no",
         "pregnancy_nursing": "no",
         "collagen_tissue_disease": "no",
         "drug_usage": "no",
@@ -71,14 +70,14 @@ def _modifiers(**overrides):
 
 
 def test_reassuring_eligibility_keeps_reassuring_core_pass():
-    eligibility = evaluate_eligibility(_plan(), _modifiers(), bilateral=True)
+    eligibility = evaluate_eligibility(_plan(), _modifiers())
     result = evaluate_normalized_case(_core_input(), external_findings=eligibility.findings)
     assert result["status"] == "PASS"
     assert result["external_findings"] == eligibility.findings
 
 
 def test_eligibility_stop_is_retained_by_same_finalizer():
-    eligibility = evaluate_eligibility(_plan(stable="no"), _modifiers(), bilateral=True)
+    eligibility = evaluate_eligibility(_plan(stable="no"), _modifiers())
     result = evaluate_normalized_case(_core_input(), external_findings=eligibility.findings)
     assert result["status"] == STOP_DEFER
     assert "refractive_stability" in {item.key for item in result["final_disposition"].stop_drivers}
@@ -88,7 +87,6 @@ def test_eligibility_caution_does_not_auto_escalate_to_stop():
     eligibility = evaluate_eligibility(
         _plan(cdva_below_20_20="yes"),
         _modifiers(dry_eye="yes"),
-        bilateral=True,
     )
     result = evaluate_normalized_case(_core_input(), external_findings=eligibility.findings)
     assert result["status"] == CAUTION
@@ -96,10 +94,21 @@ def test_eligibility_caution_does_not_auto_escalate_to_stop():
 
 
 def test_missing_eligibility_documentation_is_incomplete_not_pass():
-    eligibility = evaluate_eligibility(_plan(), _modifiers(dry_eye="unknown"), bilateral=True)
+    eligibility = evaluate_eligibility(_plan(), _modifiers(dry_eye="unknown"))
     result = evaluate_normalized_case(_core_input(), external_findings=eligibility.findings)
     assert result["status"] == ASSESSMENT_INCOMPLETE
     assert "clinical_eligibility" in {item.key for item in result["final_disposition"].incomplete_drivers}
+
+
+def test_collagen_stop_is_retained_by_same_finalizer():
+    eligibility = evaluate_eligibility(
+        _plan(), _modifiers(collagen_tissue_disease="yes")
+    )
+    result = evaluate_normalized_case(_core_input(), external_findings=eligibility.findings)
+    assert result["status"] == STOP_DEFER
+    assert "collagen_tissue_disease" in {
+        item.key for item in result["final_disposition"].stop_drivers
+    }
 
 
 def test_external_findings_must_be_canonical_decision_findings():
