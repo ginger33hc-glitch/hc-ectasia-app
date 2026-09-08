@@ -4,6 +4,7 @@ from zipfile import ZipFile
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from PIL import Image
 
 import assessment_workflow
 import case_archive
@@ -53,7 +54,7 @@ def test_source_routes_enforce_case_scope_and_return_integrity_checked_files(mon
         actor=principal("doctor-1"),
     )
 
-    current = {"principal": principal("owner-1", "OWNER")}
+    current = {"principal": principal("doctor-1")}
     monkeypatch.setattr(user_access, "require_current_principal", lambda: current["principal"])
     audit_events = []
     core = SimpleNamespace(
@@ -113,8 +114,21 @@ def test_source_routes_enforce_case_scope_and_return_integrity_checked_files(mon
             assert zipped.read("002_PATIENT_OS.png") == b"os-image"
             assert zipped.read("003_Pentacam export.pdf") == b"pdf-source"
 
-        current["principal"] = principal("doctor-1")
-        assert client.get(f"{base}/sources").status_code == 200
+        current["principal"] = principal("owner-1", "OWNER")
+        owner_inventory = client.get(f"{base}/sources")
+        assert owner_inventory.status_code == 200
+        assert [item["original_filename"] for item in owner_inventory.json()["sources"]] == [
+            "CER-AI_Pentacam_Source_001.jpg",
+            "CER-AI_Pentacam_Source_002.png",
+            "CER-AI_Pentacam_Source_003.pdf",
+        ]
+        assert [item["owner_view_available"] for item in owner_inventory.json()["sources"]] == [
+            True, True, False,
+        ]
+        assert all("sha256" not in item for item in owner_inventory.json()["sources"])
+        assert all("plaintext_bytes" not in item for item in owner_inventory.json()["sources"])
+        assert client.get(f"{base}/sources/1/preview").status_code == 415
+        assert client.get(f"{base}/sources.zip").status_code == 415
         current["principal"] = principal("doctor-2")
         assert client.get(f"{base}/sources").status_code == 403
         assert client.get(f"{base}/sources/1/preview").status_code == 403
@@ -128,3 +142,44 @@ def test_source_routes_enforce_case_scope_and_return_integrity_checked_files(mon
     finally:
         assessment_workflow.begin = original_begin
         assessment_workflow.complete = original_complete
+
+
+def test_owner_source_derivative_masks_header_and_never_returns_original_bytes(monkeypatch):
+    source = BytesIO()
+    Image.new("RGB", (200, 100), "red").save(source, format="PNG")
+    original = source.getvalue()
+    archive = case_archive.EncryptedArchive(case_archive.MemoryObjectStore(), KEY)
+    archive.archive_sources(
+        CASE_ID,
+        [(original, "Patient Name OD.png")],
+        patient_metadata={"patient_name": "Patient Name", "patient_id": "P-1"},
+        extracted={},
+    )
+    case_catalog.write_entry(
+        archive,
+        case_archive.RevisionRef(CASE_ID, REVISION_ID, tuple()),
+        ready_payload(),
+        actor=principal("doctor-1"),
+    )
+    monkeypatch.setattr(
+        user_access, "require_current_principal", lambda: principal("owner-1", "OWNER")
+    )
+    core = SimpleNamespace(app=FastAPI(), _cerai_named_users_enabled=True)
+    case_catalog.install(core, case_archive.CaseArchiveRuntime(archive, required=False))
+    client = TestClient(core.app)
+    base = f"/archive/cases/{CASE_ID}/revisions/{REVISION_ID}"
+
+    preview = client.get(f"{base}/sources/1/preview")
+    assert preview.status_code == 200
+    assert preview.content != original
+    assert preview.headers["content-type"] == "image/png"
+    assert "Patient Name" not in preview.headers["content-disposition"]
+    with Image.open(BytesIO(preview.content)) as masked:
+        assert masked.getpixel((190, 5)) == (255, 255, 255)
+        assert masked.getpixel((190, 90)) == (255, 0, 0)
+
+    bundle = client.get(f"{base}/sources.zip")
+    assert bundle.status_code == 200
+    with ZipFile(BytesIO(bundle.content)) as zipped:
+        assert zipped.namelist() == ["001_CER-AI_Deidentified_Source.png"]
+        assert zipped.read(zipped.namelist()[0]) != original

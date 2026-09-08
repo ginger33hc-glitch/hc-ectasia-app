@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict, Optional
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
+import archive_privacy
 import case_catalog
 
 
@@ -28,11 +29,15 @@ def regenerate_bytes(
     locale: str,
     pdf_builder: Callable[[Dict[str, Any]], bytes],
     docx_builder: Callable[[Dict[str, Any]], bytes],
+    owner_deidentified: bool = False,
 ) -> bytes:
     assessment = load_archived_assessment(archive, case_id, revision_id)
     if assessment is None:
         raise HTTPException(404, "Archived CER-AI canonical assessment not found.")
-    localized = dict(assessment)
+    localized = (
+        archive_privacy.owner_assessment(assessment)
+        if owner_deidentified else dict(assessment)
+    )
     localized["locale"] = "tr" if str(locale).lower().startswith("tr") else "en"
     if kind == "pdf":
         return pdf_builder(localized)
@@ -54,7 +59,7 @@ def install(core: Any, archive_runtime: Any) -> None:
             principal = user_access.require_current_principal()
             if not archive_runtime.enabled:
                 raise HTTPException(503, "CER-AI secure archive is not enabled.")
-            case_catalog._authorized_entry(
+            case_catalog._authorized_review_entry(
                 archive_runtime.archive, principal, case_id, revision_id
             )
             normalized_locale = "tr" if str(locale).lower().startswith("tr") else "en"
@@ -66,6 +71,7 @@ def install(core: Any, archive_runtime: Any) -> None:
                 locale=normalized_locale,
                 pdf_builder=build_pdf,
                 docx_builder=build_docx,
+                owner_deidentified=principal.role == "OWNER",
             )
             callback = getattr(core, "_cerai_audit_event", None)
             if callback is not None:
@@ -78,11 +84,17 @@ def install(core: Any, archive_runtime: Any) -> None:
                 )
             if kind == "pdf":
                 media_type = "application/pdf"
-                filename = "CER-AI_Report_Regenerated.pdf"
+                filename = (
+                    "CER-AI_Deidentified_Report_Regenerated.pdf"
+                    if principal.role == "OWNER" else "CER-AI_Report_Regenerated.pdf"
+                )
                 disposition = "inline"
             else:
                 media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                filename = "CER-AI_Report_Regenerated.docx"
+                filename = (
+                    "CER-AI_Deidentified_Report_Regenerated.docx"
+                    if principal.role == "OWNER" else "CER-AI_Report_Regenerated.docx"
+                )
                 disposition = "attachment"
             return StreamingResponse(
                 BytesIO(content),
@@ -90,7 +102,11 @@ def install(core: Any, archive_runtime: Any) -> None:
                 headers={
                     "Content-Disposition": f'{disposition}; filename="{filename}"',
                     "Cache-Control": "no-store",
-                    "X-CER-AI-Report-Source": "archived-canonical-current-template",
+                    "X-CER-AI-Report-Source": (
+                        "owner-deidentified-canonical-current-template"
+                        if principal.role == "OWNER"
+                        else "archived-canonical-current-template"
+                    ),
                 },
             )
 

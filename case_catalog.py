@@ -1,8 +1,8 @@
 """Encrypted case catalog and role-scoped archive retrieval for CER-AI.
 
 Catalog entries live inside the same encrypted S3-compatible case archive. Searchable PHI is never
-placed in object keys or S3 metadata. OWNER may search the complete archive; DOCTOR is restricted to
-cases created under that authenticated user identity. Legacy/unattributed cases remain OWNER-only.
+placed in object keys or S3 metadata. Identifiable archive access belongs only to the DOCTOR account
+that created the case. OWNER may review every case only through de-identified derivatives.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 from fastapi import Body, HTTPException
 from fastapi.responses import StreamingResponse
 
+import archive_privacy
 from case_archive import EncryptedArchive, RevisionRef
 
 
@@ -222,18 +223,20 @@ def search_entries(
     return matches
 
 
-def _principal_can_access(principal: Any, entry: Dict[str, Any]) -> bool:
-    if principal.role == "OWNER":
-        return True
+def _principal_can_review(principal: Any, entry: Dict[str, Any]) -> bool:
     creator = entry.get("created_by") or {}
-    return principal.role == "DOCTOR" and creator.get("user_id") == principal.user_id
+    return principal.role == "OWNER" or (
+        principal.role == "DOCTOR" and creator.get("user_id") == principal.user_id
+    )
 
 
-def _authorized_entry(archive: EncryptedArchive, principal: Any, case_id: str, revision_id: str):
+def _authorized_review_entry(
+    archive: EncryptedArchive, principal: Any, case_id: str, revision_id: str
+):
     entry = get_entry(archive, case_id, revision_id)
     if entry is None:
         raise HTTPException(404, "Archived CER-AI case revision not found.")
-    if not _principal_can_access(principal, entry):
+    if not _principal_can_review(principal, entry):
         raise HTTPException(403, "You do not have access to this archived case.")
     return entry
 
@@ -251,6 +254,28 @@ def _zip_source_filename(source: Any) -> str:
     cleaned = "".join(ch if ch.isalnum() or ch in {"-", "_", ".", " "} else "_" for ch in original)
     cleaned = cleaned.strip(" .")[:180] or _generic_source_filename(source)
     return f"{source.ordinal:03d}_{cleaned}"
+
+
+def _source_inventory_record(source: Any, *, owner_view: bool) -> Dict[str, Any]:
+    if owner_view:
+        available = source.artifact.media_type in SAFE_INLINE_SOURCE_TYPES
+        return {
+            "ordinal": source.ordinal,
+            "original_filename": _generic_source_filename(source),
+            "media_type": (
+                archive_privacy.OWNER_SOURCE_MEDIA_TYPE
+                if available else "application/octet-stream"
+            ),
+            "owner_view_available": available,
+        }
+    return {
+        "ordinal": source.ordinal,
+        "original_filename": source.original_filename,
+        "media_type": source.artifact.media_type,
+        "plaintext_bytes": source.artifact.plaintext_bytes,
+        "sha256": source.artifact.sha256,
+        "owner_view_available": True,
+    }
 
 
 def install(core: Any, archive_runtime: Any) -> None:
@@ -276,23 +301,29 @@ def install(core: Any, archive_runtime: Any) -> None:
         @core.app.post("/archive/search")
         def search_archive(payload: Dict[str, Any] = Body(default={})):
             principal = user_access.require_current_principal()
+            if principal.role not in {"DOCTOR", "OWNER"}:
+                raise HTTPException(403, "This role cannot access the clinical archive.")
             if not archive_runtime.enabled:
                 raise HTTPException(503, "CER-AI secure archive is not enabled.")
             allowed = {"patient_name", "patient_id", "report_date", "decision", "reviewer", "limit"}
             unknown = set(payload) - allowed
             if unknown:
                 raise HTTPException(422, "Unsupported archive search field(s): " + ", ".join(sorted(unknown)))
+            if principal.role == "OWNER" and (payload.get("patient_name") or payload.get("patient_id")):
+                raise HTTPException(422, "OWNER cannot search by patient name or patient ID.")
             filters = {key: payload.get(key) for key in allowed if key in payload}
             if principal.role == "DOCTOR":
                 filters["created_by_user_id"] = principal.user_id
             results = search_entries(archive_runtime.archive, **filters)
+            if principal.role == "OWNER":
+                results = [archive_privacy.owner_catalog(entry) for entry in results]
             audit(
                 "ARCHIVE_SEARCH",
                 actor=principal,
                 details={
                     "filters": {key: payload.get(key) for key in allowed if key in payload},
                     "result_count": len(results),
-                    "scope": "ALL_CASES" if principal.role == "OWNER" else "OWN_CASES",
+                    "scope": "ALL_DEIDENTIFIED" if principal.role == "OWNER" else "OWN_CASES",
                 },
             )
             return {"results": results, "count": len(results)}
@@ -302,14 +333,24 @@ def install(core: Any, archive_runtime: Any) -> None:
             principal = user_access.require_current_principal()
             if not archive_runtime.enabled:
                 raise HTTPException(503, "CER-AI secure archive is not enabled.")
-            _authorized_entry(archive_runtime.archive, principal, case_id, revision_id)
+            _authorized_review_entry(archive_runtime.archive, principal, case_id, revision_id)
             if kind not in {"pdf", "docx"}:
                 raise HTTPException(404, "Unsupported archived report type.")
             locale = "tr" if str(locale).lower().startswith("tr") else "en"
-            ref = archive_runtime.archive.find_report(case_id, revision_id, locale, kind)
-            if ref is None:
-                raise HTTPException(404, "Archived CER-AI report not found.")
-            content = archive_runtime.archive.get_bytes(ref)
+            if principal.role == "OWNER":
+                from reports import build_docx, build_pdf
+
+                assessment = archive_runtime.archive.load_assessment(case_id, revision_id)
+                if assessment is None:
+                    raise HTTPException(404, "Archived CER-AI canonical assessment not found.")
+                payload = archive_privacy.owner_assessment(assessment)
+                payload["locale"] = locale
+                content = build_pdf(payload) if kind == "pdf" else build_docx(payload)
+            else:
+                ref = archive_runtime.archive.find_report(case_id, revision_id, locale, kind)
+                if ref is None:
+                    raise HTTPException(404, "Archived CER-AI report not found.")
+                content = archive_runtime.archive.get_bytes(ref)
             audit(
                 "REPORT_DOWNLOAD",
                 actor=principal,
@@ -319,11 +360,17 @@ def install(core: Any, archive_runtime: Any) -> None:
             )
             if kind == "pdf":
                 media_type = "application/pdf"
-                filename = "CER-AI_Report.pdf"
+                filename = (
+                    "CER-AI_Deidentified_Report.pdf"
+                    if principal.role == "OWNER" else "CER-AI_Report.pdf"
+                )
                 disposition = "inline"
             else:
                 media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                filename = "CER-AI_Report.docx"
+                filename = (
+                    "CER-AI_Deidentified_Report.docx"
+                    if principal.role == "OWNER" else "CER-AI_Report.docx"
+                )
                 disposition = "attachment"
             return StreamingResponse(
                 BytesIO(content),
@@ -331,7 +378,10 @@ def install(core: Any, archive_runtime: Any) -> None:
                 headers={
                     "Content-Disposition": f'{disposition}; filename="{filename}"',
                     "Cache-Control": "no-store",
-                    "X-CER-AI-Report-Source": "archived-original",
+                    "X-CER-AI-Report-Source": (
+                        "owner-deidentified-canonical"
+                        if principal.role == "OWNER" else "archived-original"
+                    ),
                 },
             )
 
@@ -340,7 +390,7 @@ def install(core: Any, archive_runtime: Any) -> None:
             principal = user_access.require_current_principal()
             if not archive_runtime.enabled:
                 raise HTTPException(503, "CER-AI secure archive is not enabled.")
-            entry = _authorized_entry(
+            entry = _authorized_review_entry(
                 archive_runtime.archive, principal, case_id, revision_id
             )
             assessment = archive_runtime.archive.load_assessment(case_id, revision_id)
@@ -352,6 +402,9 @@ def install(core: Any, archive_runtime: Any) -> None:
                 case_id=case_id,
                 revision_id=revision_id,
             )
+            if principal.role == "OWNER":
+                entry = archive_privacy.owner_catalog(entry)
+                assessment = archive_privacy.owner_assessment(assessment)
             return {"catalog": entry, "assessment": assessment}
 
         @core.app.get("/archive/cases/{case_id}/revisions/{revision_id}/sources")
@@ -359,7 +412,7 @@ def install(core: Any, archive_runtime: Any) -> None:
             principal = user_access.require_current_principal()
             if not archive_runtime.enabled:
                 raise HTTPException(503, "CER-AI secure archive is not enabled.")
-            _authorized_entry(archive_runtime.archive, principal, case_id, revision_id)
+            _authorized_review_entry(archive_runtime.archive, principal, case_id, revision_id)
             sources = archive_runtime.archive.list_sources(case_id)
             audit(
                 "SOURCE_LIST",
@@ -368,15 +421,10 @@ def install(core: Any, archive_runtime: Any) -> None:
                 revision_id=revision_id,
                 details={"source_count": len(sources)},
             )
+            owner_view = principal.role == "OWNER"
             return {
                 "sources": [
-                    {
-                        "ordinal": source.ordinal,
-                        "original_filename": source.original_filename,
-                        "media_type": source.artifact.media_type,
-                        "plaintext_bytes": source.artifact.plaintext_bytes,
-                        "sha256": source.artifact.sha256,
-                    }
+                    _source_inventory_record(source, owner_view=owner_view)
                     for source in sources
                 ],
                 "count": len(sources),
@@ -386,13 +434,24 @@ def install(core: Any, archive_runtime: Any) -> None:
             principal = user_access.require_current_principal()
             if not archive_runtime.enabled:
                 raise HTTPException(503, "CER-AI secure archive is not enabled.")
-            _authorized_entry(archive_runtime.archive, principal, case_id, revision_id)
+            _authorized_review_entry(archive_runtime.archive, principal, case_id, revision_id)
             source = archive_runtime.archive.find_source(case_id, ordinal)
             if source is None:
                 raise HTTPException(404, "Archived Pentacam source image not found.")
             if disposition == "inline" and source.artifact.media_type not in SAFE_INLINE_SOURCE_TYPES:
                 raise HTTPException(415, "This archived source type is available for download only.")
             content = archive_runtime.archive.get_bytes(source.artifact)
+            media_type = source.artifact.media_type
+            filename = _generic_source_filename(source)
+            if principal.role == "OWNER":
+                try:
+                    content = archive_privacy.owner_source_image(content)
+                except Exception as exc:
+                    raise HTTPException(
+                        415, "This source cannot be safely de-identified for OWNER review."
+                    ) from exc
+                media_type = archive_privacy.OWNER_SOURCE_MEDIA_TYPE
+                filename = f"CER-AI_Deidentified_Source_{source.ordinal:03d}.png"
             audit(
                 "SOURCE_PREVIEW" if disposition == "inline" else "SOURCE_DOWNLOAD",
                 actor=principal,
@@ -402,12 +461,11 @@ def install(core: Any, archive_runtime: Any) -> None:
             )
             return StreamingResponse(
                 BytesIO(content),
-                media_type=source.artifact.media_type,
+                media_type=media_type,
                 headers={
-                    "Content-Disposition": (
-                        f'{disposition}; filename="{_generic_source_filename(source)}"'
-                    ),
+                    "Content-Disposition": f'{disposition}; filename="{filename}"',
                     "X-Content-Type-Options": "nosniff",
+                    "Cache-Control": "no-store",
                 },
             )
 
@@ -424,17 +482,25 @@ def install(core: Any, archive_runtime: Any) -> None:
             principal = user_access.require_current_principal()
             if not archive_runtime.enabled:
                 raise HTTPException(503, "CER-AI secure archive is not enabled.")
-            _authorized_entry(archive_runtime.archive, principal, case_id, revision_id)
+            _authorized_review_entry(archive_runtime.archive, principal, case_id, revision_id)
             sources = archive_runtime.archive.list_sources(case_id)
             if not sources:
                 raise HTTPException(404, "No archived Pentacam source images were found.")
             output = BytesIO()
             with ZipFile(output, "w", compression=ZIP_DEFLATED, allowZip64=True) as bundle:
                 for source in sources:
-                    bundle.writestr(
-                        _zip_source_filename(source),
-                        archive_runtime.archive.get_bytes(source.artifact),
-                    )
+                    content = archive_runtime.archive.get_bytes(source.artifact)
+                    filename = _zip_source_filename(source)
+                    if principal.role == "OWNER":
+                        try:
+                            content = archive_privacy.owner_source_image(content)
+                        except Exception as exc:
+                            raise HTTPException(
+                                415,
+                                "One or more sources cannot be safely de-identified for OWNER review.",
+                            ) from exc
+                        filename = f"{source.ordinal:03d}_CER-AI_Deidentified_Source.png"
+                    bundle.writestr(filename, content)
             output.seek(0)
             audit(
                 "SOURCE_DOWNLOAD_ALL",

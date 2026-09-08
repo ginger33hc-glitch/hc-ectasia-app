@@ -116,6 +116,27 @@ def list_events(
     return events[:limit]
 
 
+def institutional_event(event: Dict[str, Any]) -> Dict[str, Any]:
+    """Return the non-patient audit view available to the OWNER role.
+
+    Event details are intentionally excluded because historical archive-search
+    events may contain patient names, patient identifiers, or reviewer filters.
+    Random internal case and revision identifiers remain available for security
+    and operational auditing but cannot be used to retrieve identifiable cases
+    through the OWNER role.
+    """
+    allowed = (
+        "audit_format",
+        "event_id",
+        "event_type",
+        "occurred_at_utc",
+        "actor",
+        "case_id",
+        "revision_id",
+    )
+    return {key: event.get(key) for key in allowed if event.get(key) is not None}
+
+
 def install(core: Any, archive_runtime: Any) -> None:
     """Expose fail-aware audit writes and an OWNER-only audit review API."""
     if getattr(core, "_cerai_audit_log_installed", False):
@@ -165,6 +186,7 @@ def install(core: Any, archive_runtime: Any) -> None:
                     "result_count": len(events),
                 },
             )
-            return {"events": events, "count": len(events)}
+            safe_events = [institutional_event(event) for event in events]
+            return {"events": safe_events, "count": len(safe_events)}
 
     core._cerai_audit_log_installed = True

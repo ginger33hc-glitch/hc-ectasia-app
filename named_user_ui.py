@@ -116,6 +116,17 @@ def install(core: Any) -> None:
             return {
                 "role": principal.role,
                 "archive_enabled": bool(archive_runtime and archive_runtime.enabled),
+                "identifiable_archive_access": bool(
+                    archive_runtime and archive_runtime.enabled and principal.role == "DOCTOR"
+                ),
+                "retrospective_archive_access": bool(
+                    archive_runtime
+                    and archive_runtime.enabled
+                    and principal.role in {"DOCTOR", "OWNER"}
+                ),
+                "owner_deidentified_access": bool(
+                    archive_runtime and archive_runtime.enabled and principal.role == "OWNER"
+                ),
                 "audit_enabled": bool(getattr(core, "_cerai_audit_log_installed", False)),
                 "historical_report_enabled": bool(
                     getattr(core, "_cerai_historical_report_installed", False)

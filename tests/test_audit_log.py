@@ -80,6 +80,27 @@ def test_audit_event_type_is_sanitized_without_phi():
     assert payload["event_type"] == "REPORTDOWNLOAD"
 
 
+def test_owner_institutional_audit_view_excludes_event_details_that_may_contain_phi():
+    event = {
+        "audit_format": audit_log.AUDIT_FORMAT,
+        "event_id": "event-1",
+        "event_type": "ARCHIVE_SEARCH",
+        "occurred_at_utc": "2026-09-08T12:00:00+00:00",
+        "actor": {"user_id": "doctor-1", "display_name": "Doctor Example"},
+        "case_id": "a" * 32,
+        "details": {
+            "filters": {"patient_name": "Private Patient", "patient_id": "P-123"},
+            "result_count": 1,
+        },
+    }
+    safe = audit_log.institutional_event(event)
+    assert safe["event_type"] == "ARCHIVE_SEARCH"
+    assert safe["case_id"] == "a" * 32
+    assert "details" not in safe
+    assert "Private Patient" not in json.dumps(safe)
+    assert "P-123" not in json.dumps(safe)
+
+
 class FailingStore:
     def put(self, key, data, *, content_type, metadata):
         raise RuntimeError("storage down")

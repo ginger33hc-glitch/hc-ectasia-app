@@ -158,7 +158,7 @@ def test_authenticated_creator_is_encrypted_in_catalog_and_filterable_by_user_id
     assert matches[0]["created_by"]["user_id"] == "doctor-7"
 
 
-def test_owner_sees_all_doctor_only_own_and_legacy_is_owner_only():
+def test_owner_can_route_to_all_cases_but_doctors_only_to_their_own():
     own_entry = case_catalog.build_entry(
         ready_payload(),
         case_id="d" * 32,
@@ -176,9 +176,9 @@ def test_owner_sees_all_doctor_only_own_and_legacy_is_owner_only():
         case_id="2" * 32,
         revision_id="3" * 24,
     )
-    assert case_catalog._principal_can_access(owner(), own_entry)
-    assert case_catalog._principal_can_access(owner(), other_entry)
-    assert case_catalog._principal_can_access(owner(), legacy_entry)
-    assert case_catalog._principal_can_access(doctor("doctor-1"), own_entry)
-    assert not case_catalog._principal_can_access(doctor("doctor-1"), other_entry)
-    assert not case_catalog._principal_can_access(doctor("doctor-1"), legacy_entry)
+    assert case_catalog._principal_can_review(owner(), own_entry)
+    assert case_catalog._principal_can_review(owner(), other_entry)
+    assert case_catalog._principal_can_review(owner(), legacy_entry)
+    assert case_catalog._principal_can_review(doctor("doctor-1"), own_entry)
+    assert not case_catalog._principal_can_review(doctor("doctor-1"), other_entry)
+    assert not case_catalog._principal_can_review(doctor("doctor-1"), legacy_entry)
