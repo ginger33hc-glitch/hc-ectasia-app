@@ -293,12 +293,12 @@ def evaluate_ps3(eye, inter_eye=None):
         ))
 
     review_notes = (
-        "Corneal Thickness Map morphology: manual surgeon review only; not counted in automated PS3.",
-        "Relative Thickness Map: manual surgeon review only; not counted in automated PS3.",
-        "PTI/CTSP thickness-profile morphology: manual surgeon review only; not counted in automated PS3.",
+        "Corneal Thickness Map morphology: not evaluated; surgeon review required; not counted in automated PS3.",
+        "Relative Thickness Map: not evaluated; surgeon review required; not counted in automated PS3.",
+        "PTI/CTSP thickness-profile morphology: not evaluated; surgeon review required; not counted in automated PS3.",
     )
     for key, note in zip(MANUAL_REVIEW_KEYS, review_notes):
-        findings.append(PS3Finding(key, NOT_REQUIRED, note))
+        findings.append(PS3Finding(key, NOT_EVALUATED, note))
 
     moderate_count, high_count = _count(findings)
     complete, missing_keys = _automated_completeness(findings)

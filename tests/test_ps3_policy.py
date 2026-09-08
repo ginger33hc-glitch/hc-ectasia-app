@@ -5,6 +5,7 @@ from ps3_policy import (
     DEFER,
     HIGH,
     INCOMPLETE,
+    MANUAL_REVIEW_KEYS,
     MODERATE,
     NORMAL,
     NOT_EVALUATED,
@@ -199,13 +200,15 @@ def test_single_moderate_plus_incomplete_keeps_lasik_defer_and_other_procedures_
     assert result.disposition.smile == INCOMPLETE
 
 
-def test_manual_morphology_items_are_manual_only_not_automated_missing_inputs():
+def test_manual_morphology_items_are_not_evaluated_without_becoming_automated_missing_inputs():
     result = evaluate_ps3(normal_eye(), normal_inter_eye())
-    assert finding(result, "corneal_thickness_map_morphology").status == NOT_REQUIRED
-    assert finding(result, "relative_thickness_map").status == NOT_REQUIRED
-    assert finding(result, "pti_ctsp_morphology").status == NOT_REQUIRED
+    assert finding(result, "corneal_thickness_map_morphology").status == NOT_EVALUATED
+    assert finding(result, "relative_thickness_map").status == NOT_EVALUATED
+    assert finding(result, "pti_ctsp_morphology").status == NOT_EVALUATED
+    assert all("not evaluated" in finding(result, key).detail.lower() for key in MANUAL_REVIEW_KEYS)
     assert len(result.review_notes) == 3
     assert result.complete is True
+    assert result.missing_keys == ()
 
 
 def test_srax_exactly_20_is_not_high_but_more_than_20_is_high():
