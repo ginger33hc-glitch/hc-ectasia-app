@@ -734,6 +734,8 @@ f.addEventListener("submit", async (e) => {
     let j; try{j=JSON.parse(text)}catch{throw new Error("Server returned a non-JSON response: "+text.slice(0,200))}
     if(!r.ok){if(r.status===410)readiness.reset();throw new Error(j.detail||"Request failed");}
     const extractedAge=j.extracted?.derived_age_years;
+    const resolvedName=j.patient_metadata?.name;
+    if(resolvedName&&!value('patient_name'))document.getElementById('patient_name').value=resolvedName;
     const enteredAge=numberOrNull("age");
     const agePromptNeeded=!(Number.isInteger(extractedAge))&&enteredAge===null;
     if(Number.isInteger(extractedAge)&&enteredAge===null){

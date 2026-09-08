@@ -12,6 +12,36 @@ import assessment_workflow as workflow
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_patient_name_resolution_preserves_source_and_manual_entry():
+    extracted = {"document_contexts": [
+        {"document_type": "PENTACAM_TOPOGRAPHY", "patient_first_name": "AYŞE",
+         "patient_last_name": "KOŞTUR"},
+        {"document_type": "PENTACAM_TOPOGRAPHY", "patient_first_name": "AYŞE",
+         "patient_last_name": "KOŞTUR"},
+    ]}
+    patient, request = workflow._resolve_patient_metadata({"name": None}, extracted, 37)
+    assert patient["name"] == "AYŞE KOŞTUR" and patient["age"] == 37
+    assert request is None
+    extracted["document_contexts"][1]["patient_last_name"] = "OTHER"
+    patient, request = workflow._resolve_patient_metadata({}, extracted, 37)
+    assert not patient.get("name")
+    assert request["kind"] == "form" and request["form_id"] == "patient_name"
+    patient, request = workflow._resolve_patient_metadata({"name": "Confirmed name"}, extracted, 37)
+    assert patient["name"] == "Confirmed name" and request is None
+
+
+def test_extracted_name_reaches_ready_report_metadata():
+    session = {"extracted": {"eyes": [_eye("OD"), _eye("OS")],
+               "document_contexts": [{"document_type": "PENTACAM_TOPOGRAPHY",
+               "patient_first_name": "AYŞE", "patient_last_name": "KOŞTUR"}]},
+               "ready": None, "source_images": []}
+    response = workflow._respond(SimpleNamespace(APP_VERSION="test"), "token", session,
+                                 37, {"OD": _plan(), "OS": _plan()}, _modifiers(), {}, {})
+    assert response["workflow_status"] == "READY"
+    assert session["ready"]["patient"]["name"] == "AYŞE KOŞTUR"
+    assert response["patient_metadata"]["name"] == "AYŞE KOŞTUR"
+
+
 def _eye(name="OD", **overrides):
     values = {
         "eye": name, "Kmean_D": 43.0, "K2_D": 44.0,

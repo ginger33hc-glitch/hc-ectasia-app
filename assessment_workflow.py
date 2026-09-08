@@ -423,6 +423,36 @@ def _precore_response(token, session, readiness, plans):
     return response
 
 
+def _resolve_patient_metadata(metadata, extracted, age):
+    """Resolve report identity once; never replace an explicit surgeon entry."""
+    patient = deepcopy(metadata)
+    patient["age"] = age
+    if str(patient.get("name") or "").strip():
+        return patient, None
+    contexts = [c for c in extracted.get("document_contexts", [])
+                if c.get("document_type") == "PENTACAM_TOPOGRAPHY"]
+    names = {}
+    for context in contexts:
+        first = " ".join(str(context.get("patient_first_name") or "").split())
+        last = " ".join(str(context.get("patient_last_name") or "").split())
+        if first and last:
+            name = f"{first} {last}"
+            names.setdefault(name.casefold(), name)
+    if len(names) == 1:
+        patient["name"] = next(iter(names.values()))
+        patient["name_source"] = "PENTACAM_FIRST_LAST_NAME_FIELDS"
+        return patient, None
+    if contexts:
+        return patient, {
+            "eye": "PATIENT", "key": "patient_name", "kind": "form",
+            "destination": "source", "form_id": "patient_name",
+            "label": "Confirm patient name — conflicting or unreadable Pentacam name fields",
+            "required_for": ["Patient identity"], "source_screen": "Pentacam patient header",
+            "source_box": "First Name / Last Name", "help": "Enter the verified patient name.",
+        }
+    return patient, None
+
+
 def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
     if age is None:
         age = session["extracted"].get("derived_age_years")
@@ -431,6 +461,8 @@ def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
             raise HTTPException(422, "Clinical inputs must be objects.")
     if set(plans) - {"OD", "OS"} or any(not isinstance(value, dict) for value in plans.values()):
         raise HTTPException(422, "Plans must contain OD/OS objects.")
+    metadata, identity_request = _resolve_patient_metadata(metadata, session["extracted"], age)
+    session["patient_metadata"] = metadata
     overrides = deepcopy(overrides)
     if not isinstance(overrides, dict) or any(not isinstance(value, dict) for value in overrides.values()):
         raise HTTPException(422, "Clinical overrides must be an object.")
@@ -441,7 +473,11 @@ def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
         patient_modifiers=modifiers,
     )
     if not readiness["ready"]:
-        return _precore_response(token, session, readiness, plans)
+        response = _precore_response(token, session, readiness, plans)
+        response["patient_metadata"] = deepcopy(metadata)
+        if identity_request:
+            response["input_requests"].append(identity_request)
+        return response
 
     # A surgeon-entered I-S uses the same canonical correction/provenance path as image-derived I-S.
     for eye_id, plan in plans.items():
@@ -474,6 +510,11 @@ def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
     }
     session["ready"] = None
 
+    response["patient_metadata"] = deepcopy(metadata)
+    if identity_request:
+        missing.append(("PATIENT", identity_request["label"]))
+        requests.append(identity_request)
+        response["workflow_status"] = "NEEDS_INPUT"
     if missing:
         response["missing"] = [
             {"eye": eye, "message": message} for eye, message in missing
@@ -556,7 +597,7 @@ def begin(core, extracted, age, plans, modifiers, metadata, source_images=None):
         archive_state = runtime.begin_case(
             token,
             list(source_images or []),
-            patient_metadata=metadata,
+            patient_metadata=deepcopy(session.get("patient_metadata", metadata)),
             extracted=deepcopy(extracted),
         )
         if archive_state:
