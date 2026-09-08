@@ -457,6 +457,10 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     def normalized_eye(raw_eye: Dict[str, Any]) -> Dict[str, Any]:
         eye = dict(raw_eye)
+        # UNCERTAIN means no SRAX observation on this source, not a measured
+        # disagreement with the Front-map geometry from another page.
+        if eye.get("srax") == "UNCERTAIN":
+            eye["srax"] = None
         eye.pop("targeted_unreadable_regions", None)
         verified = eye.get("table_verified_numeric_fields")
         if isinstance(verified, list):
@@ -550,7 +554,11 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             eye["source_files"] = [source_filename] if source_filename else []
             eye["quality_by_source"] = {source_filename: eye.get("quality")} if source_filename else {}
             eye["pentacam_qs"] = eye.get("_pentacam_qs", eye.get("pentacam_qs", "NOT_SHOWN"))
-            eye["field_provenance"] = {}
+            eye["field_provenance"] = {
+                field: list((source_eye.get("field_provenance") or {}).get(field) or [])
+                for field in ("srax", "srax_deg")
+                if (source_eye.get("field_provenance") or {}).get(field)
+            }
             if source_filename:
                 for field in eye.get("table_verified_numeric_fields", []):
                     if eye.get(field) is not None:

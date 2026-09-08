@@ -4,6 +4,36 @@ import numpy as np
 from PIL import Image
 
 import geometric_srax_policy as policy
+import pytest
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_merge_preserves_measured_srax_when_other_page_is_uncertain(reverse):
+    from app import merge_extractions
+    measured = policy.enrich_extraction({"eyes": [{
+        "eye": "OD", "screen_types": ["FOUR_MAPS_REFRACTIVE"],
+        "srax": "UNCERTAIN", "srax_deg": None,
+    }]}, _synthetic_four_maps(80.0, 260.0), "front.png")
+    expected = measured["eyes"][0]["srax_deg"]
+    other = {"eyes": [{"eye": "OD", "screen_types": ["BAD"],
+                         "srax": "UNCERTAIN", "srax_deg": None}]}
+    sources = [measured, other]
+    if reverse:
+        sources.reverse()
+    eye = merge_extractions(sources)["eyes"][0]
+    assert eye["srax"] == "NO"
+    assert eye["srax_deg"] == expected
+    assert not eye["data_conflicts"]
+    assert eye["field_provenance"]["srax_deg"][0]["source"] == "AXIAL_SAGITTAL_CURVATURE_FRONT_GEOMETRIC"
+
+
+def test_merge_keeps_real_srax_disagreement_unresolved():
+    from app import merge_extractions
+    eye = merge_extractions([{"eyes": [{"eye": "OD", "srax": state,
+                                         "srax_deg": angle}]}
+                             for state, angle in [("NO", 2.0), ("YES", 25.0)]])["eyes"][0]
+    assert eye["srax"] is None and eye["srax_deg"] is None
+    assert eye["data_conflicts"]
 
 
 def _synthetic_four_maps(superior_axis, inferior_axis):
