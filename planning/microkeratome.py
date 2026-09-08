@@ -10,12 +10,13 @@ Source rules: the user-supplied Turkish ML7 reference (MED-LOGICS document
 from dataclasses import asdict, dataclass, field
 from typing import Optional, Tuple
 import math
-from clinical_disposition import FAVORABLE_PLANNING_STATUSES
+from clinical_core.disposition import CAUTION, PASS, PASS_WITH_CAUTION
+from clinical_core.safety import lasik_rsb_hard_stop, lasik_rsb_um, pta_hard_stop, pta_percent
+
+FAVORABLE_PLANNING_STATUSES = frozenset({PASS, PASS_WITH_CAUTION, CAUTION})
 
 
 FAVORABLE_LASIK_STATUSES = FAVORABLE_PLANNING_STATUSES
-LASIK_RSB_MIN_UM = 300.0
-LASIK_PTA_MAX_EXCLUSIVE_PERCENT = 40.0
 
 
 @dataclass(frozen=True)
@@ -113,9 +114,9 @@ def _alternative_tissue_safety(
     if pachy is None or flap is None or ablation is None or pachy <= 0:
         return None, None, "UNAVAILABLE"
     alternative_flap = flap + 10.0
-    rsb = pachy - alternative_flap - ablation
-    pta = 100.0 * (alternative_flap + ablation) / pachy
-    allowed = rsb >= LASIK_RSB_MIN_UM and pta < LASIK_PTA_MAX_EXCLUSIVE_PERCENT
+    rsb = lasik_rsb_um(pachy, alternative_flap, ablation)
+    pta = pta_percent(pachy, alternative_flap, ablation)
+    allowed = not lasik_rsb_hard_stop(rsb) and not pta_hard_stop(pta)
     return round(rsb, 2), round(pta, 3), "ALLOWED" if allowed else "NOT_ALLOWED"
 
 
@@ -147,10 +148,10 @@ def plan_microkeratome(inp: MicrokeratomePlanningInput) -> MicrokeratomePlan:
         if ring is None:
             warnings.append("Steepest K is outside the supplied nomogram range; no ring is inferred.")
     else:
-        warnings.append(
-            "Steepest K and labeled Pentacam horizontal white-to-white (HWTW) are required; "
-            "no vacuum-ring recommendation was generated."
-        )
+        if steep is None:
+            warnings.append("ML7 K1/K2 unavailable: enter both from the BAD Display upper-middle numeric boxes; no vacuum-ring recommendation was generated.")
+        if w2w is None:
+            warnings.append("Verified horizontal white-to-white (HWTW) unavailable: enter HWTW from the 4 Maps Refractive lower-left labeled box; no vacuum-ring recommendation was generated.")
 
     if pachy is not None and pachy < 530:
         notes.append("Active ML7 reference advises 580-590 mmHg when pachymetry is <530 µm, with corneal K taking priority.")

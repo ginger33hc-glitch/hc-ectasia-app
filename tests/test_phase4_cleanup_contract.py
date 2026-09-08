@@ -1,61 +1,81 @@
-"""Phase 4 cleanup contract: retired pre-launch tests are quarantined, not skipped."""
+"""Step-1 cleanup contract for physically retired legacy clinical paths."""
+import ast
 from pathlib import Path
 
-import tests.test_hc_engine as current
+ROOT = Path(__file__).resolve().parent
+REPO = ROOT.parent
 
-ROOT=Path(__file__).resolve().parent
 
 def test_no_retired_test_skip_hook_remains():
-    text=(ROOT/"conftest.py").read_text(encoding="utf-8")
+    text = (ROOT / "conftest.py").read_text(encoding="utf-8")
     assert "_RETIRED_LEGACY_TESTS" not in text
     assert "pytest_collection_modifyitems" not in text
     assert "pytest.mark.skip" not in text
 
-def test_historical_hc_engine_module_is_non_collected():
-    legacy=ROOT/"legacy_hc_engine_tests.py"
-    assert legacy.exists(); assert legacy.name!="test_hc_engine.py"; assert not legacy.name.startswith("test_")
 
-def test_explicit_hc_engine_methods_are_retired():
-    manifest=current.PHASE4_RETIRED_HC_ENGINE_METHODS
-    assert sum(len(methods) for methods in manifest.values())==19
-    expected={
-        "TestSafetyGates":{
-            "test_clinical_eligibility_modifier_blocks_pass_without_score_points",
-            "test_i_s_merge_does_not_create_definite_disease_override",
-            "test_unreadable_name_warns_but_eye_analyses_are_not_suppressed",
-        },
-        "TestBoundaries":{
-            "test_prk_cct_480_not_hard_stop_but_scores_caution",
-            "test_definite_ectatic_morphology_is_not_downgraded_by_srax_fields",
-            "test_minimal_axis_deviation_is_not_scored_as_srax",
-            "test_srax_20_degrees_uses_published_erss_sra_category",
-            "test_srax_below_20_degrees_is_not_scored",
-            "test_unquantified_visual_srax_label_is_not_scored",
-            "test_i_s_1_4_uses_published_erss_abnormal_pattern_without_disease_override",
-            "test_quantified_inferior_steepening_alternative_uses_published_category",
-        },
-        "TestScoringAndCompleteness":{
-            "test_reassuring_prk_can_pass",
-            "test_extraction_contract_prioritizes_labeled_pentacam_numeric_fields",
-            "test_lasik_score_two_has_no_score_escalation",
-            "test_local_kmax_is_rejected_but_explicit_local_rmin_remains_permitted",
-            "test_conflicting_i_s_values_use_concerning_value_and_prohibit_pass",
-            "test_multiple_local_rmin_values_do_not_create_unresolved_conflict",
-        },
-        "TestApiIntegration":{
-            "test_analyze_endpoint_accepts_eye_specific_payload",
-            "test_analyze_retry_reuses_same_inflight_or_completed_assessment",
-        },
+def test_monolithic_legacy_hc_engine_tests_are_physically_retired():
+    assert not (ROOT / "test_hc_engine.py").exists()
+    assert not (ROOT / "legacy_hc_engine_tests.py").exists()
+
+
+def test_parallel_clean_engine_is_physically_retired():
+    assert not (REPO / "clean_engine").exists()
+    assert not any(ROOT.glob("test_clean_*.py"))
+
+
+def test_deleted_runtime_wrappers_are_not_present():
+    retired = (
+        "hc_age_policy.py",
+        "hc_bad_final_policy.py",
+        "pachymetry_policy.py",
+        "randleman_bad_independence.py",
+        "hc_final_decision_policy.py",
+        "inter_eye_tomography_policy.py",
+        "ps3_runtime_policy.py",
+        "erss_auto_read_policy.py",
+        "erss_topography_evidence_policy.py",
+        "erss_topography_guard.py",
+        "erss_visual_morphology_policy.py",
+        "microkeratome_planning_policy.py",
+        "lasik_planning.py",
+        "nice_policy.py",
+        "nice_scoring.py",
+    )
+    for path in retired:
+        assert not (REPO / path).exists(), path
+
+
+def test_app_no_longer_defines_or_calls_legacy_clinical_engine():
+    app_path = REPO / "app.py"
+    text = app_path.read_text(encoding="utf-8")
+    tree = ast.parse(text, filename=str(app_path))
+    top_level_functions = {
+        node.name
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
-    assert {key:set(value) for key,value in manifest.items()}==expected
+    assert {"assess_eye", "hc_engine", "apply_extracted_corrections"}.isdisjoint(top_level_functions)
+    assert "from nice_policy import attach_readings" not in text
+    assert "attach_readings(" not in text
+    assert "def merge_extractions(" in text
+    assert "MAP_FALLBACK_NUMERIC_FIELDS" not in text
+    assert "map_fallback_numeric_fields" not in text
+    assert "numeric_tolerance" not in text
+    for retired in ("morphology_rank", "posterior_rank", "inferior_opposite_steepening_D", "anterior_pattern", "posterior_pattern", "asymmetric_bow_tie", "morphology_evidence"):
+        assert retired not in text
+    assert "EXCLUSIVE_LABELED_BOX_FIELDS" not in text
+    retired_helpers = {
+        "bad_classification", "lasik_topography_points", "scoring_morphology",
+        "lasik_rsb_points", "age_points", "lasik_pachy_points", "lasik_mrse_points",
+        "prk_morphology_points", "prk_pachy_points", "score_category", "tomography_review",
+        "estimate_ablation", "refractive_pattern", "required_tomography_missing",
+    }
+    assert retired_helpers.isdisjoint(top_level_functions)
 
-def _has_active_tests(cls):return any(name.startswith("test_") for name in vars(cls))
 
-def test_representative_active_hc_engine_tests_remain_collected():
-    assert hasattr(current.TestSafetyGates,"test_hc_sphere_hard_stops_and_exact_boundaries")
-    assert _has_active_tests(current.TestBoundaries); assert _has_active_tests(current.TestScoringAndCompleteness); assert _has_active_tests(current.TestApiIntegration)
-
-def test_retired_methods_are_not_exposed_on_collected_classes():
-    for class_name,method_names in current.PHASE4_RETIRED_HC_ENGINE_METHODS.items():
-        cls=getattr(current,class_name)
-        for method_name in method_names:assert not hasattr(cls,method_name)
+def test_retirement_record_exists_and_names_canonical_authority():
+    record = (REPO / "docs" / "CERAI_STEP1_TEST_RETIREMENTS.md").read_text(encoding="utf-8")
+    assert "clinical_core" in record
+    assert "canonical_runtime_service" in record
+    assert "assessment_workflow" in record
+    assert "Monolithic legacy HC-engine regression suite" in record

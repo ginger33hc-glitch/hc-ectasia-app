@@ -1,11 +1,17 @@
-"""Pure launch-contract clinical rules for CER-AI.
+"""Side-effect-free CER-AI clinical core."""
 
-This package is intentionally side-effect free. It does not import the FastAPI
-application, mutate runtime functions, or participate in production composition
-until explicit equivalence gates are satisfied.
-"""
-
-from .disposition import combine_status, presentation_class
+from .bad import BADContext, BADResult, evaluate_bad, final_bad_d_classification
+from .disposition import (
+    ASSESSMENT_INCOMPLETE,
+    CAUTION,
+    PASS_WITH_CAUTION,
+    PASS,
+    STOP_DEFER,
+    DecisionFinding,
+    FinalDisposition,
+    finalize_disposition,
+    presentation_class,
+)
 from .erss import (
     erss_disposition,
     erss_mrse_points,
@@ -17,16 +23,28 @@ from .nice import nice_disposition, score_nice
 from .pipeline import ClinicalCoreInput, PIPELINE_ORDER, evaluate_normalized_case
 from .planning import (
     LASIK_PLANS,
-    LASIK_PTA_CUTOFF_PERCENT,
-    independent_hard_stop,
-    plan_payload,
-    plan_responsive_failure,
-    planning_summary,
-    pta_cutoff,
+    MMC_MANDATORY,
+    MMC_NOT_APPLICABLE,
+    MMC_RECOMMENDED,
+    MMC_REVIEW_REQUIRED,
+    PlanEvaluation,
+    PlanningResult,
+    mmc_guidance,
+    select_first_safe_lasik_plan,
 )
 from .ps3 import PS3EyeInput, PS3InterEyeInput, evaluate_ps3
+from .refraction import (
+    HYPEROPIC,
+    INCOMPLETE,
+    MIXED,
+    MYOPIC,
+    PLANO,
+    Refraction,
+    normalize_minus_cylinder,
+    refractive_group,
+    scalar_final_k_is_valid,
+)
 from .rules import (
-    bad_d_classification,
     erss_age_points,
     erss_pachymetry_points,
     erss_topography_category,
@@ -35,8 +53,8 @@ from .rules import (
 from .safety import (
     estimated_final_kmean_d,
     final_kmean_hard_stop,
-    lasik_pta_hard_stop,
-    lasik_pta_percent,
+    pta_hard_stop,
+    pta_percent,
     lasik_rsb_hard_stop,
     lasik_rsb_um,
     preop_thickness_hard_stop,
@@ -46,14 +64,32 @@ from .safety import (
 )
 
 __all__ = [
+    "ASSESSMENT_INCOMPLETE",
+    "BADContext",
+    "BADResult",
+    "CAUTION",
+    "PASS_WITH_CAUTION",
     "ClinicalCoreInput",
+    "DecisionFinding",
+    "FinalDisposition",
+    "HYPEROPIC",
+    "INCOMPLETE",
     "LASIK_PLANS",
-    "LASIK_PTA_CUTOFF_PERCENT",
+    "MIXED",
+    "MMC_MANDATORY",
+    "MMC_NOT_APPLICABLE",
+    "MMC_RECOMMENDED",
+    "MMC_REVIEW_REQUIRED",
+    "MYOPIC",
+    "PASS",
     "PIPELINE_ORDER",
+    "PLANO",
     "PS3EyeInput",
     "PS3InterEyeInput",
-    "bad_d_classification",
-    "combine_status",
+    "PlanEvaluation",
+    "PlanningResult",
+    "Refraction",
+    "STOP_DEFER",
     "erss_age_points",
     "erss_disposition",
     "erss_mrse_points",
@@ -63,24 +99,27 @@ __all__ = [
     "erss_topography_points",
     "erss_total",
     "estimated_final_kmean_d",
+    "evaluate_bad",
     "evaluate_normalized_case",
     "evaluate_ps3",
+    "final_bad_d_classification",
     "final_kmean_hard_stop",
-    "independent_hard_stop",
-    "lasik_pta_hard_stop",
-    "lasik_pta_percent",
+    "finalize_disposition",
+    "pta_hard_stop",
+    "pta_percent",
     "lasik_rsb_hard_stop",
     "lasik_rsb_um",
+    "mmc_guidance",
     "nice_disposition",
-    "plan_payload",
-    "plan_responsive_failure",
-    "planning_summary",
+    "normalize_minus_cylinder",
     "preop_thickness_hard_stop",
     "presentation_class",
     "prk_rst_hard_stop",
     "prk_rst_um",
-    "pta_cutoff",
+    "refractive_group",
+    "scalar_final_k_is_valid",
     "score_nice",
+    "select_first_safe_lasik_plan",
     "signed_i_s_category",
     "sphere_magnitude_hard_stop",
 ]

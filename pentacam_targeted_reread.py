@@ -1,11 +1,12 @@
-"""Targeted second-pass transcription for small Pentacam numeric panels.
+"""Targeted second-pass transcription for Pentacam labeled fields.
 
 This module is an extraction-only adapter.  It never changes clinical policy,
 calculates a missing Pentacam index, or overwrites a value from the general
 extractor.  When a Pentacam image contains still-missing labeled values, the
-adapter submits the original plus four overlapping crops and, for missing age,
-one focused header crop to a structured reread. It accepts only high-confidence
-label/value pairs.
+adapter submits the original plus four overlapping crops and, when needed, one
+focused header crop to a structured reread. It accepts only high-confidence
+label/value pairs. Conflicting authoritative Four Maps examination dates are
+reread here but promoted only by the case-level date policy after both eyes agree.
 """
 
 from __future__ import annotations
@@ -15,9 +16,14 @@ from io import BytesIO
 import json
 import os
 import re
-from typing import Any, Callable
+from typing import Any
 
 from PIL import Image, ImageOps
+from exam_date_reconciliation_policy import possible_calendar_dates
+from pentacam_canonical_source_lock import (
+    CANONICAL_FIELD_SOURCES, SHOW_2_CORNEA_BACK, SHOW_2_CORNEA_FRONT, SHOW_2_INDICES,
+    canonical_source_id, source_family,
+)
 from pentacam_field_registry import (
     CORNEA_FRONT_KERATOMETRY_FIELDS,
     CORNEA_FRONT_KERATOMETRY_SOURCE,
@@ -131,10 +137,36 @@ REREAD_SCHEMA = {
             },
             "required": ["value", "status", "printed_label", "source_tile", "source_box"],
         },
+        "exam_date_reading": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "value": {"type": ["string", "null"]},
+                "status": {
+                    "type": "string",
+                    "enum": ["CONFIDENT", "UNCERTAIN", "UNREADABLE", "NOT_SHOWN"],
+                },
+                "printed_label": {"type": ["string", "null"]},
+                "source_tile": {"type": "string", "enum": list(SOURCE_TILES)},
+                "source_box": {
+                    "anyOf": [
+                        {
+                            "type": "array",
+                            "items": {"type": "integer", "minimum": 0, "maximum": 999},
+                            "minItems": 4,
+                            "maxItems": 4,
+                        },
+                        {"type": "null"},
+                    ]
+                },
+            },
+            "required": ["value", "status", "printed_label", "source_tile", "source_box"],
+        },
         "warnings": {"type": "array", "items": {"type": "string"}},
     },
     "required": [
-        "screen_family", "readings", "patient_age_reading", "pentacam_qs_reading", "warnings",
+        "screen_family", "readings", "patient_age_reading", "pentacam_qs_reading",
+        "exam_date_reading", "warnings",
     ],
 }
 
@@ -200,10 +232,31 @@ for a visibly non-OK device status. Never infer QS from apparent image clarity o
 quality label. When the QS label is visible but its value is unclear, return value=null and localize
 the label/value box so it can be shown to the surgeon.
 
+FOUR MAPS EXAMINATION-DATE RULE:
+{exam_date_target}
+When requested, read only the explicitly labeled examination Date field in the patient/header area
+of this Four Maps Refractive page. Transcribe the complete printed date string exactly, including
+leading zeroes and separators. Do not use Date of Birth, examination time, image filename, another
+page, or arithmetic. Check every digit at original resolution and in the TOP_HEADER crop. Use
+CONFIDENT only when the Date label and every printed date digit are unambiguous. This focused result
+is case-reconciled with the other Four Maps page; never copy or assume the other eye's date.
+
 REQUESTED FIELDS BY EYE:
 {targets}
 
 """
+
+
+_REREAD_CANONICAL_SOURCE_LINES = "\n".join(
+    f"- {field}: {source_id} -> {label}"
+    for field, (source_id, label) in CANONICAL_FIELD_SOURCES.items()
+)
+REREAD_PROMPT += (
+    "\nCANONICAL EXACT-SOURCE REGISTRY:\n"
+    "A requested locked field is acceptable only from the exact source below. "
+    "Use the visible group heading to distinguish Cornea Front, Cornea Back, and the 8-mm Indices panel.\n"
+    + _REREAD_CANONICAL_SOURCE_LINES + "\n"
+)
 
 
 def _enabled() -> bool:
@@ -231,28 +284,9 @@ def missing_targets_by_eye(result: dict[str, Any]) -> dict[str, list[str]]:
         eye_id = eye.get("eye")
         if eye_id not in {"OD", "OS"}:
             continue
-        central_present = any(
-            reading.get("eye") == eye_id
-            and reading.get("central_status") == "CONFIDENT"
-            and reading.get("central_landmark") == "PUPIL_CENTER_PLUS"
-            and reading.get("central_pachy_um") is not None
-            for reading in result.get("nice_readings") or []
-            if isinstance(reading, dict)
-        )
-        b_ele_th_present = any(
-            reading.get("eye") == eye_id
-            and reading.get("b_ele_th_status") == "CONFIDENT"
-            and reading.get("b_ele_th_landmark") == "B_ELE_TH_LABELED_BOX"
-            and reading.get("b_ele_th_page") == "BAD_DISPLAY"
-            and reading.get("B_Ele_Th_um") is not None
-            for reading in result.get("nice_readings") or []
-            if isinstance(reading, dict)
-        )
         missing = [
             field for field in TARGET_FIELDS
-            if not (field == "central_pachy_um" and central_present)
-            and not (field == "B_Ele_Th_um" and b_ele_th_present)
-            and not (
+            if not (
                 field in CORNEA_FRONT_KERATOMETRY_FIELDS
                 and eye.get("keratometry_source") != CORNEA_FRONT_KERATOMETRY_SOURCE
             )
@@ -363,6 +397,21 @@ def _normalize_label(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "", text)
 
 
+def source_supports_field(screen_family: Any, field: str, group_label: Any = None) -> bool:
+    required_family = source_family(field)
+    if required_family is not None and str(screen_family or "") != required_family:
+        return False
+    source_id = canonical_source_id(field)
+    group = _normalize_label(group_label)
+    if source_id == SHOW_2_CORNEA_FRONT:
+        return group == "corneafront"
+    if source_id == SHOW_2_CORNEA_BACK:
+        return group == "corneaback"
+    if source_id == SHOW_2_INDICES:
+        return any(token in group for token in ("indicesin8mmzone", "indices8mm", "indices"))
+    return True
+
+
 def label_supports_field(field: str, printed_label: Any, group_label: Any = None) -> bool:
     """Reject neighboring-number assignments before they enter the clinical audit."""
     raw_label = str(printed_label or "")
@@ -397,7 +446,14 @@ def label_supports_field(field: str, printed_label: Any, group_label: Any = None
         "IHA": {"iha"}, "K1_D": {"k1", "k1d"},
         "K2_D": {"k2", "k2d"},
         "Kmax_D": {"kmax", "kmaxd"}, "Kmean_D": {"km", "kmean", "kmeand"},
-        "Rmin_mm": {"rmin", "rminmm"},
+        "Rmin_mm": {"rmin", "rminmm"}, "topometric_RMin": {"rmin", "rminmm"},
+        "TKC": {"tkc"}, "F_Ele_Th_um": {"feleth", "felethum", "fronteleth"},
+        "posterior_Kmean_D": {"km", "kmean", "kmeand"},
+        "topographic_astig_D": {"astig", "astigd"},
+        "ml7_bad_k1_d": {"k1", "k1d"},
+        "ml7_bad_k2_d": {"k2", "k2d"},
+        "bad_flat_axis_deg": {"axis"},
+        "topographic_steep_axis_deg": {"axis", "axissteep", "steepaxis"},
         "B_Ele_Th_um": {"beleth", "belethum", "backeleth"},
     }
     if field in exact:
@@ -407,15 +463,6 @@ def label_supports_field(field: str, printed_label: Any, group_label: Any = None
         "pachy_thinnest_um": (("thinnestlocat", "thinnestlocation"),),
         "central_pachy_um": (("pupilcenter",),),
         "ARTmax_um": (("artmax", "ambrosiorelationalthicknessmax"),),
-        "anterior_elevation_thinnest_um": (("anteriorelevation", "frontelevation"), ("thin", "thinnest")),
-        "posterior_elevation_thinnest_um": (("posteriorelevation", "backelevation"), ("thin", "thinnest")),
-        "thinnest_x_mm": (("thinnestx", "thinlocationx", "pachythinx"),),
-        "thinnest_y_mm": (("thinnesty", "thinlocationy", "pachythiny"),),
-        "corneal_volume_mm3": (("cornealvolume", "corneavolume"),),
-        "RMS_HOA_um": (("rmshoa", "higherorderaberrationrms", "hoarms"),),
-        "vertical_coma_um": (("verticalcoma", "comavertical"),),
-        "total_RMS_um": (("totalrms", "rmstotal"),),
-        "spherical_aberration_um": (("sphericalaberration",),),
     }
     groups = requirements.get(field)
     return bool(groups) and all(any(token in label for token in alternatives) for alternatives in groups)
@@ -440,6 +487,7 @@ def apply_targeted_readings(
     filename: str,
     patient_age_requested: bool = False,
     pentacam_qs_requested: bool = False,
+    exam_date_requested: bool = False,
 ) -> dict[str, Any]:
     """Fill only null requested fields from one conflict-free confident reread."""
     if reread.get("screen_family") not in PENTACAM_SCREEN_FAMILIES:
@@ -452,22 +500,13 @@ def apply_targeted_readings(
         eye_id, field = reading.get("eye"), reading.get("field")
         if eye_id not in requested or field not in requested.get(eye_id, []):
             continue
-        if field in CORNEA_FRONT_KERATOMETRY_FIELDS and (
-            reread.get("screen_family") != "SHOW_2_EXAMS_TOPOMETRIC"
-            or _normalize_label(reading.get("group_label")) != "corneafront"
+        if not source_supports_field(
+            reread.get("screen_family"), field, reading.get("group_label")
         ):
             if reading.get("status") == "CONFIDENT" and core.is_number(reading.get("value")):
                 result.setdefault("global_warnings", []).append(
                     f"Targeted Pentacam reread rejected {eye_id} {field} in {filename}: "
-                    "K1/K2/Km and their axes are accepted only from the Cornea Front panel "
-                    "on Show 2 Exams Topometric."
-                )
-            continue
-        if field == "B_Ele_Th_um" and reread.get("screen_family") != "BAD_DISPLAY":
-            if reading.get("status") == "CONFIDENT" and core.is_number(reading.get("value")):
-                result.setdefault("global_warnings", []).append(
-                    f"Targeted Pentacam reread rejected {eye_id} {field} in {filename}: "
-                    "B. Ele.Th is accepted only from a verified BAD Display page."
+                    "the returned screen/panel was not the field's canonical source."
                 )
             continue
         if not label_supports_field(field, reading.get("printed_label"), reading.get("group_label")):
@@ -492,7 +531,7 @@ def apply_targeted_readings(
 
     for (eye_id, field), readings in candidates.items():
         eye = eyes.get(eye_id)
-        if eye is None or (field not in {"central_pachy_um", "B_Ele_Th_um"} and eye.get(field) is not None):
+        if eye is None or eye.get(field) is not None:
             continue
         values = [float(item["value"]) for item in readings]
         if not _same_number(values):
@@ -502,29 +541,15 @@ def apply_targeted_readings(
             )
             continue
         retained = values[0]
-        if field in {"central_pachy_um", "B_Ele_Th_um"}:
-            central_value = retained if field == "central_pachy_um" else None
-            b_ele_th_value = retained if field == "B_Ele_Th_um" else None
-            result.setdefault("nice_readings", []).append({
-                "eye": eye_id,
-                "central_pachy_um": central_value,
-                "central_status": "CONFIDENT" if field == "central_pachy_um" else "NOT_SHOWN",
-                "central_landmark": "PUPIL_CENTER_PLUS" if field == "central_pachy_um" else "UNREADABLE",
-                "B_Ele_Th_um": b_ele_th_value,
-                "b_ele_th_status": "CONFIDENT" if field == "B_Ele_Th_um" else "NOT_SHOWN",
-                "b_ele_th_landmark": "B_ELE_TH_LABELED_BOX" if field == "B_Ele_Th_um" else "UNREADABLE",
-                "b_ele_th_page": "BAD_DISPLAY" if field == "B_Ele_Th_um" else "UNREADABLE",
-                "evidence": (
-                    f"Targeted labeled-box reread: {readings[0].get('printed_label')} = {retained:g} µm"
-                ),
-            })
-        else:
-            eye[field] = retained
-            if field in CORNEA_FRONT_KERATOMETRY_FIELDS:
-                eye["keratometry_source"] = CORNEA_FRONT_KERATOMETRY_SOURCE
-            verified = set(eye.get("table_verified_numeric_fields") or [])
-            verified.add(field)
-            eye["table_verified_numeric_fields"] = sorted(verified)
+        eye[field] = retained
+        if field in CORNEA_FRONT_KERATOMETRY_FIELDS:
+            eye["keratometry_source"] = CORNEA_FRONT_KERATOMETRY_SOURCE
+        verified = set(eye.get("table_verified_numeric_fields") or [])
+        verified.add(field)
+        eye["table_verified_numeric_fields"] = sorted(verified)
+        source_id = canonical_source_id(field)
+        if source_id:
+            eye.setdefault("canonical_source_ids", {})[field] = source_id
         eye["missing_or_unreadable"] = [
             item for item in eye.get("missing_or_unreadable") or [] if item != field
         ]
@@ -613,6 +638,38 @@ def apply_targeted_readings(
                     source_box=qs_reading.get("source_box"),
                     printed_label=qs_reading.get("printed_label"),
                 )
+    if exam_date_requested:
+        context = result.setdefault("document_context", {})
+        reading = reread.get("exam_date_reading") or {}
+        value = reading.get("value")
+        label = _normalize_label(reading.get("printed_label"))
+        valid_label = label in {"date", "examdate", "examinationdate"}
+        valid_date = isinstance(value, str) and bool(possible_calendar_dates(value))
+        valid_source = reread.get("screen_family") == "FOUR_MAPS_REFRACTIVE"
+        if (
+            reading.get("status") == "CONFIDENT"
+            and valid_source and valid_label and valid_date
+        ):
+            context["targeted_exam_date_reread_evidence"] = {
+                "file": filename,
+                "source": "TARGETED_FOUR_MAPS_HEADER_REREAD",
+                "tile": reading.get("source_tile"),
+                "printed_label": reading.get("printed_label"),
+                "value": value,
+                "promoted": False,
+            }
+        elif reading.get("status") == "CONFIDENT" and value is not None:
+            result.setdefault("global_warnings", []).append(
+                f"Targeted Four Maps examination-date reread rejected in {filename}: "
+                "the page, printed Date label, or complete date value was not unambiguous."
+            )
+        elif reading.get("status") in {"UNCERTAIN", "UNREADABLE"} and valid_label:
+            context["targeted_unreadable_exam_date_region"] = {
+                "file": filename,
+                "tile": reading.get("source_tile"),
+                "source_box": reading.get("source_box"),
+                "printed_label": reading.get("printed_label"),
+            }
     return result
 
 
@@ -627,6 +684,7 @@ def targeted_reread(
     requested: dict[str, list[str]],
     patient_age_requested: bool = False,
     pentacam_qs_requested: bool = False,
+    exam_date_requested: bool = False,
 ) -> dict[str, Any]:
     age_target = (
         "PATIENT: patient_age_years is requested."
@@ -638,6 +696,11 @@ def targeted_reread(
         if pentacam_qs_requested
         else "Pentacam QS is not requested; return null/NOT_SHOWN."
     )
+    exam_date_target = (
+        "PATIENT: the Four Maps examination Date is requested."
+        if exam_date_requested
+        else "PATIENT: the examination Date is not requested; return null/NOT_SHOWN."
+    )
     content: list[dict[str, Any]] = [
         {
             "type": "input_text",
@@ -645,13 +708,16 @@ def targeted_reread(
                 targets=_target_summary(requested) or "No eye-level numeric fields requested.",
                 age_target=age_target,
                 qs_target=qs_target,
+                exam_date_target=exam_date_target,
             ),
         },
         {"type": "input_text", "text": "ORIGINAL complete screen:"},
         {"type": "input_image", "image_url": core.data_url(raw, filename), "detail": "original"},
     ]
     for tile_name, tile_raw in build_overlapping_tiles(
-        raw, include_top_header=patient_age_requested or pentacam_qs_requested
+        raw, include_top_header=(
+            patient_age_requested or pentacam_qs_requested or exam_date_requested
+        )
     ):
         content.extend((
             {"type": "input_text", "text": f"{tile_name} crop of the same screen:"},
@@ -677,44 +743,32 @@ def targeted_reread(
     return json.loads(response.output_text)
 
 
-def make_targeted_extractor(core: Any, previous: Callable[[bytes, str], dict[str, Any]]):
-    def extract_one_image_with_targeted_reread(raw: bytes, filename: str) -> dict[str, Any]:
-        result = previous(raw, filename)
-        requested = missing_targets_by_eye(result)
-        patient_age_requested = patient_age_is_missing(result)
-        pentacam_qs_requested = pentacam_qs_is_missing(result)
-        if not _enabled() or (
-            not requested and not patient_age_requested
-            and not pentacam_qs_requested
-        ):
-            return result
-        try:
-            reread = targeted_reread(
-                core, raw, filename, requested, patient_age_requested, pentacam_qs_requested,
-            )
-            return apply_targeted_readings(
-                core, result, reread, requested, filename, patient_age_requested,
-                pentacam_qs_requested,
-            )
-        except Exception as exc:
-            result.setdefault("global_warnings", []).append(
-                f"Targeted Pentacam numeric reread failed for {filename}: "
-                f"{type(exc).__name__}; original extraction retained."
-            )
-            return result
 
-    return extract_one_image_with_targeted_reread
-
-
-_previous_extract_one_image = None
-extract_one_image_with_targeted_reread = None
-
-
-def install(core: Any) -> None:
-    global _previous_extract_one_image, extract_one_image_with_targeted_reread
-    if getattr(core, "_cerai_targeted_pentacam_reread_installed", False):
-        return
-    _previous_extract_one_image = core.extract_one_image
-    extract_one_image_with_targeted_reread = make_targeted_extractor(core, _previous_extract_one_image)
-    core.extract_one_image = extract_one_image_with_targeted_reread
-    core._cerai_targeted_pentacam_reread_installed = True
+def enrich_extraction(
+    core: Any, result: dict[str, Any], raw: bytes, filename: str,
+    *, exam_date_requested: bool = False,
+) -> dict[str, Any]:
+    """Run the targeted second pass explicitly after primary extraction."""
+    requested = missing_targets_by_eye(result)
+    patient_age_requested = patient_age_is_missing(result)
+    pentacam_qs_requested = pentacam_qs_is_missing(result)
+    if not _enabled() or (
+        not requested and not patient_age_requested and not pentacam_qs_requested
+        and not exam_date_requested
+    ):
+        return result
+    try:
+        reread = targeted_reread(
+            core, raw, filename, requested, patient_age_requested, pentacam_qs_requested,
+            exam_date_requested,
+        )
+        return apply_targeted_readings(
+            core, result, reread, requested, filename, patient_age_requested,
+            pentacam_qs_requested, exam_date_requested,
+        )
+    except Exception as exc:
+        result.setdefault("global_warnings", []).append(
+            f"Targeted Pentacam numeric reread failed for {filename}: "
+            f"{type(exc).__name__}; original extraction retained."
+        )
+        return result

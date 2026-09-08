@@ -11,8 +11,6 @@ from typing import Any
 
 
 REQUEST_SOURCE_KEYS = {
-    "surgeon_nice_central_um": "central_pachy_um",
-    "surgeon_nice_pe_um": "B_Ele_Th_um",
     "surgeon_I_S_D": "I_S",
     "surgeon_topography_category": "erss_topography",
 }
@@ -155,11 +153,6 @@ def region_hints(
     exact = (eye.get("unreadable_source_regions") or {}).get(key)
     if exact:
         return [exact]
-    # Backward compatibility for snapshots created before the generic region contract.
-    legacy = (eye.get("targeted_unreadable_regions") or {}).get(key)
-    if legacy:
-        return [legacy]
-
     panel = CANONICAL_MAP_REGIONS.get(key)
     if panel is None:
         return []
@@ -181,6 +174,6 @@ def region_hints(
 def region_hint(
     extracted: dict[str, Any], eye_id: str, request_key: Any
 ) -> dict[str, Any] | None:
-    """Backward-compatible single-region accessor."""
+    """Return the first canonical source region, when one is available."""
     hints = region_hints(extracted, eye_id, request_key)
     return hints[0] if hints else None

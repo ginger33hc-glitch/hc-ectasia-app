@@ -1,6 +1,6 @@
 # CER-AI Preoperative Ectasia Risk Assessment — Software Rule Specification v0.7
 
-Effective date: 26 August 2026
+Original effective date: 26 August 2026. Reconciled with approved staging amendments: 8 September 2026.
 
 This file is the code-aligned operational rule specification. Published evidence, provisional
 triage, CER-AI operational policy, imaging-quality criteria, and general clinical eligibility are kept
@@ -8,11 +8,15 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 
 ## Case and source integrity gate
 
-- Extract and compare patient ID/name, printed age, examination date/time, laterality, filename, and
+- Require OD and OS Four Maps Refractive, OD and OS Belin/Ambrosio Display, and one bilateral Show 2 Exams Topometric page. Primary page identification confirms this five-page set before targeted rereading, geometric SRAX, merge, clinical scoring, or reporting. One excimer treatment card is optional as the sixth image. If it is absent, complete surgeon-entered manifest and intended refraction for both eyes is required before assessment continues.
+- Age is calculated in `patient_age_policy.py` as completed years at the Four Maps Refractive examination date from its labeled Date of Birth. Raw dates and calculation provenance are retained. Surgeon-entered age takes precedence; conflicting or age-ambiguous dates require confirmation. The image model transcribes dates without performing arithmetic.
+- Report patient name uses one block: First Name / Last Name in the upper-left OD 4 Maps Refractive header (first supplied OD page). Use OS only when OD Four Maps is absent. An unreadable selected header requests surgeon entry; other-page name readings do not select or veto the report name. Patient-ID safety checks remain separate.
+- Extract and compare patient ID/name, printed age, date of birth, examination date/time, laterality, filename, and
   literal Pentacam QS.
-- Conflicting patient age or Pentacam examination date prohibits PASS; identity uncertainty remains
+- Unresolved patient age or a conflicting Pentacam examination date prohibits PASS; identity uncertainty remains
   a visible surgeon-confirmation warning without suppressing the eye assessments.
-- A mismatch between entered and source patient ID or derived age prohibits PASS.
+- Surgeon-entered age is authoritative and does not conflict with printed or date-derived age. Source age evidence remains in the audit record.
+- Every surgeon-entered or surgeon-confirmed field is authoritative. Image-derived and calculated values may fill blank fields only; they do not overwrite or create a conflict against a surgeon value.
 - Both OD and OS are required for overall PASS; eyes remain separately assessed and are not averaged.
 - An unclassified upload, an upload yielding no usable eye/treatment data, or an unresolved
   decision-critical field conflict prohibits PASS.
@@ -20,20 +24,18 @@ as separate layers. No rule in one layer is silently presented as a validated ru
   Non-OK/unconfirmed QS and limited/inadequate quality do not alone suppress a report when required
   clinical measurements are readable; they generate a prominent surgeon-attention warning at the
   bottom of the browser, PDF, and Word reports. They are never silently changed to `OK`.
-- Record field-level provenance as labeled table, permitted map fallback, or visual classification.
-- Same-field readings from one accepted provenance class reconcile only when their full relative
-  spread is `<=1%`. Retain the lower value for pachymetry, ARTmax, and Rmin; retain the higher value
-  for BAD-D, Kmax, elevation, PPI, and other supported ectasia indices. Larger differences remain
-  unresolved conflicts.
+- Record field-level canonical source and surgeon-confirmation provenance. Locked fields have
+  no alternative-source fallback. Same-source disagreement clears the field and requests
+  resolution; no tolerance, first/minimum/maximum, or most-concerning selection is permitted.
 
 ## Clinical disposition contract
 
-- Completed assessments use exactly three clinical results: `PASS`, `CAUTION`, and `STOP-DEFER`.
+- Completed assessments use four clinical results: `PASS`, `PASS WITH CAUTION`, `CAUTION`, and `STOP-DEFER`.
 - `CAUTION` requires explicit surgeon review but does not automatically defer surgery. NICE 5–8
   uses this category.
 - `STOP-DEFER` means surgery must not proceed unless the stated stop/defer condition is resolved.
   NICE ≥9, independent hard stops, and explicit defer rules use this category.
-- `DATA INSUFFICIENT` and `POST-REFRACTIVE PATHWAY REQUIRED` remain workflow states, not additional
+- `ASSESSMENT INCOMPLETE` and `POST-REFRACTIVE PATHWAY REQUIRED` remain workflow states, not additional
   clinical result categories.
 
 ## Pathway gate
@@ -93,6 +95,17 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 - Intended sphere `>+6.00 D`; exactly +6.00 is allowed by this rule.
 - PRK epithelium is fixed at 50 µm for CER-AI calculations.
 
+## Shared PTA amendment — September 8, 2026
+
+Surgeon instruction: “for prk,too, same pta rule as lasik shall apply.”
+Both procedures require PTA `<40%`; exact 40% and higher fail the evaluated plan.
+PRK applies this independent STOP-DEFER gate in direct selection and automatic LASIK→PRK
+assessment, retaining the original requested PRK treatment settings and the 50 µm epithelial
+convention. LASIK retains its existing A→B→C candidate sequence; no flap-based Plan C is
+introduced for PRK. Passing PTA alone does not clear any other clinical requirement.
+The historical 35.28% cohort maximum has no separate operational caution or stop.
+This is approved CER-AI policy, not a claim of a validated PRK literature threshold.
+
 ## Tissue formulas
 
 - PRK `RST = CCT − 50 − maximum stromal ablation`.
@@ -102,18 +115,33 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 - Actual planned maximum ablation is preferred. CER-AI EX500 estimation is limited to 12 µm/D at
   6.0 mm, 15 µm/D at 6.5 mm, and 16.33 µm/D at 7.0 mm.
 
+## Final combination of scoring systems
+
+The canonical final disposition counts CAUTION results from completed ERSS, NICE,
+PS3 and Final BAD-D: zero or one = PASS; two = PASS WITH CAUTION; three or four = CAUTION.
+Independent cautions retain CAUTION. Missing critical data blocks completion;
+STOP-DEFER overrides every other result. Both caution outcomes are orange.
+Bilateral aggregation preserves the worse eye, without adding caution counts across eyes.
+Individual ERSS/NICE/PS3 scoring and procedural hard stops remain unchanged.
+
 ## Published/provisional instruments
 
 - LASIK uses the published five-component ERSS: Placido topography, RSB, age, pachymetry, and
   manifest MRSE. Score 0–2 is PASS if no other concern is present, 3 is CAUTION without automatic
   defer, and ≥4 is STOP-DEFER.
-- PRK-EWSS v1.0 is an CER-AI provisional triage score and is not validated. It does not produce a risk
-  probability.
-- A single numeric Placido criterion may support the published ERSS topography category but is not
-  relabeled as definite keratoconus. A definite visible KC/FFKC/PMD/ectatic morphology remains a
-  separate override.
-- BAD components/final D and supplied ARTmax/TP/Dt/Da thresholds are adjunctive review signals, not
-  prospective post-refractive ectasia probabilities.
+- PRK uses the same canonical ERSS component thresholds and includes its disposition in
+  the four-system result; its residual stroma supplies the tissue component.
+- The canonical signed I-S and independent geometric SRAX feed one non-additive ERSS topography
+  component. General visual morphology scoring is retired; no image-model morphology category
+  may create points or an independent override. Numeric categories are not relabeled as a
+  definitive diagnosis. SRAX >20.0° is positive; exactly 20.0° is negative.
+- Final BAD-D is the sole BAD disposition authority. Df/Db/Dp/Dt/Da, PPI and ARTmax
+  contextual colors do not independently add points, CAUTION or STOP-DEFER.
+- PPI/ARTmax reference display bands are defined once in `clinical_core.bad`, using
+  Ghiasian et al., J Curr Ophthalmol. 2022;34(2):200-207, Table 1,
+  DOI 10.4103/joco.joco_249_21. Green = normal; orange = suspicious; red = abnormal.
+  These are informational bands, not prospective post-refractive ectasia probabilities.
+  PS3 retains its separate PPI Average >1.20 Moderate criterion.
 - Check `PPImin ≤ PPIavg ≤ PPImax` and consistency of `ARTmax ≈ thinnest pachymetry / PPImax`.
 
 ## Clinical eligibility layer
@@ -121,11 +149,16 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 - Instability or documented progression: `STOP-DEFER`, repeat relevant assessment and
   reassess after at least six months.
 - Pregnancy/nursing: `STOP-DEFER`.
-- Unexplained CDVA below 20/20, inter-eye asymmetry, collagen/connective-tissue disease, relevant
-  medication, dry eye, or other systemic disease: `CAUTION` with explicit surgeon review.
+- Collagen/connective-tissue disease: `STOP-DEFER`.
+- Eye rubbing/repetitive ocular trauma, family history of keratoconus, unexplained CDVA below
+  20/20, relevant medication, dry eye, or other systemic disease: `CAUTION` with explicit
+  surgeon review.
+- Marked inter-eye asymmetry is evaluated by PS3 and is not duplicated as a patient-level
+  clinical modifier. Anticipated enhancement is not part of the eligibility contract.
 - These modifiers do not add invented ectasia-score points.
-- Soft contact lens ≥14 days and rigid/RGP ≥21 days are supplied source-study imaging criteria, not
-  universal ectasia cutoffs. Insufficient documentation prohibits automatic PASS.
+- The server readiness gate uses soft contact lens washout ≥10 full days and rigid/RGP ≥21 full
+  days, as recorded in the launch contract and owned by `clinical_core.readiness`. Missing or
+  insufficient washout blocks assessment. These operational criteria are not ectasia score points.
 
 ## Output semantics
 
@@ -138,3 +171,19 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 - Every hyperopic/mixed report contains a case-specific `Surgeon attention` section. The final
   surgical decision and all associated responsibility and liability rest with the surgeon. The
   application is a clinical decision-support aid only.
+
+### PRK shared ablation and ERSS evaluation — 2026-09-08
+
+LASIK and PRK resolve requested myopic ablation through the same canonical estimator when no entered maximum ablation is supplied. Entered ablation takes precedence. PRK includes the canonical ERSS result alongside NICE, PS3 and final BAD-D in the four-system disposition. ERSS uses the same component thresholds, with PRK residual stroma (thinnest pachymetry minus 50 µm epithelium minus ablation) supplying the tissue input. A full PRK report requires complete ERSS. Do not emit an ERSS-not-applicable warning for PRK.
+
+### PS3 prescription-axis source — 2026-09-08
+
+Only the PS3 manifest-versus-topographic astigmatism comparison uses `bad_flat_axis_deg`, read directly from the BAD Display upper-middle Axis box beside K1. Compare this flat-meridian axis to the normalized minus-cylinder manifest axis using the smaller separation modulo 180 degrees. Do not transpose the prescription again, rotate a steep-axis value, or substitute another map. The existing activation gate (either magnitude >3.00 D), magnitude and angular thresholds remain unchanged. Missing required BAD Axis prompts surgeon entry from this exact box. All steep-axis fields, their source locks, and SRAX geometry retain their existing independent roles.
+
+### ML7 keratometry source — 2026-09-08
+
+ML7 reads dedicated `ml7_bad_k1_d` and `ml7_bad_k2_d` directly from the BAD Display upper-middle K1/K2 boxes. The canonical ML7 input selects their maximum as steepest K and minimum as flattest K. No Kmax or general-scoring K1/K2 fallback is permitted. Existing scoring keratometry, axis sources, and SRAX are unchanged. HWTW remains source-locked to the 4 Maps Refractive lower-left HWTW box and requires verified provenance. Missing ML7 K1/K2 and missing verified HWTW are reported separately with exact source guidance; no ring is inferred when required inputs are absent.
+
+### Automatic PRK evaluation after LASIK failure — 2026-09-08
+
+A definitive LASIK STOP-DEFER triggers one PRK evaluation per failed eye. Incomplete LASIK alone does not trigger the transition. The original LASIK assessment and candidate history remain in `lasik_assessment`. PRK uses the requested correction, requested optical zone, and shared ablation resolution; the flap is None. All PRK tissue, ERSS, NICE, PS3, BAD and eligibility rules run through the same canonical core. A successful fellow-eye LASIK plan is unchanged. The workflow exposes an eye-specific warning, “LASIK failed. Now evaluating PRK.”, including when completion inputs remain missing. The evaluated PRK result is not an automatic clearance: shared stops and missing inputs remain effective. Browser presentation contains no clinical decision logic.

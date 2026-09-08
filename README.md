@@ -58,10 +58,14 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
   corresponding Pentacam source-region keys, so the localized unread crop can appear beside the
   surgeon-entry field instead of producing an instruction without a visible source box.
 
-- A confident Excimer Laser Takip Kartı `Düzeltme Miktarı` remains the initial source for both
-  manifest and intended refraction. If the card is unreadable, readiness requests only manifest;
-  intended initially follows the completed manifest values and remains independently editable by
-  the surgeon. An explicit intended entry always overrides this default.
+- The five mandatory Pentacam pages are confirmed immediately after primary page identification,
+  before targeted rereading, SRAX derivation, merging, scoring, or reporting. The optional treatment
+  card is reported as present or not provided. When it is absent, the pre-assessment gate requires
+  complete surgeon-entered manifest and intended refraction for both eyes.
+- A confident Excimer Laser Takip Kartı `Düzeltme Miktarı` may fill blank manifest and intended
+  refraction fields. Any surgeon-entered field is authoritative and cannot be overwritten or treated
+  as conflicting by an image-derived or calculated value. This precedence also applies to a
+  surgeon-entered maximum ablation versus an EX500 reading.
 
 - `runtime_composition.py` is the single ordered production assembly point. Clinical policy,
   Pentacam extraction, reporting/readiness, and access/persistence are owned by explicit phases;
@@ -119,7 +123,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Source identity review reads Pentacam patient names only from the labeled `First Name` and `Last Name` demographics fields and records the source filename. An unreadable or unverified name produces a prominent surgeon-confirmation warning without suppressing the eye assessments; acquisition-date conflicts and unclassified/unusable uploads remain clinical/source blockers.
 - Pentacam QS is recorded per acquisition; absent, unreadable, or visible non-OK QS produces a final
   surgeon warning but does not by itself prevent a report based on readable clinical measurements.
-- Age is read from the explicitly printed Pentacam age; a conflicting manually entered age remains a blocker. Date of birth is not collected.
+- Age is read from the explicitly printed Pentacam age when no surgeon-confirmed age is supplied; a surgeon entry has precedence. Date of birth is not collected.
 - Preoperative manifest refraction is separated from intended treatment correction. LASIK ERSS MRSE uses only the former; ablation and CER-AI treatment-range gates use only the latter.
 - Prior PRK/LASIK/SMILE short-circuits virgin-cornea scoring and routes to `POST-REFRACTIVE PATHWAY REQUIRED`.
 - Published five-component LASIK ERSS scoring and categories.
@@ -133,9 +137,12 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Optical-zone selection is limited to `6.0`, `6.5`, or `7.0 mm`; transition-zone selection is limited to `8.0`, `8.5`, or `9.0 mm`.
 - The visible laser-platform field is fixed and read-only as `Alcon EX500` for both eyes; the optical zone remains an explicit eye-specific input.
 - Planned LASIK flap thickness is selected per eye from `90`, `100`, `110`, or `120 µm`; PRK plans leave the flap selection blank.
-- Refraction stability, documented progression, unexplained CDVA loss, and anticipated enhancement remain separate eye-specific values inside one compact clinical-eligibility dropdown box.
+- Refraction stability, documented progression, and unexplained CDVA loss remain separate eye-specific values inside one compact clinical-eligibility dropdown box.
 - PRK epithelial thickness is shown per eye as a fixed, read-only `50 µm` CER-AI value and is used in the PRK RST/PTA calculations.
-- Procedure-correct PTA formulas for LASIK and PRK.
+- Procedure-correct PTA formulas for LASIK and PRK share one safety limit: PTA must be `<40%`;
+  `>=40%` fails the evaluated plan. LASIK planning evaluates A→B→C and retains the first safe
+  candidate. Direct PRK and automatic LASIK→PRK assessments apply the same limit to the PRK
+  plan, using fixed 50 µm epithelium; other safety requirements remain independent.
 - BAD-D/component display interpretation plus adjunctive ARTmax/TP/Dt/Da evidence flags.
 - Positive tomography concern flags require review and cannot receive automatic PASS.
 - Limited/inadequate image quality produces a prominent final report warning without suppressing
@@ -143,12 +150,11 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
   unresolved decision-critical cross-image value conflicts still prohibit PASS. Same-provenance
   numeric differences `<=1%` retain the parameter-specific safety-limiting value: lower for
   pachymetry, ARTmax, and Rmin; higher for the remaining supported numeric fields.
-- PRK PTA above the supplied 35.28% direct-cohort envelope requires review and cannot receive automatic PASS.
 - Expanded extraction/reporting of anterior and posterior elevation, pachymetric progression,
   topometric, thinnest-point location, corneal-volume, and HOA/coma fields when visibly available.
 - Required clinical modifiers and treatment-plan inputs; missing/unreadable critical data prohibit PASS.
-- One multi-select clinical-eligibility control records eye rubbing/ocular trauma, family history, inter-eye asymmetry, pregnancy/nursing, collagen/connective-tissue disease, medication, dry eye, and systemic disease. These create separate defer/review dispositions without invented ectasia-score points.
-- Contact-lens type and washout are documented. The supplied source-study acquisition criterion (soft ≥14 days; rigid ≥21 days) is an imaging-data gate, not an ectasia score or universal safety cutoff.
+- One multi-select clinical-eligibility control records eye rubbing/ocular trauma, family history, pregnancy/nursing, collagen/connective-tissue disease, medication, dry eye, and systemic disease. Eye rubbing and family history produce CAUTION; pregnancy/nursing and collagen/connective-tissue disease produce STOP-DEFER; medication, dry eye, and systemic disease produce CAUTION. These findings do not add ectasia-score points. Inter-eye asymmetry remains owned by PS3 and is not duplicated here.
+- Contact-lens type and washout are documented. The operational gate requires soft-lens washout ≥10 full days and rigid/RGP washout ≥21 full days; it is not an ectasia score.
 - CAUTION requires explicit surgeon review but does not automatically defer surgery. STOP-DEFER
   retains all true hard-stop and explicit defer actions.
 - Formal clinical report with patient/reviewer metadata, restrained decision colors (PASS green,
@@ -210,10 +216,9 @@ BAD-D `>=2.60` is an inclusive CER-AI operational hard stop and produces
 `STOP-DEFER`. Individual Df/Db/Dp/Dt/Da components remain contextual and
 do not independently determine clearance.
 
-`canonical_engine.py` remains the single production composition root. Independent
-`nice_scoring.py` and `nice_policy.py` add a restrictive-only final NICE disposition;
-ERSS/BAD calculations and the isolated `clean_engine` are unchanged. NICE points are
-never added to ERSS. LASIK and PRK use total 4: no NICE escalation, 5–8: CAUTION
+`canonical_engine.py` remains the single production composition root. NICE is scored
+once in `clinical_core/nice.py`; ERSS, BAD-D, and PS3 remain independent canonical
+clinical-core pathways. NICE points are never added to ERSS. LASIK and PRK use total 4: no NICE escalation, 5–8: CAUTION
 without automatic defer, and >=9: STOP-DEFER hard stop. A stronger existing stop always wins.
 
 The report labels this as **CER-AI-adapted NICE**, documents all four components and
@@ -226,9 +231,11 @@ only the plus-marked `Pupil Center` row, not Pachy Vertex N. or thinnest pachyme
 The source selection and 15.5 boundary are disclosed CER-AI adaptations, not a claim
 that the original study independently validated this implementation.
 
-`assessment_workflow.py` gates reports using all canonical decision-critical missing
-inputs plus missing NICE components. `/analyze` returns NEEDS_INPUT (without a
-clinical decision) and eye-specific completion requests until ready. The browser
+`assessment_workflow.py` gates complete reports until ERSS/Randleman (when applicable),
+NICE, and PS3 are complete, together with the remaining canonical safety and eligibility
+requirements. `/analyze` returns NEEDS_INPUT and eye-specific completion requests until ready;
+a definitive hard stop may be returned as an immediate summary but does not authorize a full
+report while a scoring system remains incomplete. The browser
 retains manual entries; `/assessment/complete` resumes without another model call.
 Explicit surgeon corrections retain an audit trail and rerun input validation.
 Unreadable decision-critical clinical data may require a clearer source or surgeon completion;
@@ -242,6 +249,9 @@ receive a retry response rather than silently evicting an active case. Do not in
 worker count without shared session storage.
 Form edits hide the previous report. No clinical model accuracy claim is inferred
 from unit tests; unreadable image values require surgeon confirmation.
+
+Both PDF and DOCX are rendered directly from the same per-eye canonical report payload.
+The report layer does not score, classify, apply thresholds, or correct clinical output.
 
 ## Operational security boundary
 

@@ -1,9 +1,10 @@
 """Encrypted, provider-neutral case archive for CER-AI.
 
-The clinical engine never depends on this module. It wraps the web/workflow boundary and stores
-source images, canonical assessment snapshots, and generated reports in private S3-compatible object
-storage. Object keys contain only random case identifiers and content hashes; patient names and IDs
-are never used in storage paths.
+The clinical engine never depends on this module. The assessment workflow calls this single
+downstream persistence owner after canonical evaluation. It stores source images, canonical
+assessment snapshots, and generated reports in private S3-compatible object storage. Object keys
+contain only random case identifiers and content hashes; patient names and IDs are never used in
+storage paths.
 
 Railway Storage Buckets currently do not provide server-side encryption, object versioning, or object
 locks. CER-AI therefore encrypts every archived payload before upload, verifies plaintext SHA-256 on
@@ -14,7 +15,6 @@ from __future__ import annotations
 
 import base64
 from collections import OrderedDict
-from contextvars import ContextVar
 from copy import deepcopy
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -22,6 +22,7 @@ import hashlib
 import json
 import mimetypes
 import os
+import re
 from pathlib import PurePosixPath
 from threading import RLock
 from typing import Any, Callable, Dict, Iterable, Optional, Protocol
@@ -469,6 +470,16 @@ class EncryptedArchive:
                 cleaned.pop(key, None)
         return cleaned
 
+    def revision_id_for(self, ready: Dict[str, Any]) -> str:
+        canonical = self._canonical_ready(ready)
+        canonical_bytes = json.dumps(
+            canonical,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return self._digest(canonical_bytes)[:24]
+
     def archive_ready(
         self,
         case_id: str,
@@ -567,6 +578,25 @@ class EncryptedArchive:
         media_type = stored.metadata.get("media-type") or "application/octet-stream"
         return ArtifactRef(keys[0], digest, size, media_type, kind, locale)
 
+    def load_assessment(self, case_id: str, revision_id: str) -> Optional[Dict[str, Any]]:
+        """Load one authenticated canonical assessment snapshot for a case revision."""
+        if (
+            not re.fullmatch(r"[0-9a-f]{32}", str(case_id))
+            or not re.fullmatch(r"[0-9a-f]{24}", str(revision_id))
+        ):
+            return None
+        prefix = f"cases/{case_id}/revisions/{revision_id}/assessment-json-"
+        keys = self.store.list(prefix)
+        if len(keys) != 1:
+            return None
+        try:
+            payload = json.loads(self.get_bytes(keys[0]))
+        except ArchiveIntegrityError:
+            raise
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ArchiveIntegrityError("Archived canonical assessment is unreadable.") from exc
+        return payload if isinstance(payload, dict) else None
+
 
 class CaseArchiveRuntime:
     """Optional runtime integration; REQUIRED mode blocks release if secure archive fails."""
@@ -577,10 +607,6 @@ class CaseArchiveRuntime:
         self._lock = RLock()
         self._token_case: "OrderedDict[str, str]" = OrderedDict()
         self._token_revision: "OrderedDict[str, str]" = OrderedDict()
-        self._pending: ContextVar[Optional[Dict[str, Any]]] = ContextVar(
-            "cer_ai_archive_pending",
-            default=None,
-        )
 
     @property
     def enabled(self) -> bool:
@@ -609,6 +635,97 @@ class CaseArchiveRuntime:
                 "retry after archive service recovery.",
             ) from exc
 
+    def begin_case(
+        self,
+        token: str,
+        source_images: Iterable[tuple[bytes, str]],
+        *,
+        patient_metadata: Dict[str, Any],
+        extracted: Dict[str, Any],
+    ) -> Optional[Dict[str, str]]:
+        """Persist one source set and bind its random case id to the workflow token."""
+        if not self.enabled:
+            return None
+        case_id = EncryptedArchive.new_case_id()
+        try:
+            self.archive.archive_sources(
+                case_id,
+                source_images,
+                patient_metadata=patient_metadata,
+                extracted=extracted,
+            )
+        except Exception as exc:
+            self.fail_or_continue(exc)
+            return {"status": "UNAVAILABLE"}
+        self._remember(self._token_case, token, case_id)
+        return {"status": "SOURCES_ARCHIVED", "case_id": case_id}
+
+    def finalize_ready(
+        self,
+        core: Any,
+        response: Dict[str, Any],
+        ready: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Persist and index one ready snapshot through the sole archive write path."""
+        if not self.enabled or response.get("workflow_status") != "READY" or not ready:
+            return response
+        token = str(response.get("assessment_token") or "")
+        report_token = str(response.get("report_token") or "")
+        case_id = self.case_for_token(token)
+        if not (token and report_token and case_id):
+            return response
+        previous_revision = self.revision_for_token(token)
+        expected_revision = self.archive.revision_id_for(ready)
+        if previous_revision == expected_revision:
+            response["archive"] = {
+                "status": "ARCHIVED",
+                "case_id": case_id,
+                "revision_id": previous_revision,
+                "catalog_status": "INDEXED",
+            }
+            return response
+        try:
+            revision = self.archive.archive_ready(
+                case_id,
+                ready,
+                pdf_builder=core.build_pdf,
+                docx_builder=core.build_docx,
+            )
+            import case_catalog
+
+            current_principal = getattr(core, "_cerai_current_principal", None)
+            actor = current_principal() if callable(current_principal) else None
+            catalog_ref = case_catalog.write_entry(
+                self.archive,
+                revision,
+                ready,
+                actor=actor,
+            )
+            self._remember(self._token_revision, token, revision.revision_id)
+            response["archive"] = {
+                "status": "ARCHIVED",
+                "case_id": case_id,
+                "revision_id": revision.revision_id,
+                "catalog_status": "INDEXED",
+                "catalog_sha256": catalog_ref.sha256,
+            }
+            audit = getattr(core, "_cerai_audit_event", None)
+            if audit is not None:
+                audit(
+                    "CASE_ARCHIVED",
+                    actor=actor,
+                    case_id=case_id,
+                    revision_id=revision.revision_id,
+                    details={
+                        "decision": (ready.get("decision") or {}).get("status"),
+                        "report_date": (ready.get("patient") or {}).get("report_date"),
+                    },
+                )
+        except Exception as exc:
+            self.fail_or_continue(exc)
+            response["archive"] = {"status": "UNAVAILABLE"}
+        return response
+
 
 def runtime_from_environment() -> CaseArchiveRuntime:
     required = os.getenv("CERAI_ARCHIVE_REQUIRED", "0").strip() == "1"
@@ -634,148 +751,11 @@ def runtime_from_environment() -> CaseArchiveRuntime:
 
 
 def install(core: Any, *, runtime: Optional[CaseArchiveRuntime] = None) -> CaseArchiveRuntime:
-    """Install archive hooks without changing any clinical scoring or decision function."""
+    """Attach the sole archive runtime without replacing workflow or report functions."""
     if getattr(core, "_cerai_case_archive_installed", False):
         return getattr(core, "_cerai_case_archive_runtime")
 
     runtime = runtime or runtime_from_environment()
-    import assessment_workflow
-    import operational_security
-
-    original_read_uploads = operational_security.read_uploads
-    original_begin = assessment_workflow.begin
-    original_complete = assessment_workflow.complete
-    original_export_payload = assessment_workflow.export_payload
-    original_build_pdf = core.build_pdf
-    original_build_docx = core.build_docx
-
-    async def read_uploads_archived(images):
-        payloads = await original_read_uploads(images)
-        runtime._pending.set({
-            "case_id": EncryptedArchive.new_case_id(),
-            "payloads": payloads,
-        })
-        return payloads
-
-    def finalize_if_ready(response: Dict[str, Any]) -> Dict[str, Any]:
-        if not runtime.enabled or response.get("workflow_status") != "READY":
-            return response
-        token = str(response.get("assessment_token") or "")
-        report_token = str(response.get("report_token") or "")
-        case_id = runtime.case_for_token(token)
-        if not (token and report_token and case_id):
-            return response
-        try:
-            ready = original_export_payload({
-                "assessment_token": token,
-                "report_token": report_token,
-                "locale": "en",
-            })
-            revision = runtime.archive.archive_ready(
-                case_id,
-                ready,
-                pdf_builder=original_build_pdf,
-                docx_builder=original_build_docx,
-            )
-            runtime._remember(runtime._token_revision, token, revision.revision_id)
-            response["archive"] = {
-                "status": "ARCHIVED",
-                "case_id": case_id,
-                "revision_id": revision.revision_id,
-            }
-        except Exception as exc:
-            runtime.fail_or_continue(exc)
-            response["archive"] = {"status": "UNAVAILABLE"}
-        return response
-
-    def begin_archived(core_arg, extracted, age, plans, modifiers, metadata, source_images=None):
-        pending = runtime._pending.get()
-        runtime._pending.set(None)
-        response = original_begin(
-            core_arg, extracted, age, plans, modifiers, metadata,
-            source_images=source_images,
-        )
-        token = str(response.get("assessment_token") or "")
-        if pending and token:
-            case_id = str(pending["case_id"])
-            runtime._remember(runtime._token_case, token, case_id)
-            if runtime.enabled:
-                try:
-                    runtime.archive.archive_sources(
-                        case_id,
-                        pending["payloads"],
-                        patient_metadata=metadata,
-                        extracted=extracted,
-                    )
-                except Exception as exc:
-                    runtime.fail_or_continue(exc)
-                    response["archive"] = {"status": "UNAVAILABLE"}
-        return finalize_if_ready(response)
-
-    def complete_archived(core_arg, payload):
-        response = original_complete(core_arg, payload)
-        return finalize_if_ready(response)
-
-    def export_payload_archived(payload):
-        exported = original_export_payload(payload)
-        token = str(payload.get("assessment_token") or "")
-        case_id = runtime.case_for_token(token)
-        revision_id = runtime.revision_for_token(token)
-        if case_id:
-            exported["_archive_case_id"] = case_id
-        if revision_id:
-            exported["_archive_revision_id"] = revision_id
-        return exported
-
-    def _clean_for_report(payload: Dict[str, Any]) -> Dict[str, Any]:
-        cleaned = deepcopy(payload)
-        for key in list(cleaned):
-            if str(key).startswith("_archive_"):
-                cleaned.pop(key, None)
-        return cleaned
-
-    def build_pdf_archived(payload: Dict[str, Any]) -> bytes:
-        case_id = payload.get("_archive_case_id")
-        revision_id = payload.get("_archive_revision_id")
-        locale = payload.get("locale", "en")
-        if runtime.enabled and case_id and revision_id:
-            try:
-                ref = runtime.archive.find_report(
-                    str(case_id),
-                    str(revision_id),
-                    str(locale),
-                    "pdf",
-                )
-                if ref:
-                    return runtime.archive.get_bytes(ref)
-            except Exception as exc:
-                runtime.fail_or_continue(exc)
-        return original_build_pdf(_clean_for_report(payload))
-
-    def build_docx_archived(payload: Dict[str, Any]) -> bytes:
-        case_id = payload.get("_archive_case_id")
-        revision_id = payload.get("_archive_revision_id")
-        locale = payload.get("locale", "en")
-        if runtime.enabled and case_id and revision_id:
-            try:
-                ref = runtime.archive.find_report(
-                    str(case_id),
-                    str(revision_id),
-                    str(locale),
-                    "docx",
-                )
-                if ref:
-                    return runtime.archive.get_bytes(ref)
-            except Exception as exc:
-                runtime.fail_or_continue(exc)
-        return original_build_docx(_clean_for_report(payload))
-
-    operational_security.read_uploads = read_uploads_archived
-    assessment_workflow.begin = begin_archived
-    assessment_workflow.complete = complete_archived
-    assessment_workflow.export_payload = export_payload_archived
-    core.build_pdf = build_pdf_archived
-    core.build_docx = build_docx_archived
     core._cerai_case_archive_runtime = runtime
     core._cerai_case_archive_installed = True
     return runtime

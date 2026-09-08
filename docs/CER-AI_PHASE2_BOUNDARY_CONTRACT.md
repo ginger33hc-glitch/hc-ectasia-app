@@ -9,23 +9,24 @@ The new `clinical_core` is allowed to receive already-normalized, source-validat
 ## Explicit production order
 
 1. Authentication / access control
-2. Upload-count and mandatory source-set validation
-3. Image extraction
-4. Source provenance and reconciliation
-5. Assessment readiness / contact-lens washout
-6. Surgeon completion of unresolved required inputs
-7. Clinical eligibility gate
-8. Normalized per-eye clinical input
-9. Pure clinical core
+2. Upload-count validation
+3. Primary page-identity extraction
+4. Mandatory source-set confirmation and conditional manual-refraction gate
+5. Targeted extraction, provenance, and reconciliation
+6. Assessment readiness / contact-lens washout
+7. Surgeon completion of unresolved required inputs
+8. Clinical eligibility gate
+9. Normalized per-eye clinical input
+10. Pure clinical core
    - ERSS
    - Final BAD-D
    - NICE
    - PS3
    - procedural tissue / refractive safety
    - final disposition aggregation
-10. LASIK / procedure planning
-11. Report generation
-12. Archive / audit / research persistence
+11. LASIK / procedure planning
+12. Report generation
+13. Archive / audit / research persistence
 
 ## Responsibilities that MUST remain outside `clinical_core`
 
@@ -40,7 +41,9 @@ The clinical core must never decide whether the five mandatory Pentacam source i
 - one Show 2 Exams Topometric page
 - one optional excimer treatment card as the sixth image only
 
-Missing or unidentifiable mandatory source images block assessment before clinical scoring.
+Missing or unidentifiable mandatory source images block assessment before targeted rereading, geometric SRAX derivation, reconciliation, or clinical scoring. The intake response identifies every missing mandatory source and states whether the optional treatment card was provided. If the card is absent, complete surgeon-entered bilateral manifest and intended refraction is required at this same gate.
+
+An explicit surgeon value has field-level precedence throughout the workflow. Extraction and derived values may fill blank fields only and cannot overwrite or create a conflict against a surgeon-entered value. When age is entered by the surgeon, printed and date-derived age remains audit evidence but does not create an age conflict.
 
 ### Extraction and provenance
 

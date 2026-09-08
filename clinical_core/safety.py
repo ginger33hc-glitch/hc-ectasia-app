@@ -1,6 +1,7 @@
-"""Pure CER-AI procedural safety calculations frozen by the launch contract.
+"""Pure CER-AI procedural safety calculations.
 
-No FastAPI imports, runtime mutation, reporting, or persistence concerns.
+Hard stops follow the master order and subsequent approved amendments.
+LASIK and PRK PTA at or above 40.0% fail the evaluated plan.
 """
 from __future__ import annotations
 
@@ -9,7 +10,7 @@ from math import isfinite
 PRK_EPITHELIUM_UM = 50.0
 LASIK_RSB_MIN_UM = 300.0
 PRK_RST_MIN_UM = 310.0
-LASIK_PTA_CUTOFF_PERCENT = 40.0
+PTA_LIMIT_PERCENT = 40.0
 CORNEAL_EFFECT_PER_INTENDED_MRSE_D = 0.8
 FINAL_KMEAN_MIN_D = 36.0
 FINAL_KMEAN_MAX_D = 48.0
@@ -34,10 +35,11 @@ def prk_rst_um(thinnest_um, ablation_um):
     return float(thinnest_um) - PRK_EPITHELIUM_UM - float(ablation_um)
 
 
-def lasik_pta_percent(thinnest_um, flap_um, ablation_um):
-    if not all(_finite(x) for x in (thinnest_um, flap_um, ablation_um)) or float(thinnest_um) <= 0:
+def pta_percent(thinnest_um, anterior_tissue_um, ablation_um):
+    """PTA using LASIK flap thickness or fixed PRK epithelial thickness."""
+    if not all(_finite(x) for x in (thinnest_um, anterior_tissue_um, ablation_um)) or float(thinnest_um) <= 0:
         return None
-    return 100.0 * (float(flap_um) + float(ablation_um)) / float(thinnest_um)
+    return 100.0 * (float(anterior_tissue_um) + float(ablation_um)) / float(thinnest_um)
 
 
 def estimated_final_kmean_d(preop_kmean_d, intended_mrse_d):
@@ -54,12 +56,12 @@ def lasik_rsb_hard_stop(rsb_um) -> bool:
     return _finite(rsb_um) and float(rsb_um) < LASIK_RSB_MIN_UM
 
 
+def pta_hard_stop(pta_percent) -> bool:
+    return _finite(pta_percent) and float(pta_percent) >= PTA_LIMIT_PERCENT
+
+
 def prk_rst_hard_stop(rst_um) -> bool:
     return _finite(rst_um) and float(rst_um) < PRK_RST_MIN_UM
-
-
-def lasik_pta_hard_stop(pta_percent) -> bool:
-    return _finite(pta_percent) and float(pta_percent) >= LASIK_PTA_CUTOFF_PERCENT
 
 
 def final_kmean_hard_stop(final_kmean_d) -> bool:

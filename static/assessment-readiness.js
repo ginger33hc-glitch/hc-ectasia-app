@@ -107,14 +107,18 @@
       :'If a source image is missing or unreadable, select only the new/replacement image. Existing patient information and selected images are retained.';
     wrapper.append(note);
   }
-  window.CER_AI_SourceImageRetention={openPicker:()=>imageInput.click(),files:()=>[...retained]};
+  window.CER_AI_SourceImageRetention={
+    openPicker:()=>imageInput.click(),
+    files:()=>[...retained],
+    adopt:files=>setFiles([...files])
+  };
 })();
 
 window.HCReadiness = class {
   constructor(panel) { this.panel=panel; this.regionUrls=[]; this.reset(); }
   reset() {
     for(const url of this.regionUrls||[])URL.revokeObjectURL(url);
-    this.regionUrls=[];this.token=null;this.overrides={};this.hasCompletableInputs=false;this.panel.hidden=true;this.panel.replaceChildren();
+    this.regionUrls=[];this.token=null;this.overrides={};this.hasCompletableInputs=false;this.requiresSourceReplacement=false;this.panel.hidden=true;this.panel.replaceChildren();
   }
   async loadSourceRegion(container,item,index=0) {
     const tr=value=>window.CERAI_I18N?.translate(value)??value;
@@ -150,8 +154,9 @@ window.HCReadiness = class {
     this.regionUrls=[];
     this.token=response.assessment_token;
     this.hasCompletableInputs=false;
+    this.requiresSourceReplacement=false;
     this.panel.replaceChildren();
-    this.panel.hidden=response.workflow_status!=='NEEDS_INPUT';
+    this.panel.hidden=response.workflow_status==='READY';
     if(this.panel.hidden)return false;
     const tr=value=>window.CERAI_I18N?.translate(value)??value;
     const heading=document.createElement('h3'); heading.textContent=tr('Required information — no report has been generated');
@@ -162,7 +167,10 @@ window.HCReadiness = class {
       const identity=[item.eye,item.form_id||item.key,item.kind].join(':');
       if(seen.has(identity))continue;seen.add(identity);
       const row=document.createElement('div');row.className='row';
-      const label=document.createElement('label');label.textContent=`${tr(item.eye)}: ${tr(item.label)}`;row.append(label);
+      const label=document.createElement('label');
+      const required=(item.required_for||[]).map(tr).join('/');
+      label.textContent=[tr(item.eye),tr(item.label),required?`${tr('Required for')} ${required}`:'',item.source_screen?tr(item.source_screen):'',item.source_box?tr(item.source_box):''].filter(Boolean).join(' — ');
+      row.append(label);
       if(item.source_region){
         row.classList.add('completion-with-source');
         const region=document.createElement('div');region.className='completion-source-region';
@@ -194,10 +202,13 @@ window.HCReadiness = class {
       else {
         row.classList.add('completion-blocker');
         const help=document.createElement('span');help.textContent=tr(item.help);row.append(help);
-        const replace=document.createElement('button');replace.type='button';replace.className='secondary';
-        replace.textContent=window.CERAI_I18N?.locale==='tr'?'Kaynak görüntü ekle/değiştir':'Add/replace source image';
-        replace.addEventListener('click',()=>window.CER_AI_SourceImageRetention?.openPicker());
-        row.append(replace);
+        if(item.destination!=='separate_pathway'){
+          this.requiresSourceReplacement=true;
+          const replace=document.createElement('button');replace.type='button';replace.className='secondary';
+          replace.textContent=window.CERAI_I18N?.locale==='tr'?'Kaynak görüntü ekle/değiştir':'Add/replace source image';
+          replace.addEventListener('click',()=>window.CER_AI_SourceImageRetention?.openPicker());
+          row.append(replace);
+        }
       }
       this.panel.append(row);
     }

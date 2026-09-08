@@ -82,6 +82,8 @@ def test_authenticated_clinical_app_injects_archive_navigation_and_escapes_displ
     assert "Case Archive" in response.text
     assert "Doctor &lt;One&gt;" in response.text
     assert "Doctor <One>" not in response.text
+    assert 'cerAiReviewerField.readOnly = true' in response.text
+    assert 'Report attribution is bound to the authenticated CER-AI user.' in response.text
     assert response.headers["cache-control"] == "no-store"
     assert response.headers["content-security-policy"]
 

@@ -54,7 +54,7 @@ PROTECTED_PATHS = frozenset({
     "/report/pdf",
     "/report/word",
 })
-PROTECTED_PREFIXES = ("/archive/",)
+PROTECTED_PREFIXES = ("/archive/", "/analysis/jobs")
 
 _rate_lock = RLock()
 _analysis_starts: deque[float] = deque()
@@ -152,7 +152,7 @@ def _is_protected_path(path: str) -> bool:
 
 
 def _request_limit(path: str) -> int:
-    return MAX_REQUEST_BYTES if path == "/analyze" else MAX_JSON_REQUEST_BYTES
+    return MAX_REQUEST_BYTES if path == "/analyze" or path == "/analysis/jobs" else MAX_JSON_REQUEST_BYTES
 
 
 def _secure_response(response, path: str):

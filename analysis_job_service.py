@@ -10,9 +10,9 @@ from __future__ import annotations
 import asyncio
 from io import BytesIO
 from pathlib import Path
-import secrets
 from time import monotonic
 from typing import Any
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from fastapi import File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -28,6 +28,21 @@ _APP_HTML = Path("static/index.html")
 
 _jobs: dict[str, dict[str, Any]] = {}
 _lock = asyncio.Lock()
+
+
+def _actor_id(core) -> str:
+    current_principal = getattr(core, "_cerai_current_principal", None)
+    principal = current_principal() if callable(current_principal) else None
+    return str(principal.user_id) if principal is not None else "access-key-session"
+
+
+def _job_id(actor_id: str, client_request_id: str | None) -> str:
+    request_id = str(client_request_id or "").strip()
+    if len(request_id) > 160:
+        raise HTTPException(422, "Assessment request identifier is too long.")
+    if request_id:
+        return str(uuid5(NAMESPACE_URL, f"cer-ai:{actor_id}:{request_id}"))
+    return str(uuid4())
 
 
 def _prune_locked() -> None:
@@ -157,10 +172,21 @@ def install(core) -> None:
         assessment_request_id: str | None = Form(None),
     ) -> JSONResponse:
         captured = await _capture_uploads(images)
-        job_id = secrets.token_urlsafe(32)
+        actor_id = _actor_id(core)
+        job_id = _job_id(actor_id, assessment_request_id)
         now = monotonic()
         async with _lock:
             _prune_locked()
+            existing = _jobs.get(job_id)
+            if existing is not None:
+                if existing.get("actor_id") != actor_id:
+                    raise HTTPException(409, "Assessment request identifier is already in use.")
+                existing["expires"] = now + JOB_TTL_SECONDS
+                return JSONResponse({
+                    "job_id": job_id,
+                    "status": existing["status"],
+                    "message": "Existing CER-AI assessment job recovered.",
+                }, status_code=202)
             _jobs[job_id] = {
                 "created": now,
                 "updated": now,
@@ -172,12 +198,13 @@ def install(core) -> None:
                     "eye_plans": eye_plans,
                     "patient_modifiers": patient_modifiers,
                     "patient_metadata": patient_metadata,
-                    "client_request_id": assessment_request_id,
+                    "client_request_id": str(assessment_request_id or "") or None,
                 },
                 "result": None,
                 "error": None,
                 "http_status": None,
                 "task": None,
+                "actor_id": actor_id,
             }
             task = asyncio.create_task(_run(core, job_id))
             _jobs[job_id]["task"] = task
@@ -194,6 +221,8 @@ def install(core) -> None:
             job = _jobs.get(job_id)
             if not job:
                 raise HTTPException(410, "Assessment job expired or the server restarted.")
+            if job.get("actor_id") != _actor_id(core):
+                raise HTTPException(403, "You do not have access to this assessment job.")
             job["expires"] = monotonic() + JOB_TTL_SECONDS
             status = job["status"]
             if status == "COMPLETED":

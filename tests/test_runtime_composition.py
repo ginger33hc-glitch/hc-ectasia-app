@@ -1,5 +1,6 @@
 """Architecture locks for the canonical production composition root."""
 import ast
+import inspect
 import os
 from pathlib import Path
 import subprocess
@@ -8,16 +9,9 @@ import tomllib
 from types import SimpleNamespace
 
 from fastapi import FastAPI
-import canonical_engine
+
 import assessment_workflow
-import critical_score_highlight
-import erss_auto_read_policy
-import erss_topography_evidence_policy
-import erss_visual_morphology_policy
-import hc_age_policy
-import inter_eye_tomography_policy
-import microkeratome_planning_policy
-import nice_policy
+import canonical_engine
 import runtime_composition
 
 
@@ -55,26 +49,34 @@ def _local_imports(filename):
     return names
 
 
-def test_canonical_engine_has_one_composition_dependency():
-    assert _local_imports("canonical_engine.py") == {"runtime_composition"}
+def test_canonical_engine_imports_only_surviving_runtime_and_canonical_owners():
+    imports = _local_imports("canonical_engine.py")
+    assert "runtime_composition" in imports
+    assert "assessment_workflow" in imports
+    assert "canonical_runtime_service" in imports
+    assert "clinical_core.bad" in imports
+    assert "clinical_core.erss" in imports
+    assert "clinical_core.rules" in imports
+    assert "clinical_core.safety" in imports
 
-
-def test_policy_leaf_modules_do_not_hide_install_order():
-    assert _local_imports("critical_score_highlight.py") == set()
-    assert _local_imports("pachymetry_policy.py") == {"bootstrap"}
-    assert _local_imports("hc_final_decision_policy.py") == {"bootstrap", "clinical_disposition"}
-    assert _local_imports("hc_age_policy.py") == set()
-    assert _local_imports("erss_visual_morphology_policy.py") == set()
-    assert _local_imports("erss_auto_read_policy.py") == set()
-    assert _local_imports("erss_topography_evidence_policy.py") == set()
-    assert _local_imports("srax_completion_policy.py") == set()
-    assert _local_imports("microkeratome_planning_policy.py") == {
-        "planning.microkeratome",
-        "typing",
+    retired = {
+        "clean_engine",
+        "hc_age_policy",
+        "hc_bad_final_policy",
+        "pachymetry_policy",
+        "randleman_bad_independence",
+        "hc_final_decision_policy",
+        "inter_eye_tomography_policy",
+        "ps3_runtime_policy",
+        "erss_auto_read_policy",
+        "erss_topography_evidence_policy",
+        "erss_visual_morphology_policy",
+        "microkeratome_planning_policy",
+        "lasik_planning",
+        "nice_policy",
+        "nice_scoring",
     }
-    assert _local_imports("inter_eye_tomography_policy.py") == {
-        "inter_eye_tomography"
-    }
+    assert not (imports & retired)
 
 
 def test_every_runtime_topic_is_owned_by_one_phase():
@@ -83,206 +85,64 @@ def test_every_runtime_topic_is_owned_by_one_phase():
         for module in modules:
             assert module not in owners, f"{module} is owned by both {owners[module]} and {phase}"
             owners[module] = phase
-    assert owners["pentacam_targeted_reread"] == "pentacam_extraction"
-    assert owners["assessment_workflow"] == "reporting_and_readiness"
-    assert owners["srax_completion_policy"] == "reporting_and_readiness"
+
+    assert owners["assessment_workflow"] == "canonical_workflow"
+    assert "pentacam_targeted_reread" not in owners
+    assert "geometric_srax_policy" not in owners
+    extraction_source = inspect.getsource(canonical_engine.core.extract_one_image)
+    assessment_source = inspect.getsource(canonical_engine.core._run_image_assessment)
+    assert "pentacam_targeted_reread.enrich_extraction(" not in extraction_source
+    assert "geometric_srax_policy.enrich_extraction(" not in extraction_source
+    gate = assessment_source.index("mandatory_source_set_policy.validate_preassessment_requirements(")
+    assert gate < assessment_source.index("pentacam_targeted_reread.enrich_extraction")
+    assert gate < assessment_source.index("geometric_srax_policy.enrich_extraction")
+    assert owners["reports"] == "canonical_reporting"
+    assert "report_export_guard" not in owners
+    assert "ps3_report_policy" not in owners
+    assert "microkeratome_report_policy" not in owners
     assert owners["operational_security"] == "access_and_persistence"
-    assert owners["hc_final_decision_policy"] == "clinical_policy"
+
+
+def test_runtime_manifest_contains_no_retired_clinical_wrapper():
+    modules = {name for values in runtime_composition.COMPOSITION_PHASES.values() for name in values}
+    retired = {
+        "hc_age_policy",
+        "hc_bad_final_policy",
+        "pachymetry_policy",
+        "randleman_bad_independence",
+        "hc_final_decision_policy",
+        "inter_eye_tomography_policy",
+        "ps3_runtime_policy",
+        "erss_auto_read_policy",
+        "erss_topography_evidence_policy",
+        "erss_topography_guard",
+        "erss_visual_morphology_policy",
+        "microkeratome_planning_policy",
+        "lasik_planning",
+        "nice_policy",
+        "nice_scoring",
+        "report_export_guard",
+        "ps3_report_policy",
+        "microkeratome_report_policy",
+        "critical_score_highlight",
+    }
+    assert not (modules & retired)
+
+
+def test_compose_does_not_install_or_call_a_clinical_scorer():
+    source = inspect.getsource(runtime_composition.compose)
+    assert "hc_engine" not in source
+    assert "assess_eye" not in source
+    assert "nice_policy" not in source
+    assert "ps3_runtime_policy" not in source
+    assert "hc_final_decision_policy" not in source
+    assert "microkeratome_planning_policy" not in source
+    assert "pentacam_targeted_reread.install" not in source
+    assert "geometric_srax_policy.install" not in source
 
 
 def test_active_runtime_exposes_exact_manifest():
     assert canonical_engine.core._cerai_composition_phases == runtime_composition.COMPOSITION_PHASES
-
-
-def test_nice_install_is_idempotent_for_schema_prompt_and_engine_wrapper():
-    core = SimpleNamespace(
-        SCHEMA={"properties": {}, "required": []},
-        PROMPT="base prompt",
-        hc_engine=lambda *args, **kwargs: {"eyes": [], "status": "PASS"},
-        APP_VERSION="test",
-    )
-
-    nice_policy.install(core)
-    installed_engine = core.hc_engine
-    nice_policy.install(core)
-
-    assert core.hc_engine is installed_engine
-    assert core.SCHEMA["required"].count("nice_readings") == 1
-    assert core.PROMPT.count("NICE SEPARATE INPUT READING") == 1
-
-
-def test_age_policy_install_is_explicit_and_idempotent():
-    core = SimpleNamespace(age_points=lambda age: 99)
-    audit_owner = SimpleNamespace(
-        _score_audit=lambda result: {"source": "base", "total": 0}
-    )
-
-    hc_age_policy.install(core, score_audit_owner=audit_owner)
-    installed_age_points = core.age_points
-    installed_score_audit = audit_owner._score_audit
-    hc_age_policy.install(core, score_audit_owner=audit_owner)
-
-    assert core.age_points is installed_age_points
-    assert audit_owner._score_audit is installed_score_audit
-    assert [core.age_points(age) for age in (17, 18, 19, 20, 21)] == [
-        None,
-        3,
-        2,
-        2,
-        0,
-    ]
-    audit = audit_owner._score_audit({"values": {"procedure": "LASIK"}})
-    assert audit["source"] == "base; CER-AI-modified age bands"
-
-
-def test_report_builder_install_is_explicit_and_idempotent():
-    def original_pdf(payload):
-        return b"original-pdf"
-
-    def original_docx(payload):
-        return b"original-docx"
-
-    def active_pdf(payload):
-        return b"active-pdf"
-
-    def active_docx(payload):
-        return b"active-docx"
-
-    core = SimpleNamespace(build_pdf=original_pdf, build_docx=original_docx)
-    report_builders = SimpleNamespace(build_pdf=active_pdf, build_docx=active_docx)
-
-    critical_score_highlight.install(core, report_builders)
-    critical_score_highlight.install(
-        core,
-        SimpleNamespace(build_pdf=original_pdf, build_docx=original_docx),
-    )
-
-    assert core.build_pdf is active_pdf
-    assert core.build_docx is active_docx
-
-
-def test_visual_morphology_install_is_explicit_and_idempotent():
-    core = SimpleNamespace()
-    erss_runtime = SimpleNamespace(core=core, ERSS_PROMPT="legacy")
-
-    erss_visual_morphology_policy.install(erss_runtime)
-    installed_prompt = erss_runtime.ERSS_PROMPT
-    erss_visual_morphology_policy.install(erss_runtime)
-
-    assert installed_prompt == erss_visual_morphology_policy.ERSS_PROMPT
-    assert erss_runtime.ERSS_PROMPT == installed_prompt
-    assert core._erss_visual_morphology_policy_installed is True
-
-
-def test_microkeratome_install_is_explicit_and_idempotent(monkeypatch):
-    existing_core = microkeratome_planning_policy.core
-    existing_previous = microkeratome_planning_policy._previous_hc_engine
-    monkeypatch.setattr(microkeratome_planning_policy, "core", existing_core)
-    monkeypatch.setattr(
-        microkeratome_planning_policy,
-        "_previous_hc_engine",
-        existing_previous,
-    )
-
-    def upstream(*args, **kwargs):
-        return {"eyes": []}
-
-    core = SimpleNamespace(hc_engine=upstream)
-    microkeratome_planning_policy.install(core)
-    installed_engine = core.hc_engine
-    microkeratome_planning_policy.install(core)
-
-    assert installed_engine is microkeratome_planning_policy.hc_engine_with_microkeratome_planning
-    assert core.hc_engine is installed_engine
-    assert microkeratome_planning_policy._previous_hc_engine is upstream
-
-
-def test_inter_eye_install_is_explicit_and_idempotent(monkeypatch):
-    existing_previous = inter_eye_tomography_policy._previous_hc_engine
-    monkeypatch.setattr(
-        inter_eye_tomography_policy,
-        "_previous_hc_engine",
-        existing_previous,
-    )
-
-    def upstream(*args, **kwargs):
-        return {"eyes": []}
-
-    core = SimpleNamespace(hc_engine=upstream)
-    compatibility_owner = SimpleNamespace(hc_engine=None)
-    inter_eye_tomography_policy.install(
-        core,
-        compatibility_owner=compatibility_owner,
-    )
-    installed_engine = core.hc_engine
-    inter_eye_tomography_policy.install(
-        core,
-        compatibility_owner=compatibility_owner,
-    )
-
-    assert installed_engine is inter_eye_tomography_policy.hc_engine_with_inter_eye_tomography
-    assert core.hc_engine is installed_engine
-    assert compatibility_owner.hc_engine is installed_engine
-    assert inter_eye_tomography_policy._previous_hc_engine is upstream
-
-
-def test_erss_auto_read_install_is_explicit_and_idempotent(monkeypatch):
-    existing_previous = erss_auto_read_policy._previous_hc_engine
-    monkeypatch.setattr(
-        erss_auto_read_policy,
-        "_previous_hc_engine",
-        existing_previous,
-    )
-
-    def upstream(*args, **kwargs):
-        return {"eyes": []}
-
-    core = SimpleNamespace(hc_engine=upstream)
-    erss_auto_read_policy.install(core)
-    installed_engine = core.hc_engine
-    erss_auto_read_policy.install(core)
-
-    assert installed_engine is erss_auto_read_policy.hc_engine_with_erss_auto_read
-    assert core.hc_engine is installed_engine
-    assert erss_auto_read_policy._previous_hc_engine is upstream
-
-
-def test_erss_evidence_install_is_explicit_and_idempotent(monkeypatch):
-    for name in (
-        "core",
-        "_previous_scoring_morphology",
-        "_previous_required_tomography_missing",
-        "_previous_assess_eye",
-    ):
-        monkeypatch.setattr(
-            erss_topography_evidence_policy,
-            name,
-            getattr(erss_topography_evidence_policy, name),
-        )
-
-    def scoring(eye):
-        return {"category": "NORMAL_SYMMETRIC"}
-
-    def missing(eye):
-        return []
-
-    def assess(eye, plan, age, modifiers):
-        return {"status": "PASS"}
-
-    core = SimpleNamespace(
-        scoring_morphology=scoring,
-        required_tomography_missing=missing,
-        assess_eye=assess,
-    )
-    erss_topography_evidence_policy.install(core)
-    installed_assess_eye = core.assess_eye
-    erss_topography_evidence_policy.install(core)
-
-    assert core.scoring_morphology is erss_topography_evidence_policy.scoring_morphology_with_i_s_evidence_gate
-    assert core.required_tomography_missing is erss_topography_evidence_policy.required_tomography_missing_with_i_s
-    assert installed_assess_eye is erss_topography_evidence_policy.assess_eye_with_i_s_evidence
-    assert core.assess_eye is installed_assess_eye
-    assert erss_topography_evidence_policy._previous_assess_eye is assess
 
 
 def test_readiness_install_is_idempotent_for_routes():
@@ -298,6 +158,13 @@ def test_readiness_install_is_idempotent_for_routes():
             route_counts[key] = route_counts.get(key, 0) + 1
     assert route_counts[("POST", "/assessment/complete")] == 1
     assert route_counts[("POST", "/assessment/source-region")] == 1
+
+
+def test_production_workflow_uses_direct_canonical_runtime():
+    source = inspect.getsource(assessment_workflow._respond)
+    assert "evaluate_case(" in source
+    assert "core.hc_engine" not in source
+    assert "apply_extracted_corrections" not in source
 
 
 def test_uncomposed_app_target_refuses_asgi_startup():
@@ -325,5 +192,4 @@ def test_canonical_app_target_allows_asgi_startup():
 
 def test_railway_start_command_uses_canonical_bootstrap():
     config = tomllib.loads((ROOT / "railway.toml").read_text(encoding="utf-8"))
-
     assert config["deploy"]["startCommand"] == "python start.py"

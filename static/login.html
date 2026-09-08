@@ -32,7 +32,8 @@
   const allowedNext = new Set(["/", "/app", "/clinical-app", "/archive-ui"]);
   const params = new URLSearchParams(window.location.search);
   const requested = params.get("next") || "/app";
-  const next = allowedNext.has(requested) ? requested : "/app";
+  const safeSharedApp = /^\/app\?(?:share_token=[A-Za-z0-9-]{1,128}|share_error=(?:no_images|too_many_images|image_too_large|images_too_large))$/.test(requested);
+  const next = allowedNext.has(requested) || safeSharedApp ? requested : "/app";
   const form = document.getElementById("loginForm");
   const button = document.getElementById("submitButton");
   const error = document.getElementById("error");

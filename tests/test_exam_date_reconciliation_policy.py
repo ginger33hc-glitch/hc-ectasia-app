@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 import exam_date_reconciliation_policy as policy
 
 
@@ -37,6 +35,15 @@ def test_same_calendar_date_with_ambiguous_slash_format_is_consistent_only_by_co
     ])
 
 
+def test_identical_ambiguous_day_month_strings_are_not_a_conflict():
+    inputs = [
+        four_maps("03/09/2026", "OD"),
+        four_maps("03/09/2026", "OS"),
+    ]
+    assert policy.dates_are_semantically_consistent(inputs)
+    assert not policy.authoritative_exam_date_conflict(inputs)
+
+
 def test_true_different_four_maps_dates_remain_conflicting():
     assert not policy.dates_are_semantically_consistent([
         four_maps("2026-09-02", "OD"),
@@ -52,62 +59,90 @@ def test_unparseable_four_maps_date_never_suppresses_conflict():
 
 
 def test_show_2_exams_topometric_date_is_ignored_completely():
-    merged = {"critical_input_issues": [CONFLICT]}
-    result = policy.reconcile_merged_exam_date_conflict(merged, [
+    assert not policy.authoritative_exam_date_conflict([
         four_maps("2026-09-02", "OD"),
         extraction("2026-09-03", "SHOW_2_EXAMS_TOPOMETRIC", eye="OD"),
     ])
-    assert result["critical_input_issues"] == []
 
 
 def test_bad_display_date_is_ignored_completely():
-    merged = {"critical_input_issues": [CONFLICT]}
-    result = policy.reconcile_merged_exam_date_conflict(merged, [
+    assert not policy.authoritative_exam_date_conflict([
         four_maps("2026-09-02", "OD"),
         extraction("2026-09-03", "BAD_DISPLAY", eye="OD"),
     ])
-    assert result["critical_input_issues"] == []
 
 
 def test_other_pentacam_dates_do_not_hide_true_four_maps_conflict():
-    merged = {"critical_input_issues": [CONFLICT]}
-    result = policy.reconcile_merged_exam_date_conflict(merged, [
+    assert policy.authoritative_exam_date_conflict([
         four_maps("2026-09-02", "OD"),
         four_maps("2026-09-03", "OS"),
         extraction("2026-09-02", "BAD_DISPLAY", eye="OD"),
         extraction("2026-09-02", "SHOW_2_EXAMS_TOPOMETRIC", eye="OS"),
     ])
-    assert result["critical_input_issues"] == [CONFLICT]
 
 
-def test_wrapper_removes_false_conflict_from_non_four_maps_sources_and_preserves_raw_dates():
-    core = SimpleNamespace()
-
-    def base_merge(extractions):
-        return {
-            "critical_input_issues": [CONFLICT, "another issue"],
-            "source_dates": [item["document_context"]["exam_date"] for item in extractions],
-        }
-
-    core.merge_extractions = base_merge
-    policy._previous_merge_extractions = None
-    policy.install(core)
+def test_authoritative_check_ignores_non_four_maps_dates_and_preserves_inputs():
     inputs = [
         four_maps("2026-09-02", "OD"),
         extraction("03.09.2026", "BAD_DISPLAY", eye="OD"),
     ]
-    merged = core.merge_extractions(inputs)
-    assert merged["critical_input_issues"] == ["another issue"]
-    assert merged["source_dates"] == ["2026-09-02", "03.09.2026"]
+    assert not policy.authoritative_exam_date_conflict(inputs)
+    assert [item["document_context"]["exam_date"] for item in inputs] == [
+        "2026-09-02", "03.09.2026"
+    ]
 
 
-def test_wrapper_keeps_true_four_maps_exam_date_conflict():
-    def base_merge(extractions):
-        return {"critical_input_issues": [CONFLICT]}
-
-    policy._previous_merge_extractions = base_merge
-    merged = policy.merge_extractions_with_exam_date_reconciliation([
+def test_authoritative_check_keeps_true_four_maps_exam_date_conflict():
+    inputs = [
         four_maps("2026-09-02", "OD"),
         four_maps("2026-09-03", "OS"),
-    ])
-    assert merged["critical_input_issues"] == [CONFLICT]
+    ]
+    assert policy.authoritative_exam_date_conflict(inputs)
+
+
+def test_consistent_targeted_four_maps_rereads_replace_false_primary_ocr_conflict():
+    inputs = [
+        four_maps("23/09/2026", "OD"),
+        four_maps("13/09/2026", "OS"),
+    ]
+    for item in inputs:
+        item["document_context"]["targeted_exam_date_reread_evidence"] = {
+            "value": "03/09/2026", "promoted": False,
+        }
+    assert policy.promote_consistent_targeted_exam_dates(inputs)
+    assert not policy.authoritative_exam_date_conflict(inputs)
+    assert [item["document_context"]["exam_date"] for item in inputs] == [
+        "03/09/2026", "03/09/2026",
+    ]
+    assert [item["document_context"]["primary_exam_date_reading"] for item in inputs] == [
+        "23/09/2026", "13/09/2026",
+    ]
+    assert all(
+        item["document_context"]["targeted_exam_date_reread_evidence"]["promoted"]
+        for item in inputs
+    )
+
+
+def test_incomplete_or_disagreeing_targeted_date_rereads_do_not_override_primary_reads():
+    incomplete = [four_maps("23/09/2026", "OD"), four_maps("13/09/2026", "OS")]
+    incomplete[0]["document_context"]["targeted_exam_date_reread_evidence"] = {
+        "value": "03/09/2026", "promoted": False,
+    }
+    assert not policy.promote_consistent_targeted_exam_dates(incomplete)
+    assert [item["document_context"]["exam_date"] for item in incomplete] == [
+        "23/09/2026", "13/09/2026",
+    ]
+
+    disagreeing = [four_maps("23/09/2026", "OD"), four_maps("13/09/2026", "OS")]
+    for item, value in zip(disagreeing, ("03/09/2026", "04/09/2026")):
+        item["document_context"]["targeted_exam_date_reread_evidence"] = {
+            "value": value, "promoted": False,
+        }
+    assert not policy.promote_consistent_targeted_exam_dates(disagreeing)
+    assert policy.authoritative_exam_date_conflict(disagreeing)
+
+
+def test_exam_date_module_exposes_no_install_time_merge_wrapper():
+    assert not hasattr(policy, "install")
+    assert not hasattr(policy, "merge_extractions_with_exam_date_reconciliation")
+    assert not hasattr(policy, "reconcile_merged_exam_date_conflict")

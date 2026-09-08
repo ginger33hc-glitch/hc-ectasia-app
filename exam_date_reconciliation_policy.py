@@ -8,12 +8,8 @@ Binding CER-AI rule: ONLY Four Maps Refractive pages are authoritative for the
 exam date. Dates printed on BAD Display, Show 2 Exams Topometric, or any other
 uploaded Pentacam source are excluded entirely from exam-date reconciliation.
 """
-from copy import deepcopy
 from datetime import date
 import re
-
-_CONFLICT = "Conflicting Pentacam examination dates across uploaded sources."
-_previous_merge_extractions = None
 
 
 def _valid_iso(year, month, day):
@@ -66,7 +62,28 @@ def _is_four_maps_refractive(extraction):
     return False
 
 
-def _pentacam_date_possibilities(extractions):
+def _normalized_printed_date(value):
+    """Normalize separators only; retain the printed value in extraction evidence."""
+    text = " ".join(str(value or "").strip().split())
+    return re.sub(r"[.-]", "/", text)
+
+
+def _dates_have_one_calendar_interpretation(values):
+    if len(values) < 2:
+        return False
+    possibilities = [possible_calendar_dates(value) for value in values]
+    if any(not item for item in possibilities):
+        return False
+    # Two Four Maps pages from the same Pentacam can print the same ambiguous
+    # day/month string. Equal printed numeric components establish consistency
+    # even though the calendar locale cannot be inferred from the string alone.
+    normalized = {_normalized_printed_date(value) for value in values}
+    if len(normalized) == 1:
+        return True
+    return len(set.intersection(*possibilities)) == 1
+
+
+def _authoritative_date_values(extractions, *, targeted=False):
     values = []
     for extraction in extractions or []:
         context = (extraction or {}).get("document_context") or {}
@@ -74,56 +91,53 @@ def _pentacam_date_possibilities(extractions):
             continue
         if not _is_four_maps_refractive(extraction):
             continue
-        raw = context.get("exam_date")
-        if raw in (None, ""):
-            continue
-        possibilities = possible_calendar_dates(raw)
-        if not possibilities:
-            return None
-        values.append(possibilities)
+        if targeted:
+            evidence = context.get("targeted_exam_date_reread_evidence") or {}
+            raw = evidence.get("value")
+        else:
+            raw = context.get("exam_date")
+        if raw not in (None, ""):
+            values.append(raw)
     return values
 
 
 def dates_are_semantically_consistent(extractions):
-    possibilities = _pentacam_date_possibilities(extractions)
-    if not possibilities or len(possibilities) < 2:
+    values = _authoritative_date_values(extractions)
+    return _dates_have_one_calendar_interpretation(values)
+
+
+def authoritative_exam_date_conflict(extractions) -> bool:
+    """Return whether two or more authoritative Four Maps dates conflict."""
+    values = _authoritative_date_values(extractions)
+    if len(values) < 2:
         return False
-    common = set.intersection(*possibilities)
-    return len(common) == 1
+    if any(not possible_calendar_dates(value) for value in values):
+        return True
+    return not _dates_have_one_calendar_interpretation(values)
 
 
-def reconcile_merged_exam_date_conflict(merged, extractions):
-    """Remove a date conflict unless authoritative Four Maps pages disagree."""
-    authoritative = _pentacam_date_possibilities(extractions)
-    if authoritative is None or not authoritative:
-        return merged
-    if len(authoritative) == 1:
-        consistent = True
-    else:
-        common = set.intersection(*authoritative)
-        consistent = len(common) == 1
-    if not consistent:
-        return merged
-    reconciled = deepcopy(merged)
-    reconciled["critical_input_issues"] = [
-        issue for issue in reconciled.get("critical_input_issues") or []
-        if str(issue) != _CONFLICT
+def promote_consistent_targeted_exam_dates(extractions) -> bool:
+    """Promote focused Four Maps header rereads only when both pages agree.
+
+    Primary OCR strings remain attached as evidence. No targeted value is used
+    unless every authoritative Four Maps page produced a valid, mutually
+    consistent date reread.
+    """
+    authoritative = [
+        extraction for extraction in extractions or []
+        if ((extraction or {}).get("document_context") or {}).get("document_type")
+        == "PENTACAM_TOPOGRAPHY"
+        and _is_four_maps_refractive(extraction)
     ]
-    return reconciled
-
-
-def merge_extractions_with_exam_date_reconciliation(extractions):
-    """Compatibility wrapper for isolated tests; production composes this inside PS3 merge."""
-    if _previous_merge_extractions is None:
-        raise RuntimeError("Exam-date reconciliation wrapper was not initialized")
-    return reconcile_merged_exam_date_conflict(_previous_merge_extractions(extractions), extractions)
-
-
-def install(runtime_core):
-    """Compatibility installer only; production must not stack this outside the canonical merge adapter."""
-    global _previous_merge_extractions
-    if getattr(runtime_core, "_exam_date_reconciliation_policy_installed", False):
-        return
-    _previous_merge_extractions = runtime_core.merge_extractions
-    runtime_core.merge_extractions = merge_extractions_with_exam_date_reconciliation
-    runtime_core._exam_date_reconciliation_policy_installed = True
+    if len(authoritative) < 2:
+        return False
+    values = _authoritative_date_values(authoritative, targeted=True)
+    if len(values) != len(authoritative) or not _dates_have_one_calendar_interpretation(values):
+        return False
+    for extraction in authoritative:
+        context = extraction["document_context"]
+        evidence = context["targeted_exam_date_reread_evidence"]
+        context["primary_exam_date_reading"] = context.get("exam_date")
+        context["exam_date"] = evidence["value"]
+        evidence["promoted"] = True
+    return True

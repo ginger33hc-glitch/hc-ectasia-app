@@ -1,10 +1,36 @@
-"""Canonical production runtime for CER-AI.
+"""Canonical production entrypoint for CER-AI.
 
-Single supported composition point. Production and production-runtime tests must import this
-module rather than assembling policy wrappers independently.
+Startup invariants validate the direct canonical architecture rather than runtime
+wrapper order. Clinical truth lives in ``clinical_core`` and
+``canonical_runtime_service``; operational composition may not replace it.
 """
+from __future__ import annotations
 
+import inspect
+
+import assessment_workflow
+import canonical_runtime_service
+import geometric_srax_policy
+import mandatory_source_set_policy
+import pentacam_targeted_reread
 import runtime_composition as composition
+from clinical_core.bad import final_bad_d_classification
+from clinical_core.erss import erss_disposition, erss_rsb_points
+from clinical_core.rules import erss_age_points, erss_pachymetry_points
+from clinical_core.safety import (
+    FINAL_KMEAN_MAX_D,
+    FINAL_KMEAN_MIN_D,
+    PTA_LIMIT_PERCENT,
+    LASIK_RSB_MIN_UM,
+    PREOP_THINNEST_HARD_STOP_UM,
+    PRK_EPITHELIUM_UM,
+    PRK_RST_MIN_UM,
+    pta_hard_stop,
+)
+from pentacam_canonical_source_lock import (
+    CANONICAL_FIELD_SOURCES,
+    SHOW_2_CORNEA_BACK,
+)
 
 core = composition.core
 app = composition.app
@@ -13,168 +39,124 @@ _archive_runtime = composition.compose(CANONICAL_VERSION)
 
 
 def runtime_invariants():
-    """Fail startup if a decision-critical CER-AI rule is disconnected or overwritten."""
+    """Fail startup if canonical clinical/runtime ownership is disconnected."""
     errors = []
 
-    if [core.age_points(x) for x in (18, 19, 20, 21, 30)] != [3, 2, 2, 0, 0]:
-        errors.append("CER-AI age policy is not active")
-    if not getattr(core, "_hc_age_policy_installed", False):
-        errors.append("Explicit CER-AI age policy installation is not active")
-    if [
-        core.lasik_pachy_points(x) for x in (479, 480, 481, 499, 500, 509, 510, 511)
-    ] != [None, 2, 2, 2, 1, 1, 0, 0]:
-        errors.append("CER-AI pachymetry policy is not active")
-    if [core.bad_classification(x, final=True) for x in (1.6, 1.61, 2.5999, 2.6)] != [
-        "NORMAL",
-        "SUSPICIOUS",
-        "SUSPICIOUS",
-        "ABNORMAL",
+    # Canonical clinical boundaries are validated directly at their owning modules.
+    if [erss_age_points(x) for x in (18, 19, 20, 21, 30)] != [3, 2, 2, 0, 0]:
+        errors.append("Canonical Randleman age policy is invalid")
+    if [erss_pachymetry_points(x) for x in (479, 480, 499, 500, 509, 510)] != [None, 2, 2, 1, 1, 0]:
+        errors.append("Canonical Randleman pachymetry policy is invalid")
+    if [erss_rsb_points(x) for x in (239, 240, 259, 260, 279, 280, 299, 300)] != [4, 3, 3, 2, 2, 1, 1, 0]:
+        errors.append("Canonical Randleman RSB policy is invalid")
+    if [erss_disposition(x) for x in (0, 2, 3, 4)] != ["PASS", "PASS", "CAUTION", "STOP-DEFER"]:
+        errors.append("Canonical Randleman disposition is invalid")
+    if [final_bad_d_classification(x) for x in (1.60, 1.61, 2.59, 2.60)] != [
+        "NORMAL", "SUSPICIOUS", "SUSPICIOUS", "ABNORMAL"
     ]:
-        errors.append("CER-AI Final BAD-D policy is not active")
+        errors.append("Canonical Final BAD-D policy is invalid")
 
-    expected_topography = {
-        "NORMAL_SYMMETRIC": 0,
-        "ASYMMETRIC_BOWTIE": 1,
-        "INFERIOR_STEEPENING_SRA": 3,
-        "ABNORMAL_ECTATIC": 4,
-    }
-    for category, expected in expected_topography.items():
-        try:
-            actual = core.lasik_topography_points(category)
-        except Exception as exc:
-            errors.append(
-                f"Randleman topography scorer failed for {category}: {type(exc).__name__}"
-            )
-            continue
-        if actual != expected:
-            errors.append(
-                f"Randleman topography mapping {category} expected {expected}, got {actual}"
-            )
+    if PRK_EPITHELIUM_UM != 50.0:
+        errors.append("Canonical PRK epithelial convention is not 50 µm")
+    if LASIK_RSB_MIN_UM != 300.0 or PRK_RST_MIN_UM != 310.0:
+        errors.append("Canonical stromal safety minima are invalid")
+    if PTA_LIMIT_PERCENT != 40.0 or [
+        pta_hard_stop(value) for value in (39.99, 40.0, 40.01)
+    ] != [False, True, True]:
+        errors.append("Canonical LASIK/PRK PTA boundary is invalid")
+    if PREOP_THINNEST_HARD_STOP_UM != 480.0:
+        errors.append("Canonical preoperative thickness hard stop is invalid")
+    if FINAL_KMEAN_MIN_D != 36.0 or FINAL_KMEAN_MAX_D != 48.0:
+        errors.append("Canonical final keratometry bounds are invalid")
 
-    try:
-        erss_evidence = composition.erss_topography_evidence_policy
-        targeted = composition.pentacam_targeted_reread
-        rmin = composition.rmin_front_source_policy
-        geometric = composition.geometric_srax_policy
-        new_fields = composition.ps3_extraction_policy
-        mandatory = composition.mandatory_source_set_policy
-        if core.extract_one_image is not geometric.extract_one_image_with_geometric_srax:
-            errors.append("Deterministic geometric SRAX is not the active extraction layer")
-        if geometric._previous_extract_one_image is not rmin.extract_one_image_with_front_rmin:
-            errors.append("Cornea Front Rmin source lock is not preserved immediately below geometric SRAX")
-        if rmin._previous_extract_one_image is not targeted.extract_one_image_with_targeted_reread:
-            errors.append("Targeted Pentacam reread is not preserved immediately below Rmin source lock")
-        if "Rmin_mm" in getattr(core, "MAP_FALLBACK_NUMERIC_FIELDS", ()):
-            errors.append("Rmin map fallback is still enabled")
-        if not getattr(core, "_cerai_rmin_front_source_installed", False):
-            errors.append("Cornea Front Rmin source lock is not marked active")
-        if not getattr(core, "_cerai_geometric_srax_installed", False):
-            errors.append("Deterministic geometric SRAX extraction is not marked active")
-        if getattr(core, "_cerai_geometric_srax_algorithm", None) != "srax-geom-v1":
-            errors.append("Unexpected geometric SRAX algorithm version")
-        if core.merge_extractions is not mandatory.merge_extractions_with_mandatory_source_gate:
-            errors.append("Mandatory five-image source gate is not the active outer merge layer")
-        if mandatory._previous_merge_extractions is not new_fields.merge_extractions_with_new_fields:
-            errors.append("PS3/new-field merge adapter is not preserved immediately below the mandatory source gate")
-        if not getattr(core, "_cerai_mandatory_source_set_installed", False):
-            errors.append("Mandatory five-image source gate is not marked active")
-        if not getattr(core, "_cerai_ps3_merge_installed", False):
-            errors.append("New Pentacam labeled-field merge adapter is not marked active")
-        if core.scoring_morphology is not erss_evidence.scoring_morphology_with_i_s_evidence_gate:
-            errors.append("ERSS I-S/SRAX evidence gate is not the active numeric topography handoff")
-        if core.assess_eye is not erss_evidence.assess_eye_with_i_s_evidence:
-            errors.append("ERSS I-S/SRAX evidence gate is not the active eye-assessment layer")
-        if core.required_tomography_missing is not erss_evidence.required_tomography_missing_with_i_s:
-            errors.append("ERSS I-S/SRAX evidence gate is not the active tomography requirement layer")
-    except Exception as exc:
-        errors.append(f"ERSS/source-set module unavailable: {type(exc).__name__}")
+    # Canonical source registry, not legacy module naming, owns source truth.
+    if CANONICAL_FIELD_SOURCES.get("Rmin_mm", (None,))[0] != SHOW_2_CORNEA_BACK:
+        errors.append("Rmin is not source-locked to Show 2 Exams Cornea Back")
+    if CANONICAL_FIELD_SOURCES.get("posterior_Kmean_D", (None,))[0] != SHOW_2_CORNEA_BACK:
+        errors.append("Posterior Km is not source-locked to Show 2 Exams Cornea Back")
 
-    if not getattr(core, "_cerai_erss_numeric_extraction_installed", False):
-        errors.append("ERSS numeric-only extraction policy is not active")
-    if "ERSS VISUAL MORPHOLOGY DISABLED:" not in core.PROMPT:
-        errors.append("ERSS visual morphology extraction is still present in the production prompt")
-    if "ERSS SRAX SOURCE LOCK — MODEL ESTIMATION DISABLED:" not in core.PROMPT:
-        errors.append("Model-based SRAX estimation has not been disabled")
-    if not getattr(core, "_randleman_bad_independence_installed", False):
-        errors.append("BAD-independent Randleman ERSS pathway is not active")
-    if not getattr(core, "_hc_final_decision_hierarchy_installed", False):
-        errors.append("CER-AI final BAD-D/Randleman decision hierarchy is not active")
-    if not getattr(core, "_hc_inter_eye_tomography_policy_installed", False):
-        errors.append("Automated inter-eye tomography concern layer is not active")
-    if (
-        composition.microkeratome_planning_policy._previous_hc_engine
-        is not composition.inter_eye_tomography_policy.hc_engine_with_inter_eye_tomography
+    # Workflow must call the direct canonical runtime, never the legacy clinical engine.
+    workflow_source = inspect.getsource(assessment_workflow._respond)
+    if "evaluate_case(" not in workflow_source:
+        errors.append("Assessment workflow is not connected to canonical_runtime_service")
+    if "core.hc_engine" in workflow_source:
+        errors.append("Assessment workflow still calls legacy core.hc_engine")
+    if "apply_extracted_corrections" in workflow_source:
+        errors.append("Assessment workflow still uses legacy plan correction pre-pass")
+    if assessment_workflow._respond.__module__ != "assessment_workflow":
+        errors.append("Assessment workflow has been monkey-patched")
+    if callable(getattr(canonical_runtime_service, "install", None)):
+        errors.append("Canonical runtime service must not expose an installer")
+
+    # Retired Phase 3 shadow/cutover wrappers must not be in production composition.
+    phase_names = {name for values in composition.COMPOSITION_PHASES.values() for name in values}
+    if "phase3_runtime_seam" in phase_names or "phase3_workflow_shadow_observer" in phase_names:
+        errors.append("Retired Phase 3 wrapper remains in production composition")
+    if "srax_completion_policy" in phase_names or "randleman_report_readiness_policy" in phase_names:
+        errors.append("Retired workflow monkey-patch remains in production composition")
+
+    assessment_source = inspect.getsource(core._run_image_assessment)
+    if "mandatory_source_set_policy.validate_preassessment_requirements(" not in assessment_source:
+        errors.append("Mandatory Pentacam source gate is not directly owned by app._run_image_assessment")
+    source_gate = assessment_source.find("mandatory_source_set_policy.validate_preassessment_requirements(")
+    targeted_reread = assessment_source.find("pentacam_targeted_reread.enrich_extraction")
+    geometric_srax = assessment_source.find("geometric_srax_policy.enrich_extraction")
+    if min(source_gate, targeted_reread, geometric_srax) < 0 or not (
+        source_gate < targeted_reread and source_gate < geometric_srax
     ):
-        errors.append("Inter-eye to ML7 runtime wrapper order is invalid")
-    if not getattr(core, "_hc_microkeratome_planning_installed", False):
-        errors.append("Post-assessment ML7 microkeratome planning layer is not active")
-    if not getattr(core, "_hc_nice_installed", False):
-        errors.append("Independent CER-AI NICE policy is not active")
-    if not getattr(core, "_cerai_ps3_runtime_installed", False):
-        errors.append("Independent PS3 runtime policy is not active")
-    if composition.ps3_runtime_policy._installed_hc_engine is not composition.ps3_runtime_policy.hc_engine_with_ps3:
-        errors.append("PS3 runtime adapter identity is invalid")
-    if composition.erss_auto_read_policy._previous_hc_engine is not composition.ps3_runtime_policy.hc_engine_with_ps3:
-        errors.append("PS3 is not preserved immediately below the outer ERSS cleanup layer")
-    if not getattr(core, "_hc_readiness_installed", False):
-        errors.append("Pre-report readiness workflow is not active")
-    if not getattr(core, "_cerai_report_builders_installed", False):
-        errors.append("Explicit report-builder installation is not active")
-    if not getattr(core, "_cerai_named_user_access_installed", False):
-        errors.append("Named-user access boundary is not active")
-    if not getattr(core, "_cerai_operational_security_installed", False):
-        errors.append("Operational security boundary is not active")
-    if not getattr(core, "_cerai_case_archive_installed", False):
-        errors.append("Encrypted case archive boundary is not active")
-    if not getattr(core, "_cerai_audit_log_installed", False):
-        errors.append("Encrypted audit-log boundary is not active")
-    if not getattr(core, "_cerai_case_catalog_installed", False):
-        errors.append("Encrypted case catalog boundary is not active")
-    if not getattr(core, "_cerai_historical_report_installed", False):
-        errors.append("Historical report regeneration boundary is not active")
-    if not getattr(core, "_cerai_research_export_installed", False):
-        errors.append("Research export boundary is not active")
-    if not getattr(core, "_cerai_named_user_ui_installed", False):
-        errors.append("Named-user archive UI boundary is not active")
-    if not getattr(core, "_erss_topography_evidence_policy_installed", False):
-        errors.append("ERSS I-S/SRAX numeric topography evidence gate is not active")
-    if not getattr(core, "_erss_auto_read_policy_installed", False):
-        errors.append("ERSS legacy morphology cleanup policy is not active")
-    if core.hc_engine is not composition.erss_auto_read_policy.hc_engine_with_erss_auto_read:
-        errors.append("ERSS cleanup is not the outermost clinical engine layer")
-    if not getattr(core, "_cerai_targeted_pentacam_reread_installed", False):
-        errors.append("Targeted Pentacam numeric reread layer is not active")
-    if getattr(core.lasik_topography_points, "__module__", None) != "app":
-        errors.append(
-            "ERSS evidence gate must not replace or duplicate the canonical topography point mapper"
-        )
-    try:
-        if core.combine_status("PASS", "CAUTION") != "CAUTION":
-            errors.append("CAUTION aggregate ranking is invalid")
-        if core.combine_status("CAUTION", "STOP-DEFER") != "STOP-DEFER":
-            errors.append("STOP-DEFER aggregate ranking is invalid")
-    except Exception as exc:
-        errors.append(f"Aggregate status ranking failed: {type(exc).__name__}")
-    if not getattr(core, "_hc_lasik_fallback_installed", False):
-        errors.append("LASIK fallback planner is not active")
-    if getattr(core, "PRK_EPITHELIUM_UM", None) != 50:
-        errors.append("PRK epithelial convention is not 50 µm")
-    if (
-        getattr(core, "FINAL_KMEAN_MIN_D", None) != 36.0
-        or getattr(core, "FINAL_KMEAN_MAX_D", None) != 48.0
+        errors.append("Mandatory source confirmation must precede targeted reread and geometric SRAX")
+    if callable(getattr(mandatory_source_set_policy, "install", None)):
+        errors.append("Mandatory Pentacam source policy must not expose a runtime installer")
+    if "mandatory_source_set_policy" in phase_names:
+        errors.append("Mandatory Pentacam source wrapper remains in runtime composition")
+
+    extraction_source = inspect.getsource(core.extract_one_image)
+    if "pentacam_targeted_reread.enrich_extraction(" in extraction_source:
+        errors.append("Primary extraction performs targeted reread before source-set confirmation")
+    if "geometric_srax_policy.enrich_extraction(" in extraction_source:
+        errors.append("Primary extraction performs geometric SRAX before source-set confirmation")
+    if callable(getattr(pentacam_targeted_reread, "install", None)):
+        errors.append("Targeted Pentacam reread must not expose a runtime installer")
+    if callable(getattr(geometric_srax_policy, "install", None)):
+        errors.append("Geometric SRAX must not expose a runtime installer")
+    if "pentacam_targeted_reread" in phase_names or "geometric_srax_policy" in phase_names:
+        errors.append("Per-image extraction wrapper remains in runtime composition")
+
+    merge_source = inspect.getsource(core.merge_extractions)
+    if core.merge_extractions.__module__ != "app":
+        errors.append("Canonical merge_extractions is not owned directly by app.py")
+    if "apply_extraction_validation(merged)" not in merge_source:
+        errors.append("Canonical merge does not directly invoke extraction validation")
+    if "merge_policy_base" in phase_names or "extraction_guard" in phase_names:
+        errors.append("Retired merge wrapper remains in runtime composition")
+
+    # Extraction/transport/operational boundaries still required at this stage.
+    for marker, message in (
+        ("_hc_readiness_installed", "Assessment workflow endpoints are not installed"),
+        ("_cerai_report_builders_installed", "Report builders are not installed"),
+        ("_cerai_named_user_access_installed", "Named-user access boundary is not active"),
+        ("_cerai_operational_security_installed", "Operational security boundary is not active"),
+        ("_cerai_case_archive_installed", "Case archive boundary is not active"),
+        ("_cerai_audit_log_installed", "Audit log boundary is not active"),
+        ("_cerai_case_catalog_installed", "Case catalog boundary is not active"),
+        ("_cerai_historical_report_installed", "Historical report boundary is not active"),
+        ("_cerai_research_export_installed", "Research export boundary is not active"),
+        ("_cerai_named_user_ui_installed", "Named-user UI boundary is not active"),
     ):
-        errors.append("Final keratometry safety bounds are not 36-48 D")
+        if not getattr(core, marker, False):
+            errors.append(message)
+
     if getattr(composition.reports, "APP_VERSION", None) != CANONICAL_VERSION:
         errors.append("Report version is not synchronized with canonical runtime")
+    if "reporting_pending_stage10" in composition.COMPOSITION_PHASES:
+        errors.append("Legacy Stage 10 report wrapper phase remains active")
     if getattr(core, "_cerai_composition_phases", None) != composition.COMPOSITION_PHASES:
         errors.append("Canonical composition manifest is not active")
     if not getattr(app.state, "cerai_canonical_runtime_ready", False):
         errors.append("Canonical ASGI startup marker is not active")
 
     if errors:
-        raise RuntimeError(
-            "Canonical CER-AI runtime invariant failure: " + "; ".join(errors)
-        )
+        raise RuntimeError("Canonical CER-AI runtime invariant failure: " + "; ".join(errors))
     return True
 
 

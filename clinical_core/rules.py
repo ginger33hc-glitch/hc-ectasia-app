@@ -1,32 +1,19 @@
-"""Pure CER-AI launch-contract rules.
+"""Pure CER-AI ERSS/topography rules.
 
-No runtime mutation, no application imports, and no presentation behavior.
-These functions encode only rules already frozen by the Phase 1 launch
-behavior contract. They are introduced in parallel first; production wiring
-must not move here until equivalence tests are green.
+No runtime mutation, application imports, presentation behavior, or downstream
+correction layers belong here. BAD, NICE, PS3, safety and planning rules live in
+their own canonical modules.
 """
 from __future__ import annotations
 
 from math import isfinite
 from typing import Optional
 
-
-NORMAL = "NORMAL"
-SUSPICIOUS = "SUSPICIOUS"
-ABNORMAL = "ABNORMAL"
-
 NORMAL_SYMMETRIC = "NORMAL_SYMMETRIC"
 ASYMMETRIC_BOWTIE = "ASYMMETRIC_BOWTIE"
 INFERIOR_STEEPENING_SRA = "INFERIOR_STEEPENING_SRA"
 ABNORMAL_ECTATIC = "ABNORMAL_ECTATIC"
 UNCERTAIN = "UNCERTAIN"
-
-_CATEGORY_RANK = {
-    NORMAL_SYMMETRIC: 0,
-    ASYMMETRIC_BOWTIE: 1,
-    INFERIOR_STEEPENING_SRA: 3,
-    ABNORMAL_ECTATIC: 4,
-}
 
 
 def _finite(value) -> bool:
@@ -38,7 +25,6 @@ def _finite(value) -> bool:
 
 
 def erss_age_points(age_years) -> Optional[int]:
-    """CER-AI age component frozen at launch."""
     if not _finite(age_years) or float(age_years) < 18:
         return None
     age = float(age_years)
@@ -50,7 +36,7 @@ def erss_age_points(age_years) -> Optional[int]:
 
 
 def erss_pachymetry_points(thinnest_um) -> Optional[int]:
-    """CER-AI LASIK pachymetry component; <480 is handled as a hard stop."""
+    """<480 µm is an independent hard stop and leaves this score row unscored."""
     if not _finite(thinnest_um):
         return None
     value = float(thinnest_um)
@@ -63,20 +49,8 @@ def erss_pachymetry_points(thinnest_um) -> Optional[int]:
     return 0
 
 
-def bad_d_classification(value) -> str:
-    """Final BAD-D launch classification."""
-    if not _finite(value):
-        return "UNAVAILABLE"
-    value = float(value)
-    if value <= 1.60:
-        return NORMAL
-    if value < 2.60:
-        return SUSPICIOUS
-    return ABNORMAL
-
-
 def signed_i_s_category(i_s_d) -> str:
-    """Return the mutually exclusive CER-AI signed Topometric I-S category."""
+    """Mutually exclusive signed Topometric I-S category."""
     if not _finite(i_s_d):
         return UNCERTAIN
     value = float(i_s_d)
@@ -84,28 +58,43 @@ def signed_i_s_category(i_s_d) -> str:
         return ABNORMAL_ECTATIC
     if value > 1.00:
         return INFERIOR_STEEPENING_SRA
-    if value > 0.50:
-        return ASYMMETRIC_BOWTIE
-    if value < -0.50:
+    if value > 0.50 or value < -0.50:
         return ASYMMETRIC_BOWTIE
     return NORMAL_SYMMETRIC
 
 
-def erss_topography_category(i_s_d, derived_srax_deg=None) -> str:
-    """Select one ERSS topography category from numeric authorities only.
+def erss_topography_category(
+    i_s_d,
+    derived_srax_deg=None,
+    srax_gt20_confirmed: Optional[bool] = None,
+) -> str:
+    """Return the single Randleman topography category.
 
-    Signed Topometric I-S and derived SRAX are the only authorities. The
-    original Randleman SRA/SRAX threshold is >=20 degrees. The higher-risk
-    single category wins; categories are never added together.
+    I-S is mandatory and evaluated first. If I-S already gives inferior
+    steepening (3 points) or abnormal/ectatic topography (4 points), SRAX is not
+    needed and is not consulted. When I-S is <= +1.00 D, SRAX must be known
+    because a value >20.0° escalates the same single topography row to the
+    inferior-steepening/SRA category.
+
+    SRAX evidence has two non-interchangeable canonical channels:
+    - a directly measured geometric degree value; or
+    - an explicit surgeon confirmation answering whether SRAX is >20°.
+
+    A binary confirmation is never converted into an invented numeric degree.
+    Missing SRAX is UNCERTAIN, not silently equivalent to a negative finding.
+    Exact measured 20.0° is negative. I-S and SRAX are never added.
     """
-    candidates = []
     i_s_category = signed_i_s_category(i_s_d)
-    if i_s_category != UNCERTAIN:
-        candidates.append(i_s_category)
-
-    if _finite(derived_srax_deg) and float(derived_srax_deg) >= 20.0:
-        candidates.append(INFERIOR_STEEPENING_SRA)
-
-    if not candidates:
+    if i_s_category == UNCERTAIN:
         return UNCERTAIN
-    return max(candidates, key=_CATEGORY_RANK.__getitem__)
+    if i_s_category in {INFERIOR_STEEPENING_SRA, ABNORMAL_ECTATIC}:
+        return i_s_category
+
+    if _finite(derived_srax_deg):
+        positive = float(derived_srax_deg) > 20.0
+    elif isinstance(srax_gt20_confirmed, bool):
+        positive = srax_gt20_confirmed
+    else:
+        return UNCERTAIN
+
+    return INFERIOR_STEEPENING_SRA if positive else i_s_category

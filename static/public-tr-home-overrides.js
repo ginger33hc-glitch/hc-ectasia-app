@@ -2,7 +2,6 @@
 (() => {
   const NOTICE_PATH = "/static/testing-notice.html";
   const LANGUAGE_KEY = "cerai-public-language";
-  const LEGACY_CERAI_NAME = "CER" + "AI";
   let developerOriginalHtml = null;
 
   const DEVELOPER_TR_HTML = `
@@ -19,7 +18,7 @@
         <h2>Kurucunun Notu</h2>
         <p>Otuz yılı aşkın cerrahi ve idari deneyimden sonra, biriktirdiğim bilgi ve deneyimin bir bölümünü benden sonraki kuşaklara aktarabilmenin bir yolunu bulmak istedim.</p>
         <p>Bir refraktif cerrah olarak en çok çekindiğimiz komplikasyonlardan biri korneal ektazidir. Amacım, cerrahi öncesinde ektazi yatkınlığını daha güvenilir biçimde belirlemeye yardımcı olabilecek ve sonuçta hastaları önlenebilir bir komplikasyondan korumaya katkı sağlayabilecek bir sistem geliştirmekti. Yapay zekânın hızlı gelişimiyle birlikte, yerleşik klinik kanıtları, modern görüntüleme verilerini ve kendi cerrahi deneyimimi yapılandırılmış bir klinik karar destek platformunda birleştirmeye karar verdim.</p>
-        <p>Proje ilk olarak <strong>HC-Ectasia-App</strong> adıyla başladı. Daha sonra <strong>${LEGACY_CERAI_NAME} — Corneal Ectasia Risk Analysis Intelligence</strong> biçimine dönüştü ve sonunda <strong>CER-AI — Kornel Ektazi Riski Değerlendirmesinde Yapay Zeka</strong> adını aldı.</p>
+        <p><strong>CER-AI — Cornea Ectasia Risk Assessment Intelligence</strong>, platform genelinde kullanılan tek güncel ürün adıdır.</p>
         <p>Yazılım 0.1, 0.2, 0.3 sürümleri ve sonraki geliştirmelerle aşamalı olarak ilerledi; bu metnin yazıldığı sırada <strong>0.7.71</strong> sürümüne ulaştı. Geliştirme sürekli devam ettiği için siz bunu okurken daha yeni bir sürüm kullanımda olabilir.</p>
         <p>Geliştirme sürecinde korneal ektazi, keratokonus yatkınlığı, refraktif cerrahi taraması, kornea tomografisi, topografi, biyomekanik ve doku güvenliğiyle ilgili tıbbi literatürü kapsamlı biçimde gözden geçirdim. Bu kanıtları pratik cerrahi deneyimle birleştirerek farklı ektazi risk değerlendirme sistemlerini tek bir çerçeve içinde bir araya getirdim.</p>
         <p>CER-AI'nin temel ilkelerinden biri, bu sistemlerin <strong>birbirinden bağımsız kalmasıdır</strong>. Bunları tek ve şeffaf olmayan bir puanda birleştirmek yerine, her değerlendirme yolu vakayı ayrı olarak inceler; böylece cerrah farklı risk değerlendirme yaklaşımlarının nerede uyumlu, nerede farklı sonuç verdiğini görebilir.</p>
@@ -39,7 +38,7 @@
     if (!document.querySelector('link[rel="manifest"]')) {
       const manifest = document.createElement("link");
       manifest.rel = "manifest";
-      manifest.href = "/static/manifest.webmanifest?v=10";
+      manifest.href = "/static/manifest.webmanifest?v=11";
       document.head.appendChild(manifest);
     }
     if (!document.querySelector('link[rel="apple-touch-icon"]')) {

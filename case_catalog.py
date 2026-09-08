@@ -254,76 +254,17 @@ def _zip_source_filename(source: Any) -> str:
 
 
 def install(core: Any, archive_runtime: Any) -> None:
-    """Persist encrypted catalog entries and add role-scoped archive routes when named auth is on."""
+    """Add role-scoped archive routes; persistence is owned by CaseArchiveRuntime."""
     if getattr(core, "_cerai_case_catalog_installed", False):
         return
 
-    import assessment_workflow
     import user_access
-
-    previous_begin = assessment_workflow.begin
-    previous_complete = assessment_workflow.complete
-    export_payload = assessment_workflow.export_payload
 
     def audit(event_type: str, **kwargs) -> None:
         callback = getattr(core, "_cerai_audit_event", None)
         if callback is not None:
             callback(event_type, **kwargs)
 
-    def catalog_if_ready(response: Dict[str, Any]) -> Dict[str, Any]:
-        if not archive_runtime.enabled or response.get("workflow_status") != "READY":
-            return response
-        archive_state = response.get("archive") or {}
-        if archive_state.get("status") != "ARCHIVED":
-            return response
-        token = str(response.get("assessment_token") or "")
-        report_token = str(response.get("report_token") or "")
-        case_id = str(archive_state.get("case_id") or "")
-        revision_id = str(archive_state.get("revision_id") or "")
-        if not all((token, report_token, case_id, revision_id)):
-            return response
-        try:
-            ready = export_payload({
-                "assessment_token": token,
-                "report_token": report_token,
-                "locale": "en",
-            })
-            revision = RevisionRef(case_id=case_id, revision_id=revision_id, artifacts=tuple())
-            actor = user_access.current_principal()
-            ref = write_entry(
-                archive_runtime.archive,
-                revision,
-                ready,
-                actor=actor,
-            )
-            response["archive"]["catalog_status"] = "INDEXED"
-            response["archive"]["catalog_sha256"] = ref.sha256
-            audit(
-                "CASE_ARCHIVED",
-                actor=actor,
-                case_id=case_id,
-                revision_id=revision_id,
-                details={
-                    "decision": (ready.get("decision") or {}).get("status"),
-                    "report_date": (ready.get("patient") or {}).get("report_date"),
-                },
-            )
-        except Exception as exc:
-            archive_runtime.fail_or_continue(exc)
-            response["archive"]["catalog_status"] = "UNAVAILABLE"
-        return response
-
-    def begin_cataloged(core_arg, extracted, age, plans, modifiers, metadata, source_images=None):
-        return catalog_if_ready(previous_begin(
-            core_arg, extracted, age, plans, modifiers, metadata,
-            source_images=source_images,
-        ))
-
-    def complete_cataloged(core_arg, payload):
-        return catalog_if_ready(previous_complete(core_arg, payload))
-
-    assessment_workflow.begin = begin_cataloged
-    assessment_workflow.complete = complete_cataloged
     core._cerai_case_catalog_runtime = archive_runtime
     core._cerai_case_catalog_search = (
         (lambda **filters: search_entries(archive_runtime.archive, **filters))
@@ -379,14 +320,39 @@ def install(core: Any, archive_runtime: Any) -> None:
             if kind == "pdf":
                 media_type = "application/pdf"
                 filename = "CER-AI_Report.pdf"
+                disposition = "inline"
             else:
                 media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 filename = "CER-AI_Report.docx"
+                disposition = "attachment"
             return StreamingResponse(
                 BytesIO(content),
                 media_type=media_type,
-                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+                headers={
+                    "Content-Disposition": f'{disposition}; filename="{filename}"',
+                    "Cache-Control": "no-store",
+                    "X-CER-AI-Report-Source": "archived-original",
+                },
             )
+
+        @core.app.get("/archive/cases/{case_id}/revisions/{revision_id}")
+        def archived_case(case_id: str, revision_id: str):
+            principal = user_access.require_current_principal()
+            if not archive_runtime.enabled:
+                raise HTTPException(503, "CER-AI secure archive is not enabled.")
+            entry = _authorized_entry(
+                archive_runtime.archive, principal, case_id, revision_id
+            )
+            assessment = archive_runtime.archive.load_assessment(case_id, revision_id)
+            if assessment is None:
+                raise HTTPException(404, "Archived CER-AI canonical assessment not found.")
+            audit(
+                "CASE_OPEN",
+                actor=principal,
+                case_id=case_id,
+                revision_id=revision_id,
+            )
+            return {"catalog": entry, "assessment": assessment}
 
         @core.app.get("/archive/cases/{case_id}/revisions/{revision_id}/sources")
         def archived_sources(case_id: str, revision_id: str):

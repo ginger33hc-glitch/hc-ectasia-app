@@ -2,6 +2,9 @@ const SHARE_CACHE = "hc-ectasia-shared-images-v1";
 const SHARE_PATH = "/share-target";
 const SHARE_STORAGE_PATH = "/__hc_share__/";
 const PUBLIC_HELPER_PATH = "/static/public-tr-home-overrides.js";
+const MAX_SHARED_IMAGES = 6;
+const MAX_SHARED_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_SHARED_TOTAL_BYTES = 80 * 1024 * 1024;
 
 self.addEventListener("install", () => self.skipWaiting());
 
@@ -14,10 +17,17 @@ function shareToken(){
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function clinicalRedirect(parameters){
+  return Response.redirect(new URL(`/app?${parameters}`, self.location.origin).href, 303);
+}
+
 async function receiveSharedImages(request){
   const formData=await request.formData();
   const files=formData.getAll("images").filter(item=>item instanceof File && item.type.startsWith("image/") && item.size>0);
-  if(!files.length)return Response.redirect("/?share_error=no_images",303);
+  if(!files.length)return clinicalRedirect("share_error=no_images");
+  if(files.length>MAX_SHARED_IMAGES)return clinicalRedirect("share_error=too_many_images");
+  if(files.some(file=>file.size>MAX_SHARED_IMAGE_BYTES))return clinicalRedirect("share_error=image_too_large");
+  if(files.reduce((total,file)=>total+file.size,0)>MAX_SHARED_TOTAL_BYTES)return clinicalRedirect("share_error=images_too_large");
 
   const cache=await caches.open(SHARE_CACHE), token=shareToken(), metadata=[];
   // Only one shared assessment is active at a time. Removing an older set here
@@ -32,7 +42,7 @@ async function receiveSharedImages(request){
     `/__hc_share__/${token}/meta`,
     new Response(JSON.stringify({files:metadata}),{headers:{"Content-Type":"application/json","Cache-Control":"no-store"}})
   );
-  return Response.redirect(`/?share_token=${encodeURIComponent(token)}`,303);
+  return clinicalRedirect(`share_token=${encodeURIComponent(token)}`);
 }
 
 self.addEventListener("fetch",event=>{

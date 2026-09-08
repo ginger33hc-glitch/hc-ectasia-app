@@ -1,92 +1,98 @@
-import erss_auto_read_policy as cleanup
-import ps3_extraction_policy as ps3_extract
+from pathlib import Path
+
+import canonical_engine
+import pentacam_targeted_reread as targeted_reread
+from pentacam_canonical_source_lock import BAD_CENTER, canonical_source_id
 
 
-def _base_merged():
+def _eye(**values):
+    eye = {
+        "eye": "OD",
+        "screen_types": ["BELIN_AMBROSIO_DISPLAY"],
+        "quality": "ADEQUATE",
+        "missing_or_unreadable": [],
+        "table_verified_numeric_fields": list(values),
+        "map_fallback_numeric_fields": [],
+        "keratometry_source": "NOT_SHOWN",
+        "canonical_source_ids": {},
+        "morphology": "UNCERTAIN",
+        "morphology_evidence": [],
+        "asymmetric_bow_tie": "UNCERTAIN",
+        "srax": "UNCERTAIN",
+        "srax_deg": None,
+        "inferior_opposite_steepening_D": None,
+        "anterior_pattern": "UNREADABLE",
+        "posterior_pattern": "UNREADABLE",
+        "_source_filename": "od-bad.png",
+    }
+    eye.update(values)
+    return eye
+
+
+def _payload(eye):
     return {
-        "document_context": {},
-        "eyes": [{
-            "eye": "OD",
-            "table_verified_numeric_fields": [],
-            "data_conflicts": [
-                "posterior_elevation_thinnest_um: 7 vs 12",
-                "anterior_elevation_thinnest_um: 3 vs 6",
-            ],
-            "field_provenance": {},
-        }],
-        "critical_input_issues": [],
+        "document_context": {
+            "document_type": "PENTACAM_TOPOGRAPHY",
+            "patient_id": "P1",
+            "patient_first_name": "Test",
+            "patient_last_name": "Patient",
+            "patient_name": "Test Patient",
+            "patient_name_source": "PENTACAM_FIRST_LAST_NAME_FIELDS",
+            "patient_age_years": 30,
+            "exam_date": "2026-09-07",
+            "exam_time": "10:00",
+            "laterality": "OD",
+            "pentacam_qs": "OK",
+            "missing_or_unreadable": [],
+            "source_filename": "od-bad.png",
+        },
+        "eyes": [eye],
+        "treatment_corrections": [],
         "global_warnings": [],
     }
 
 
-def test_f_and_b_ele_th_are_owned_only_by_bad_display():
-    previous = ps3_extract._previous_merge_extractions
-    ps3_extract._previous_merge_extractions = lambda results: _base_merged()
-    try:
-        results = [
-            {
-                "document_context": {"document_type": "PENTACAM_TOPOGRAPHY"},
-                "eyes": [{
-                    "eye": "OD",
-                    "screen_types": ["FOUR_MAPS_REFRACTIVE"],
-                    "F_Ele_Th_um": 99,
-                    "table_verified_numeric_fields": ["F_Ele_Th_um"],
-                }],
-                "nice_readings": [],
-            },
-            {
-                "document_context": {"document_type": "PENTACAM_TOPOGRAPHY"},
-                "eyes": [{
-                    "eye": "OD",
-                    "screen_types": ["BELIN_AMBROSIO_DISPLAY"],
-                    "F_Ele_Th_um": 7,
-                    "table_verified_numeric_fields": ["F_Ele_Th_um"],
-                }],
-                "nice_readings": [{
-                    "eye": "OD",
-                    "B_Ele_Th_um": 12,
-                    "b_ele_th_status": "CONFIDENT",
-                    "b_ele_th_landmark": "B_ELE_TH_LABELED_BOX",
-                    "b_ele_th_page": "BAD_DISPLAY",
-                }],
-            },
-        ]
-        merged = ps3_extract.merge_extractions_with_new_fields(results)
-        eye = merged["eyes"][0]
-        assert eye["F_Ele_Th_um"] == 7
-        assert eye["B_Ele_Th_um"] == 12
-        assert not any("posterior_elevation_thinnest_um" in x for x in eye["data_conflicts"])
-        assert not any("anterior_elevation_thinnest_um" in x for x in eye["data_conflicts"])
-    finally:
-        ps3_extract._previous_merge_extractions = previous
+def test_bad_elevation_fields_have_one_canonical_source():
+    assert canonical_source_id("F_Ele_Th_um") == BAD_CENTER
+    assert canonical_source_id("B_Ele_Th_um") == BAD_CENTER
+    assert not Path("ps3_extraction_policy.py").exists()
 
 
-def test_retired_patterns_and_generic_elevation_never_reach_readiness():
-    previous = cleanup._previous_hc_engine
-    cleanup._previous_hc_engine = lambda *args, **kwargs: {
-        "eyes": [{
-            "eye": "OS",
-            "missing": [
-                "readable anterior pattern",
-                "readable posterior pattern",
-                "topography morphology",
-                "NICE: I_S_D",
-            ],
-            "randleman_erss": {"missing_erss_inputs": ["topography", "morphology"]},
-        }],
-        "critical_input_issues": [
-            "OD extraction validation: unresolved multi-image conflict: posterior_elevation_thinnest_um: 7 vs 12",
-            "OD extraction validation: unresolved multi-image conflict: anterior_elevation_thinnest_um: 3 vs 6",
-        ],
+def test_wrong_screen_elevation_fields_fail_closed_before_merge():
+    eye = _eye(F_Ele_Th_um=99, B_Ele_Th_um=88)
+    eye["screen_types"] = ["FOUR_MAPS_REFRACTIVE"]
+    eye["canonical_source_ids"] = {
+        "F_Ele_Th_um": "FOUR_MAPS_REFRACTIVE_LOWER_LEFT_LABELED_BOX",
+        "B_Ele_Th_um": "FOUR_MAPS_REFRACTIVE_LOWER_LEFT_LABELED_BOX",
     }
-    try:
-        decision = cleanup.hc_engine_with_erss_auto_read({}, 30, {}, {}, {})
-        assert decision["eyes"][0]["missing"] == ["NICE: I_S_D"]
-        assert decision["critical_input_issues"] == []
-        # The synthetic fixture has no completed ERSS row values. Retired morphology
-        # is removed, but all five canonical rows remain missing so readiness fails closed.
-        assert decision["eyes"][0]["randleman_erss"]["missing_erss_inputs"] == [
-            "topography", "RSB", "age", "pachymetry", "MRSE"
-        ]
-    finally:
-        cleanup._previous_hc_engine = previous
+    merged = canonical_engine.core.merge_extractions([_payload(eye)])
+    od = merged["eyes"][0]
+    assert od["F_Ele_Th_um"] is None
+    assert od["B_Ele_Th_um"] is None
+    assert "F_Ele_Th_um" in od["missing_or_unreadable"]
+    assert "B_Ele_Th_um" in od["missing_or_unreadable"]
+
+
+def test_bad_display_elevation_fields_survive_with_exact_source_provenance():
+    eye = _eye(F_Ele_Th_um=7, B_Ele_Th_um=12)
+    eye["canonical_source_ids"] = {
+        "F_Ele_Th_um": BAD_CENTER,
+        "B_Ele_Th_um": BAD_CENTER,
+    }
+    merged = canonical_engine.core.merge_extractions([_payload(eye)])
+    od = merged["eyes"][0]
+    assert od["F_Ele_Th_um"] == 7
+    assert od["B_Ele_Th_um"] == 12
+    assert od["field_provenance"]["F_Ele_Th_um"][0]["source"] == BAD_CENTER
+    assert od["field_provenance"]["B_Ele_Th_um"][0]["source"] == BAD_CENTER
+
+
+def test_targeted_reread_rejects_elevation_maps_for_bad_box_fields():
+    assert not targeted_reread.source_supports_field(
+        "FOUR_MAPS_REFRACTIVE", "F_Ele_Th_um", "Elevation (Front)"
+    )
+    assert not targeted_reread.source_supports_field(
+        "FOUR_MAPS_REFRACTIVE", "B_Ele_Th_um", "Elevation (Back)"
+    )
+    assert targeted_reread.source_supports_field("BAD_DISPLAY", "F_Ele_Th_um", "")
+    assert targeted_reread.source_supports_field("BAD_DISPLAY", "B_Ele_Th_um", "")

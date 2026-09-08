@@ -1,15 +1,17 @@
-"""Pre-assessment source-set gate for CER-AI.
+"""Pre-assessment source-set and conditional manual-input gate for CER-AI.
 
 The clinical engine must not run until the mandatory Pentacam source set is
-present. The optional excimer treatment card does not participate in this gate.
-The gate is active only during an actual clinical image-assessment request so
-internal merge utilities and isolated regression fixtures remain reusable.
+present. The excimer treatment card is optional; when it is absent, the surgeon
+must provide complete bilateral manifest and intended refraction before the
+engine runs. The gate is active only during an actual clinical image-assessment
+request so internal merge utilities and isolated regression fixtures remain
+reusable.
 """
 from __future__ import annotations
 
-from contextvars import ContextVar
 import re
 import unicodedata
+from math import isfinite
 from typing import Any
 
 from fastapi import HTTPException
@@ -23,6 +25,8 @@ MANDATORY_LABELS = (
     "OS Belin/Ambrosio Display",
     "Show 2 Exams Topometric",
 )
+OPTIONAL_TREATMENT_CARD_LABEL = "Excimer laser treatment card"
+MAX_UPLOAD_IMAGES = 6
 
 BAD_DISPLAY_RECOGNITION_PROMPT = r"""
 MANDATORY BELIN/AMBROSIO PAGE RECOGNITION:
@@ -34,11 +38,6 @@ from an explicit visible OD/OS (or Right/Left) label on the page/maps and set
 both the eye item and document laterality consistently. Never infer laterality
 from upload order or neighboring files.
 """
-
-_previous_merge_extractions = None
-_previous_run_image_assessment = None
-_gate_active: ContextVar[bool] = ContextVar("cerai_mandatory_source_gate_active", default=False)
-
 
 def _norm(value: Any) -> str:
     text = unicodedata.normalize("NFKD", str(value or ""))
@@ -125,9 +124,6 @@ def _has_show_two_numeric_signature(result: dict[str, Any]) -> bool:
 
 
 def _has_bad_display_signature(result: dict[str, Any]) -> bool:
-    for reading in result.get("nice_readings") or []:
-        if reading.get("b_ele_th_page") == "BAD_DISPLAY":
-            return True
     bad_fields = {"BAD_D", "Df", "Db", "Dp", "Dt", "Da"}
     for eye in result.get("eyes") or []:
         verified = set(eye.get("table_verified_numeric_fields") or [])
@@ -179,58 +175,132 @@ def classify_source_set(results: list[dict[str, Any]]) -> dict[str, Any]:
         if recognized_this_image:
             recognized_mandatory_images += 1
 
+    missing = [label for label, available in present.items() if not available]
     return {
         "present": present,
-        "missing": [label for label, available in present.items() if not available],
+        "required_sources": [
+            {"label": label, "present": available}
+            for label, available in present.items()
+        ],
+        "missing": missing,
         "mandatory_count": sum(present.values()),
         "recognized_mandatory_images": recognized_mandatory_images,
         "treatment_card_count": treatment_cards,
+        "optional_treatment_card": {
+            "label": OPTIONAL_TREATMENT_CARD_LABEL,
+            "present": treatment_cards > 0,
+            "count": treatment_cards,
+        },
+        "confirmed": not missing,
         "uploaded_count": len(results),
     }
 
 
-def validate_source_set(results: list[dict[str, Any]]) -> dict[str, Any]:
-    if len(results) > 6:
+def validate_upload_count(count: int) -> None:
+    if count > MAX_UPLOAD_IMAGES:
         raise HTTPException(
             422,
             "CER-AI accepts at most 6 images: the 5 mandatory Pentacam images plus one optional excimer laser treatment card.",
         )
+
+
+def validate_source_set(results: list[dict[str, Any]]) -> dict[str, Any]:
+    validate_upload_count(len(results))
     summary = classify_source_set(results)
     if summary["missing"]:
-        missing_text = "; ".join(summary["missing"])
+        missing_text = ", ".join(summary["missing"])
+        optional = "present" if summary["optional_treatment_card"]["present"] else "not provided"
         raise HTTPException(
             422,
-            "Assessment not started. Required Pentacam source image(s) are missing or could not be identified: "
-            + missing_text
-            + ". Upload the missing image(s) and run the assessment again. The excimer laser treatment card is optional.",
+            {
+                "code": "MANDATORY_SOURCE_SET_INCOMPLETE",
+                "message": (
+                    "Assessment not started. Upload the missing required image(s): "
+                    f"{missing_text}. Optional treatment card: {optional}."
+                ),
+                "source_set": summary,
+            },
         )
     return summary
 
 
-def merge_extractions_with_mandatory_source_gate(results):
-    summary = validate_source_set(results) if _gate_active.get() else None
-    merged = _previous_merge_extractions(results)
-    if summary is not None:
-        merged["mandatory_source_set"] = summary
-    return merged
+def _finite(value: Any) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and isfinite(float(value))
+    )
 
 
-async def run_image_assessment_with_mandatory_gate(*args, **kwargs):
-    token = _gate_active.set(True)
-    try:
-        return await _previous_run_image_assessment(*args, **kwargs)
-    finally:
-        _gate_active.reset(token)
+def missing_manual_refraction(plans: dict[str, Any]) -> list[dict[str, str]]:
+    """Return surgeon fields required when no treatment card was uploaded."""
+    missing: list[dict[str, str]] = []
+    for eye, prefix in (("OD", "od"), ("OS", "os")):
+        plan = plans.get(eye) if isinstance(plans, dict) else None
+        plan = plan if isinstance(plan, dict) else {}
+        roles = (
+            ("manifest", "manifest_entered_sphere_D", "manifest_cylinder_signed_D"),
+            ("intended", "intended_entered_sphere_D", "intended_cylinder_signed_D"),
+        )
+        axis_required = False
+        axis_available_for_every_nonzero_role = True
+        for role, sphere_key, cylinder_key in roles:
+            if not _finite(plan.get(sphere_key)):
+                missing.append({
+                    "eye": eye,
+                    "field": sphere_key,
+                    "form_id": f"{prefix}_{'manifest_sphere' if role == 'manifest' else 'sphere'}",
+                    "label": f"{eye} {role} sphere",
+                })
+            if not _finite(plan.get(cylinder_key)):
+                missing.append({
+                    "eye": eye,
+                    "field": cylinder_key,
+                    "form_id": f"{prefix}_{'manifest_cylinder' if role == 'manifest' else 'cylinder'}",
+                    "label": f"{eye} {role} cylinder",
+                })
+            else:
+                cylinder = float(plan[cylinder_key])
+                if abs(cylinder) > 1e-9:
+                    axis_required = True
+                    role_axis = any(_finite(plan.get(key)) for key in (
+                        "entered_axis_deg", f"{role}_axis_deg", f"{role}_entered_axis_deg",
+                    ))
+                    axis_available_for_every_nonzero_role &= role_axis
+        if axis_required and not axis_available_for_every_nonzero_role:
+            missing.append({
+                "eye": eye,
+                "field": "entered_axis_deg",
+                "form_id": f"{prefix}_axis",
+                "label": f"{eye} cylinder axis",
+            })
+    return missing
 
 
-def install(core) -> None:
-    global _previous_merge_extractions, _previous_run_image_assessment
-    if getattr(core, "_cerai_mandatory_source_set_installed", False):
-        return
-    _previous_merge_extractions = core.merge_extractions
-    _previous_run_image_assessment = core._run_image_assessment
-    if BAD_DISPLAY_RECOGNITION_PROMPT not in core.PROMPT:
-        core.PROMPT += "\n" + BAD_DISPLAY_RECOGNITION_PROMPT
-    core.merge_extractions = merge_extractions_with_mandatory_source_gate
-    core._run_image_assessment = run_image_assessment_with_mandatory_gate
-    core._cerai_mandatory_source_set_installed = True
+def validate_preassessment_requirements(
+    results: list[dict[str, Any]], plans: dict[str, Any],
+) -> dict[str, Any]:
+    """Confirm source identity and any conditional manual inputs before enrichment."""
+    summary = validate_source_set(results)
+    card_present = summary["optional_treatment_card"]["present"]
+    missing_refraction = [] if card_present else missing_manual_refraction(plans)
+    summary["manual_refraction"] = {
+        "required": not card_present,
+        "complete": not missing_refraction,
+        "missing": missing_refraction,
+    }
+    if missing_refraction:
+        labels = ", ".join(item["label"] for item in missing_refraction)
+        raise HTTPException(
+            422,
+            {
+                "code": "PREASSESSMENT_REFRACTION_REQUIRED",
+                "message": (
+                    "Assessment not started. No treatment card was provided. Enter the complete "
+                    f"manifest and intended refraction for both eyes: {labels}."
+                ),
+                "source_set": summary,
+                "missing_refraction": missing_refraction,
+            },
+        )
+    return summary

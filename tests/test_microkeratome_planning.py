@@ -1,6 +1,6 @@
 import pytest
 
-from clean_engine.microkeratome_planning import MicrokeratomePlanningInput, plan_microkeratome
+from planning.microkeratome import MicrokeratomePlanningInput, plan_microkeratome
 
 
 def base(**kw):

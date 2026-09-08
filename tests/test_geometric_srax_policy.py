@@ -4,6 +4,36 @@ import numpy as np
 from PIL import Image
 
 import geometric_srax_policy as policy
+import pytest
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_merge_preserves_measured_srax_when_other_page_is_uncertain(reverse):
+    from app import merge_extractions
+    measured = policy.enrich_extraction({"eyes": [{
+        "eye": "OD", "screen_types": ["FOUR_MAPS_REFRACTIVE"],
+        "srax": "UNCERTAIN", "srax_deg": None,
+    }]}, _synthetic_four_maps(80.0, 260.0), "front.png")
+    expected = measured["eyes"][0]["srax_deg"]
+    other = {"eyes": [{"eye": "OD", "screen_types": ["BAD"],
+                         "srax": "UNCERTAIN", "srax_deg": None}]}
+    sources = [measured, other]
+    if reverse:
+        sources.reverse()
+    eye = merge_extractions(sources)["eyes"][0]
+    assert eye["srax"] == "NO"
+    assert eye["srax_deg"] == expected
+    assert not eye["data_conflicts"]
+    assert eye["field_provenance"]["srax_deg"][0]["source"] == "AXIAL_SAGITTAL_CURVATURE_FRONT_GEOMETRIC"
+
+
+def test_merge_keeps_real_srax_disagreement_unresolved():
+    from app import merge_extractions
+    eye = merge_extractions([{"eyes": [{"eye": "OD", "srax": state,
+                                         "srax_deg": angle}]}
+                             for state, angle in [("NO", 2.0), ("YES", 25.0)]])["eyes"][0]
+    assert eye["srax"] is None and eye["srax_deg"] is None
+    assert eye["data_conflicts"]
 
 
 def _synthetic_four_maps(superior_axis, inferior_axis):
@@ -55,31 +85,38 @@ def test_skewed_geometry_over_20_is_srax_positive():
     assert 20.0 < result["srax_deg"] < 40.0
 
 
+def test_measurement_reports_both_hemimeridian_axes():
+    result = policy.measure_srax(_synthetic_four_maps(80.0, 260.0))
+    assert result["status"] == "CONFIDENT"
+    assert isinstance(result["superior_axis_deg"], float)
+    assert isinstance(result["inferior_axis_deg"], float)
+    assert result["algorithm"] == "srax-geom-v2"
+
+
 def test_exact_threshold_rule_is_strictly_greater_than_20():
     assert policy.SRAX_THRESHOLD_DEG == 20.0
     assert (20.0 > policy.SRAX_THRESHOLD_DEG) is False
     assert (20.1 > policy.SRAX_THRESHOLD_DEG) is True
 
 
-def test_extractor_uses_geometry_not_model_visual_srax():
+def test_direct_enrichment_uses_geometry_not_model_visual_srax():
     raw = _synthetic_four_maps(80.0, 230.0)
+    result = {
+        "eyes": [{
+            "eye": "OS",
+            "screen_types": ["FOUR_MAPS_REFRACTIVE"],
+            "srax": "UNCERTAIN",
+            "srax_deg": None,
+        }],
+        "global_warnings": [],
+    }
 
-    def previous(_raw, _filename):
-        return {
-            "eyes": [{
-                "eye": "OS",
-                "screen_types": ["FOUR_MAPS_REFRACTIVE"],
-                "srax": "UNCERTAIN",
-                "srax_deg": None,
-                "morphology_evidence": [],
-            }],
-            "global_warnings": [],
-        }
-
-    extractor = policy.make_geometric_srax_extractor(object(), previous)
-    result = extractor(raw, "synthetic.png")
+    result = policy.enrich_extraction(result, raw, "synthetic.png")
     eye = result["eyes"][0]
     assert eye["srax"] == "YES"
     assert eye["srax_deg"] > 20.0
     assert eye["field_provenance"]["srax"][0]["source"] == "AXIAL_SAGITTAL_CURVATURE_FRONT_GEOMETRIC"
-    assert "srax-geom-v1" in eye["morphology_evidence"][0]
+    assert eye["field_provenance"]["srax_deg"][0]["source"] == "AXIAL_SAGITTAL_CURVATURE_FRONT_GEOMETRIC"
+    assert "morphology_evidence" not in eye
+    assert not hasattr(policy, "make_geometric_srax_extractor")
+    assert not hasattr(policy, "install")

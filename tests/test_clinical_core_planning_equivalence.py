@@ -1,67 +1,71 @@
-"""Phase 2 equivalence gates for pure LASIK fallback-planning primitives."""
+"""Monday acceptance locks for pure planning policy."""
 
-import lasik_planning
 from clinical_core.planning import (
     LASIK_PLANS,
-    LASIK_PTA_CUTOFF_PERCENT,
-    independent_hard_stop,
-    plan_payload,
-    plan_responsive_failure,
-    planning_summary,
-    pta_cutoff,
+    MMC_MANDATORY,
+    MMC_NOT_APPLICABLE,
+    MMC_RECOMMENDED,
+    MMC_REVIEW_REQUIRED,
+    PlanEvaluation,
+    mmc_guidance,
+    select_first_safe_lasik_plan,
 )
+from clinical_core.refraction import HYPEROPIC, MIXED, MYOPIC
 
 
-def test_plan_sequence_matches_frozen_production():
-    assert LASIK_PLANS == lasik_planning.LASIK_PLANS
-    assert LASIK_PTA_CUTOFF_PERCENT == lasik_planning.LASIK_PTA_CUTOFF_PERCENT
+def test_lasik_plan_sequence_is_exactly_a_b_c():
+    assert LASIK_PLANS == (
+        {"name": "Plan A", "flap_um": 100.0, "optical_zone_mm": 6.5, "transition_zone_mm": 9.0},
+        {"name": "Plan B", "flap_um": 100.0, "optical_zone_mm": 6.0, "transition_zone_mm": 8.5},
+        {"name": "Plan C", "flap_um": 90.0, "optical_zone_mm": 6.0, "transition_zone_mm": 8.5},
+    )
 
 
-def test_pta_cutoff_matches_production_boundaries():
-    for value in (39.999, 40.0, 40.001):
-        result = {"values": {"LASIK_PTA_percent": value}}
-        assert pta_cutoff(result) == lasik_planning._pta_cutoff(result)
+def test_first_safe_plan_is_selected_and_rejected_plans_remain_visible():
+    calls = []
+
+    def evaluator(spec):
+        calls.append(spec["name"])
+        if spec["name"] == "Plan A":
+            return PlanEvaluation("Plan A", False, ("RSB <300 µm",))
+        return PlanEvaluation(spec["name"], True)
+
+    result = select_first_safe_lasik_plan(evaluator)
+    assert calls == ["Plan A", "Plan B"]
+    assert result.selected_plan == "Plan B"
+    assert result.sequence[0].safe is False
+    assert result.sequence[0].rejection_reasons == ("RSB <300 µm",)
+    assert result.sequence[1].safe is True
 
 
-def test_independent_hard_stop_matches_production_markers():
-    samples = [
-        "CER-AI operational hard stop: thinnest preoperative cornea <480 µm.",
-        "Definite KC/FFKC/PMD",
-        "intended sphere <−10.00 D",
-        "intended sphere >+6.00 D",
-        "postoperative Kmean <36.00 D",
-        "postoperative Kmean >48.00 D",
-        "unrelated warning",
-    ]
-    for text in samples:
-        result = {"hard_stops": [text]}
-        assert independent_hard_stop(result) == lasik_planning._independent_hard_stop(result)
+def test_all_three_plans_use_the_same_evaluator_and_none_selected_if_all_unsafe():
+    evaluator_ids = []
+
+    def evaluator(spec):
+        evaluator_ids.append(id(evaluator))
+        return PlanEvaluation(spec["name"], False, (f"{spec['name']} unsafe",))
+
+    result = select_first_safe_lasik_plan(evaluator)
+    assert len(result.sequence) == 3
+    assert len(set(evaluator_ids)) == 1
+    assert result.selected_plan is None
+    assert [item.plan for item in result.sequence] == ["Plan A", "Plan B", "Plan C"]
 
 
-def test_plan_responsive_failure_matches_production():
-    cases = [
-        {"hard_stops": [], "score": {"category": "LOW"}},
-        {"hard_stops": [], "score": {"category": "HIGH"}},
-        {"hard_stops": ["plan-specific stop"], "score": {"category": "LOW"}},
-    ]
-    for result in cases:
-        assert plan_responsive_failure(result) == lasik_planning._plan_responsive_failure(result)
+def test_mmc_myopic_boundary_is_exactly_four_diopters():
+    assert mmc_guidance("PRK", MYOPIC, -3.99) == MMC_RECOMMENDED
+    assert mmc_guidance("PRK", MYOPIC, -4.00) == MMC_MANDATORY
+    assert mmc_guidance("PRK", MYOPIC, -6.00) == MMC_MANDATORY
 
 
-def test_plan_payload_matches_production_and_does_not_mutate_base():
-    base = {"procedure": "LASIK", "ablation_um": 120, "custom": "keep"}
-    for idx, spec in enumerate(LASIK_PLANS):
-        actual = plan_payload(base, spec, first=(idx == 0))
-        expected = lasik_planning._plan_payload(base, spec, first=(idx == 0))
-        assert actual == expected
-    assert base == {"procedure": "LASIK", "ablation_um": 120, "custom": "keep"}
+def test_hyperopic_prk_mmc_is_mandatory():
+    assert mmc_guidance("PRK", HYPEROPIC, +1.0) == MMC_MANDATORY
+    assert mmc_guidance("PRK", HYPEROPIC, +5.0) == MMC_MANDATORY
 
 
-def test_planning_summary_matches_production():
-    spec = LASIK_PLANS[1]
-    result = {
-        "status": "CAUTION",
-        "values": {"max_ablation_um": 88.0, "LASIK_RSB_um": 312.0, "LASIK_PTA_percent": 38.5},
-        "score": {"total": 3, "category": "CAUTION"},
-    }
-    assert planning_summary(spec, result) == lasik_planning._summary(spec, result)
+def test_mixed_prk_does_not_borrow_myopic_scalar_mmc_rule():
+    assert mmc_guidance("PRK", MIXED, 0.0) == MMC_REVIEW_REQUIRED
+
+
+def test_mmc_is_not_applicable_to_lasik():
+    assert mmc_guidance("LASIK", MYOPIC, -5.0) == MMC_NOT_APPLICABLE
