@@ -129,7 +129,7 @@ def test_turkish_bad_classifications_and_selected_plan_keep_colors():
     assert db.cells[2].text == 'ŞÜPHELİ / 1.60 ile < 2.60; yalnızca bilgilendirme'
     assert df.cells[1]._tc.get_or_add_tcPr().find(qn('w:shd')).get(qn('w:fill')) == reports.RED_FILL
     assert db.cells[1]._tc.get_or_add_tcPr().find(qn('w:shd')).get(qn('w:fill')) == reports.AMBER_FILL
-    selected = next(row for t in doc.tables for row in t.rows if row.cells[0].text == 'Seçilen plan')
-    assert selected.cells[1].text == 'Plan A'
+    selected = next(row for t in doc.tables for row in t.rows if row.cells[0].text == 'Seçilen LASIK planı')
+    assert selected.cells[1].text == 'Plan A — flep 100 µm; optik zon 6,5 mm; geçiş zonu 9,0 mm'
     assert selected.cells[1]._tc.get_or_add_tcPr().find(qn('w:shd')).get(qn('w:fill')) == reports.GREEN_FILL
     assert 'pachymetry' not in translate_text('Inter-eye score 1/5; exceeded: thinnest pachymetry.', 'tr')

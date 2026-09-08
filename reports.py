@@ -112,8 +112,18 @@ def _status_palette(value):
 
 def _cell_palette(row, index, selected_plan_status=None):
     label = str(row[0]).strip().lower()
-    if label == "selected_plan" and str(row[1]) not in {"", "Not documented"} and selected_plan_status in {"PASS", "PASS WITH CAUTION"}:
-        return _status_palette(selected_plan_status)
+    safe_plan_rows = {
+        "selected lasik plan",
+        "ml7 preferred hinge location",
+        "ml7 vacuum ring",
+        "ml7 vacuum pressure",
+    }
+    if (
+        label in safe_plan_rows
+        and str(row[1]) not in {"", "Not documented"}
+        and selected_plan_status in {"PASS", "PASS WITH CAUTION", "CAUTION"}
+    ):
+        return GREEN, GREEN_FILL
     if label in {"df", "db", "dp", "dt", "da", "ppi min", "ppi avg", "ppi max", "artmax"} and index > 0:
         classification = str(row[2]).split(" / ")[0]
         return {"NORMAL": (GREEN, GREEN_FILL),
@@ -261,14 +271,25 @@ def _report_sections(report: Mapping[str, Any]) -> list[tuple[str, list[list[str
     safety = report.get("tissue_safety") or {}
     sections.append(("Procedural safety", [["Parameter", "Canonical result"]] + [[key, _text(value)] for key, value in safety.items()]))
     planning = report.get("planning") or {}
-    planning_labels = {
-        "selected_plan_definition": "Selected plan parameters",
-        "selection_rule": "Plan-selection priority",
+    planning_rows = [["Planning item", "Canonical result"], ["Procedure", procedure]]
+    for key, value in planning.items():
+        if key == "selected_plan_definition":
+            continue
+        if key == "selected_plan":
+            value = planning.get("selected_plan_definition") or value
+            key = "Selected LASIK plan"
+        elif key == "selection_rule":
+            key = "Plan-selection priority"
+        planning_rows.append([key, _text(value)])
+    ml7_labels = {
+        "hinge_location_preference": "Preferred hinge location",
+        "vacuum_ring_mm": "Vacuum ring",
+        "vacuum_pressure_mmhg": "Vacuum pressure",
     }
-    planning_rows = [["Planning item", "Canonical result"], ["Procedure", procedure]] + [
-        [planning_labels.get(key, key), _text(value)] for key, value in planning.items()
-    ]
-    planning_rows.extend([[f"ML7 {key}", _text(value)] for key, value in (report.get("microkeratome_planning") or {}).items()])
+    planning_rows.extend([
+        [f"ML7 {ml7_labels.get(key, key)}", _text(value)]
+        for key, value in (report.get("microkeratome_planning") or {}).items()
+    ])
     sections.append(("Procedure planning", planning_rows))
 
     drivers = report.get("decision_drivers") or {}

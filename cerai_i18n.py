@@ -284,6 +284,7 @@ TR = {
     "Steep − flat K spread": "Dik − düz K farkı",
     "Vacuum ring": "Vakum halkası",
     "Vacuum pressure": "Vakum basıncı",
+    "Preferred hinge location": "Tercih edilen menteşe konumu",
     "Blade recommendation(s)": "Bıçak önerisi/önerileri",
     "Primary hinge": "Birincil menteşe",
     "Conditional alternative": "Koşullu alternatif",

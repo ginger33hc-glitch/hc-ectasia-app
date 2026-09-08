@@ -197,6 +197,21 @@ def test_browser_result_view_consumes_canonical_report_payload_only():
     assert "extracted.eyes" not in render_source
 
 
+def test_browser_places_plan_definition_beside_name_and_marks_only_requested_safe_ml7_rows():
+    html = (ROOT / "static" / "index.html").read_text()
+    render_source = html[html.index("function renderEye("):html.index("function patientPayload(")]
+    assert 'key==="selected_plan"?(p.planning?.selected_plan_definition||value):value' in render_source
+    assert '.filter(([key])=>key!=="selected_plan_definition")' in render_source
+    for label in (
+        "Selected LASIK plan",
+        "ML7 Preferred hinge location",
+        "ML7 Vacuum ring",
+        "ML7 Vacuum pressure",
+    ):
+        assert label in render_source
+    assert '"ML7 blade_recommendations"' not in render_source
+
+
 def test_readiness_javascript_renders_contact_lens_status_as_visible():
     if not shutil.which("node"):
         pytest.skip("Node is not available")
