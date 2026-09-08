@@ -6,7 +6,6 @@
     "English":"English","Turkish":"Türkçe","Language":"Dil",
     "Case inputs":"Vaka girdileri","Report identification":"Rapor kimlik bilgileri",
     "Patient name":"Hasta adı","Patient ID / record number":"Hasta kimliği / dosya numarası",
-    "Patient age (Pentacam age unreadable; enter years)":"Hasta yaşı (Pentacam yaşı okunamadı; yıl olarak girin)",
     "Reviewer / surgeon":"Değerlendiren / cerrah","Assessment date":"Değerlendirme tarihi",
     "Pentacam/topography and treatment-card images":"Pentacam/topografi ve tedavi kartı görüntüleri",
     "Required image confirmation":"Zorunlu görüntü doğrulaması","Optional treatment card":"İsteğe bağlı tedavi kartı",
