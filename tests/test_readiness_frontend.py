@@ -98,6 +98,11 @@ assert.equal(fields.od_cylinder.value,'-2.00');
 def test_patient_age_completion_uses_one_shared_field():
     item = assessment_workflow._request('PATIENT', 'age', {})
     readiness = (ROOT / 'static/assessment-readiness.js').read_text()
+    html = (ROOT / 'static/index.html').read_text()
+    translations = (ROOT / 'static/i18n.js').read_text()
+    assert '<label>Patient age (years)</label>' in html
+    assert 'Pentacam age unreadable; enter years' not in html
+    assert 'Pentacam yaşı okunamadı; yıl olarak girin' not in translations
     assert item == {
         'eye': 'PATIENT',
         'label': 'Patient age (years)',
