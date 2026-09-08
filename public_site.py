@@ -4,10 +4,13 @@ This module is presentation-only. It does not alter clinical decision logic,
 authentication, assessment endpoints, report generation, or archive behavior.
 """
 import json
+import os
+import re
+from html import escape
 from pathlib import Path
 
 from fastapi import Request
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, Response
 
 
 _PUBLIC_HOME = Path("static/public-home.html")
@@ -15,6 +18,10 @@ _AI_LANDING = Path("static/corneal-ectasia-risk-assessment.html")
 _EVIDENCE_PAGE = Path("static/clinical-evidence.html")
 _REFERENCES_PAGE = Path("static/references.html")
 _TESTING_NOTICE = Path("static/testing-notice.html")
+_PUBLIC_CANONICAL_BASE = os.getenv(
+    "CERAI_PUBLIC_CANONICAL_BASE", "https://cer-ai.com"
+).rstrip("/")
+_PUBLIC_CONTENT_LASTMOD = "2026-09-08"
 _MOBILE_INSTALL_SECTION = """
 <div id="mobile-install" style="margin-top:34px;padding:26px;border:1px solid var(--line);border-radius:15px;background:#fff;box-shadow:0 6px 18px rgba(23,59,87,.045)">
   <div class="section-kicker">Mobile access</div>
@@ -62,10 +69,39 @@ _SEARCH_CRAWLERS = (
 
 
 def _site_base(request: Request) -> str:
-    return str(request.base_url).rstrip("/")
+    del request
+    return _PUBLIC_CANONICAL_BASE
 
 
-def _discovery_head(base: str) -> str:
+def _is_indexable_host(request: Request) -> bool:
+    """Only the canonical production host may enter public search indexes."""
+    hostname = (request.url.hostname or "").lower().rstrip(".")
+    return hostname in {"cer-ai.com", "www.cer-ai.com"}
+
+
+def _robots_directive(request: Request) -> str:
+    if _is_indexable_host(request):
+        return "index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1"
+    return "noindex,nofollow"
+
+
+def _webmaster_verification_meta() -> str:
+    """Render optional public ownership tokens configured by the site owner."""
+    tags = []
+    google = os.getenv("CERAI_GOOGLE_SITE_VERIFICATION", "").strip()
+    bing = os.getenv("CERAI_BING_SITE_VERIFICATION", "").strip()
+    if google:
+        tags.append(
+            f'<meta name="google-site-verification" content="{escape(google, quote=True)}">'
+        )
+    if bing:
+        tags.append(
+            f'<meta name="msvalidate.01" content="{escape(bing, quote=True)}">'
+        )
+    return "\n  ".join(tags)
+
+
+def _discovery_head(base: str, *, robots_directive: str) -> str:
     """Machine-readable discovery metadata for public CER-AI pages."""
     citations = [
         {
@@ -113,6 +149,8 @@ def _discovery_head(base: str) -> str:
                 "@id": f"{base}/#software",
                 "name": "CER-AI",
                 "url": f"{base}/",
+                "softwareVersion": "0.7.71",
+                "creator": {"@id": f"{base}/#clinical-author"},
                 "applicationCategory": "MedicalApplication",
                 "applicationSubCategory": (
                     "Corneal ectasia risk assessment and refractive-surgery screening"
@@ -138,6 +176,13 @@ def _discovery_head(base: str) -> str:
                     "Auditable clinical decision-support reporting",
                 ],
                 "isAccessibleForFree": False,
+            },
+            {
+                "@type": "Person",
+                "@id": f"{base}/#clinical-author",
+                "name": "Hüseyin Cengiz, M.D.",
+                "jobTitle": "Ophthalmic Surgeon and Developer of CER-AI",
+                "url": f"{base}/#developer",
             },
             {
                 "@type": "MedicalWebPage",
@@ -173,6 +218,8 @@ def _discovery_head(base: str) -> str:
                     "PRK screening",
                 ],
                 "citation": citations,
+                "author": {"@id": f"{base}/#clinical-author"},
+                "dateModified": _PUBLIC_CONTENT_LASTMOD,
                 "mainEntity": {"@id": f"{base}/#software"},
                 "isPartOf": {"@id": f"{base}/#website"},
                 "inLanguage": "en",
@@ -180,9 +227,12 @@ def _discovery_head(base: str) -> str:
         ],
     }
     schema = json.dumps(structured_data, ensure_ascii=False, separators=(",", ":"))
+    verification = _webmaster_verification_meta()
+    if verification:
+        verification = f"  {verification}\n"
     return f"""
-  <meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1">
-  <meta name="keywords" content="corneal ectasia, ectasia risk assessment, refractive surgery screening, keratoconus screening, Pentacam, Final BAD-D, Belin Ambrosio, Randleman ERSS, NICE, PS3, LASIK ectasia, PRK ectasia, residual stromal bed">
+  <meta name="robots" content="{robots_directive}">
+{verification}  <meta name="keywords" content="corneal ectasia, ectasia risk assessment, refractive surgery screening, keratoconus screening, Pentacam, Final BAD-D, Belin Ambrosio, Randleman ERSS, NICE, PS3, LASIK ectasia, PRK ectasia, residual stromal bed">
   <link rel="canonical" href="{base}/">
   <link rel="describedby" type="text/markdown" href="{base}/llms.txt">
   <link rel="alternate" type="text/html" href="{base}/corneal-ectasia-risk-assessment">
@@ -195,7 +245,8 @@ def _discovery_head(base: str) -> str:
 
 def _render_public_home(request: Request) -> HTMLResponse:
     html = _PUBLIC_HOME.read_text(encoding="utf-8")
-    discovery = _discovery_head(_site_base(request))
+    directive = _robots_directive(request)
+    discovery = _discovery_head(_site_base(request), robots_directive=directive)
     if "</head>" in html:
         html = html.replace("</head>", f"{discovery}</head>", 1)
     marker = '<a href="#about">About</a>'
@@ -215,7 +266,33 @@ def _render_public_home(request: Request) -> HTMLResponse:
         marker = '<div class="guide-alert"><strong>Clinical use:'
         if marker in html:
             html = html.replace(marker, _MOBILE_INSTALL_SECTION + marker, 1)
-    return HTMLResponse(html)
+    return HTMLResponse(html, headers={"X-Robots-Tag": directive})
+
+
+def _render_public_page(path: Path, request: Request, canonical_path: str) -> HTMLResponse:
+    """Serve a static public page with one environment-safe canonical contract."""
+    html = path.read_text(encoding="utf-8")
+    directive = _robots_directive(request)
+    canonical = f'{_site_base(request)}{canonical_path}'
+    canonical_tag = '<link rel="canonical" href="{}">'.format(canonical)
+    if re.search(r'<link\s+rel="canonical"[^>]*>', html, flags=re.IGNORECASE):
+        html = re.sub(
+            r'<link\s+rel="canonical"[^>]*>', canonical_tag, html,
+            count=1, flags=re.IGNORECASE,
+        )
+    else:
+        html = html.replace("</head>", f"  {canonical_tag}\n</head>", 1)
+    if re.search(r'<meta\s+name="robots"[^>]*>', html, flags=re.IGNORECASE):
+        html = re.sub(
+            r'<meta\s+name="robots"[^>]*>',
+            f'<meta name="robots" content="{directive}">',
+            html, count=1, flags=re.IGNORECASE,
+        )
+    else:
+        html = html.replace(
+            "</head>", f'  <meta name="robots" content="{directive}">\n</head>', 1,
+        )
+    return HTMLResponse(html, headers={"X-Robots-Tag": directive})
 
 
 def _robot_group(agents: tuple[str, ...], *, explicit_allow: bool) -> str:
@@ -291,13 +368,13 @@ CER-AI is a clinical decision-support system, not an autonomous diagnostic syste
 def _sitemap_xml(base: str) -> str:
     urls = (
         (f"{base}/", "1.0"),
-        (f"{base}/home", "0.9"),
         (f"{base}/corneal-ectasia-risk-assessment", "0.9"),
         (f"{base}/clinical-evidence", "0.9"),
         (f"{base}/references", "0.9"),
     )
     body = "".join(
-        f"<url><loc>{url}</loc><changefreq>weekly</changefreq><priority>{priority}</priority></url>"
+        f"<url><loc>{url}</loc><lastmod>{_PUBLIC_CONTENT_LASTMOD}</lastmod>"
+        f"<changefreq>weekly</changefreq><priority>{priority}</priority></url>"
         for url, priority in urls
     )
     return (
@@ -325,23 +402,30 @@ def install(core) -> None:
         return _render_public_home(request)
 
     @core.app.get("/home", include_in_schema=False)
-    def public_home(request: Request) -> HTMLResponse:
-        return _render_public_home(request)
+    def public_home() -> RedirectResponse:
+        return RedirectResponse(url="/", status_code=308)
 
     @core.app.get("/corneal-ectasia-risk-assessment", include_in_schema=False)
-    def corneal_ectasia_risk_assessment() -> FileResponse:
-        return FileResponse(_AI_LANDING)
+    def corneal_ectasia_risk_assessment(request: Request) -> HTMLResponse:
+        return _render_public_page(
+            _AI_LANDING, request, "/corneal-ectasia-risk-assessment"
+        )
 
     @core.app.get("/clinical-evidence", include_in_schema=False)
-    def clinical_evidence() -> FileResponse:
-        return FileResponse(_EVIDENCE_PAGE)
+    def clinical_evidence(request: Request) -> HTMLResponse:
+        return _render_public_page(_EVIDENCE_PAGE, request, "/clinical-evidence")
 
     @core.app.get("/references", include_in_schema=False)
-    def references() -> FileResponse:
-        return FileResponse(_REFERENCES_PAGE)
+    def references(request: Request) -> HTMLResponse:
+        return _render_public_page(_REFERENCES_PAGE, request, "/references")
 
     @core.app.get("/robots.txt", include_in_schema=False)
     def robots(request: Request) -> PlainTextResponse:
+        if not _is_indexable_host(request):
+            return PlainTextResponse(
+                "User-agent: *\nDisallow: /\n",
+                headers={"X-Robots-Tag": "noindex, nofollow"},
+            )
         return PlainTextResponse(_robots_txt(_site_base(request)))
 
     @core.app.get("/llms.txt", include_in_schema=False)
@@ -350,6 +434,13 @@ def install(core) -> None:
 
     @core.app.get("/sitemap.xml", include_in_schema=False)
     def sitemap(request: Request) -> Response:
+        if not _is_indexable_host(request):
+            return Response(
+                '<?xml version="1.0" encoding="UTF-8"?>'
+                '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"/>',
+                media_type="application/xml",
+                headers={"X-Robots-Tag": "noindex, nofollow"},
+            )
         return Response(_sitemap_xml(_site_base(request)), media_type="application/xml")
 
     # Public website application links intentionally land on the testing notice.
