@@ -39,6 +39,7 @@ _RETIRED = {
     "test_bad_display_b_ele_th_box_feeds_only_nice_posterior_input",
     "test_wrapper_runs_for_missing_age_even_when_no_eye_numeric_field_is_missing",
     "test_wrapper_fails_open_to_original_extraction_when_crop_decode_fails",
+    "test_targeted_reread_does_not_seek_keratometry_on_other_pentacam_screens",
 }
 for _name in _RETIRED:
     if not hasattr(_legacy, _name):
@@ -105,7 +106,7 @@ def test_unresolved_disparity_axis_does_not_retain_unverified_warning_value(monk
 def test_canonical_eye_fields_suppress_duplicate_targeted_reread_requests():
     result = pentacam_result()
     eye = result["eyes"][0]
-    assert "central_pachy_um" in targeted.missing_targets_by_eye(result)["OD"]
+    assert "central_pachy_um" not in targeted.missing_targets_by_eye(result)["OD"]
     assert "B_Ele_Th_um" in targeted.missing_targets_by_eye(result)["OD"]
 
     eye["central_pachy_um"] = 542
@@ -119,6 +120,21 @@ def test_canonical_eye_fields_suppress_duplicate_targeted_reread_requests():
     assert "central_pachy_um" not in remaining
     assert "B_Ele_Th_um" not in remaining
     assert not result.get("nice_readings")
+
+
+def test_standard_reread_requests_only_fields_owned_by_the_visible_screen():
+    bad = pentacam_result()
+    bad_missing = set(targeted.missing_targets_by_eye(bad)["OD"])
+    assert {"F_Ele_Th_um", "B_Ele_Th_um", "BAD_D"} <= bad_missing
+    assert "K1_D" not in bad_missing
+    assert "central_pachy_um" not in bad_missing
+
+    show2 = pentacam_result()
+    show2["eyes"][0]["screen_types"] = ["SHOW_2_EXAMS_TOPOMETRIC"]
+    show2_missing = set(targeted.missing_targets_by_eye(show2)["OD"])
+    assert {"K1_D", "K2_D", "Rmin_mm", "I_S"} <= show2_missing
+    assert "F_Ele_Th_um" not in show2_missing
+    assert "central_pachy_um" not in show2_missing
 
 
 def test_pupil_center_reread_writes_direct_canonical_eye_field_and_numeric_prompt():
@@ -177,320 +193,38 @@ def test_bad_display_b_ele_th_reread_writes_direct_canonical_eye_field():
     assert not result.get("nice_readings")
 
 
-def test_dedicated_bad_cell_consensus_corrects_primary_and_localizer_errors(monkeypatch):
-    result = pentacam_result(F_Ele_Th_um=41, B_Ele_Th_um=93)
+def test_bad_elevations_use_the_standard_single_targeted_reread_path(monkeypatch):
+    result = pentacam_result()
     eye = result["eyes"][0]
-    eye["table_verified_numeric_fields"] = ["F_Ele_Th_um", "B_Ele_Th_um"]
-    eye["canonical_source_ids"] = {
-        "F_Ele_Th_um": BAD_ELEVATION_ROW,
-        "B_Ele_Th_um": BAD_ELEVATION_ROW,
-    }
-    payload = {
-        "screen_family": "BAD_DISPLAY",
-        "readings": [
-            reading(
-                "F_Ele_Th_um", 13, "F. Ele.Th", tile="UPPER_RIGHT",
-                source_box=[100, 100, 400, 250],
-            ),
-            reading(
-                "B_Ele_Th_um", 9, "B. Ele.Th", tile="UPPER_RIGHT",
-                source_box=[500, 100, 800, 250],
-            ),
-        ],
-        "warnings": [],
-    }
-    monkeypatch.setattr(targeted, "targeted_reread", lambda *args, **kwargs: payload)
-    monkeypatch.setattr(targeted, "render_source_region", lambda *args, **kwargs: b"crop")
-    runs = iter([
-        {("OD", "F_Ele_Th_um"): 3, ("OD", "B_Ele_Th_um"): 9},
-        {("OD", "F_Ele_Th_um"): 3},
-    ])
-    monkeypatch.setattr(
-        targeted, "confirm_bad_elevation_crops", lambda *args, **kwargs: next(runs),
-    )
+    for field in targeted.TARGET_FIELDS:
+        eye[field] = 1.0
+    eye["F_Ele_Th_um"] = None
+    eye["B_Ele_Th_um"] = None
+    result["document_context"].update({"patient_age_years": 40, "pentacam_qs": "OK"})
+    calls = []
 
+    def reread(_core, _raw, _filename, requested, *_args):
+        calls.append(requested)
+        return {
+            "screen_family": "BAD_DISPLAY",
+            "readings": [
+                reading("F_Ele_Th_um", 3, "F.Ele.Th", tile="LOWER_RIGHT"),
+                reading("B_Ele_Th_um", 8, "B.Ele.Th", tile="LOWER_RIGHT"),
+            ],
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(targeted, "targeted_reread", reread)
     targeted.enrich_extraction(Core, result, b"image", "od-bad.png")
 
+    assert calls == [{"OD": ["F_Ele_Th_um", "B_Ele_Th_um"]}]
     assert eye["F_Ele_Th_um"] == 3
-    assert eye["B_Ele_Th_um"] == 9
-    assert eye["bad_elevation_verification_evidence"] == {
-        "F_Ele_Th_um": {
-            "file": "od-bad.png", "primary_value": 41,
-                "localized_value": 13,
-                "confirmation_values": [3, 3],
-                "automated_attempts": 2,
-                "attempt_errors": [],
-                "verified_value": 3, "status": "VERIFIED",
-        },
-        "B_Ele_Th_um": {
-            "file": "od-bad.png", "primary_value": 93,
-                "localized_value": 9,
-                "confirmation_values": [9, None],
-                "automated_attempts": 1,
-                "attempt_errors": [],
-                "verified_value": 9, "status": "VERIFIED",
-        },
-    }
+    assert eye["B_Ele_Th_um"] == 8
     assert all(
         eye["targeted_reread_evidence"][field][0]["source"]
-        == "DEDICATED_BAD_ELEVATION_DIGIT_CONSENSUS"
-        for field in targeted.BAD_ELEVATION_FIELDS
+        == "TARGETED_LABELED_TILE_REREAD"
+        for field in ("F_Ele_Th_um", "B_Ele_Th_um")
     )
-    assert any("from 41 to 3" in warning for warning in result["global_warnings"])
-    assert any("from 93 to 9" in warning for warning in result["global_warnings"])
-
-
-def test_unresolved_bad_elevation_does_not_retain_primary_ocr_value(monkeypatch):
-    result = pentacam_result(F_Ele_Th_um=41, B_Ele_Th_um=93)
-    eye = result["eyes"][0]
-    eye["table_verified_numeric_fields"] = ["F_Ele_Th_um", "B_Ele_Th_um"]
-    eye["canonical_source_ids"] = {
-        "F_Ele_Th_um": BAD_ELEVATION_ROW,
-        "B_Ele_Th_um": BAD_ELEVATION_ROW,
-    }
-    payload = {
-        "screen_family": "BAD_DISPLAY",
-        "readings": [
-            reading(
-                "F_Ele_Th_um", None, "F. Ele.Th", status="UNREADABLE",
-                tile="LOWER_LEFT", source_box=[100, 100, 400, 250],
-            ),
-            reading(
-                "B_Ele_Th_um", None, "B. Ele.Th", status="UNREADABLE",
-                tile="LOWER_RIGHT", source_box=[100, 100, 400, 250],
-            ),
-        ],
-        "warnings": [],
-    }
-    monkeypatch.setattr(targeted, "targeted_reread", lambda *args, **kwargs: payload)
-
-    targeted.enrich_extraction(Core, result, b"image", "od-bad.png")
-
-    assert eye["F_Ele_Th_um"] is None
-    assert eye["B_Ele_Th_um"] is None
-    assert not set(targeted.BAD_ELEVATION_FIELDS) & set(eye["table_verified_numeric_fields"])
-    assert not set(targeted.BAD_ELEVATION_FIELDS) & set(eye["canonical_source_ids"])
-    assert set(targeted.BAD_ELEVATION_FIELDS) <= set(eye["missing_or_unreadable"])
-    assert all(
-        eye["bad_elevation_verification_evidence"][field]["status"] == "UNRESOLVED"
-        for field in targeted.BAD_ELEVATION_FIELDS
-    )
-
-
-def test_bad_cell_consensus_uses_one_confirmation_when_localizer_agrees(monkeypatch):
-    result = pentacam_result(F_Ele_Th_um=3, B_Ele_Th_um=9)
-    eye = result["eyes"][0]
-    eye["table_verified_numeric_fields"] = ["F_Ele_Th_um", "B_Ele_Th_um"]
-    eye["canonical_source_ids"] = {
-        "F_Ele_Th_um": BAD_ELEVATION_ROW,
-        "B_Ele_Th_um": BAD_ELEVATION_ROW,
-    }
-    payload = {
-        "screen_family": "BAD_DISPLAY",
-        "readings": [
-            reading(
-                "F_Ele_Th_um", 3, "F. Ele.Th", tile="UPPER_RIGHT",
-                source_box=[100, 100, 400, 250],
-            ),
-            reading(
-                "B_Ele_Th_um", 9, "B. Ele.Th", tile="UPPER_RIGHT",
-                source_box=[500, 100, 800, 250],
-            ),
-        ],
-        "warnings": [],
-    }
-    monkeypatch.setattr(targeted, "targeted_reread", lambda *args, **kwargs: payload)
-    monkeypatch.setattr(targeted, "render_source_region", lambda *args, **kwargs: b"crop")
-    calls = []
-
-    def confirm(*args, **kwargs):
-        calls.append(True)
-        return {("OD", "F_Ele_Th_um"): 3, ("OD", "B_Ele_Th_um"): 9}
-
-    monkeypatch.setattr(targeted, "confirm_bad_elevation_crops", confirm)
-    targeted.enrich_extraction(Core, result, b"image", "od-bad.png")
-
-    assert eye["F_Ele_Th_um"] == 3
-    assert eye["B_Ele_Th_um"] == 9
-    assert len(calls) == 1
-
-
-def test_bad_cell_confirmation_reads_only_literal_integer_and_warns_about_cell_border():
-    captured = {}
-    response_payload = {
-        "readings": [{
-            "eye": "OS", "field": "F_Ele_Th_um",
-            "visible_field_label": "F.Ele.Th",
-            "label_value_pair_status": "CONFIRMED_LABEL_ADJACENCY",
-            "observed_value_text": "3", "value": 3, "status": "CONFIDENT",
-        }],
-        "warnings": [],
-    }
-
-    def create(**kwargs):
-        captured.update(kwargs)
-        return SimpleNamespace(output_text=json.dumps(response_payload))
-
-    core = Core()
-    core.openai_client = lambda: SimpleNamespace(responses=SimpleNamespace(create=create))
-    confirmed = targeted.confirm_bad_elevation_crops(
-        core, {("OS", "F_Ele_Th_um"): image_bytes(180, 80)},
-    )
-
-    assert confirmed == {("OS", "F_Ele_Th_um"): 3}
-    prompt = captured["input"][0]["content"][0]["text"]
-    normalized_prompt = " ".join(prompt.casefold().split())
-    assert "thin vertical edge of the white value cell is a border, not" in normalized_prompt
-    assert "immediately above the progression index section" in normalized_prompt
-    assert "front/anterior elevation at the thinnest corneal point" in normalized_prompt
-    assert "back/posterior elevation at the thinnest corneal point" in normalized_prompt
-    assert "do not" in normalized_prompt and "infer" in normalized_prompt
-
-
-def test_bad_elevation_confirmation_rejects_axis_k1_crop():
-    response_payload = {
-        "readings": [{
-            "eye": "OD", "field": "F_Ele_Th_um",
-            "visible_field_label": "Axis",
-            "label_value_pair_status": "WRONG_LABEL",
-            "observed_value_text": None, "value": None, "status": "UNREADABLE",
-        }],
-        "warnings": [],
-    }
-    core = Core()
-    core.openai_client = lambda: SimpleNamespace(responses=SimpleNamespace(
-        create=lambda **_kwargs: SimpleNamespace(output_text=json.dumps(response_payload)),
-    ))
-
-    assert targeted.confirm_bad_elevation_crops(
-        core, {("OD", "F_Ele_Th_um"): image_bytes(180, 80)},
-    ) == {}
-
-
-def test_bad_elevation_wrong_label_crop_is_relocalized_once(monkeypatch):
-    result = pentacam_result(F_Ele_Th_um=3, B_Ele_Th_um=9)
-    eye = result["eyes"][0]
-    eye["table_verified_numeric_fields"] = list(targeted.BAD_ELEVATION_FIELDS)
-    eye["canonical_source_ids"] = {
-        field: BAD_ELEVATION_ROW for field in targeted.BAD_ELEVATION_FIELDS
-    }
-    payload = {
-        "screen_family": "BAD_DISPLAY",
-        "readings": [
-            reading(
-                "F_Ele_Th_um", 3, "F.Ele.Th", tile="UPPER_RIGHT",
-                source_box=[100, 100, 400, 250],
-            ),
-            reading(
-                "B_Ele_Th_um", 9, "B.Ele.Th", tile="UPPER_RIGHT",
-                source_box=[500, 100, 800, 250],
-            ),
-        ],
-        "warnings": [],
-    }
-    locator_calls = []
-
-    def locate(_core, _raw, _filename, requested, *args, **kwargs):
-        locator_calls.append(requested)
-        return payload
-
-    monkeypatch.setattr(
-        targeted, "targeted_reread", locate,
-    )
-    monkeypatch.setattr(targeted, "render_source_region", lambda *args, **kwargs: b"crop")
-    confirmations = iter([
-        {},
-        {("OD", "F_Ele_Th_um"): 3, ("OD", "B_Ele_Th_um"): 9},
-    ])
-    monkeypatch.setattr(
-        targeted, "confirm_bad_elevation_crops", lambda *args, **kwargs: next(confirmations),
-    )
-
-    targeted.enrich_extraction(Core, result, b"image", "od-bad.png")
-
-    elevation_calls = [
-        requested for requested in locator_calls
-        if set(requested.get("OD", [])) == set(targeted.BAD_ELEVATION_FIELDS)
-    ]
-    assert len(elevation_calls) == 2
-    assert eye["F_Ele_Th_um"] == 3
-    assert eye["B_Ele_Th_um"] == 9
-
-
-def test_bad_elevation_missing_read_is_retried_five_times_and_can_resolve_on_fifth(monkeypatch):
-    result = pentacam_result(F_Ele_Th_um=3, B_Ele_Th_um=9)
-    payload = {
-        "screen_family": "BAD_DISPLAY",
-        "readings": [
-            reading(
-                "F_Ele_Th_um", 3, "F.Ele.Th", tile="LOWER_RIGHT",
-                source_box=[100, 100, 400, 250],
-            ),
-            reading(
-                "B_Ele_Th_um", 9, "B.Ele.Th", tile="LOWER_RIGHT",
-                source_box=[500, 100, 800, 250],
-            ),
-        ],
-        "warnings": [],
-    }
-    locator_calls = []
-    monkeypatch.setattr(
-        targeted,
-        "targeted_reread",
-        lambda *_args, **_kwargs: locator_calls.append(True) or payload,
-    )
-    monkeypatch.setattr(targeted, "render_source_region", lambda *args, **kwargs: b"crop")
-    confirmations = iter([
-        {}, {}, {}, {},
-        {("OD", "F_Ele_Th_um"): 3, ("OD", "B_Ele_Th_um"): 9},
-    ])
-    monkeypatch.setattr(
-        targeted, "confirm_bad_elevation_crops", lambda *args, **kwargs: next(confirmations),
-    )
-
-    targeted.verify_bad_elevation_fields(
-        Core,
-        result,
-        b"image",
-        "od-bad.png",
-        {"OD": list(targeted.BAD_ELEVATION_FIELDS)},
-        {("OD", "F_Ele_Th_um"): 3, ("OD", "B_Ele_Th_um"): 9},
-    )
-
-    eye = result["eyes"][0]
-    assert len(locator_calls) == targeted.BAD_ELEVATION_MAX_ATTEMPTS == 5
-    assert eye["F_Ele_Th_um"] == 3
-    assert eye["B_Ele_Th_um"] == 9
-    for field in targeted.BAD_ELEVATION_FIELDS:
-        assert eye["bad_elevation_verification_evidence"][field]["automated_attempts"] == 5
-
-
-def test_bad_elevation_attempt_exception_cannot_request_surgeon_before_fifth_try(monkeypatch):
-    result = pentacam_result(F_Ele_Th_um=3, B_Ele_Th_um=9)
-    calls = []
-
-    def fail_attempt(*_args, **_kwargs):
-        calls.append(True)
-        raise RuntimeError("temporary reader failure")
-
-    monkeypatch.setattr(targeted, "targeted_reread", fail_attempt)
-    targeted.verify_bad_elevation_fields(
-        Core,
-        result,
-        b"image",
-        "od-bad.png",
-        {"OD": list(targeted.BAD_ELEVATION_FIELDS)},
-        {("OD", "F_Ele_Th_um"): 3, ("OD", "B_Ele_Th_um"): 9},
-    )
-
-    eye = result["eyes"][0]
-    assert len(calls) == targeted.BAD_ELEVATION_MAX_ATTEMPTS == 5
-    for field in targeted.BAD_ELEVATION_FIELDS:
-        evidence = eye["bad_elevation_verification_evidence"][field]
-        assert evidence["automated_attempts"] == 5
-        assert evidence["attempt_errors"] == ["RuntimeError"] * 5
-        assert eye[field] is None
-    assert all("after 5 automated BAD elevation attempts" in warning for warning in result["global_warnings"])
 
 
 def test_unreadable_b_ele_th_uses_canonical_numeric_prompt_with_source_region():
@@ -589,16 +323,45 @@ def test_direct_enrichment_runs_for_missing_age_without_missing_eye_numeric_fiel
     assert result["document_context"]["patient_age_years"] == 61
 
 
-def test_direct_enrichment_fails_open_when_crop_decode_fails():
+def test_direct_enrichment_fails_open_after_five_crop_decode_failures():
     original = pentacam_result()
     result = targeted.enrich_extraction(Core, original, b"not-an-image", "od.png")
     assert result is original
     assert any(
-        "targeted pentacam numeric reread failed" in warning.casefold()
+        "had 5 failed attempt(s)" in warning.casefold()
         for warning in result["global_warnings"]
     )
     assert not hasattr(targeted, "make_targeted_extractor")
     assert not hasattr(targeted, "install")
+
+
+def test_required_field_can_resolve_on_fifth_standard_reread(monkeypatch):
+    result = pentacam_result()
+    eye = result["eyes"][0]
+    for field in targeted.TARGET_FIELDS:
+        eye[field] = 1.0
+    eye["B_Ele_Th_um"] = None
+    result["document_context"].update({"patient_age_years": 40, "pentacam_qs": "OK"})
+    calls = []
+
+    def reread(_core, _raw, _filename, requested, *_args):
+        calls.append(requested)
+        value = 8 if len(calls) == targeted.TARGETED_REREAD_MAX_ATTEMPTS else None
+        return {
+            "screen_family": "BAD_DISPLAY",
+            "readings": [reading(
+                "B_Ele_Th_um", value, "B.Ele.Th",
+                status="CONFIDENT" if value is not None else "UNREADABLE",
+            )],
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(targeted, "targeted_reread", reread)
+    targeted.enrich_extraction(Core, result, b"image", "od-bad.png")
+
+    assert len(calls) == targeted.TARGETED_REREAD_MAX_ATTEMPTS == 5
+    assert all(call == {"OD": ["B_Ele_Th_um"]} for call in calls)
+    assert eye["B_Ele_Th_um"] == 8
 
 
 def test_confident_four_maps_exam_date_reread_is_evidence_until_case_reconciliation():
