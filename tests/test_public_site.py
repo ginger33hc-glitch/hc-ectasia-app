@@ -18,6 +18,16 @@ def test_public_homepage_is_the_root_and_home_alias():
             assert "Hüseyin Cengiz, M.D." in response.text
 
 
+def test_public_homepage_uses_bad_d_for_both_pathway_labels():
+    with TestClient(canonical_engine.app) as client:
+        response = client.get("/")
+        assert response.status_code == 200
+        assert response.text.count('class="pill">BAD-D</span>') == 1
+        assert response.text.count('class="risk-label">BAD-D</span>') == 1
+        assert 'class="pill">Final BAD-D</span>' not in response.text
+        assert 'class="risk-label">Final BAD-D</span>' not in response.text
+
+
 def test_clinical_app_has_stable_app_entry():
     with TestClient(canonical_engine.app) as client:
         response = client.get("/app")
