@@ -96,18 +96,25 @@ def runtime_invariants():
         errors.append("Retired workflow monkey-patch remains in production composition")
 
     assessment_source = inspect.getsource(core._run_image_assessment)
-    if "mandatory_source_set_policy.validate_source_set(extraction_results)" not in assessment_source:
+    if "mandatory_source_set_policy.validate_preassessment_requirements(" not in assessment_source:
         errors.append("Mandatory Pentacam source gate is not directly owned by app._run_image_assessment")
+    source_gate = assessment_source.find("mandatory_source_set_policy.validate_preassessment_requirements(")
+    targeted_reread = assessment_source.find("pentacam_targeted_reread.enrich_extraction")
+    geometric_srax = assessment_source.find("geometric_srax_policy.enrich_extraction")
+    if min(source_gate, targeted_reread, geometric_srax) < 0 or not (
+        source_gate < targeted_reread and source_gate < geometric_srax
+    ):
+        errors.append("Mandatory source confirmation must precede targeted reread and geometric SRAX")
     if callable(getattr(mandatory_source_set_policy, "install", None)):
         errors.append("Mandatory Pentacam source policy must not expose a runtime installer")
     if "mandatory_source_set_policy" in phase_names:
         errors.append("Mandatory Pentacam source wrapper remains in runtime composition")
 
     extraction_source = inspect.getsource(core.extract_one_image)
-    if "pentacam_targeted_reread.enrich_extraction(" not in extraction_source:
-        errors.append("Targeted Pentacam reread is not directly owned by app.extract_one_image")
-    if "geometric_srax_policy.enrich_extraction(" not in extraction_source:
-        errors.append("Geometric SRAX is not directly owned by app.extract_one_image")
+    if "pentacam_targeted_reread.enrich_extraction(" in extraction_source:
+        errors.append("Primary extraction performs targeted reread before source-set confirmation")
+    if "geometric_srax_policy.enrich_extraction(" in extraction_source:
+        errors.append("Primary extraction performs geometric SRAX before source-set confirmation")
     if callable(getattr(pentacam_targeted_reread, "install", None)):
         errors.append("Targeted Pentacam reread must not expose a runtime installer")
     if callable(getattr(geometric_srax_policy, "install", None)):

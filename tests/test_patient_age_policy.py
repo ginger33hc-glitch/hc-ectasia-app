@@ -1,5 +1,5 @@
 import pytest
-from patient_age_policy import resolve_patient_age
+from patient_age_policy import apply_surgeon_age_precedence, resolve_patient_age
 
 
 def source(birth, exam, printed=None, screen="FOUR_MAPS_REFRACTIVE"):
@@ -36,3 +36,23 @@ def test_merge_exposes_calculated_age_and_retains_raw_dates():
     assert result["derived_age_years"] == 21
     assert result["patient_age_resolution"]["source"] == "DOB_AT_EXAM"
     assert result["document_contexts"][0]["patient_date_of_birth"] == "2005-03-15"
+
+
+def test_surgeon_entered_age_overrides_derived_conflict_without_erasing_source_audit():
+    warning = "Printed and/or calculated patient ages conflict; enter surgeon-confirmed age."
+    extracted = {
+        "patient_age_resolution": {
+            "age_years": None, "candidate_ages": [31, 32], "warning": warning,
+            "source": "DOB_AT_EXAM", "date_evidence": [{"file": "od.png"}],
+        },
+        "patient_age_conflict_values": [31, 32],
+        "global_warnings": [warning, "another warning"],
+    }
+    resolved = apply_surgeon_age_precedence(extracted, 33)
+    assert resolved["resolved_age_years"] == 33
+    assert resolved["surgeon_confirmed_age_years"] == 33
+    assert resolved["age_source"] == "SURGEON_CONFIRMED"
+    assert "patient_age_conflict_values" not in resolved
+    assert resolved["global_warnings"] == ["another warning"]
+    assert resolved["patient_age_resolution"]["candidate_ages"] == [31, 32]
+    assert "patient_age_conflict_values" in extracted

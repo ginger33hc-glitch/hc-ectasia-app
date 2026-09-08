@@ -914,12 +914,9 @@ def extract_one_image(raw: bytes, filename: str) -> Dict[str, Any]:
         for eye in result.get("eyes", []):
             eye["_source_filename"] = filename
             eye["_pentacam_qs"] = context.get("pentacam_qs", "NOT_SHOWN")
-        # Validate primary values before deciding which fields need a reread.
+        # Primary transcription ends here. The case-level source-set gate runs
+        # before any targeted reread or geometric SRAX processing.
         result["eyes"] = [normalized_eye(eye) for eye in result.get("eyes", [])]
-        result = pentacam_targeted_reread.enrich_extraction(
-            sys.modules[__name__], result, raw, filename
-        )
-        result = geometric_srax_policy.enrich_extraction(result, raw, filename)
         return result
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"OpenAI output was not valid JSON: {exc}") from exc
@@ -979,6 +976,29 @@ async def _run_image_assessment(
             extraction_results = await asyncio.gather(
                 *(extract_bounded(raw, filename) for raw, filename in image_payloads)
             )
+            # Page identity from the primary read is the single source-set authority.
+            # Stop here if one of the five mandatory sources is absent; no targeted
+            # reread, SRAX measurement, merge, clinical score, or report may start.
+            mandatory_source_set = mandatory_source_set_policy.validate_preassessment_requirements(
+                extraction_results, plans
+            )
+
+            async def enrich_bounded(
+                result: Dict[str, Any], raw: bytes, filename: str,
+            ) -> Dict[str, Any]:
+                async with semaphore:
+                    reread = await asyncio.to_thread(
+                        pentacam_targeted_reread.enrich_extraction,
+                        sys.modules[__name__], result, raw, filename,
+                    )
+                    return await asyncio.to_thread(
+                        geometric_srax_policy.enrich_extraction, reread, raw, filename,
+                    )
+
+            extraction_results = await asyncio.gather(*(
+                enrich_bounded(result, raw, filename)
+                for result, (raw, filename) in zip(extraction_results, image_payloads)
+            ))
     except HTTPException:
         raise
     except Exception as exc:
@@ -990,7 +1010,6 @@ async def _run_image_assessment(
 
     from assessment_workflow import begin
     import sys
-    mandatory_source_set = mandatory_source_set_policy.validate_source_set(extraction_results)
     extracted = merge_extractions(extraction_results)
     extracted["mandatory_source_set"] = mandatory_source_set
     return begin(
@@ -1037,6 +1056,8 @@ async def analyze(
         raise HTTPException(400, f"Invalid structured clinical input: {exc}") from exc
     if not isinstance(plans, dict) or not isinstance(modifiers, dict) or not isinstance(metadata, dict):
         raise HTTPException(400, "eye_plans, patient_modifiers, and patient_metadata must be JSON objects.")
+
+    mandatory_source_set_policy.validate_upload_count(len(images))
 
     from operational_security import read_uploads
 

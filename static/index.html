@@ -57,6 +57,7 @@
         <div class="row"><label>Assessment date</label><input id="report_date" type="date"></div>
       </div>
       <div class="row"><label>Pentacam/topography and treatment-card images <span class="required">*</span></label><div class="file-picker-wrap"><input id="imageInput" name="images" type="file" accept="image/*" multiple required><div id="selectedFiles" class="selected-files" aria-live="polite"></div></div></div>
+      <p id="sourceSetStatus" class="note" hidden aria-live="polite"></p>
       <p id="sharedImageNotice" class="alert" hidden></p>
       <h3>Patient-level clinical modifiers</h3>
       <div class="modifier-row">
@@ -277,11 +278,25 @@ const pdfBtn = document.querySelector("#pdfBtn");
 const wordBtn = document.querySelector("#wordBtn");
 const printBtn = document.querySelector("#printBtn");
 const imageInput = document.querySelector("#imageInput");
+const sourceSetStatus = document.querySelector("#sourceSetStatus");
 const sharedImageNotice = document.querySelector("#sharedImageNotice");
 const selectedFiles = document.querySelector("#selectedFiles");
 const manualAgeRow = document.querySelector("#manualAgeRow");
 const ageInput = document.querySelector("#age");
 let selectedFileUrls = [];
+function renderSourceSetStatus(summary){
+  if(!summary||!Array.isArray(summary.required_sources)){
+    sourceSetStatus.hidden=true;sourceSetStatus.textContent="";return;
+  }
+  const required=summary.required_sources.map(item=>
+    `${i18n.translate(item.label)}: ${i18n.translate(item.present?"present":"missing")}`
+  );
+  const card=summary.optional_treatment_card||{};
+  const cardState=card.present?"present":"not provided";
+  sourceSetStatus.textContent=`${i18n.translate("Required image confirmation")}: ${required.join(" • ")} • ${i18n.translate("Optional treatment card")}: ${i18n.translate(cardState)}`;
+  sourceSetStatus.className=summary.confirmed?"note":"alert";
+  sourceSetStatus.hidden=false;
+}
 function resetAgeAcquisition(){
   ageInput.value="";
   ageInput.readOnly=false;
@@ -454,6 +469,7 @@ const wait=milliseconds=>new Promise(resolve=>setTimeout(resolve,milliseconds));
 
 imageInput.addEventListener("change",()=>{
   readiness.reset();reportCard.hidden=true;lastReport=null;
+  renderSourceSetStatus(null);
   assessBtn.disabled=false;assessBtn.textContent=i18n.translate("Assess images and run CER-AI assessment");
   resetAgeAcquisition();
   renderSelectedFiles(imageInput.files);
@@ -719,7 +735,21 @@ f.addEventListener("submit", async (e) => {
     }
     const text=await r.text();
     let j; try{j=JSON.parse(text)}catch{throw new Error("Server returned a non-JSON response: "+text.slice(0,200))}
-    if(!r.ok){if(r.status===410)readiness.reset();throw new Error(j.detail||"Request failed");}
+    const errorDetail=j.detail&&typeof j.detail==="object"?j.detail:null;
+    renderSourceSetStatus(j.extracted?.mandatory_source_set||errorDetail?.source_set);
+    if(!r.ok){
+      if(r.status===410)readiness.reset();
+      let message=errorDetail?.message||j.detail||"Request failed";
+      if(errorDetail?.code==="MANDATORY_SOURCE_SET_INCOMPLETE"){
+        message=i18n.translate("Upload each missing required image before assessment.");
+      }else if(errorDetail?.code==="PREASSESSMENT_REFRACTION_REQUIRED"){
+        message=i18n.translate("No treatment card was provided. Enter complete manifest and intended refraction values for both eyes before assessment.");
+        const firstMissing=errorDetail.missing_refraction?.[0];
+        const input=firstMissing?.form_id?document.getElementById(firstMissing.form_id):null;
+        if(input){input.scrollIntoView({behavior:"smooth",block:"center"});input.focus();}
+      }
+      throw new Error(message);
+    }
     const extractedAge=j.extracted?.derived_age_years;
     const resolvedName=j.patient_metadata?.name;
     if(resolvedName&&!value('patient_name'))document.getElementById('patient_name').value=resolvedName;

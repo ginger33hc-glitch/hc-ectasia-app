@@ -19,7 +19,7 @@ identifiers therefore do not indicate different source files. The review branch 
 from the actual GitHub staging commit, not replace staging with the local history.
 
 Application label: `0.7.71`. Checkpoint policy: `CER-AI-2026-09-08-PRK-ERSS-SHARED-ABLATION`.
-Amended review policy: `CER-AI-2026-09-08-SHARED-PTA-LT40-ELIGIBILITY-V2`.
+Amended review policy: `CER-AI-2026-09-08-SHARED-PTA-LT40-ELIGIBILITY-V2-SURGEON-FIRST`.
 The label alone is insufficient to identify a deployment; retain commit and policy identifiers.
 
 ## Evidence already accepted

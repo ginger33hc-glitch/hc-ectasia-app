@@ -8,13 +8,15 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 
 ## Case and source integrity gate
 
+- Require OD and OS Four Maps Refractive, OD and OS Belin/Ambrosio Display, and one bilateral Show 2 Exams Topometric page. Primary page identification confirms this five-page set before targeted rereading, geometric SRAX, merge, clinical scoring, or reporting. One excimer treatment card is optional as the sixth image. If it is absent, complete surgeon-entered manifest and intended refraction for both eyes is required before assessment continues.
 - Age is calculated in `patient_age_policy.py` as completed years at the Four Maps Refractive examination date from its labeled Date of Birth. Raw dates and calculation provenance are retained. Surgeon-entered age takes precedence; conflicting or age-ambiguous dates require confirmation. The image model transcribes dates without performing arithmetic.
 - Report patient name uses one block: First Name / Last Name in the upper-left OD 4 Maps Refractive header (first supplied OD page). Use OS only when OD Four Maps is absent. An unreadable selected header requests surgeon entry; other-page name readings do not select or veto the report name. Patient-ID safety checks remain separate.
 - Extract and compare patient ID/name, printed age, date of birth, examination date/time, laterality, filename, and
   literal Pentacam QS.
-- Conflicting patient age or Pentacam examination date prohibits PASS; identity uncertainty remains
+- Unresolved patient age or a conflicting Pentacam examination date prohibits PASS; identity uncertainty remains
   a visible surgeon-confirmation warning without suppressing the eye assessments.
-- A mismatch between entered and source patient ID or derived age prohibits PASS.
+- Surgeon-entered age is authoritative and does not conflict with printed or date-derived age. Source age evidence remains in the audit record.
+- Every surgeon-entered or surgeon-confirmed field is authoritative. Image-derived and calculated values may fill blank fields only; they do not overwrite or create a conflict against a surgeon value.
 - Both OD and OS are required for overall PASS; eyes remain separately assessed and are not averaged.
 - An unclassified upload, an upload yielding no usable eye/treatment data, or an unresolved
   decision-critical field conflict prohibits PASS.

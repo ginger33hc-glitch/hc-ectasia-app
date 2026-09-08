@@ -43,7 +43,7 @@ def test_turkish_exports_translate_current_report_sections_and_preserve_snapshot
             'Kaynak: Axial/Sagittal Curvature (Front).',
             'No Source Şule Işık', 'PASS-NO-035', 'Dr. Çağrı Şen',
             'SHOW_2_CORNEA_BACK / show2.png', 'BAD_D_STRIP / OD-bad.png',
-                'CER-AI-2026-09-08-SHARED-PTA-LT40-ELIGIBILITY-V2',
+                'CER-AI-2026-09-08-SHARED-PTA-LT40-ELIGIBILITY-V2-SURGEON-FIRST',
         ):
             assert required in content
         for obsolete in ('Canonical result', 'Procedure disposition', 'selected_plan',

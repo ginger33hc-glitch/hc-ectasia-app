@@ -58,10 +58,14 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
   corresponding Pentacam source-region keys, so the localized unread crop can appear beside the
   surgeon-entry field instead of producing an instruction without a visible source box.
 
-- A confident Excimer Laser Takip Kartı `Düzeltme Miktarı` remains the initial source for both
-  manifest and intended refraction. If the card is unreadable, readiness requests only manifest;
-  intended initially follows the completed manifest values and remains independently editable by
-  the surgeon. An explicit intended entry always overrides this default.
+- The five mandatory Pentacam pages are confirmed immediately after primary page identification,
+  before targeted rereading, SRAX derivation, merging, scoring, or reporting. The optional treatment
+  card is reported as present or not provided. When it is absent, the pre-assessment gate requires
+  complete surgeon-entered manifest and intended refraction for both eyes.
+- A confident Excimer Laser Takip Kartı `Düzeltme Miktarı` may fill blank manifest and intended
+  refraction fields. Any surgeon-entered field is authoritative and cannot be overwritten or treated
+  as conflicting by an image-derived or calculated value. This precedence also applies to a
+  surgeon-entered maximum ablation versus an EX500 reading.
 
 - `runtime_composition.py` is the single ordered production assembly point. Clinical policy,
   Pentacam extraction, reporting/readiness, and access/persistence are owned by explicit phases;
@@ -119,7 +123,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Source identity review reads Pentacam patient names only from the labeled `First Name` and `Last Name` demographics fields and records the source filename. An unreadable or unverified name produces a prominent surgeon-confirmation warning without suppressing the eye assessments; acquisition-date conflicts and unclassified/unusable uploads remain clinical/source blockers.
 - Pentacam QS is recorded per acquisition; absent, unreadable, or visible non-OK QS produces a final
   surgeon warning but does not by itself prevent a report based on readable clinical measurements.
-- Age is read from the explicitly printed Pentacam age; a conflicting manually entered age remains a blocker. Date of birth is not collected.
+- Age is read from the explicitly printed Pentacam age when no surgeon-confirmed age is supplied; a surgeon entry has precedence. Date of birth is not collected.
 - Preoperative manifest refraction is separated from intended treatment correction. LASIK ERSS MRSE uses only the former; ablation and CER-AI treatment-range gates use only the latter.
 - Prior PRK/LASIK/SMILE short-circuits virgin-cornea scoring and routes to `POST-REFRACTIVE PATHWAY REQUIRED`.
 - Published five-component LASIK ERSS scoring and categories.

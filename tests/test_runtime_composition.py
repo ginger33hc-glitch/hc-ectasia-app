@@ -90,8 +90,12 @@ def test_every_runtime_topic_is_owned_by_one_phase():
     assert "pentacam_targeted_reread" not in owners
     assert "geometric_srax_policy" not in owners
     extraction_source = inspect.getsource(canonical_engine.core.extract_one_image)
-    assert "pentacam_targeted_reread.enrich_extraction(" in extraction_source
-    assert "geometric_srax_policy.enrich_extraction(" in extraction_source
+    assessment_source = inspect.getsource(canonical_engine.core._run_image_assessment)
+    assert "pentacam_targeted_reread.enrich_extraction(" not in extraction_source
+    assert "geometric_srax_policy.enrich_extraction(" not in extraction_source
+    gate = assessment_source.index("mandatory_source_set_policy.validate_preassessment_requirements(")
+    assert gate < assessment_source.index("pentacam_targeted_reread.enrich_extraction")
+    assert gate < assessment_source.index("geometric_srax_policy.enrich_extraction")
     assert owners["reports"] == "canonical_reporting"
     assert "report_export_guard" not in owners
     assert "ps3_report_policy" not in owners

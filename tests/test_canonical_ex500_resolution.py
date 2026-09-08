@@ -36,16 +36,23 @@ def _ex500(eye="OD", value=92.0, *, profile=92.0, max_status="CONFIDENT", profil
     }
 
 
-def test_single_confident_ex500_value_replaces_entered_ablation_at_canonical_plan_resolution():
+def test_surgeon_entered_ablation_is_authoritative_over_ex500_value_without_conflict():
     extracted = {"eyes": [_eye()], "laser_plans": [_ex500(value=92.0)]}
     resolved = resolve_eye_plan(_plan(80.0), extracted=extracted, eye_name="OD")
+    assert resolved["ablation_um"] == 80.0
+    assert "max_ablation_um" not in resolved
+    assert "ablation_source" not in resolved
+    assert "correction_warnings" not in resolved
+    inp = build_clinical_core_input(_eye(), _plan(80.0), age_years=30, extracted=extracted)
+    assert inp.ablation_um == 80.0
+
+
+def test_blank_ablation_can_be_filled_from_one_confident_ex500_value():
+    extracted = {"eyes": [_eye()], "laser_plans": [_ex500(value=92.0)]}
+    resolved = resolve_eye_plan(_plan(None), extracted=extracted, eye_name="OD")
     assert resolved["ablation_um"] == 92.0
     assert resolved["max_ablation_um"] == 92.0
     assert resolved["ablation_source"] == "ALCON_WAVELIGHT_EX500_DISPLAYED_MAXIMAL_ABLATION"
-    assert resolved["laser_platform"] == "Alcon WaveLight EX500"
-    assert any("replaced" in warning for warning in resolved["correction_warnings"])
-    inp = build_clinical_core_input(_eye(), _plan(80.0), age_years=30, extracted=extracted)
-    assert inp.ablation_um == 92.0
 
 
 def test_ex500_profile_conflict_never_overwrites_existing_plan_ablation():
@@ -53,7 +60,7 @@ def test_ex500_profile_conflict_never_overwrites_existing_plan_ablation():
     resolved = resolve_eye_plan(_plan(80.0), extracted=extracted, eye_name="OD")
     assert resolved["ablation_um"] == 80.0
     assert "ablation_source" not in resolved
-    assert any("DATA CONFLICT" in warning for warning in resolved["correction_warnings"])
+    assert "correction_warnings" not in resolved
 
 
 def test_multiple_distinct_confident_ex500_values_never_choose_one():
@@ -64,7 +71,7 @@ def test_multiple_distinct_confident_ex500_values_never_choose_one():
     resolved = resolve_eye_plan(_plan(80.0), extracted=extracted, eye_name="OD")
     assert resolved["ablation_um"] == 80.0
     assert "ablation_source" not in resolved
-    assert any("multiple confident" in warning for warning in resolved["correction_warnings"])
+    assert "correction_warnings" not in resolved
 
 
 def test_ex500_resolution_is_eye_specific_and_never_cross_fills():
@@ -72,7 +79,7 @@ def test_ex500_resolution_is_eye_specific_and_never_cross_fills():
         "eyes": [_eye("OD"), _eye("OS")],
         "laser_plans": [_ex500("OD", 91.0, profile=91.0), _ex500("OS", 103.0, profile=103.0)],
     }
-    resolved = resolve_case_plans(extracted, {"OD": _plan(80.0), "OS": _plan(80.0)})
+    resolved = resolve_case_plans(extracted, {"OD": _plan(None), "OS": _plan(None)})
     assert resolved["OD"]["ablation_um"] == 91.0
     assert resolved["OS"]["ablation_um"] == 103.0
 

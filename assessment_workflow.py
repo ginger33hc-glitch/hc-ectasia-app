@@ -19,6 +19,7 @@ from pentacam_field_registry import COMPLETION_NUMERIC_FIELDS
 from pentacam_canonical_source_lock import canonical_source_region
 from pentacam_quality_policy import is_quality_only_issue
 from pentacam_source_regions import region_hints
+from patient_age_policy import apply_surgeon_age_precedence
 
 _lock = RLock()
 _sessions = {}
@@ -460,6 +461,8 @@ def _resolve_patient_metadata(metadata, extracted, age):
 def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
     if age is None:
         age = session["extracted"].get("derived_age_years")
+    else:
+        session["extracted"] = apply_surgeon_age_precedence(session["extracted"], age)
     for value in (plans, modifiers, metadata):
         if not isinstance(value, dict):
             raise HTTPException(422, "Clinical inputs must be objects.")

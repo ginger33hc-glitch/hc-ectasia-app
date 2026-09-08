@@ -8,7 +8,7 @@ from pentacam_canonical_source_lock import BAD_CENTER
 
 
 @pytest.mark.parametrize("verified, source", [(False, BAD_CENTER), (True, None)])
-def test_primary_axis_rejected_by_source_gate_gets_real_reread_opportunity(monkeypatch, verified, source):
+def test_primary_axis_rejected_by_source_lock_remains_available_to_post_gate_reread(monkeypatch, verified, source):
     primary = {"document_context": {"document_type": "PENTACAM_TOPOGRAPHY"}, "eyes": [{
         "eye": "OS", "screen_types": ["BAD_DISPLAY"], "bad_flat_axis_deg": 178.5,
         "table_verified_numeric_fields": ["bad_flat_axis_deg"] if verified else [],
@@ -28,6 +28,8 @@ def test_primary_axis_rejected_by_source_gate_gets_real_reread_opportunity(monke
             targets, filename)
     monkeypatch.setattr(reread, "enrich_extraction", second_pass)
     extracted = app.extract_one_image(b"test", "bad.jpg")
-    eye = app.merge_extractions([extracted])["eyes"][0]
+    assert extracted["eyes"][0]["bad_flat_axis_deg"] is None
+    enriched = reread.enrich_extraction(app, extracted, b"test", "bad.jpg")
+    eye = app.merge_extractions([enriched])["eyes"][0]
     assert eye["bad_flat_axis_deg"] == 178.5
     assert eye["canonical_source_ids"]["bad_flat_axis_deg"] == BAD_CENTER

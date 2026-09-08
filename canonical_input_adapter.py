@@ -11,9 +11,10 @@ Treatment-role precedence is explicit:
    wholly blank.
 A partially entered role is never completed from another source.
 
-A conflict-free, directly displayed Alcon WaveLight EX500 Maximal Ablation is the
-canonical ablation input when available. Conflicting/uncertain EX500 values never
-overwrite the existing plan value.
+A surgeon-entered maximum ablation is authoritative. Only when that field is
+blank may a conflict-free, directly displayed Alcon WaveLight EX500 Maximal
+Ablation supply it. Machine-derived values and conflicts never replace or
+challenge a surgeon-entered value.
 """
 from __future__ import annotations
 
@@ -257,22 +258,19 @@ def resolve_eye_plan(
             if _role_supplied(resolved, "intended"):
                 resolved["intended_source"] = "DEFAULTED_FROM_MANIFEST"
 
-    ex500_value, ex500_warnings = _ex500_ablation(extracted, eye_name)
     warnings = list(resolved.get("correction_warnings") or [])
-    warnings.extend(ex500_warnings)
-    if ex500_value is not None:
-        previous = _first_number(resolved, "max_ablation_um", "ablation_um")
-        if previous is not None and abs(previous - ex500_value) > 0.5:
+    surgeon_ablation = _first_number(resolved, "max_ablation_um", "ablation_um")
+    if surgeon_ablation is None:
+        ex500_value, ex500_warnings = _ex500_ablation(extracted, eye_name)
+        warnings.extend(ex500_warnings)
+        if ex500_value is not None:
+            resolved["max_ablation_um"] = ex500_value
+            resolved["ablation_um"] = ex500_value
+            resolved["ablation_source"] = "ALCON_WAVELIGHT_EX500_DISPLAYED_MAXIMAL_ABLATION"
+            resolved["laser_platform"] = "Alcon WaveLight EX500"
             warnings.append(
-                f"{eye_name} entered/calculated ablation {previous:g} µm was replaced by the directly displayed EX500 Maximal Ablation {ex500_value:g} µm."
+                f"{eye_name} maximum ablation uses the directly displayed Alcon WaveLight EX500 Maximal Ablation value ({ex500_value:g} µm); no value was reconstructed."
             )
-        resolved["max_ablation_um"] = ex500_value
-        resolved["ablation_um"] = ex500_value
-        resolved["ablation_source"] = "ALCON_WAVELIGHT_EX500_DISPLAYED_MAXIMAL_ABLATION"
-        resolved["laser_platform"] = "Alcon WaveLight EX500"
-        warnings.append(
-            f"{eye_name} maximum ablation uses the directly displayed Alcon WaveLight EX500 Maximal Ablation value ({ex500_value:g} µm); no value was reconstructed."
-        )
     if warnings:
         resolved["correction_warnings"] = list(dict.fromkeys(warnings))
 

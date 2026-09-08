@@ -1,4 +1,5 @@
-"""Resolve patient age at the Pentacam examination, without model arithmetic."""
+"""Resolve patient age and enforce surgeon-entered age precedence."""
+from copy import deepcopy
 from datetime import date
 from exam_date_reconciliation_policy import possible_calendar_dates, _is_four_maps_refractive
 
@@ -39,3 +40,21 @@ def resolve_patient_age(extractions):
     value = next(iter(ages)) if len(ages) == 1 and not problem else None
     return {"age_years": value, "candidate_ages": sorted(ages), "warning": problem,
             "source": "DOB_AT_EXAM" if derived else "PRINTED_AGE", "date_evidence": evidence}
+
+
+def apply_surgeon_age_precedence(extracted, surgeon_age):
+    """Keep source evidence but remove derived-age conflict when the surgeon enters age."""
+    working = deepcopy(extracted)
+    if not isinstance(surgeon_age, int) or isinstance(surgeon_age, bool):
+        return working
+    resolution = working.get("patient_age_resolution") or {}
+    warning = resolution.get("warning")
+    if warning:
+        working["global_warnings"] = [
+            item for item in working.get("global_warnings") or [] if item != warning
+        ]
+    working.pop("patient_age_conflict_values", None)
+    working["surgeon_confirmed_age_years"] = surgeon_age
+    working["resolved_age_years"] = surgeon_age
+    working["age_source"] = "SURGEON_CONFIRMED"
+    return working

@@ -48,6 +48,22 @@ def test_hidden_reports_stay_hidden_when_printing_and_after_edits():
     assert "f.addEventListener('change',()=>{reportCard.hidden=true;lastReport=null;})" in html
 
 
+def test_preassessment_source_confirmation_and_refraction_prompt_are_visible():
+    html = (ROOT / 'static/index.html').read_text()
+    translations = (ROOT / 'static/i18n.js').read_text()
+    assert 'id="sourceSetStatus"' in html
+    assert 'summary.required_sources.map' in html
+    assert 'summary.optional_treatment_card' in html
+    assert 'MANDATORY_SOURCE_SET_INCOMPLETE' in html
+    assert 'PREASSESSMENT_REFRACTION_REQUIRED' in html
+    assert 'errorDetail.missing_refraction?.[0]' in html
+    for label in (
+        'Required image confirmation', 'Optional treatment card', 'present',
+        'missing', 'not provided', 'No treatment card was provided.',
+    ):
+        assert label in translations
+
+
 def test_manifest_defaults_intended_until_surgeon_edits_intended():
     if not shutil.which('node'):
         pytest.skip('Node is not available')

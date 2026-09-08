@@ -41,7 +41,9 @@ def test_phase1_contract_uses_direct_canonical_clinical_authority():
     }
 
     assessment_source = inspect.getsource(canonical_engine.core._run_image_assessment)
-    assert "mandatory_source_set_policy.validate_source_set(extraction_results)" in assessment_source
+    gate = assessment_source.index("mandatory_source_set_policy.validate_preassessment_requirements(")
+    assert gate < assessment_source.index("pentacam_targeted_reread.enrich_extraction")
+    assert gate < assessment_source.index("geometric_srax_policy.enrich_extraction")
     assert not callable(getattr(mandatory_source_set_policy, "install", None))
     assert "mandatory_source_set_policy" not in {
         name for values in runtime_composition.COMPOSITION_PHASES.values() for name in values

@@ -136,6 +136,18 @@ def test_explicit_intended_role_outranks_treatment_card_for_that_role_only():
     assert resolved["intended_cylinder_signed_D"] == -0.5
     assert resolved["intended_axis_deg"] == 70.0
     assert "intended_source" not in resolved
+    assert "correction_warnings" not in resolved
+
+
+def test_explicit_manifest_and_intended_values_create_no_card_conflict():
+    plan = _plan()
+    extracted = {"eyes": [_eye("OD")], "treatment_corrections": [_card(sphere=-8.0)]}
+    resolved = resolve_eye_plan(plan, extracted=extracted, eye_name="OD")
+    assert resolved["manifest_entered_sphere_D"] == plan["manifest_entered_sphere_D"]
+    assert resolved["intended_entered_sphere_D"] == plan["intended_entered_sphere_D"]
+    assert "manifest_source" not in resolved
+    assert "intended_source" not in resolved
+    assert "correction_warnings" not in resolved
 
 
 def test_wholly_blank_intended_role_defaults_from_manifest_without_card():
