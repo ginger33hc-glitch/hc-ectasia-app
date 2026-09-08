@@ -5,6 +5,7 @@ import pytest
 from fastapi import HTTPException
 
 import app
+import assessment_workflow
 import canonical_engine
 import mandatory_source_set_policy as policy
 import operational_security
@@ -169,6 +170,48 @@ def test_source_or_no_card_refraction_failure_prevents_all_enrichment(
         asyncio.run(app._run_image_assessment(payloads, 30, plans, {}, {}))
     expected = "MANDATORY_SOURCE_SET_INCOMPLETE" if missing_source else "PREASSESSMENT_REFRACTION_REQUIRED"
     assert exc.value.detail["code"] == expected
+
+
+def test_complete_intake_runs_post_gate_enrichment_and_enters_workflow(monkeypatch):
+    sources = complete_set(False)
+    payloads = [(b"image", f"source-{index}.png") for index in range(len(sources))]
+    by_name = {filename: source for source, (_raw, filename) in zip(sources, payloads)}
+    calls = []
+
+    monkeypatch.setattr(app, "extract_one_image", lambda raw, filename: by_name[filename])
+    monkeypatch.setattr(operational_security, "admit_analysis", lambda: None)
+
+    @asynccontextmanager
+    async def slot():
+        yield
+
+    monkeypatch.setattr(operational_security, "analysis_slot", slot)
+
+    def targeted(core, result, raw, filename):
+        calls.append(("targeted", filename))
+        return result
+
+    def geometric(result, raw, filename):
+        calls.append(("geometric", filename))
+        return result
+
+    monkeypatch.setattr(app.pentacam_targeted_reread, "enrich_extraction", targeted)
+    monkeypatch.setattr(app.geometric_srax_policy, "enrich_extraction", geometric)
+    monkeypatch.setattr(app, "merge_extractions", lambda results: {"eyes": [], "items": results})
+    monkeypatch.setattr(
+        assessment_workflow, "begin",
+        lambda core, extracted, age, plans, modifiers, metadata, source_images: {
+            "entered_workflow": True, "extracted": extracted,
+        },
+    )
+
+    result = asyncio.run(app._run_image_assessment(
+        payloads, 30, complete_refraction_plans(), {}, {},
+    ))
+    assert result["entered_workflow"] is True
+    assert result["extracted"]["mandatory_source_set"]["confirmed"] is True
+    assert len([call for call in calls if call[0] == "targeted"]) == 5
+    assert len([call for call in calls if call[0] == "geometric"]) == 5
 
 
 def test_legacy_bad_component_signature_recognizes_od_page_even_if_screen_type_is_imperfect():

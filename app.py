@@ -1009,7 +1009,6 @@ async def _run_image_assessment(
         ) from exc
 
     from assessment_workflow import begin
-    import sys
     extracted = merge_extractions(extraction_results)
     extracted["mandatory_source_set"] = mandatory_source_set
     return begin(
