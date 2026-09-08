@@ -21,6 +21,7 @@ import geometric_srax_policy
 
 import mandatory_source_set_policy
 from exam_date_reconciliation_policy import authoritative_exam_date_conflict
+from patient_age_policy import resolve_patient_age
 from pentacam_canonical_source_lock import (
     CANONICAL_FIELD_SOURCES, LOCKED_FIELDS, canonical_source_id,
 )
@@ -96,6 +97,7 @@ SCHEMA = {
                     ],
                 },
                 "patient_age_years": {"type": ["integer", "null"]},
+                "patient_date_of_birth": {"type": ["string", "null"]},
                 "exam_date": {"type": ["string", "null"]},
                 "exam_time": {"type": ["string", "null"]},
                 "laterality": {"type": "string", "enum": ["OD", "OS", "BOTH", "UNKNOWN"]},
@@ -107,7 +109,7 @@ SCHEMA = {
             },
             "required": [
                 "document_type", "patient_id", "patient_last_name", "patient_first_name",
-                "patient_name", "patient_name_source", "patient_age_years", "exam_date",
+                "patient_name", "patient_name_source", "patient_age_years", "patient_date_of_birth", "exam_date",
                 "exam_time", "laterality", "pentacam_qs", "missing_or_unreadable",
             ],
         },
@@ -303,7 +305,10 @@ If the patient-ID label or its value is not clearly readable, return patient_id=
 when other identity fields are absent or unreadable. Patient age is one patient-level value shared by
 OD and OS: on every Pentacam source, inspect the top patient-demographics/header area for the explicitly
 printed Age field, but return it only when the label and completed-year integer are both unambiguous.
-Do not extract or return date of birth. Never calculate age from another field and never
+On 4 Maps Refractive, transcribe the labeled Date of Birth exactly into patient_date_of_birth,
+preserving the printed date format. Return null if absent or unreadable. The canonical engine
+calculates completed years from this date and the examination date. Never perform date arithmetic
+in the image extraction or place calculated age in patient_age_years. Never
 infer that two images belong to the same patient merely because their laterality matches. For a Pentacam image, transcribe
 the device quality specification only when the literal QS status is visible. Use OK only for an
 explicitly visible acceptable/OK QS. Use NOT_OK for a visible non-OK status, UNREADABLE when the QS
@@ -709,10 +714,9 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         for c in pentacam_contexts
     ]
     names = {name for name in normalized_names if name}
-    pentacam_ages = {
-        int(c["patient_age_years"]) for c in pentacam_contexts
-        if is_number(c.get("patient_age_years"))
-    }
+    age_resolution = resolve_patient_age(results)
+    merged["patient_age_resolution"] = age_resolution
+    pentacam_ages = set(age_resolution["candidate_ages"])
     shared_readable_name = (
         bool(normalized_names)
         and all(normalized_names)
@@ -733,14 +737,13 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             "PATIENT IDENTITY NOT VERIFIED: different patient names were read from the Pentacam "
             f"First Name / Last Name fields ({identity_readings}). Surgeon confirmation is required."
         )
-    if len(pentacam_ages) > 1:
+    if age_resolution["warning"]:
         merged["patient_age_conflict_values"] = sorted(pentacam_ages)
         merged["global_warnings"].append(
-            "Different printed patient ages were transcribed across Pentacam sources; "
-            "no image-derived age was used and one surgeon-confirmed patient age is required."
+            age_resolution["warning"]
         )
-    elif len(pentacam_ages) == 1:
-        merged["derived_age_years"] = next(iter(pentacam_ages))
+    elif age_resolution["age_years"] is not None:
+        merged["derived_age_years"] = age_resolution["age_years"]
     if len(ids) > 1:
         if identity_corroborated_by_name_and_age:
             merged["identity_warnings"].append(

@@ -424,6 +424,8 @@ def _precore_response(token, session, readiness, plans):
 
 
 def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
+    if age is None:
+        age = session["extracted"].get("derived_age_years")
     for value in (plans, modifiers, metadata):
         if not isinstance(value, dict):
             raise HTTPException(422, "Clinical inputs must be objects.")
