@@ -166,11 +166,11 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
   (`PASS` or `CAUTION`). It extracts labeled K1/K2 axes and the Pentacam horizontal
   white-to-white (HWTW) value when available, applies the active Turkish ML7 vacuum-ring/blade
   reference, and applies the CER-AI
-  `steep K − flat K >4.00 D` hinge rule. The output uses physical hinge location rather than a
-  contradictory rotated numeric hinge axis: vertical steep meridians from 60° through 120°
-  prefer a superior hinge, while horizontal
-  steep meridians from 0° through 30° or 150° through 180° prefer a temporal hinge with nasal
-  secondary. Intervening oblique meridians require surgeon determination of the physical hinge site.
+  `steep K − flat K >4.00 D` hinge rule. Temporal is the default preferred hinge. The output uses
+  physical hinge location rather than a contradictory rotated numeric hinge axis: vertical steep
+  meridians from 60° through 120° change the preference to superior, while horizontal steep
+  meridians from 0° through 30° or 150° through 180° retain temporal with nasal secondary.
+  Intervening oblique or unavailable axes retain temporal and require surgeon judgment before change.
   When the preferred superior hinge is anatomically impractical, a `+10` temporal/nasal alternative
   is shown only if projected RSB remains `>=300 µm` and projected PTA remains `<40%`. The module
   cannot change the ectasia status.

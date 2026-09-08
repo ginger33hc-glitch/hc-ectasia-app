@@ -5,7 +5,8 @@ produce a surgeon-review recommendation after a favorable LASIK assessment and
 can never change the CER-AI disposition.
 
 Source rules: the user-supplied Turkish ML7 reference (MED-LOGICS document
-200-0386, Rev. 22) plus the binding CER-AI hinge rule for a K spread >4.00 D.
+200-0386, Rev. 22) plus the binding CER-AI temporal-default hinge rule and
+steep-meridian amendment for a K spread >4.00 D.
 """
 from dataclasses import asdict, dataclass, field
 from typing import Optional, Tuple
@@ -187,9 +188,11 @@ def plan_microkeratome(inp: MicrokeratomePlanningInput) -> MicrokeratomePlan:
             warnings.append("Ablation/transition zone is not 0.4-0.5 mm smaller than the selected ring (active ML7 reference optimum).")
 
     delta = round(steep - flat, 2) if steep is not None and flat is not None else None
-    primary_hinge = None
+    # Canonical baseline: temporal is the preferred hinge unless the high-
+    # astigmatism steep-meridian rule below explicitly changes it.
+    primary_hinge = "Temporal hinge (default)"
     steep_meridian_axis = None
-    hinge_location = None
+    hinge_location = "Temporal"
     hinge_location_alternative = None
     alternative_hinge = None
     alternative_rsb = alternative_pta = None
@@ -214,13 +217,20 @@ def plan_microkeratome(inp: MicrokeratomePlanningInput) -> MicrokeratomePlan:
                 )
             else:
                 primary_hinge = (
-                    f"Oblique steep meridian ({steep_meridian_axis:.0f}°); "
-                    "surgeon determines the anatomical hinge location"
+                    f"Temporal hinge remains the default; oblique steep meridian "
+                    f"({steep_meridian_axis:.0f}°) requires surgeon judgment"
                 )
+                hinge_location = "Temporal"
         elif steep_axis is None:
-            warnings.append("K spread is >4.00 D, but the steep K axis is unavailable; the physical hinge preference cannot be determined.")
+            warnings.append(
+                "K spread is >4.00 D, but the steep K axis is unavailable; "
+                "temporal remains the default and no axis-based change was made."
+            )
         else:
-            warnings.append("Steep K axis is outside 0-180°; the physical hinge preference was not determined.")
+            warnings.append(
+                "Steep K axis is outside 0-180°; temporal remains the default "
+                "and no axis-based change was made."
+            )
 
         # The +10 temporal/nasal contingency is specific to a vertical steep
         # meridian when the preferred superior hinge is anatomically impractical.

@@ -74,20 +74,34 @@ def test_horizontal_steep_meridian_prefers_temporal_hinge(steep_axis):
 
 
 @pytest.mark.parametrize("steep_axis", [30.01, 45, 59.99, 120.01, 135, 149.99])
-def test_oblique_steep_meridian_does_not_invent_a_physical_hinge_location(steep_axis):
+def test_oblique_high_astigmatism_retains_temporal_default(steep_axis):
     p = plan_microkeratome(base(steepest_k_d=46.1, flattest_k_d=42.0, steep_axis_deg=steep_axis))
     assert p.steep_meridian_axis_deg == pytest.approx(steep_axis, abs=0.1)
-    assert p.hinge_location_preference is None
+    assert p.hinge_location_preference == "Temporal"
     assert p.hinge_location_alternative is None
-    assert "Oblique steep meridian" in p.primary_hinge
+    assert "Temporal hinge remains the default" in p.primary_hinge
+    assert "requires surgeon judgment" in p.primary_hinge
 
 
 def test_delta_k_exact_four_does_not_trigger_hc_rule():
     p = plan_microkeratome(base(steepest_k_d=46.0, flattest_k_d=42.0))
     assert p.delta_k_d == 4.0
-    assert p.primary_hinge is None
+    assert p.primary_hinge == "Temporal hinge (default)"
     assert p.steep_meridian_axis_deg is None
-    assert p.hinge_location_preference is None
+    assert p.hinge_location_preference == "Temporal"
+
+
+def test_temporal_is_default_when_delta_k_or_axis_is_unavailable():
+    missing_k = plan_microkeratome(base(steepest_k_d=None, flattest_k_d=None))
+    assert missing_k.primary_hinge == "Temporal hinge (default)"
+    assert missing_k.hinge_location_preference == "Temporal"
+
+    missing_axis = plan_microkeratome(base(
+        steepest_k_d=47, flattest_k_d=42, steep_axis_deg=None,
+    ))
+    assert missing_axis.primary_hinge == "Temporal hinge (default)"
+    assert missing_axis.hinge_location_preference == "Temporal"
+    assert any("temporal remains the default" in warning for warning in missing_axis.warnings)
 
 
 def test_anatomic_exception_requires_rsb_pta_clearance():
