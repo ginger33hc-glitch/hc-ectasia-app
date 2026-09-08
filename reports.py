@@ -185,6 +185,9 @@ def assert_complete_report_payload(payload: Mapping[str, Any]) -> list[dict[str,
         nice = report.get("nice") or {}
         if nice.get("total") is None or nice.get("missing"):
             errors.append(f"{eye}: NICE is incomplete")
+        bad = report.get("bad") or {}
+        if bad.get("final_d") is None or bad.get("classification") == "UNAVAILABLE":
+            errors.append(f"{eye}: Final BAD-D is incomplete")
         ps3 = report.get("ps3") or {}
         if not ps3.get("complete") or ps3.get("missing_keys"):
             errors.append(f"{eye}: PS3 is incomplete")

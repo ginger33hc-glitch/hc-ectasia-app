@@ -89,6 +89,9 @@ def _decision_reasons(core_result: Mapping[str, Any]) -> list[str]:
 
 def _missing(core_result: Mapping[str, Any], eligibility_missing=()) -> list[str]:
     missing = []
+    bad = core_result.get("bad_d") or {}
+    if bad.get("classification") == "UNAVAILABLE":
+        missing.append("BAD-D: BAD_D")
     erss = core_result.get("erss") or {}
     for key in erss.get("missing") or []:
         missing.append(f"Randleman: {key}")

@@ -137,6 +137,12 @@ def test_full_report_rejects_incomplete_ps3_even_when_an_immediate_stop_exists()
         reports.canonical_report_model(payload)
 
 
+def test_full_report_rejects_unavailable_final_bad_d():
+    payload = _payload(BAD_D=None)
+    with pytest.raises(reports.ReportContractError, match="Final BAD-D is incomplete"):
+        reports.canonical_report_model(payload)
+
+
 def test_report_module_has_no_scorer_import_threshold_or_runtime_patch():
     source = inspect.getsource(reports)
     assert "clinical_core.erss" not in source

@@ -128,7 +128,7 @@ def _with_region(item, extracted):
 
 def _required_system(message):
     prefix = str(message).split(":", 1)[0].strip()
-    return prefix if prefix in {"Randleman", "NICE", "PS3", "Safety"} else "CER-AI"
+    return prefix if prefix in {"Randleman", "NICE", "PS3", "BAD-D", "Safety"} else "CER-AI"
 
 
 def _source_number_request(eye, key, label, extracted, *, required_for="CER-AI"):
@@ -217,6 +217,7 @@ def _request(eye, message, extracted):
         return _source_number_request(eye, "I_S", "Signed I-S (D)", extracted, required_for=_required_system(text))
 
     exact_source_fields = {
+        "bad-d: bad_d": "BAD_D",
         "nice: k2_d": "K2_D",
         "nice: central_pachy_um": "central_pachy_um",
         "nice: b_ele_th_um": "B_Ele_Th_um",

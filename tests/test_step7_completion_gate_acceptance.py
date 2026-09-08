@@ -112,6 +112,30 @@ def test_missing_nice_central_pachymetry_blocks_report_with_one_canonical_reques
     assert "Pupil Center (+)" in requests[0]["label"]
 
 
+def test_missing_final_bad_d_blocks_report_and_requests_only_canonical_d_box():
+    session = _session(od=_eye("OD", BAD_D=None))
+    first = _respond(session)
+    assert first["workflow_status"] == "NEEDS_INPUT"
+    assert first["report_token"] is None
+    requests = [
+        item for item in first["input_requests"]
+        if item.get("eye") == "OD" and item.get("key") == "BAD_D"
+    ]
+    assert len(requests) == 1
+    assert requests[0]["kind"] == "number"
+    assert requests[0]["required_for"] == ["BAD-D"]
+    assert requests[0]["source_box"] == "bottom BAD-D strip → D"
+
+    second = _respond(session, overrides={"OD": {"BAD_D": 1.2}})
+    assert second["workflow_status"] == "READY"
+    assert second["report_token"]
+    od = next(item for item in second["extracted"]["eyes"] if item["eye"] == "OD")
+    assert od["BAD_D"] == 1.2
+    assert od["field_provenance"]["BAD_D"] == [{"source": "SURGEON_CONFIRMED"}]
+    corrections = second["decision"]["eyes"][0]["report_payload"]["manual_corrections"]
+    assert {"field": "BAD_D", "original": None, "value": 1.2, "label": "SURGEON_CONFIRMED"} in corrections
+
+
 def test_missing_ps3_ppi_average_blocks_report_with_one_canonical_ppi_request():
     result = _respond(_session(od=_eye("OD", PPI_avg=None)), procedure="PRK")
     assert result["workflow_status"] == "NEEDS_INPUT"
