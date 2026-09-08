@@ -1,11 +1,12 @@
-"""Targeted second-pass transcription for small Pentacam numeric panels.
+"""Targeted second-pass transcription for Pentacam labeled fields.
 
 This module is an extraction-only adapter.  It never changes clinical policy,
 calculates a missing Pentacam index, or overwrites a value from the general
 extractor.  When a Pentacam image contains still-missing labeled values, the
-adapter submits the original plus four overlapping crops and, for missing age,
-one focused header crop to a structured reread. It accepts only high-confidence
-label/value pairs.
+adapter submits the original plus four overlapping crops and, when needed, one
+focused header crop to a structured reread. It accepts only high-confidence
+label/value pairs. Conflicting authoritative Four Maps examination dates are
+reread here but promoted only by the case-level date policy after both eyes agree.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ import re
 from typing import Any
 
 from PIL import Image, ImageOps
+from exam_date_reconciliation_policy import possible_calendar_dates
 from pentacam_canonical_source_lock import (
     CANONICAL_FIELD_SOURCES, SHOW_2_CORNEA_BACK, SHOW_2_CORNEA_FRONT, SHOW_2_INDICES,
     canonical_source_id, source_family,
@@ -135,10 +137,36 @@ REREAD_SCHEMA = {
             },
             "required": ["value", "status", "printed_label", "source_tile", "source_box"],
         },
+        "exam_date_reading": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "value": {"type": ["string", "null"]},
+                "status": {
+                    "type": "string",
+                    "enum": ["CONFIDENT", "UNCERTAIN", "UNREADABLE", "NOT_SHOWN"],
+                },
+                "printed_label": {"type": ["string", "null"]},
+                "source_tile": {"type": "string", "enum": list(SOURCE_TILES)},
+                "source_box": {
+                    "anyOf": [
+                        {
+                            "type": "array",
+                            "items": {"type": "integer", "minimum": 0, "maximum": 999},
+                            "minItems": 4,
+                            "maxItems": 4,
+                        },
+                        {"type": "null"},
+                    ]
+                },
+            },
+            "required": ["value", "status", "printed_label", "source_tile", "source_box"],
+        },
         "warnings": {"type": "array", "items": {"type": "string"}},
     },
     "required": [
-        "screen_family", "readings", "patient_age_reading", "pentacam_qs_reading", "warnings",
+        "screen_family", "readings", "patient_age_reading", "pentacam_qs_reading",
+        "exam_date_reading", "warnings",
     ],
 }
 
@@ -203,6 +231,15 @@ when the printed label and an explicitly acceptable/OK value are both unambiguou
 for a visibly non-OK device status. Never infer QS from apparent image clarity or from another
 quality label. When the QS label is visible but its value is unclear, return value=null and localize
 the label/value box so it can be shown to the surgeon.
+
+FOUR MAPS EXAMINATION-DATE RULE:
+{exam_date_target}
+When requested, read only the explicitly labeled examination Date field in the patient/header area
+of this Four Maps Refractive page. Transcribe the complete printed date string exactly, including
+leading zeroes and separators. Do not use Date of Birth, examination time, image filename, another
+page, or arithmetic. Check every digit at original resolution and in the TOP_HEADER crop. Use
+CONFIDENT only when the Date label and every printed date digit are unambiguous. This focused result
+is case-reconciled with the other Four Maps page; never copy or assume the other eye's date.
 
 REQUESTED FIELDS BY EYE:
 {targets}
@@ -450,6 +487,7 @@ def apply_targeted_readings(
     filename: str,
     patient_age_requested: bool = False,
     pentacam_qs_requested: bool = False,
+    exam_date_requested: bool = False,
 ) -> dict[str, Any]:
     """Fill only null requested fields from one conflict-free confident reread."""
     if reread.get("screen_family") not in PENTACAM_SCREEN_FAMILIES:
@@ -600,6 +638,38 @@ def apply_targeted_readings(
                     source_box=qs_reading.get("source_box"),
                     printed_label=qs_reading.get("printed_label"),
                 )
+    if exam_date_requested:
+        context = result.setdefault("document_context", {})
+        reading = reread.get("exam_date_reading") or {}
+        value = reading.get("value")
+        label = _normalize_label(reading.get("printed_label"))
+        valid_label = label in {"date", "examdate", "examinationdate"}
+        valid_date = isinstance(value, str) and bool(possible_calendar_dates(value))
+        valid_source = reread.get("screen_family") == "FOUR_MAPS_REFRACTIVE"
+        if (
+            reading.get("status") == "CONFIDENT"
+            and valid_source and valid_label and valid_date
+        ):
+            context["targeted_exam_date_reread_evidence"] = {
+                "file": filename,
+                "source": "TARGETED_FOUR_MAPS_HEADER_REREAD",
+                "tile": reading.get("source_tile"),
+                "printed_label": reading.get("printed_label"),
+                "value": value,
+                "promoted": False,
+            }
+        elif reading.get("status") == "CONFIDENT" and value is not None:
+            result.setdefault("global_warnings", []).append(
+                f"Targeted Four Maps examination-date reread rejected in {filename}: "
+                "the page, printed Date label, or complete date value was not unambiguous."
+            )
+        elif reading.get("status") in {"UNCERTAIN", "UNREADABLE"} and valid_label:
+            context["targeted_unreadable_exam_date_region"] = {
+                "file": filename,
+                "tile": reading.get("source_tile"),
+                "source_box": reading.get("source_box"),
+                "printed_label": reading.get("printed_label"),
+            }
     return result
 
 
@@ -614,6 +684,7 @@ def targeted_reread(
     requested: dict[str, list[str]],
     patient_age_requested: bool = False,
     pentacam_qs_requested: bool = False,
+    exam_date_requested: bool = False,
 ) -> dict[str, Any]:
     age_target = (
         "PATIENT: patient_age_years is requested."
@@ -625,6 +696,11 @@ def targeted_reread(
         if pentacam_qs_requested
         else "Pentacam QS is not requested; return null/NOT_SHOWN."
     )
+    exam_date_target = (
+        "PATIENT: the Four Maps examination Date is requested."
+        if exam_date_requested
+        else "PATIENT: the examination Date is not requested; return null/NOT_SHOWN."
+    )
     content: list[dict[str, Any]] = [
         {
             "type": "input_text",
@@ -632,13 +708,16 @@ def targeted_reread(
                 targets=_target_summary(requested) or "No eye-level numeric fields requested.",
                 age_target=age_target,
                 qs_target=qs_target,
+                exam_date_target=exam_date_target,
             ),
         },
         {"type": "input_text", "text": "ORIGINAL complete screen:"},
         {"type": "input_image", "image_url": core.data_url(raw, filename), "detail": "original"},
     ]
     for tile_name, tile_raw in build_overlapping_tiles(
-        raw, include_top_header=patient_age_requested or pentacam_qs_requested
+        raw, include_top_header=(
+            patient_age_requested or pentacam_qs_requested or exam_date_requested
+        )
     ):
         content.extend((
             {"type": "input_text", "text": f"{tile_name} crop of the same screen:"},
@@ -666,7 +745,8 @@ def targeted_reread(
 
 
 def enrich_extraction(
-    core: Any, result: dict[str, Any], raw: bytes, filename: str
+    core: Any, result: dict[str, Any], raw: bytes, filename: str,
+    *, exam_date_requested: bool = False,
 ) -> dict[str, Any]:
     """Run the targeted second pass explicitly after primary extraction."""
     requested = missing_targets_by_eye(result)
@@ -674,15 +754,17 @@ def enrich_extraction(
     pentacam_qs_requested = pentacam_qs_is_missing(result)
     if not _enabled() or (
         not requested and not patient_age_requested and not pentacam_qs_requested
+        and not exam_date_requested
     ):
         return result
     try:
         reread = targeted_reread(
             core, raw, filename, requested, patient_age_requested, pentacam_qs_requested,
+            exam_date_requested,
         )
         return apply_targeted_readings(
             core, result, reread, requested, filename, patient_age_requested,
-            pentacam_qs_requested,
+            pentacam_qs_requested, exam_date_requested,
         )
     except Exception as exc:
         result.setdefault("global_warnings", []).append(

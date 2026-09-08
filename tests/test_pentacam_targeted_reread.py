@@ -232,5 +232,36 @@ def test_direct_enrichment_fails_open_when_crop_decode_fails():
     assert not hasattr(targeted, "install")
 
 
+def test_confident_four_maps_exam_date_reread_is_evidence_until_case_reconciliation():
+    result = pentacam_result()
+    result["eyes"][0]["screen_types"] = ["FOUR_MAPS_REFRACTIVE"]
+    result["document_context"]["exam_date"] = "23/09/2026"
+    reread = {
+        "screen_family": "FOUR_MAPS_REFRACTIVE",
+        "readings": [],
+        "exam_date_reading": {
+            "value": "03/09/2026",
+            "status": "CONFIDENT",
+            "printed_label": "Date",
+            "source_tile": "TOP_HEADER",
+            "source_box": [20, 20, 300, 120],
+        },
+        "warnings": [],
+    }
+    targeted.apply_targeted_readings(
+        Core, result, reread, {}, "od-four-maps.png", exam_date_requested=True,
+    )
+    context = result["document_context"]
+    assert context["exam_date"] == "23/09/2026"
+    assert context["targeted_exam_date_reread_evidence"] == {
+        "file": "od-four-maps.png",
+        "source": "TARGETED_FOUR_MAPS_HEADER_REREAD",
+        "tile": "TOP_HEADER",
+        "printed_label": "Date",
+        "value": "03/09/2026",
+        "promoted": False,
+    }
+
+
 PENTACAM_SOURCE_LOCK_RETIRED_TARGETED_TESTS = tuple(sorted(_RETIRED))
 del _name, _value

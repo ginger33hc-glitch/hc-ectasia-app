@@ -20,7 +20,11 @@ import pentacam_targeted_reread
 import geometric_srax_policy
 
 import mandatory_source_set_policy
-from exam_date_reconciliation_policy import authoritative_exam_date_conflict
+from exam_date_reconciliation_policy import (
+    _is_four_maps_refractive,
+    authoritative_exam_date_conflict,
+    promote_consistent_targeted_exam_dates,
+)
 from patient_age_policy import resolve_patient_age
 from pentacam_canonical_source_lock import (
     is_four_maps_eye,
@@ -982,6 +986,7 @@ async def _run_image_assessment(
             mandatory_source_set = mandatory_source_set_policy.validate_preassessment_requirements(
                 extraction_results, plans
             )
+            exam_date_reread_required = authoritative_exam_date_conflict(extraction_results)
 
             async def enrich_bounded(
                 result: Dict[str, Any], raw: bytes, filename: str,
@@ -990,6 +995,9 @@ async def _run_image_assessment(
                     reread = await asyncio.to_thread(
                         pentacam_targeted_reread.enrich_extraction,
                         sys.modules[__name__], result, raw, filename,
+                        exam_date_requested=(
+                            exam_date_reread_required and _is_four_maps_refractive(result)
+                        ),
                     )
                     return await asyncio.to_thread(
                         geometric_srax_policy.enrich_extraction, reread, raw, filename,
@@ -999,6 +1007,8 @@ async def _run_image_assessment(
                 enrich_bounded(result, raw, filename)
                 for result, (raw, filename) in zip(extraction_results, image_payloads)
             ))
+            if exam_date_reread_required:
+                promote_consistent_targeted_exam_dates(extraction_results)
     except HTTPException:
         raise
     except Exception as exc:

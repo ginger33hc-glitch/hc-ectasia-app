@@ -187,8 +187,8 @@ def test_complete_intake_runs_post_gate_enrichment_and_enters_workflow(monkeypat
 
     monkeypatch.setattr(operational_security, "analysis_slot", slot)
 
-    def targeted(core, result, raw, filename):
-        calls.append(("targeted", filename))
+    def targeted(core, result, raw, filename, **kwargs):
+        calls.append(("targeted", filename, kwargs))
         return result
 
     def geometric(result, raw, filename):
@@ -212,6 +212,53 @@ def test_complete_intake_runs_post_gate_enrichment_and_enters_workflow(monkeypat
     assert result["extracted"]["mandatory_source_set"]["confirmed"] is True
     assert len([call for call in calls if call[0] == "targeted"]) == 5
     assert len([call for call in calls if call[0] == "geometric"]) == 5
+
+
+def test_false_primary_four_maps_date_conflict_requests_only_two_header_rereads(monkeypatch):
+    sources = complete_set(False)
+    sources[0]["document_context"]["exam_date"] = "23/09/2026"
+    sources[1]["document_context"]["exam_date"] = "13/09/2026"
+    for source in sources[2:]:
+        source["document_context"]["exam_date"] = "03/09/2026"
+    payloads = [(b"image", f"source-{index}.png") for index in range(len(sources))]
+    by_name = {filename: source for source, (_raw, filename) in zip(sources, payloads)}
+    calls = []
+
+    monkeypatch.setattr(app, "extract_one_image", lambda raw, filename: by_name[filename])
+    monkeypatch.setattr(operational_security, "admit_analysis", lambda: None)
+
+    @asynccontextmanager
+    async def slot():
+        yield
+
+    monkeypatch.setattr(operational_security, "analysis_slot", slot)
+
+    def targeted(core, result, raw, filename, **kwargs):
+        requested = kwargs.get("exam_date_requested", False)
+        calls.append((filename, requested))
+        if requested:
+            result["document_context"]["targeted_exam_date_reread_evidence"] = {
+                "value": "03/09/2026", "promoted": False,
+            }
+        return result
+
+    monkeypatch.setattr(app.pentacam_targeted_reread, "enrich_extraction", targeted)
+    monkeypatch.setattr(app.geometric_srax_policy, "enrich_extraction", lambda result, *_: result)
+    monkeypatch.setattr(app, "merge_extractions", lambda results: {"eyes": [], "items": results})
+    monkeypatch.setattr(
+        assessment_workflow, "begin",
+        lambda core, extracted, age, plans, modifiers, metadata, source_images: extracted,
+    )
+
+    extracted = asyncio.run(app._run_image_assessment(
+        payloads, 30, complete_refraction_plans(), {}, {},
+    ))
+    assert [requested for _name, requested in calls].count(True) == 2
+    four_maps = extracted["items"][:2]
+    assert [item["document_context"]["exam_date"] for item in four_maps] == [
+        "03/09/2026", "03/09/2026",
+    ]
+    assert not app.authoritative_exam_date_conflict(four_maps)
 
 
 def test_legacy_bad_component_signature_recognizes_od_page_even_if_screen_type_is_imperfect():
