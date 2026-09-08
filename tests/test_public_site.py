@@ -125,7 +125,7 @@ def test_public_landing_page_answers_surgeon_discovery_questions():
             "Hüseyin Cengiz, M.D.",
         ):
             assert phrase in response.text
-        assert "does not constitute external validation" in response.text
+        assert "do not constitute external validation" in response.text
 
 
 def test_nonproduction_hosts_are_not_indexable():
