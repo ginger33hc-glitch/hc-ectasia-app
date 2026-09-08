@@ -29,13 +29,18 @@ def _png_size(path: Path) -> tuple[int, int]:
     return struct.unpack(">II", data[16:24])
 
 
-def test_manifest_opens_the_clinical_app_and_declares_the_image_share_target():
+def test_staging_manifest_has_a_distinct_install_identity_and_opens_the_clinical_app():
     manifest = json.loads((STATIC / "manifest.webmanifest").read_text(encoding="utf-8"))
-    assert manifest["name"] == "CER-AI — Cornea Ectasia Risk Assessment Intelligence"
-    assert manifest["short_name"] == "CER-AI"
+    assert manifest["name"] == "CER-AI Staging"
+    assert manifest["short_name"] == "CER-AI Staging"
+    assert manifest["id"] == "/cer-ai-staging"
     assert manifest["start_url"] == "/app"
     assert manifest["scope"] == "/"
     assert manifest["display"] == "standalone"
+    for filename in ("index.html", "public-home.html"):
+        page = (STATIC / filename).read_text(encoding="utf-8")
+        assert '/static/manifest.webmanifest?v=12' in page
+        assert '<meta name="apple-mobile-web-app-title" content="CER-AI Staging">' in page
     target = manifest["share_target"]
     assert target == {
         "action": "/share-target",
@@ -206,7 +211,8 @@ def test_public_renderer_directly_owns_mobile_install_content_without_wrapper():
     assert page.status_code == 200
     assert page.text.count('id="mobile-install"') == 1
     assert "Install CER-AI on your phone" in page.text
-    assert '/static/manifest.webmanifest?v=11' in page.text
+    assert '/static/manifest.webmanifest?v=12' in page.text
+    assert '<meta name="apple-mobile-web-app-title" content="CER-AI Staging">' in page.text
 
 
 def test_mobile_ui_uses_one_server_workflow_from_upload_through_archive():

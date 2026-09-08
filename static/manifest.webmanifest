@@ -1,7 +1,7 @@
 {
-  "name": "CER-AI — Cornea Ectasia Risk Assessment Intelligence",
-  "short_name": "CER-AI",
-  "id": "/",
+  "name": "CER-AI Staging",
+  "short_name": "CER-AI Staging",
+  "id": "/cer-ai-staging",
   "start_url": "/app",
   "scope": "/",
   "display": "standalone",
