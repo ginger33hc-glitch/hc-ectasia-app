@@ -128,8 +128,14 @@ def test_ps3_factor_is_expanded_to_each_exact_missing_canonical_field():
         item["key"]: item for item in response["input_requests"]
         if item.get("eye") == "OD" and "PS3" in item.get("required_for", [])
     }
-    assert requests["F_Ele_Th_um"]["source_box"] == "central numeric box → F.Ele.Th"
-    assert requests["B_Ele_Th_um"]["source_box"] == "central numeric box → B.Ele.Th"
+    assert requests["F_Ele_Th_um"]["source_box"] == (
+        "central results table — elevation label/value row immediately above Progression Index "
+        "→ F.Ele.Th — adjacent signed µm value"
+    )
+    assert requests["B_Ele_Th_um"]["source_box"] == (
+        "central results table — elevation label/value row immediately above Progression Index "
+        "→ B.Ele.Th — adjacent signed µm value"
+    )
 
 
 def test_ps3_intereye_requirement_identifies_the_actual_eye_and_field():

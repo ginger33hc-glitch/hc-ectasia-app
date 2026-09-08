@@ -4,6 +4,7 @@ import pytest
 
 from pentacam_canonical_source_lock import (
     BAD_CENTER,
+    BAD_ELEVATION_ROW,
     BAD_PPI,
     BAD_STRIP,
     FOUR_MAPS_LOWER_LEFT,
@@ -61,6 +62,5 @@ def test_interchange_pairs_retain_distinct_canonical_source_regions():
     assert canonical_source_id("Kmax_D") == FOUR_MAPS_LOWER_LEFT
     assert canonical_source_id("central_pachy_um") == canonical_source_id("pachy_thinnest_um") == FOUR_MAPS_LOWER_LEFT
     assert canonical_source_id("PPI_min") == canonical_source_id("PPI_avg") == canonical_source_id("PPI_max") == BAD_PPI
-    assert canonical_source_id("F_Ele_Th_um") == canonical_source_id("B_Ele_Th_um") == BAD_CENTER
+    assert canonical_source_id("F_Ele_Th_um") == canonical_source_id("B_Ele_Th_um") == BAD_ELEVATION_ROW
     assert {canonical_source_id(key) for key in ("Df", "Db", "Dp", "Dt", "Da", "BAD_D")} == {BAD_STRIP}
-

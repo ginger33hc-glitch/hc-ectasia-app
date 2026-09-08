@@ -13,7 +13,12 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import canonical_engine
-from pentacam_canonical_source_lock import BAD_CENTER, BAD_PPI, FOUR_MAPS_LOWER_LEFT
+from pentacam_canonical_source_lock import (
+    BAD_CENTER,
+    BAD_ELEVATION_ROW,
+    BAD_PPI,
+    FOUR_MAPS_LOWER_LEFT,
+)
 
 _LEGACY_PATH = Path(__file__).with_name("legacy_pentacam_targeted_reread_tests.py")
 _SPEC = importlib.util.spec_from_file_location("cerai_legacy_pentacam_targeted_reread_tests", _LEGACY_PATH)
@@ -108,7 +113,7 @@ def test_canonical_eye_fields_suppress_duplicate_targeted_reread_requests():
     eye["table_verified_numeric_fields"] = ["central_pachy_um", "B_Ele_Th_um"]
     eye["canonical_source_ids"] = {
         "central_pachy_um": FOUR_MAPS_LOWER_LEFT,
-        "B_Ele_Th_um": BAD_CENTER,
+        "B_Ele_Th_um": BAD_ELEVATION_ROW,
     }
     remaining = targeted.missing_targets_by_eye(result).get("OD", [])
     assert "central_pachy_um" not in remaining
@@ -167,7 +172,7 @@ def test_bad_display_b_ele_th_reread_writes_direct_canonical_eye_field():
     targeted.apply_targeted_readings(Core, result, reread, {"OD": ["B_Ele_Th_um"]}, "od.png")
     eye = result["eyes"][0]
     assert eye["B_Ele_Th_um"] == 23
-    assert eye["canonical_source_ids"]["B_Ele_Th_um"] == BAD_CENTER
+    assert eye["canonical_source_ids"]["B_Ele_Th_um"] == BAD_ELEVATION_ROW
     assert "B_Ele_Th_um" in eye["table_verified_numeric_fields"]
     assert not result.get("nice_readings")
 
@@ -177,8 +182,8 @@ def test_dedicated_bad_cell_consensus_corrects_primary_and_localizer_errors(monk
     eye = result["eyes"][0]
     eye["table_verified_numeric_fields"] = ["F_Ele_Th_um", "B_Ele_Th_um"]
     eye["canonical_source_ids"] = {
-        "F_Ele_Th_um": BAD_CENTER,
-        "B_Ele_Th_um": BAD_CENTER,
+        "F_Ele_Th_um": BAD_ELEVATION_ROW,
+        "B_Ele_Th_um": BAD_ELEVATION_ROW,
     }
     payload = {
         "screen_family": "BAD_DISPLAY",
@@ -211,15 +216,19 @@ def test_dedicated_bad_cell_consensus_corrects_primary_and_localizer_errors(monk
     assert eye["bad_elevation_verification_evidence"] == {
         "F_Ele_Th_um": {
             "file": "od-bad.png", "primary_value": 41,
-            "localized_value": 13,
-            "confirmation_values": [3, 3],
-            "verified_value": 3, "status": "VERIFIED",
+                "localized_value": 13,
+                "confirmation_values": [3, 3],
+                "automated_attempts": 2,
+                "attempt_errors": [],
+                "verified_value": 3, "status": "VERIFIED",
         },
         "B_Ele_Th_um": {
             "file": "od-bad.png", "primary_value": 93,
-            "localized_value": 9,
-            "confirmation_values": [9, None],
-            "verified_value": 9, "status": "VERIFIED",
+                "localized_value": 9,
+                "confirmation_values": [9, None],
+                "automated_attempts": 1,
+                "attempt_errors": [],
+                "verified_value": 9, "status": "VERIFIED",
         },
     }
     assert all(
@@ -236,8 +245,8 @@ def test_unresolved_bad_elevation_does_not_retain_primary_ocr_value(monkeypatch)
     eye = result["eyes"][0]
     eye["table_verified_numeric_fields"] = ["F_Ele_Th_um", "B_Ele_Th_um"]
     eye["canonical_source_ids"] = {
-        "F_Ele_Th_um": BAD_CENTER,
-        "B_Ele_Th_um": BAD_CENTER,
+        "F_Ele_Th_um": BAD_ELEVATION_ROW,
+        "B_Ele_Th_um": BAD_ELEVATION_ROW,
     }
     payload = {
         "screen_family": "BAD_DISPLAY",
@@ -273,8 +282,8 @@ def test_bad_cell_consensus_uses_one_confirmation_when_localizer_agrees(monkeypa
     eye = result["eyes"][0]
     eye["table_verified_numeric_fields"] = ["F_Ele_Th_um", "B_Ele_Th_um"]
     eye["canonical_source_ids"] = {
-        "F_Ele_Th_um": BAD_CENTER,
-        "B_Ele_Th_um": BAD_CENTER,
+        "F_Ele_Th_um": BAD_ELEVATION_ROW,
+        "B_Ele_Th_um": BAD_ELEVATION_ROW,
     }
     payload = {
         "screen_family": "BAD_DISPLAY",
@@ -330,8 +339,12 @@ def test_bad_cell_confirmation_reads_only_literal_integer_and_warns_about_cell_b
 
     assert confirmed == {("OS", "F_Ele_Th_um"): 3}
     prompt = captured["input"][0]["content"][0]["text"]
-    assert "thin vertical edge of the white value cell is a border, not" in prompt.casefold()
-    assert "do not" in prompt.casefold() and "infer" in prompt.casefold()
+    normalized_prompt = " ".join(prompt.casefold().split())
+    assert "thin vertical edge of the white value cell is a border, not" in normalized_prompt
+    assert "immediately above the progression index section" in normalized_prompt
+    assert "front/anterior elevation at the thinnest corneal point" in normalized_prompt
+    assert "back/posterior elevation at the thinnest corneal point" in normalized_prompt
+    assert "do not" in normalized_prompt and "infer" in normalized_prompt
 
 
 def test_bad_elevation_confirmation_rejects_axis_k1_crop():
@@ -359,7 +372,7 @@ def test_bad_elevation_wrong_label_crop_is_relocalized_once(monkeypatch):
     eye = result["eyes"][0]
     eye["table_verified_numeric_fields"] = list(targeted.BAD_ELEVATION_FIELDS)
     eye["canonical_source_ids"] = {
-        field: BAD_CENTER for field in targeted.BAD_ELEVATION_FIELDS
+        field: BAD_ELEVATION_ROW for field in targeted.BAD_ELEVATION_FIELDS
     }
     payload = {
         "screen_family": "BAD_DISPLAY",
@@ -402,6 +415,82 @@ def test_bad_elevation_wrong_label_crop_is_relocalized_once(monkeypatch):
     assert len(elevation_calls) == 2
     assert eye["F_Ele_Th_um"] == 3
     assert eye["B_Ele_Th_um"] == 9
+
+
+def test_bad_elevation_missing_read_is_retried_five_times_and_can_resolve_on_fifth(monkeypatch):
+    result = pentacam_result(F_Ele_Th_um=3, B_Ele_Th_um=9)
+    payload = {
+        "screen_family": "BAD_DISPLAY",
+        "readings": [
+            reading(
+                "F_Ele_Th_um", 3, "F.Ele.Th", tile="LOWER_RIGHT",
+                source_box=[100, 100, 400, 250],
+            ),
+            reading(
+                "B_Ele_Th_um", 9, "B.Ele.Th", tile="LOWER_RIGHT",
+                source_box=[500, 100, 800, 250],
+            ),
+        ],
+        "warnings": [],
+    }
+    locator_calls = []
+    monkeypatch.setattr(
+        targeted,
+        "targeted_reread",
+        lambda *_args, **_kwargs: locator_calls.append(True) or payload,
+    )
+    monkeypatch.setattr(targeted, "render_source_region", lambda *args, **kwargs: b"crop")
+    confirmations = iter([
+        {}, {}, {}, {},
+        {("OD", "F_Ele_Th_um"): 3, ("OD", "B_Ele_Th_um"): 9},
+    ])
+    monkeypatch.setattr(
+        targeted, "confirm_bad_elevation_crops", lambda *args, **kwargs: next(confirmations),
+    )
+
+    targeted.verify_bad_elevation_fields(
+        Core,
+        result,
+        b"image",
+        "od-bad.png",
+        {"OD": list(targeted.BAD_ELEVATION_FIELDS)},
+        {("OD", "F_Ele_Th_um"): 3, ("OD", "B_Ele_Th_um"): 9},
+    )
+
+    eye = result["eyes"][0]
+    assert len(locator_calls) == targeted.BAD_ELEVATION_MAX_ATTEMPTS == 5
+    assert eye["F_Ele_Th_um"] == 3
+    assert eye["B_Ele_Th_um"] == 9
+    for field in targeted.BAD_ELEVATION_FIELDS:
+        assert eye["bad_elevation_verification_evidence"][field]["automated_attempts"] == 5
+
+
+def test_bad_elevation_attempt_exception_cannot_request_surgeon_before_fifth_try(monkeypatch):
+    result = pentacam_result(F_Ele_Th_um=3, B_Ele_Th_um=9)
+    calls = []
+
+    def fail_attempt(*_args, **_kwargs):
+        calls.append(True)
+        raise RuntimeError("temporary reader failure")
+
+    monkeypatch.setattr(targeted, "targeted_reread", fail_attempt)
+    targeted.verify_bad_elevation_fields(
+        Core,
+        result,
+        b"image",
+        "od-bad.png",
+        {"OD": list(targeted.BAD_ELEVATION_FIELDS)},
+        {("OD", "F_Ele_Th_um"): 3, ("OD", "B_Ele_Th_um"): 9},
+    )
+
+    eye = result["eyes"][0]
+    assert len(calls) == targeted.BAD_ELEVATION_MAX_ATTEMPTS == 5
+    for field in targeted.BAD_ELEVATION_FIELDS:
+        evidence = eye["bad_elevation_verification_evidence"][field]
+        assert evidence["automated_attempts"] == 5
+        assert evidence["attempt_errors"] == ["RuntimeError"] * 5
+        assert eye[field] is None
+    assert all("after 5 automated BAD elevation attempts" in warning for warning in result["global_warnings"])
 
 
 def test_unreadable_b_ele_th_uses_canonical_numeric_prompt_with_source_region():

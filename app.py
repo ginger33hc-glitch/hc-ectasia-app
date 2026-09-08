@@ -349,7 +349,14 @@ EXCLUSIVE LABELED-BOX SOURCE LOCK:
   another map/display, a color-map number, Kmax, or another K/Km-like field for these outputs.
 - Rmin_mm: exactly one accepted source: "Show 2 Exams Topometric" -> panel headed "Cornea Back" -> printed Rmin row. Never use Cornea Front Rmin, the center topometric RMin index, Four Maps, a map spot, or any calculated value.
 - central_pachy_um: use only 4 Maps Refractive lower-left Pupil Center (+) pachymetry.
-- B_Ele_Th_um and F_Ele_Th_um: use only the BAD Display central labeled B.Ele.Th/F.Ele.Th boxes.
+- F_Ele_Th_um: on the Belin/Ambrósio BAD Display, first locate the literal F.Ele.Th label in the
+  central results table's elevation row immediately above the Progression Index section, then
+  transcribe only the signed integer in the immediately adjacent value box. This is front/anterior elevation at the
+  thinnest corneal point in µm. Never use K1, K2, Axis, an elevation map, or an unlabeled number.
+- B_Ele_Th_um: on that same row immediately above Progression Index, first locate the literal B.Ele.Th label,
+  then transcribe only the signed integer in its immediately adjacent value box. This is back/posterior
+  elevation at the thinnest corneal point in µm. Never use K1, K2, Axis, an elevation map, or an
+  unlabeled number.
 - posterior_Kmean_D: use only Show 2 Exams Topometric -> Cornea Back -> printed Km.
 - topographic_astig_D and topographic_steep_axis_deg: use only Show 2 Exams Topometric -> Cornea Front.
 - ml7_bad_k1_d and ml7_bad_k2_d: ML7 planning ONLY. Read K1 and K2 directly from the BAD Display upper-middle numeric boxes. Do not substitute Show 2 Exams K1/K2 or Kmax. HWTW remains in the 4 Maps Refractive lower-left HWTW box.

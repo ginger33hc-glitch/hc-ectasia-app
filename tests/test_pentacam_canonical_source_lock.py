@@ -5,6 +5,7 @@ import pentacam_targeted_reread as targeted_reread
 from pentacam_canonical_source_lock import (
     BAD,
     BAD_CENTER,
+    BAD_ELEVATION_ROW,
     BAD_PPI,
     BAD_STRIP,
     CANONICAL_FIELD_SOURCES,
@@ -102,7 +103,7 @@ def test_four_maps_lower_left_fields_are_exact_sources():
 
 def test_bad_fields_are_exact_box_sources():
     for field in ("F_Ele_Th_um", "B_Ele_Th_um"):
-        assert canonical_source_id(field) == BAD_CENTER
+        assert canonical_source_id(field) == BAD_ELEVATION_ROW
         assert source_family(field) == BAD
     for field in ("PPI_min", "PPI_avg", "PPI_max", "ARTmax_um"):
         assert canonical_source_id(field) == BAD_PPI

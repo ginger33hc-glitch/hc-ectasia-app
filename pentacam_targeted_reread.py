@@ -44,6 +44,7 @@ PENTACAM_SCREEN_FAMILIES = {
 }
 
 BAD_ELEVATION_FIELDS = ("F_Ele_Th_um", "B_Ele_Th_um")
+BAD_ELEVATION_MAX_ATTEMPTS = 5
 
 SOURCE_TILES = (
     "ORIGINAL", "TOP_HEADER", "UPPER_LEFT", "UPPER_RIGHT", "LOWER_LEFT", "LOWER_RIGHT"
@@ -218,9 +219,12 @@ Use this strict order for each field:
 1. First find the literal printed definition: F.Ele.Th for front elevation or B.Ele.Th for back elevation.
 2. Then read only the numeric box immediately adjacent to that exact definition.
 
-These definitions are in the elevation row below the upper K1/K2/Axis boxes. If the crop instead
-shows K1, K2, Axis, or another definition, return WRONG_LABEL with value=null. A plausible number
-without the requested definition beside it is never acceptable.
+These definitions are in the central results table's ELEVATION ROW IMMEDIATELY ABOVE THE
+PROGRESSION INDEX SECTION, below the upper K1/K2/Axis rows. F.Ele.Th means front/anterior
+elevation at the thinnest corneal point; B.Ele.Th means back/posterior elevation at the thinnest
+corneal point. Both adjacent values are signed
+integers in µm. If the crop instead shows K1, K2, Axis, or another definition, return WRONG_LABEL
+with value=null. A plausible number without the requested definition beside it is never acceptable.
 
 Read only the integer printed inside that field's value cell:
 - F_Ele_Th_um: the integer immediately attached to the printed F.Ele.Th label.
@@ -269,11 +273,15 @@ PENTACAM LANDMARK LABELS:
   marker beside it. Pachy Vertex N., the circle-marked Thinnest Locat. value, and map numbers are
   not central_pachy_um.
 - F_Ele_Th_um is only the signed value attached to the explicitly printed "F. Ele.Th" label in
-  the BAD Display central numeric box. B_Ele_Th_um is only the signed value in the
-  explicitly printed "B. Ele.Th" box in that central numeric area. First locate the literal
-  F.Ele.Th or B.Ele.Th definition in the lower elevation row beneath K1/K2/Axis; then localize only
-  that definition and its immediately adjacent value box. A K1/K2/Axis crop is invalid even if its
-  number looks plausible. Read each label/value pair independently;
+  the BAD Display central results table's elevation row immediately above Progression Index.
+  B_Ele_Th_um is only the signed value in the explicitly printed "B. Ele.Th" box in that same row.
+  First locate the literal
+  F.Ele.Th or B.Ele.Th definition in the central results table's elevation row immediately above
+  the Progression Index section and below the upper K1/K2/Axis rows; then localize only that
+  definition and its immediately adjacent signed µm value box. F.Ele.Th is front/anterior elevation
+  at the thinnest point. B.Ele.Th is back/posterior
+  elevation at the thinnest point. A K1/K2/Axis crop is invalid even if its number looks plausible.
+  Read each label/value pair independently;
   never swap the front and back values or copy one into the other. Never use an Elevation (Back) map
   or Elevation (Front) map, pupil boundary, BFS/Float or BFTE value, another elevation field, neighboring
   number, or a calculated value. If either label, sign, or number is unclear, return that field as
@@ -535,6 +543,8 @@ def _finish_bad_elevation_verification(
     filename: str,
     localized: dict[tuple[str, str], dict[str, Any]],
     confirmation_runs: list[dict[tuple[str, str], int]],
+    attempt_counts: dict[tuple[str, str], int] | None = None,
+    attempt_errors: dict[tuple[str, str], list[str]] | None = None,
 ) -> None:
     eyes = {
         eye.get("eye"): eye for eye in result.get("eyes") or []
@@ -582,7 +592,8 @@ def _finish_bad_elevation_verification(
             if field not in missing:
                 missing.append(field)
             result.setdefault("global_warnings", []).append(
-                f"{eye_id} {field} dedicated BAD value-cell reads did not reach consensus; "
+                f"{eye_id} {field} remained unresolved after "
+                f"{(attempt_counts or {}).get(key, 0)} automated BAD elevation attempts; "
                 "surgeon entry is required."
             )
         eye["table_verified_numeric_fields"] = sorted(verified)
@@ -592,6 +603,8 @@ def _finish_bad_elevation_verification(
             "primary_value": primary_value,
             "localized_value": localized_value,
             "confirmation_values": [run.get(key) for run in confirmation_runs],
+            "automated_attempts": (attempt_counts or {}).get(key, 0),
+            "attempt_errors": list((attempt_errors or {}).get(key, [])),
             "verified_value": accepted,
             "status": "VERIFIED" if accepted is not None else "UNRESOLVED",
         }
@@ -607,18 +620,28 @@ def verify_bad_elevation_fields(
 ) -> None:
     """Find each literal F/B definition, then verify only its adjacent value box."""
     localized: dict[tuple[str, str], dict[str, Any]] = {}
-    crops: dict[tuple[str, str], bytes] = {}
     confirmation_runs: list[dict[tuple[str, str], int]] = []
+    attempt_counts: dict[tuple[str, str], int] = defaultdict(int)
+    attempt_errors: dict[tuple[str, str], list[str]] = defaultdict(list)
     unresolved = {
         (eye_id, field) for eye_id, fields in requested.items() for field in fields
     }
-    for _attempt in range(2):
+    for _attempt in range(BAD_ELEVATION_MAX_ATTEMPTS):
         if not unresolved:
             break
+        active_keys = set(unresolved)
+        for key in active_keys:
+            attempt_counts[key] += 1
         retry_request: dict[str, list[str]] = defaultdict(list)
-        for eye_id, field in unresolved:
+        for eye_id, field in active_keys:
             retry_request[eye_id].append(field)
-        reread = targeted_reread(core, raw, filename, dict(retry_request))
+        try:
+            reread = targeted_reread(core, raw, filename, dict(retry_request))
+        except Exception as exc:
+            for key in active_keys:
+                attempt_errors[key].append(type(exc).__name__)
+            confirmation_runs.append({})
+            continue
         candidates: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
         for reading in reread.get("readings") or []:
             key = (reading.get("eye"), reading.get("field"))
@@ -643,29 +666,34 @@ def verify_bad_elevation_fields(
                 for reading in readings
             )
         }
-        attempt_crops = {
-            key: render_source_region(
-                raw, reading.get("source_tile"), reading.get("source_box"),
-            )
-            for key, reading in attempt_localized.items()
-        }
-        confirmation = confirm_bad_elevation_crops(core, attempt_crops) if attempt_crops else {}
+        attempt_crops = {}
+        for key, reading in attempt_localized.items():
+            try:
+                attempt_crops[key] = render_source_region(
+                    raw, reading.get("source_tile"), reading.get("source_box"),
+                )
+            except Exception as exc:
+                attempt_errors[key].append(type(exc).__name__)
+        try:
+            confirmation = confirm_bad_elevation_crops(core, attempt_crops) if attempt_crops else {}
+        except Exception as exc:
+            for key in active_keys:
+                attempt_errors[key].append(type(exc).__name__)
+            confirmation = {}
         confirmation_runs.append(confirmation)
         for key in set(confirmation) & set(attempt_localized):
             localized[key] = attempt_localized[key]
-            crops[key] = attempt_crops[key]
-            unresolved.discard(key)
-    disagreement_crops = {
-        key: crop for key, crop in crops.items()
-        if not any(
-            run.get(key) == int(localized[key]["value"])
-            for run in confirmation_runs
-        )
-    }
-    if disagreement_crops:
-        confirmation_runs.append(confirm_bad_elevation_crops(core, disagreement_crops))
+            confirmed_value = confirmation[key]
+            independent_values = [
+                run.get(key) for run in confirmation_runs if run.get(key) is not None
+            ]
+            localizer_agrees = confirmed_value == int(attempt_localized[key]["value"])
+            independent_consensus = independent_values.count(confirmed_value) >= 2
+            if localizer_agrees or independent_consensus:
+                unresolved.discard(key)
     _finish_bad_elevation_verification(
         core, result, requested, originals, filename, localized, confirmation_runs,
+        attempt_counts, attempt_errors,
     )
 
 
