@@ -23,7 +23,7 @@ def _eye(name="OD", **overrides):
         "PPI_max": 1.2,
         "I_S": 0.0,
         "topographic_astig_D": 1.0,
-        "topographic_steep_axis_deg": 90.0,
+        "bad_flat_axis_deg": 90.0, "topographic_steep_axis_deg": 90.0,
         "posterior_Kmean_D": -6.0 if name == "OD" else -6.05,
         "F_Ele_Th_um": 5.0,
         "B_Ele_Th_um": 10.0,
@@ -213,3 +213,88 @@ def test_runtime_service_contains_no_installer_or_clinical_threshold_table():
     assert "BAD_D >=" not in source
     assert "I_S >=" not in source
     assert "RSB <" not in source
+
+
+def test_prk_uses_shared_myopic_estimate_and_complete_erss_in_final_combination():
+    plans = {name: _plan('PRK', ablation_um=None, optical_zone_mm=6.5,
+                        intended_entered_sphere_D=-1.5, intended_cylinder_signed_D=0)
+             for name in ('OD', 'OS')}
+    result = _evaluate(
+        extracted=_case(_eye('OD', I_S=0.61), _eye('OS', I_S=1.03)), plans=plans)
+    assert [eye['status'] for eye in result['eyes']] == ['PASS', 'PASS WITH CAUTION']
+    assert [eye['score']['total'] for eye in result['eyes']] == [1, 3]
+    for eye in result['eyes']:
+        assert eye['values']['PRK_RST_um'] == 545 - 50 - 22.5
+        assert eye['report_payload']['randleman']['total'] == eye['score']['total']
+        assert not eye['missing']
+
+
+def test_prk_preserves_entered_ablation_and_requires_missing_erss_input():
+    plans = {name: _plan('PRK', ablation_um=60, optical_zone_mm=6.5)
+             for name in ('OD', 'OS')}
+    result = _evaluate(plans=plans)
+    assert all(eye['values']['PRK_RST_um'] == 435 for eye in result['eyes'])
+    result = evaluate_case(_case(), None, plans, _modifiers())
+    assert all(eye['score']['total'] is None for eye in result['eyes'])
+    assert result['status'] == 'ASSESSMENT INCOMPLETE'
+
+
+def test_surgeon_confirmed_negative_srax_completes_both_erss_and_ps3():
+    od = _eye('OD', I_S=-0.92, srax_deg=None, srax='NO',
+              field_provenance={'srax': [{'source': 'SURGEON_CONFIRMED'}]})
+    result = _evaluate(extracted=_case(od), plans={'OD': _plan('PRK'), 'OS': _plan('PRK')})
+    eye = result['eyes'][0]
+    assert eye['score']['total'] == 1
+    assert eye['ps3']['complete']
+    assert eye['status'] == 'PASS'
+    od['field_provenance'] = {}
+    eye = _evaluate(extracted=_case(od))['eyes'][0]
+    assert eye['score']['total'] is None
+    assert not eye['ps3']['complete']
+
+
+def test_ps3_compares_bad_flat_axis_only_and_never_substitutes_steep_axis():
+    od = _eye('OD', topographic_astig_D=3.3, topographic_steep_axis_deg=92.8,
+              bad_flat_axis_deg=2.8)
+    plans = {name: _plan(manifest_cylinder_signed_D=-3, manifest_axis_deg=180)
+             for name in ('OD', 'OS')}
+    eye = _evaluate(extracted=_case(od), plans=plans)['eyes'][0]
+    factor = next(f for f in eye['ps3']['findings'] if f['key'] == 'astigmatic_study')
+    assert factor['status'] == 'NORMAL'
+    assert '2.8°' in factor['detail']
+    assert eye['report_payload']['source_values']['topographic_steep_axis_deg'] == 92.8
+    od['bad_flat_axis_deg'] = None
+    eye = _evaluate(extracted=_case(od), plans=plans)['eyes'][0]
+    assert not eye['ps3']['complete']
+
+
+def test_failed_lasik_automatically_evaluates_prk_and_retains_failed_assessment():
+    result = _evaluate(extracted=_case(_eye('OD', PPI_avg=1.3)))
+    od, os = result['eyes']
+    assert od['lasik_assessment']['status'] == 'STOP-DEFER'
+    assert od['lasik_assessment']['report_payload']['procedure'] == 'LASIK'
+    assert od['report_payload']['procedure'] == 'PRK'
+    assert od['status'] == 'PASS'
+    assert od['values']['PRK_RST_um'] == 445
+    assert result['effective_eye_plans']['OD']['flap_um'] is None
+    assert result['procedure_transitions'][0]['message'] == 'OD: LASIK failed. Now evaluating PRK.'
+    assert os['report_payload']['procedure'] == 'LASIK'
+    assert 'lasik_assessment' not in os
+
+
+def test_prk_fallback_keeps_shared_stops_and_missing_data():
+    result = _evaluate(extracted=_case(_eye('OD', pachy_thinnest_um=498, PPI_avg=1.3,
+                                           srax=None, srax_deg=None)))
+    od = result['eyes'][0]
+    assert od['report_payload']['procedure'] == 'PRK'
+    assert od['status'] == 'STOP-DEFER'
+    assert not od['ps3']['complete']
+    assert 'Randleman: SRAX' in od['missing']
+    assert od['ps3']['moderate_count'] == 2
+
+
+def test_incomplete_lasik_does_not_trigger_prk_fallback():
+    result = _evaluate(extracted=_case(_eye('OD', srax=None, srax_deg=None)))
+    assert result['eyes'][0]['status'] == 'ASSESSMENT INCOMPLETE'
+    assert not result['procedure_transitions']
+    assert result['effective_eye_plans']['OD']['procedure'] == 'LASIK'

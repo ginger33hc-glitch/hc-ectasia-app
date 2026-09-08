@@ -4,6 +4,7 @@ from .bad import BADContext, BADResult, evaluate_bad, final_bad_d_classification
 from .disposition import (
     ASSESSMENT_INCOMPLETE,
     CAUTION,
+    PASS_WITH_CAUTION,
     PASS,
     STOP_DEFER,
     DecisionFinding,
@@ -52,6 +53,7 @@ from .rules import (
 from .safety import (
     estimated_final_kmean_d,
     final_kmean_hard_stop,
+    lasik_pta_hard_stop,
     lasik_pta_percent,
     lasik_rsb_hard_stop,
     lasik_rsb_um,
@@ -66,6 +68,7 @@ __all__ = [
     "BADContext",
     "BADResult",
     "CAUTION",
+    "PASS_WITH_CAUTION",
     "ClinicalCoreInput",
     "DecisionFinding",
     "FinalDisposition",
@@ -102,6 +105,7 @@ __all__ = [
     "final_bad_d_classification",
     "final_kmean_hard_stop",
     "finalize_disposition",
+    "lasik_pta_hard_stop",
     "lasik_pta_percent",
     "lasik_rsb_hard_stop",
     "lasik_rsb_um",

@@ -23,7 +23,7 @@ def _eye(name="OD"):
         "KISA": 1.0,
         "Kmax_D": 47.0,
         "topographic_astig_D": 1.0,
-        "topographic_steep_axis_deg": 90.0,
+        "bad_flat_axis_deg": 90.0, "topographic_steep_axis_deg": 90.0,
         "PPI_avg": 1.0,
         "posterior_Kmean_D": -6.0,
         "F_Ele_Th_um": 2.0,

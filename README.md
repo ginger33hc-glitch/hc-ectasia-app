@@ -135,7 +135,9 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Planned LASIK flap thickness is selected per eye from `90`, `100`, `110`, or `120 µm`; PRK plans leave the flap selection blank.
 - Refraction stability, documented progression, unexplained CDVA loss, and anticipated enhancement remain separate eye-specific values inside one compact clinical-eligibility dropdown box.
 - PRK epithelial thickness is shown per eye as a fixed, read-only `50 µm` CER-AI value and is used in the PRK RST/PTA calculations.
-- Procedure-correct PTA formulas for LASIK and PRK.
+- Procedure-correct PTA formulas for LASIK and PRK. A LASIK candidate at PTA `>=40%`
+  fails; planning evaluates Plan A, then B, then C, and returns STOP-DEFER when none has
+  PTA `<40%` together with the other canonical safety requirements.
 - BAD-D/component display interpretation plus adjunctive ARTmax/TP/Dt/Da evidence flags.
 - Positive tomography concern flags require review and cannot receive automatic PASS.
 - Limited/inadequate image quality produces a prominent final report warning without suppressing
@@ -210,10 +212,9 @@ BAD-D `>=2.60` is an inclusive CER-AI operational hard stop and produces
 `STOP-DEFER`. Individual Df/Db/Dp/Dt/Da components remain contextual and
 do not independently determine clearance.
 
-`canonical_engine.py` remains the single production composition root. Independent
-`nice_scoring.py` and `nice_policy.py` add a restrictive-only final NICE disposition;
-ERSS/BAD calculations and the isolated `clean_engine` are unchanged. NICE points are
-never added to ERSS. LASIK and PRK use total 4: no NICE escalation, 5–8: CAUTION
+`canonical_engine.py` remains the single production composition root. NICE is scored
+once in `clinical_core/nice.py`; ERSS, BAD-D, and PS3 remain independent canonical
+clinical-core pathways. NICE points are never added to ERSS. LASIK and PRK use total 4: no NICE escalation, 5–8: CAUTION
 without automatic defer, and >=9: STOP-DEFER hard stop. A stronger existing stop always wins.
 
 The report labels this as **CER-AI-adapted NICE**, documents all four components and
@@ -226,9 +227,11 @@ only the plus-marked `Pupil Center` row, not Pachy Vertex N. or thinnest pachyme
 The source selection and 15.5 boundary are disclosed CER-AI adaptations, not a claim
 that the original study independently validated this implementation.
 
-`assessment_workflow.py` gates reports using all canonical decision-critical missing
-inputs plus missing NICE components. `/analyze` returns NEEDS_INPUT (without a
-clinical decision) and eye-specific completion requests until ready. The browser
+`assessment_workflow.py` gates complete reports until ERSS/Randleman (when applicable),
+NICE, and PS3 are complete, together with the remaining canonical safety and eligibility
+requirements. `/analyze` returns NEEDS_INPUT and eye-specific completion requests until ready;
+a definitive hard stop may be returned as an immediate summary but does not authorize a full
+report while a scoring system remains incomplete. The browser
 retains manual entries; `/assessment/complete` resumes without another model call.
 Explicit surgeon corrections retain an audit trail and rerun input validation.
 Unreadable decision-critical clinical data may require a clearer source or surgeon completion;
@@ -242,6 +245,9 @@ receive a retry response rather than silently evicting an active case. Do not in
 worker count without shared session storage.
 Form edits hide the previous report. No clinical model accuracy claim is inferred
 from unit tests; unreadable image values require surgeon confirmation.
+
+Both PDF and DOCX are rendered directly from the same per-eye canonical report payload.
+The report layer does not score, classify, apply thresholds, or correct clinical output.
 
 ## Operational security boundary
 

@@ -4,18 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.71</title>
-  <link rel="manifest" href="/static/manifest.webmanifest?v=9">
+  <link rel="manifest" href="/static/manifest.webmanifest?v=11">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=8">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png?v=8">
   <link rel="shortcut icon" type="image/png" href="/static/icons/favicon-32.png?v=8">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon.png?v=8">
   <meta name="theme-color" content="#05090d">
-  <link rel="stylesheet" href="/static/hc-reference.css?v=1">
   <style>
     :root{--navy:#173b57;--ink:#17212b;--muted:#66717d;--line:#d9e0e6;--bg:#f4f6f8;--blue:#eaf3fa;--blueInk:#1f5e8c;--green:#e6f4ea;--greenInk:#176b3a;--orange:#fff0d8;--orangeInk:#9a4d00;--red:#fde5e5;--redInk:#a31212;--gray:#eef2f5;--grayInk:#4b5965}
     *{box-sizing:border-box}body{font-family:Arial,sans-serif;background:var(--bg);margin:0;color:var(--ink);line-height:1.42}
     .app-header{background:#05090d;border-bottom:1px solid #1f2a33;padding:8px 22px;box-shadow:0 2px 8px rgba(0,0,0,.28)}
-    .brand-lockup{position:relative;width:min(100%,900px);margin:0 auto}.brand-logo-frame{overflow:hidden;aspect-ratio:1500/445}.brand-logo{display:block;width:100%;height:auto}.brand-subtitle{text-align:center;color:#8fbce4;font-size:clamp(12px,2.55vw,27px);font-weight:300;letter-spacing:1.15px;line-height:1.15;white-space:nowrap;margin:2px 0 7px}.brand-subtitle .brand-initial{color:#ef7f2d}.brand-version{position:absolute;right:1.5%;top:4%;font-size:11px;font-weight:700;color:#9aa6b5;letter-spacing:.4px}
+    .brand-lockup{position:relative;width:min(100%,900px);margin:0 auto;text-align:center}.brand-logo-frame{display:block;text-decoration:none}.brand-wordmark{color:#fff;font-size:clamp(34px,6vw,62px);font-weight:800;letter-spacing:2px;line-height:1.05}.brand-subtitle{text-align:center;color:#8fbce4;font-size:clamp(12px,2.55vw,27px);font-weight:300;letter-spacing:1.15px;line-height:1.15;white-space:nowrap;margin:2px 0 7px}.brand-subtitle .brand-initial{color:#ef7f2d}.brand-version{position:absolute;right:1.5%;top:4%;font-size:11px;font-weight:700;color:#9aa6b5;letter-spacing:.4px}
     .language-switch{display:flex;justify-content:flex-end;align-items:center;gap:6px;max-width:900px;margin:2px auto 0;color:#b8c7d5;font-size:12px}.language-switch button{padding:5px 10px;border:1px solid #56728a;border-radius:6px;background:#101a22;color:#d8e4ed;font-size:12px}.language-switch button.active{background:#2f668d;border-color:#8ab6d3;color:#fff}.language-switch button:focus-visible{outline:2px solid #ef7f2d;outline-offset:2px}
     .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
     main{max-width:1100px;margin:20px auto;padding:0 14px 40px}.card{background:white;border:1px solid var(--line);border-radius:11px;padding:18px;margin:14px 0;box-shadow:0 1px 2px rgba(0,0,0,.03)}
@@ -27,7 +26,7 @@
     .erss-reference{margin:12px 0;padding:12px;border:1px solid #9eb8ca;border-left:5px solid var(--blueInk);border-radius:7px;background:#f4f9fc}.erss-reference h4{margin:0 0 7px;color:var(--navy)}.erss-reference ol{margin:7px 0 10px;padding-left:21px}.erss-reference li{margin:4px 0}.erss-reference table{width:100%;border-collapse:collapse;background:#fff}.erss-reference th,.erss-reference td{border:1px solid #c7d5df;padding:7px;text-align:left;vertical-align:top;font-size:12px}.erss-reference th{background:var(--navy);color:#fff}.erss-reference td:last-child,.erss-reference th:last-child{text-align:center;white-space:nowrap}.erss-reference .reference-warning{margin:9px 0 0;color:#7a3d00;font-weight:bold}.erss-reference a{color:var(--blueInk)}
     button{background:var(--navy);color:white;border:0;border-radius:8px;padding:13px 18px;font-weight:bold;font-size:15px;cursor:pointer}button:disabled{opacity:.6;cursor:wait}
     .status{font-size:21px;font-weight:bold;padding:14px;border-radius:6px;background:var(--gray);color:var(--grayInk);border-left:7px solid #8a98a4}.status.pass{background:var(--green);color:var(--greenInk);border-color:var(--greenInk)}.status.caution,.status.review{background:var(--orange);color:var(--orangeInk);border-color:#d9790d}.status.fail{background:var(--red);color:var(--redInk);border-color:#c52b2b}.status.insufficient{background:var(--gray);color:var(--grayInk);border-color:#8a98a4}
-    .report-card{padding:0;background:transparent;border:0;box-shadow:none}.report-toolbar{display:flex;justify-content:flex-end;gap:9px;margin:0 0 12px}.secondary{background:white;color:var(--navy);border:1px solid var(--navy)}
+    .report-card{padding:0;background:transparent;border:0;box-shadow:none}.report-toolbar{display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap;margin:0 0 12px}.secondary{background:white;color:var(--navy);border:1px solid var(--navy)}
     .report-sheet{background:#fff;max-width:850px;margin:0 auto;padding:38px 44px;border:1px solid #cfd8df;box-shadow:0 8px 28px rgba(23,59,87,.10);font-family:Arial,sans-serif}.report-masthead{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid var(--navy);padding-bottom:13px;margin-bottom:17px}.report-masthead h2{font-size:20px;letter-spacing:.35px;color:var(--navy);margin:0 0 5px}.report-kicker{font-size:11px;font-weight:bold;letter-spacing:1.1px;color:var(--blueInk);text-transform:uppercase}.report-version{text-align:right;color:var(--muted);font-size:11px;white-space:nowrap}
     .meta-table,.clinical-table{width:100%;border-collapse:collapse}.meta-table{margin-bottom:17px}.meta-table th,.meta-table td{border:1px solid var(--line);padding:7px 9px;font-size:12px;text-align:left}.meta-table th{width:15%;background:#f1f4f6;color:#42515d}.meta-table td{width:35%}.report-section-title{font-size:13px;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--line);padding-bottom:5px;margin:20px 0 8px}.report-patient-name{font-size:24px;line-height:1.2;font-weight:800;color:var(--navy);text-transform:uppercase;letter-spacing:.6px;margin:0 0 8px;overflow-wrap:anywhere}
     .eye-result{border:1px solid var(--line);margin:18px 0;page-break-inside:avoid}.eye-head{padding:10px 12px;background:#f1f4f6;display:flex;justify-content:space-between;gap:10px;align-items:center;border-bottom:1px solid var(--line)}.eye-head strong{color:var(--navy);font-size:15px}.eye-head .status{font-size:13px;padding:6px 9px;border-left-width:4px}.eye-body{padding:13px}.eye-action{margin:0 0 11px;padding:9px 11px;background:#f7f9fb;border-left:4px solid var(--navy);font-size:12px}.clinical-table{margin:9px 0 12px}.clinical-table th,.clinical-table td{border:1px solid var(--line);padding:6px 8px;font-size:11px;text-align:left;vertical-align:middle}.clinical-table th{background:var(--navy);color:white}.clinical-table td:first-child{font-weight:bold;width:38%;background:#f7f9fb}.finding-group{page-break-inside:avoid}.finding-group h4{color:var(--navy);font-size:12px;margin:12px 0 4px}.finding-group ul{margin:4px 0 8px;padding-left:21px}.finding-group li{font-size:11px;margin:3px 0}.report-footer-note{margin-top:19px;padding-top:10px;border-top:1px solid var(--line);font-size:9px;color:var(--muted)}
@@ -36,13 +35,13 @@
     .app-legal-footer,.report-legal-footer{text-align:center;color:#52616d;font-size:11px;line-height:1.4}.app-legal-footer{max-width:1100px;margin:8px auto 22px;padding:12px 18px;border-top:1px solid var(--line)}.report-legal-footer{margin-top:12px;padding-top:8px;border-top:1px solid var(--line)}
     .identity-alert,.quality-alert{background:#fff0d8;color:#7a3d00;border:2px solid #d9790d;border-left-width:7px;padding:12px 14px;border-radius:6px;margin:10px 0 16px;font-size:12px}.identity-alert strong,.quality-alert strong{display:block;font-size:13px;margin-bottom:5px}.identity-alert ul,.quality-alert ul{margin:5px 0 0;padding-left:20px}
     .report-liability-notice{color:var(--redInk);font-weight:bold;font-size:12px;border:1px solid #c52b2b;border-left:6px solid #c52b2b;background:var(--red);padding:9px 11px;margin:0 0 16px;border-radius:5px}
-    @media(max-width:760px){.grid{grid-template-columns:1fr}.row,.completion-with-source{grid-template-columns:1fr}.completion-with-source>label,.completion-source-region,.completion-with-source>input,.completion-with-source>select{grid-column:1}.eye-head,.report-masthead{align-items:flex-start;flex-direction:column}.report-sheet{padding:24px 18px}.report-version{text-align:left}.meta-table th,.meta-table td{display:block;width:100%}}
+    @media(max-width:760px){main{margin-top:10px;padding-inline:9px}.card{padding:13px}.grid{grid-template-columns:1fr}.row,.completion-with-source{grid-template-columns:1fr}.completion-with-source>label,.completion-source-region,.completion-with-source>input,.completion-with-source>select{grid-column:1}.eye-head,.report-masthead{align-items:flex-start;flex-direction:column}.eye-body,.finding-group{max-width:100%;overflow-x:auto}.report-sheet{padding:20px 12px}.report-version{text-align:left}.report-toolbar button{flex:1 1 145px;min-height:44px}.meta-table th,.meta-table td{display:block;width:100%}.clinical-table{min-width:560px}input,select,button{font-size:16px}.sign-button{font-size:20px}}
     @media print{@page{size:A4;margin:12mm 12mm 20mm}body{background:white}.no-print,body>header,.card:first-of-type,.app-legal-footer{display:none!important}main{max-width:none;margin:0;padding:0}.report-card{display:block!important;margin:0}.report-sheet{max-width:none;border:0;box-shadow:none;padding:0}.report-legal-footer{position:fixed;left:12mm;right:12mm;bottom:5mm;margin:0;padding-top:5px;background:#fff}.eye-result{break-inside:avoid-page}.status,.meta-table th,.clinical-table th,.clinical-table td:first-child{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
   </style>
   <style>@media print{.report-card[hidden]{display:none!important}}</style>
 </head>
 <body>
-<header class="app-header"><div class="brand-lockup"><div class="brand-logo-frame"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=4" alt="CER-AI — Cornea Ectasia Risk Assessment Intelligence"></div><div class="brand-subtitle">Cornea Ectasia Risk <span class="brand-initial">A</span>ssessment <span class="brand-initial">I</span>ntelligence</div><span class="brand-version">v0.7.71</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.71</h1></header>
+<header class="app-header"><div class="brand-lockup"><div class="brand-logo-frame" aria-label="CER-AI"><span class="brand-wordmark">CER-AI</span></div><div class="brand-subtitle">Cornea Ectasia Risk <span class="brand-initial">A</span>ssessment <span class="brand-initial">I</span>ntelligence</div><span class="brand-version">v0.7.71</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.71</h1></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -97,9 +96,10 @@
     </form>
   </div>
 
+  <div id="procedureTransitionWarning" class="quality-alert" role="alert" hidden></div>
   <div id="reportCard" class="card report-card" hidden>
     <div class="report-toolbar no-print">
-      <button id="pdfBtn" type="button">Download PDF</button>
+      <button id="pdfBtn" type="button">Open / Download PDF</button>
       <button id="wordBtn" type="button" class="secondary">Download Word</button>
       <button id="printBtn" type="button" class="secondary">Print report</button>
     </div>
@@ -131,7 +131,7 @@
 <footer class="app-legal-footer">Developed by Hüseyin Cengiz, MD. All rights reserved. Final responsibility rests with the surgeon at all times and under all circumstances.</footer>
 
 <script src="/static/i18n.js?v=5"></script>
-<script src="/static/assessment-readiness.js?v=4"></script>
+<script src="/static/assessment-readiness.js?v=5"></script>
 <script>
 const i18n=window.CERAI_I18N;
 async function ceraiFetch(url,options={}){
@@ -153,7 +153,7 @@ async function ceraiFetch(url,options={}){
 }
 window.ceraiFetch=ceraiFetch;
 const eyeTemplate = (eye) => `
-  <div class="row"><label>Prior corneal refractive surgery?</label><select id="${eye}_prior"><option value="no" selected>No</option><option value="yes">Yes</option><option value="unknown">Unknown</option></select></div>
+  <div class="row"><label>Prior corneal refractive surgery?</label><select id="${eye}_prior"><option value="no" selected>No</option><option value="prk">Yes — PRK</option><option value="lasik">Yes — LASIK</option><option value="smile">Yes — SMILE</option><option value="unknown">Not documented</option></select></div>
   <div class="row"><label>Procedure</label><select id="${eye}_procedure"><option value="">Select</option><option value="PRK">PRK</option><option value="LASIK">LASIK</option></select></div>
   <div class="row"><label>Preoperative manifest sphere (D)</label><div class="signed-number sphere"><input id="${eye}_manifest_sphere" type="text" inputmode="decimal" autocomplete="off" data-min="-30" data-max="20"><button type="button" class="sign-button" data-positive-target="${eye}_manifest_sphere" aria-label="Make manifest sphere positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_manifest_sphere" aria-label="Make manifest sphere negative">−</button></div></div>
   <div class="row"><label>Preoperative manifest cylinder (D; + or −)</label><div class="signed-number"><input id="${eye}_manifest_cylinder" type="text" inputmode="decimal" autocomplete="off" data-min="-15" data-max="15"><button type="button" class="sign-button" data-positive-target="${eye}_manifest_cylinder" aria-label="Make manifest cylinder positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_manifest_cylinder" aria-label="Make manifest cylinder negative">−</button></div></div>
@@ -168,11 +168,10 @@ const eyeTemplate = (eye) => `
   <div class="row"><label>Optical zone (mm)</label><select id="${eye}_optical"><option value="">Select</option><option value="6.0">6.0 mm</option><option value="6.5" selected>6.5 mm</option><option value="7.0">7.0 mm</option></select></div>
   <div class="row"><label>Transition zone (mm)</label><select id="${eye}_transition"><option value="">Select</option><option value="8.0">8.0 mm</option><option value="8.5">8.5 mm</option><option value="9.0" selected>9.0 mm</option></select></div>
   <details id="${eye}_erss_confirmation" class="clinical-select-group" hidden>
-    <summary>Randleman topography — surgeon confirmation required</summary>
+    <summary>Randleman I-S — surgeon confirmation required</summary>
     <div class="clinical-select-options">
-      <div data-erss-reference="surgeon"></div>
+      <p class="note">ERSS topography uses signed Topometric I-S and derived SRAX only. Visual morphology is not evaluated.</p>
       <div class="row"><label>Surgeon-confirmed I-S (D)</label><div class="signed-number"><input id="${eye}_surgeon_i_s" type="text" inputmode="decimal" autocomplete="off"><button type="button" class="sign-button" data-positive-target="${eye}_surgeon_i_s" aria-label="Make I-S positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_surgeon_i_s" aria-label="Make I-S negative">−</button></div></div>
-      <div class="row"><label>Surgeon-confirmed Randleman topography category</label><select id="${eye}_surgeon_topography"><option value="">Select only when requested</option><option value="NORMAL_SYMMETRIC">Normal / symmetric bow-tie</option><option value="ASYMMETRIC_BOWTIE">Asymmetric bow-tie</option><option value="INFERIOR_STEEPENING_SRA">Inferior steepening and/or SRA</option><option value="ABNORMAL_ECTATIC">Abnormal / ectatic pattern</option></select></div>
     </div>
   </details>
   <details id="${eye}_nice_confirmation" class="clinical-select-group">
@@ -387,7 +386,19 @@ function validateERSSTopographyInputs(){
 document.querySelector("#report_date").value = new Date().toISOString().slice(0,10);
 
 async function loadSharedImages(){
-  const params=new URLSearchParams(window.location.search), token=params.get("share_token");
+  const params=new URLSearchParams(window.location.search), token=params.get("share_token"), shareError=params.get("share_error");
+  if(shareError){
+    const messages={
+      no_images:"No readable image was received. Share the Pentacam images again.",
+      too_many_images:"A maximum of six images can be shared for one CER-AI assessment.",
+      image_too_large:"One shared image exceeds the 20 MB limit.",
+      images_too_large:"The shared images exceed the 80 MB total limit."
+    };
+    sharedImageNotice.hidden=false;
+    sharedImageNotice.innerHTML=`<strong>Shared images were not loaded.</strong> ${safe(messages[shareError]||"Open the image picker and select the Pentacam images.")}`;
+    history.replaceState({},document.title,window.location.pathname);
+    return;
+  }
   if(!token)return;
   try{
     if(!window.caches)throw new Error("Shared-image storage is unavailable.");
@@ -395,17 +406,22 @@ async function loadSharedImages(){
     const metaUrl=`/__hc_share__/${encodeURIComponent(token)}/meta`;
     const metaResponse=await cache.match(metaUrl);
     if(!metaResponse)throw new Error("The shared images could not be found. Please share them again.");
-    const meta=await metaResponse.json(), loaded=[];
+    const meta=await metaResponse.json(), loaded=[], files=[];
     for(const item of meta.files||[]){
       const response=await cache.match(item.url);
       if(!response)continue;
+      const blob=await response.blob();
       loaded.push({...item,name:item.name||"shared-image.jpg",size:Number(item.size)||null,previewUrl:item.url});
+      if(typeof File==="function")files.push(new File([blob],item.name||"shared-image.jpg",{type:blob.type||item.type||"image/jpeg",lastModified:Number(item.lastModified)||Date.now()}));
     }
     if(!loaded.length)throw new Error("No readable image was received. Please share the photos again.");
-    sharedImages=loaded;
+    const retention=window.CER_AI_SourceImageRetention;
+    if(files.length===loaded.length&&typeof retention?.adopt==="function"){
+      retention.adopt(files);sharedImages=[];renderSelectedFiles(imageInput.files);imageInput.required=true;
+    }else{
+      sharedImages=loaded;renderSelectedFiles(loaded);imageInput.required=false;
+    }
     resetAgeAcquisition();
-    renderSelectedFiles(loaded);
-    imageInput.required=false;
     sharedImageNotice.hidden=false;
     const knownBytes=loaded.reduce((total,item)=>total+(item.size||0),0);
     const sizeText=knownBytes?` (${(knownBytes/1024/1024).toFixed(1)} MB total)`:"";
@@ -500,7 +516,7 @@ function plan(prefix){
   epithelium_um:50,
   laser_platform:"Alcon EX500", optical_zone_mm:numberOrNull(`${prefix}_optical`),
   transition_zone_mm:numberOrNull(`${prefix}_transition`), transition_zone_not_applicable:"no",
-  surgeon_I_S_D:numberOrNull(`${prefix}_surgeon_i_s`), surgeon_topography_category:value(`${prefix}_surgeon_topography`)||null,
+  surgeon_I_S_D:numberOrNull(`${prefix}_surgeon_i_s`),
   surgeon_nice_central_um:numberOrNull(`${prefix}_nice_central`), surgeon_nice_pe_um:numberOrNull(`${prefix}_nice_pe`),
   stable:value(`${prefix}_stable`), progression:value(`${prefix}_progression`),
   cdva_below_20_20:value(`${prefix}_cdva`), enhancement_anticipated:value(`${prefix}_enhancement`)
@@ -509,6 +525,7 @@ function plan(prefix){
 function statusClass(s){
   if(s === "PASS") return "pass";
   if(s === "CAUTION") return "caution";
+  if(s === "PASS WITH CAUTION") return "caution";
   if(s === "STOP-DEFER") return "fail";
   return "insufficient";
 }
@@ -518,17 +535,6 @@ function correctionText(values){
   if(values.intended_sphere_D===null||values.intended_sphere_D===undefined||values.intended_cylinder_magnitude_D===null||values.intended_cylinder_magnitude_D===undefined)return "—";
   const axis=values.correction_axis_deg===null||values.correction_axis_deg===undefined?"axis unavailable":`${fmt(values.correction_axis_deg,0)}°`;
   return `${fmt(values.intended_sphere_D,2)} D / -${fmt(values.intended_cylinder_magnitude_D,2)} D × ${axis}`;
-}
-function enteredRefractionText(values,role){
-  const sphere=values[`${role}_entered_sphere_D`], cylinder=values[`${role}_cylinder_signed_D`], axis=values[`${role}_entered_axis_deg`];
-  if(sphere===null||sphere===undefined||cylinder===null||cylinder===undefined)return "—";
-  const axisText=axis===null||axis===undefined?"axis unavailable":`${fmt(axis,0)}°`;
-  return `${Number(sphere)>=0?"+":""}${fmt(sphere,2)} D / ${Number(cylinder)>=0?"+":""}${fmt(cylinder,2)} D × ${axisText}`;
-}
-function manifestText(values){
-  if(values.manifest_sphere_D===null||values.manifest_sphere_D===undefined||values.manifest_cylinder_magnitude_D===null||values.manifest_cylinder_magnitude_D===undefined)return "—";
-  const axis=values.manifest_normalized_axis_deg===null||values.manifest_normalized_axis_deg===undefined?"axis unavailable":`${fmt(values.manifest_normalized_axis_deg,0)}°`;
-  return `${fmt(values.manifest_sphere_D,2)} D / -${fmt(values.manifest_cylinder_magnitude_D,2)} D × ${axis}`;
 }
 function applyEffectivePlans(plans){
   const transferred=[];
@@ -548,81 +554,47 @@ function applyEffectivePlans(plans){
   cardTransferNote.textContent=transferred.length?`Card values transferred: ${transferred.join("; ")}`:"";
 }
 function listBlock(title, items){if(!items || !items.length)return "";return `<div class="finding-group"><h4>${safe(i18n.translate(title))}</h4><ul>${items.map(x=>`<li>${safe(i18n.clinical(x))}</li>`).join("")}</ul></div>`}
-function lasikPlanHeadline(r){ const v=r.values||{}; if(!["PASS","CAUTION"].includes(r.status)||v.procedure!=="LASIK")return ""; const selected=r.lasik_selected_plan||v.LASIK_selected_plan; if(!selected)return ""; const parts=[selected]; if(v.LASIK_flap_um!=null)parts.push(`FLAP ${fmt(v.LASIK_flap_um,0)} µm`); if(v.optical_zone_mm!=null)parts.push(`OPTICAL ZONE ${fmt(v.optical_zone_mm,1)} mm`); if(v.transition_zone_mm!=null)parts.push(`TRANSITION ZONE ${fmt(v.transition_zone_mm,1)} mm`); return parts.join(" • "); }
-function statusHeadline(r){ const selected=lasikPlanHeadline(r); return selected?`${i18n.clinical(r.status)} — ${selected}`:i18n.clinical(r.status); }
-function microkeratomeBlock(r){
-  const p=r.microkeratome_planning;
-  if(!p?.applicable)return "";
-  const rows=[
-    ["Assessment gate",p.assessment_gate??"—"],["Steep − flat K spread",`${fmt(p.delta_k_d,2)} D`],
-    ["Vacuum ring",`${fmt(p.vacuum_ring_mm,1)} mm`],["Vacuum pressure",p.vacuum_pressure_mmhg?`${p.vacuum_pressure_mmhg} mmHg`:"—"],
-    ["Blade recommendation(s)",(p.blade_recommendations||[]).join(", ")||"—"],
-    ["Primary hinge",p.primary_hinge||"No CER-AI K-spread hinge override"],
-    ["Conditional alternative",p.alternative_hinge||"Not cleared / not applicable"],
-    ["Alternative projected RSB / PTA",p.alternative_safety==="NOT_APPLICABLE"?"Not applicable":`${fmt(p.alternative_rsb_um,1)} µm / ${fmt(p.alternative_pta_percent,1)}%`],
-    ["Alternative safety",p.alternative_safety??"—"],["Ring-zone clearance",`${fmt(p.ring_tzone_clearance_mm,2)} mm`],
-    ["Source",p.source??"—"]
-  ];
-  return `<div class="finding-group"><h4>Post-assessment ML7 microkeratome planning</h4><p class="note"><strong>Surgeon-review recommendation only; this module does not alter the ectasia disposition.</strong></p><table class="clinical-table"><thead><tr><th>Parameter</th><th>Recommendation</th></tr></thead><tbody>${rows.map(([a,b])=>`<tr><td>${safe(a)}</td><td>${safe(b)}</td></tr>`).join("")}</tbody></table>${listBlock("Planning warnings",p.warnings)}${listBlock("Planning notes",p.notes)}</div>`;
+function displayValue(value){
+  if(value===null||value===undefined||value==="")return "—";
+  if(Array.isArray(value))return value.map(displayValue).join("; ");
+  if(typeof value==="object")return Object.entries(value).map(([key,item])=>`${key}: ${displayValue(item)}`).join("; ");
+  return String(value);
 }
-function renderEye(r, extracted){
-  const v=r.values||{}, s=r.score||{};
-  const erssEvidence=r.erss_topography_evidence||{};
-  const transition=v.transition_zone_mm===null||v.transition_zone_mm===undefined?(v.transition_zone_not_applicable==="yes"?"Not applicable":"—"):`${fmt(v.transition_zone_mm,1)} mm`;
-  const rows=[["Procedure",v.procedure??"—"]];
-  if(String(v.procedure||"").toUpperCase()==="PRK") rows.push(
-    ["CER-AI provisional PRK-EWSS score / category",`${s.total ?? "—"} / ${s.category ?? "—"}`]
-  );
-  rows.push(
-    ["Randleman ERSS / category",`${r.randleman_erss?.total??"Not applicable"} / ${r.randleman_erss?.category??"—"}`],
-    ["Final BAD-D / class",`${fmt(r.bad_summary?.value,2)} / ${r.bad_summary?.category??"—"}`],
-    ["CER-AI-adapted NICE / class",`${r.nice?.total??"Not applicable"} / ${r.nice?.category??"—"}`],
-    ["Prior refractive surgery",v.prior_refractive_surgery??"—"],["Stability / progression / CDVA flag",`${v.refractive_stability??"—"} / ${v.documented_progression??"—"} / ${v.unexplained_CDVA_below_20_20??"—"}`],
-    ["Manifest entered notation",enteredRefractionText(v,"manifest")],["Manifest normalized (minus-cylinder)",manifestText(v)],
-    ["Intended entered notation",enteredRefractionText(v,"intended")],["Intended normalized (minus-cylinder)",correctionText(v)],["Correction source",v.correction_source??"Manual / not documented"],
-    ["Thinnest pachymetry",`${fmt(v.pachy_thinnest_um,0)} µm`],["Manifest MRSE",`${fmt(v.MRSE_D,2)} D`],
-    ["Intended MRSE",`${fmt(v.intended_MRSE_D,2)} D`],["Preoperative Kmean",`${fmt(v.preoperative_Kmean_D,2)} D`],
-    ["Manifest / intended pattern",`${v.manifest_refractive_pattern??"—"} / ${v.intended_refractive_pattern??"—"}`],
-    ["Intended principal meridians",(v.intended_principal_meridians_D||[]).map(x=>`${fmt(x,2)} D`).join(" / ")||"—"],
-    ["Estimated final Kmean",`${fmt(v.estimated_final_Kmean_D,2)} D`],["Corneal effect factor",`${fmt(v.corneal_effect_per_intended_MRSE_D,1)} D/D`],
-    ["Maximum ablation",`${fmt(v.max_ablation_um,1)} µm`],["Laser platform",v.laser_platform??"—"],
-    ["PRK epithelium",`${fmt(v.PRK_epithelium_um,0)} µm`],
-    ["Optical / transition zone",`${fmt(v.optical_zone_mm,1)} mm / ${transition}`],["Enhancement anticipated",v.enhancement_anticipated??"—"],
-    ["PRK RST / PTA",`${fmt(v.PRK_RST_um,0)} µm / ${fmt(v.PRK_PTA_percent,1)}%`],
-    ["LASIK RSB / PTA",`${fmt(v.LASIK_RSB_um,0)} µm / ${fmt(v.LASIK_PTA_percent,1)}%`],
-    ["Tomography review",r.tomography_review?.status??"—"],["Morphology category",r.topography_classification?.scoring_category??"—"],
-    ["Randleman I-S / source",`${fmt(erssEvidence.I_S_D,2)} D / ${erssEvidence.I_S_source??"—"}`],
-    ["Validated Randleman topography",`${erssEvidence.validated_category??"—"} / ${erssEvidence.category_source??"—"}`],
-    ["Anterior-map read confidence",erssEvidence.image_category_confidence??"—"]
-  );
-  const source=(extracted.eyes||[]).find(x=>x.eye===r.eye)||{};
-  const targetedReadText=Object.entries(source.targeted_reread_evidence||{}).flatMap(([field,records])=>(records||[]).map(record=>{
-    const label=[record.group_label,record.printed_label].filter(Boolean).join(" / ")||field;
-    return `${field}: ${label} (${String(record.tile||"original").replaceAll("_"," ").toLowerCase()})`;
-  })).join("; ")||"—";
-  const tomoRows=[
-    ["K1",fmt(source.K1_D,2)+" D"],["K1 axis",fmt(source.K1_axis_deg,0)+"°"],["K2",fmt(source.K2_D,2)+" D"],["K2 axis",fmt(source.K2_axis_deg,0)+"°"],["Kmax",fmt(source.Kmax_D,2)+" D"],["Horizontal white-to-white (HWTW)",fmt(source.corneal_diameter_mm,2)+" mm"],
-    ["Thinnest pachymetry",fmt(source.pachy_thinnest_um,0)+" µm"],["BAD-D final",fmt(source.BAD_D,2)],
-    ["BAD-Df",fmt(source.Df,2)],["BAD-Db",fmt(source.Db,2)],["BAD-Dp",fmt(source.Dp,2)],["BAD-Dt",fmt(source.Dt,3)],["BAD-Da",fmt(source.Da,3)],
-    ["ARTmax",fmt(source.ARTmax_um,0)+" µm"],["PPI min",fmt(source.PPI_min,2)],["PPI avg",fmt(source.PPI_avg,2)],["PPI max",fmt(source.PPI_max,2)],
-    ["ISV",fmt(source.ISV,0)],["IVA",fmt(source.IVA,3)],["KI",fmt(source.KI,3)],["CKI",fmt(source.CKI,3)],
-    ["IHA",fmt(source.IHA,3)],["IHD",fmt(source.IHD,3)],["I-S",fmt(source.I_S,2)+" D"],["KISA",fmt(source.KISA,1)+"%"],
-    ["Rmin",fmt(source.Rmin_mm,2)+" mm"],["SRAX",fmt(source.srax_deg,1)+"°"],
-    ["Inferior vs opposite steepening",fmt(source.inferior_opposite_steepening_D,2)+" D"],
-    ["Anterior elevation at TP",fmt(source.anterior_elevation_thinnest_um,1)+" µm"],["Posterior elevation at TP",fmt(source.posterior_elevation_thinnest_um,1)+" µm"],
-    ["Thinnest X / Y",`${fmt(source.thinnest_x_mm,2)} / ${fmt(source.thinnest_y_mm,2)} mm`],["Corneal volume",fmt(source.corneal_volume_mm3,2)+" mm³"],
-    ["RMS-HOA",fmt(source.RMS_HOA_um,3)+" µm"],["Vertical coma",fmt(source.vertical_coma_um,3)+" µm"],
-    ["Morphology",source.morphology??"—"],["Anterior pattern",source.anterior_pattern??"—"],["Posterior pattern",source.posterior_pattern??"—"],["Image quality",source.quality??"—"],
-    ["Pentacam QS",source.pentacam_qs??"—"],["Targeted crop reread",targetedReadText],["Source files",(source.source_files||[]).join(", ")||"—"]
-  ];
+function canonicalTable(title,headers,rows){
+  if(!rows.length)return "";
+  return `<div class="finding-group"><h4>${safe(i18n.translate(title))}</h4><table class="clinical-table"><thead><tr>${headers.map(value=>`<th>${safe(i18n.translate(value))}</th>`).join("")}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(value=>`<td>${safe(displayValue(value))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+function provenanceText(entries){
+  return (entries||[]).map(item=>[item.source,item.region,item.file].filter(Boolean).join(" / ")||displayValue(item)).join("; ")||"—";
+}
+function statusHeadline(r){
+  const selected=r.report_payload?.planning?.selected_plan;
+  return selected?`${i18n.clinical(r.status)} — ${selected}`:i18n.clinical(r.status);
+}
+function renderEye(r){
+  const p=r.report_payload||{},erss=p.randleman,nice=p.nice||{},ps3=p.ps3||{},bad=p.bad||{},badContext=bad.context||{};
+  const erssRows=erss?Object.entries(erss.rows||{}).map(([key,value])=>[key,value]).concat([["Total",erss.total],["Topography category",erss.category],["Disposition",erss.status]]):[["Applicability","Not applicable to selected non-LASIK procedure"]];
+  const niceValueKeys={K2:"K2_D",central_pachymetry:"central_pachy_um",B_Ele_Th:"B_Ele_Th_um",I_S:"I_S_D"};
+  const niceRows=Object.entries(nice.rows||{}).map(([key,points])=>[key,nice.values?.[niceValueKeys[key]],points]).concat([["Total","",nice.total],["Classification",nice.category,nice.status]]);
+  const ps3Rows=(ps3.findings||[]).map(item=>[item.key,item.status,item.detail]).concat([["Moderate / High",ps3.moderate_count,ps3.high_count],["Procedure disposition",ps3.status,ps3.disposition]]);
+  const badRows=[["Final BAD-D",bad.final_d,`${displayValue(bad.classification)} / ${displayValue(bad.status)}`],...["df","db","dp","dt","da"].map(key=>[key.toUpperCase(),badContext[key],"Displayed component; not recalculated"]),...["ppi_min","ppi_avg","ppi_max","artmax_um"].map(key=>[key,badContext[key],"Information / QC only"])];
+  const safetyRows=Object.entries(p.tissue_safety||{}).map(([key,value])=>[key,value]);
+  const planningRows=[["Procedure",p.procedure],...Object.entries(p.planning||{}),...Object.entries(p.microkeratome_planning||{}).map(([key,value])=>[`ML7 ${key}`,value])];
+  const driverRows=["stop","caution","incomplete"].flatMap(level=>(p.decision_drivers?.[level]||[]).map(item=>[level.toUpperCase(),item]));
+  const sourceRows=Object.entries(p.source_values||{}).map(([key,value])=>[key,value,provenanceText(p.source_provenance?.[key])]);
+  const correctionRows=(p.manual_corrections||[]).map(item=>[item.field,item.original,item.value,item.label]);
   return `<section class="eye-result"><div class="eye-head"><strong>${safe(r.eye)} ASSESSMENT</strong><span class="status ${statusClass(r.status)}">${safe(statusHeadline(r))}</span></div><div class="eye-body">
     <p class="eye-action"><strong>Clinical action:</strong> ${safe(i18n.clinical(r.action))}</p>
-    <p class="note"><strong>Instrument/source:</strong> ${safe(i18n.clinical(r.instrument||"Not documented"))}</p>
-    <table class="clinical-table"><thead><tr><th>Parameter</th><th>Result</th></tr></thead><tbody>${rows.map(([a,b])=>`<tr><td>${safe(a)}</td><td>${safe(b)}</td></tr>`).join("")}</tbody></table>
-    ${listBlock("NICE component audit",Object.entries(r.nice?.rows||{}).map(([k,v])=>`${k}: ${v} point(s)`).concat(Object.entries(r.nice?.values||{}).map(([k,v])=>`${k}: ${v}`),Object.entries(r.nice?.input_sources||{}).map(([k,v])=>`${k} source: ${v}`)))}
-    ${listBlock("NICE interpretation note",r.nice?.note?[r.nice.note]:[])}
-    ${listBlock("Reasons",r.reasons)}${listBlock("Hard stops",r.hard_stops)}${listBlock("Missing / unresolved",r.missing)}${listBlock("PRK Mitomycin-C guidance",r.prk_mitomycin_c_guidance)}${listBlock("Surgeon attention — hyperopic/mixed pathway",r.surgeon_attention)}${listBlock("Tomography concern flags",r.tomography_review?.cross_sectional_flags)}${listBlock("BAD display interpretation",Object.entries(r.tomography_review?.BAD_display||{}).map(([k,v])=>`${k}: ${v}`))}${listBlock("Surgical-load evidence flags",r.surgical_load_flags)}${listBlock("Clinical modifiers",r.clinical_modifiers)}${listBlock("Warnings",r.warnings)}${microkeratomeBlock(r)}
-    <div class="finding-group"><h4>Extracted tomography</h4><table class="clinical-table"><thead><tr><th>Parameter</th><th>Value</th></tr></thead><tbody>${tomoRows.map(([a,b])=>`<tr><td>${safe(a)}</td><td>${safe(b)}</td></tr>`).join("")}</tbody></table></div>
+    ${canonicalTable("Randleman / ERSS",["Component","Points"],erssRows)}
+    ${canonicalTable("NICE",["Component","Input","Points / disposition"],niceRows)}
+    ${canonicalTable("PS3",["Factor","Status","Exact finding"],ps3Rows)}
+    ${canonicalTable("Belin/Ambrósio BAD-D",["Parameter","Value","Interpretation"],badRows)}
+    ${canonicalTable("Procedural safety",["Parameter","Canonical result"],safetyRows)}
+    ${canonicalTable("Procedure planning",["Planning item","Canonical result"],planningRows)}
+    ${canonicalTable("Decision basis",["Level","Canonical decision driver"],driverRows)}
+    ${canonicalTable("Canonical Pentacam values and provenance",["Canonical field","Value","Provenance"],sourceRows)}
+    ${canonicalTable("Surgeon-completed values",["Field","Original","Surgeon-entered value","Provenance"],correctionRows)}
+    ${listBlock("Clinical modifiers",r.clinical_modifiers)}${listBlock("Warnings",r.warnings)}
   </div></section>`;
 }
 
@@ -646,14 +618,23 @@ function setReportMetadata(decision){
 async function downloadReport(kind){
   if(!lastReport)return;
   const button=kind==="pdf"?pdfBtn:wordBtn, original=button.textContent;
+  const preview=kind==="pdf"?window.open("about:blank","_blank"):null;
+  if(preview)preview.opener=null;
   button.disabled=true;button.textContent=i18n.translate("Preparing...");
   try{
     const response=await ceraiFetch(`/report/${kind}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(lastReport)});
     if(!response.ok)throw new Error(`Report export failed (${response.status})`);
     const blob=await response.blob(), url=URL.createObjectURL(blob), a=document.createElement("a");
     const id=(lastReport.patient.id||lastReport.patient.name||"Report").replace(/[^a-z0-9_-]+/gi,"_");
-    a.href=url;a.download=`CER-AI_${id}.${kind==="pdf"?"pdf":"docx"}`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
-  }catch(err){alert(String(err))}finally{button.disabled=false;button.textContent=original}
+    a.href=url;
+    if(kind==="pdf"){
+      if(preview)preview.location.replace(url);
+      else{a.target="_blank";a.rel="noopener";document.body.appendChild(a);a.click();a.remove();}
+    }else{
+      a.download=`CER-AI_${id}.docx`;document.body.appendChild(a);a.click();a.remove();
+    }
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+  }catch(err){if(preview)preview.close();alert(String(err))}finally{button.disabled=false;button.textContent=original}
 }
 pdfBtn.addEventListener("click",()=>downloadReport("pdf"));
 wordBtn.addEventListener("click",()=>downloadReport("word"));
@@ -666,28 +647,11 @@ const showFormMessage=(message)=>{
   assessmentProgress.textContent=message;
   assessmentProgress.hidden=false;
 };
-function applyERSSTopographyPrompts(decision){
-  const requested=[];
-  for(const result of decision?.eyes||[]){
-    const prefix=result.eye==="OD"?"od":result.eye==="OS"?"os":null;
-    if(!prefix)continue;
-    const evidence=result.erss_topography_evidence||{};
-    const details=document.getElementById(`${prefix}_erss_confirmation`);
-    const iSInput=document.getElementById(`${prefix}_surgeon_i_s`);
-    const categoryInput=document.getElementById(`${prefix}_surgeon_topography`);
-    if(evidence.needs_surgeon_I_S||evidence.needs_surgeon_category){
-      details.hidden=false;details.open=true;
-      iSInput.required=Boolean(evidence.needs_surgeon_I_S);
-      categoryInput.required=Boolean(evidence.needs_surgeon_category);
-      requested.push(`${result.eye}${evidence.needs_surgeon_I_S?" I-S":""}${evidence.needs_surgeon_category?" topography category":""}`);
-    }
-  }
-  return requested;
-}
 const allowLoadingStateToPaint=()=>new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
 
 f.addEventListener("submit", async (e) => {
   e.preventDefault();
+  document.querySelector('#procedureTransitionWarning').hidden=true;
   reportCard.hidden=true;lastReport=null;
   for(const eye of ['od','os'])for(const suffix of ['nice_central','nice_pe']){
     const id=`${eye}_${suffix}`,raw=value(id).trim();
@@ -732,6 +696,7 @@ f.addEventListener("submit", async (e) => {
   assessBtn.setAttribute("aria-busy","true");
   showFormMessage("Assessing images... Please wait.");
   statusBox.className="status insufficient"; statusBox.textContent="ASSESSING...";
+  document.querySelector('#procedureTransitionWarning').hidden=true;
   reportCard.hidden=true;lastReport=null;eyeResults.innerHTML=""; decisionBox.textContent=""; extractBox.textContent=""; overallNote.textContent="";qualityWarning.hidden=true;qualityWarning.innerHTML="";cardTransferNote.textContent="";
   try{
     await allowLoadingStateToPaint();
@@ -781,19 +746,30 @@ f.addEventListener("submit", async (e) => {
       ageInput.required=true;
       manualAgeRow.hidden=false;
     }
+    const transitionWarning=document.querySelector('#procedureTransitionWarning');
+    const transitions=j.procedure_transitions||[];
+    transitionWarning.hidden=!transitions.length;
+    transitionWarning.textContent=transitions.map(item=>item.message).join(' ');
     applyEffectivePlans(j.effective_eye_plans);
     if(readiness.show(j)){
-      showFormMessage(j.message);statusBox.textContent='REQUIRED INFORMATION';
-      statusBox.className='status insufficient';return;
+      const stop=j.hard_stop_summary;
+      if(stop){
+        statusBox.textContent='STOP-DEFER';statusBox.className='status fail';
+        const reasons=(stop.eyes||[]).flatMap(eye=>(eye.reasons||[]).map(reason=>`${eye.eye}: ${reason}`));
+        overallNote.textContent=reasons.join(' • ')||'A definitive hard stop is present. Complete the requested values for the full report.';
+      }else{
+        statusBox.textContent=j.workflow_status==='CONTACT_LENS_WASHOUT_REQUIRED'?'CONTACT-LENS WASHOUT REQUIRED':'REQUIRED INFORMATION';
+        statusBox.className='status insufficient';overallNote.textContent='';
+      }
+      showFormMessage(j.message);return;
     }
     if(j.workflow_status!=='READY'||!j.report_token||!j.decision)throw new Error('Server did not return a complete report-ready assessment.');
-    const erssPrompts=applyERSSTopographyPrompts(j.decision);
     statusBox.textContent=i18n.clinical(j.decision.status); statusBox.className=`status ${statusClass(j.decision.status)}`;
     overallNote.textContent=i18n.clinical(j.decision.action||"");
     const identityWarnings=j.decision.identity_warnings||[];
     identityWarning.hidden=!identityWarnings.length;
     identityWarning.innerHTML=identityWarnings.length?`<strong>${safe(i18n.translate("PATIENT IDENTITY NOT VERIFIED — SURGEON CONFIRMATION REQUIRED"))}</strong><ul>${identityWarnings.map(item=>`<li>${safe(i18n.clinical(item))}</li>`).join("")}</ul>`:"";
-    eyeResults.innerHTML=listBlock("Global clinical / source blockers",j.decision.critical_input_issues)+orderedEyes(j.decision.eyes).map(x=>renderEye(x,j.extracted)).join("");
+    eyeResults.innerHTML=listBlock("Global clinical / source blockers",j.decision.critical_input_issues)+orderedEyes(j.decision.eyes).map(renderEye).join("");
     const qualityWarnings=j.decision.source_quality_warnings||[];
     qualityWarning.hidden=!qualityWarnings.length;
     qualityWarning.innerHTML=qualityWarnings.length?`<strong>${safe(i18n.translate("PENTACAM ACQUISITION QUALITY — SURGEON ATTENTION"))}</strong><ul>${qualityWarnings.map(item=>`<li>${safe(i18n.clinical(item))}</li>`).join("")}</ul>`:"";
@@ -803,10 +779,6 @@ f.addEventListener("submit", async (e) => {
       showFormMessage("Patient age could not be read from the Pentacam image. Enter the age, then run the assessment again.");
       manualAgeRow.scrollIntoView({behavior:"smooth",block:"center"});
       ageInput.focus();
-    }else if(erssPrompts.length){
-      showFormMessage(`Randleman topography requires surgeon confirmation for ${erssPrompts.join("; ")}. Enter the requested Pentacam I-S/category, then run the assessment again.`);
-      const firstPrefix=erssPrompts[0].startsWith("OD")?"od":"os";
-      document.getElementById(`${firstPrefix}_erss_confirmation`).scrollIntoView({behavior:"smooth",block:"center"});
     }else{
       assessmentProgress.hidden=true;
       reportCard.scrollIntoView({behavior:"smooth",block:"start"});
@@ -818,9 +790,12 @@ f.addEventListener("submit", async (e) => {
       :"";
     showFormMessage(`Assessment failed: ${err.message||String(err)}${networkHint}`);
   }finally{
-    const sourceBlocked=Boolean(readiness.token&&!readiness.hasCompletableInputs);
-    assessBtn.disabled=sourceBlocked;
-    assessBtn.textContent=sourceBlocked?'Replace source images to continue':readiness.token?'Continue with completed information':originalText;
+    assessBtn.disabled=false;
+    assessBtn.textContent=readiness.token
+      ?readiness.hasCompletableInputs?'Continue with completed information'
+        :readiness.requiresSourceReplacement?'Add/replace source image to continue'
+        :'Review the required action'
+      :originalText;
     assessBtn.removeAttribute("aria-busy");
   }
 });
@@ -832,6 +807,5 @@ if("serviceWorker" in navigator){
 }
 loadSharedImages();
 </script>
-<script id="hc-reference-script" src="/static/hc-reference.js?v=6"></script>
 </body>
 </html>

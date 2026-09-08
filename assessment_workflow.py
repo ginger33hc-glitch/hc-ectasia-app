@@ -16,6 +16,7 @@ from fastapi import Body, HTTPException, Response
 from canonical_readiness import evaluate_precore_readiness
 from canonical_runtime_service import evaluate_case
 from pentacam_field_registry import COMPLETION_NUMERIC_FIELDS
+from pentacam_canonical_source_lock import canonical_source_region
 from pentacam_quality_policy import is_quality_only_issue
 from pentacam_source_regions import region_hints
 
@@ -34,6 +35,50 @@ def _finite(value):
         and not isinstance(value, bool)
         and isfinite(float(value))
     )
+
+
+def _eye_record(extracted, eye_id):
+    return next(
+        (item for item in (extracted or {}).get("eyes") or [] if item.get("eye") == eye_id),
+        {},
+    )
+
+
+def _expanded_ps3_missing(eye_id, message, decision, extracted):
+    """Translate a PS3 factor dependency into the exact missing source/form fields."""
+    if not str(message).lower().startswith("ps3: "):
+        return [(eye_id, str(message))]
+    factor = str(message).split(":", 1)[1].strip().lower()
+    eye = _eye_record(extracted, eye_id)
+    direct = {
+        "anterior_km": ("Kmean_D",),
+        "thinnest": ("pachy_thinnest_um",),
+        "elevation": ("F_Ele_Th_um", "B_Ele_Th_um"),
+        "ppi_average": ("PPI_avg",),
+    }
+    if factor in direct:
+        missing = [key for key in direct[factor] if not _finite(eye.get(key))]
+        return [(eye_id, f"PS3: {key}") for key in missing] or [(eye_id, str(message))]
+    if factor == "astigmatic_study":
+        missing = [
+            key for key in ("topographic_astig_D", "bad_flat_axis_deg")
+            if not _finite(eye.get(key))
+        ]
+        plan = (decision.get("effective_eye_plans") or {}).get(eye_id) or {}
+        if not _finite(plan.get("manifest_cylinder_signed_D")):
+            missing.append("manifest_cylinder_signed_D")
+        if not any(_finite(plan.get(key)) for key in ("manifest_axis_deg", "manifest_entered_axis_deg", "entered_axis_deg")):
+            missing.append("manifest_axis_deg")
+        return [(eye_id, f"PS3: {key}") for key in missing] or [(eye_id, str(message))]
+    if factor == "inter_eye_asymmetry":
+        missing = []
+        for candidate_eye in ("OD", "OS"):
+            record = _eye_record(extracted, candidate_eye)
+            for key in ("Kmean_D", "posterior_Kmean_D", "pachy_thinnest_um", "F_Ele_Th_um", "B_Ele_Th_um"):
+                if not _finite(record.get(key)):
+                    missing.append((candidate_eye, f"PS3: {key}"))
+        return missing or [(eye_id, str(message))]
+    return [(eye_id, str(message))]
 
 
 def _prune():
@@ -64,9 +109,11 @@ def missing_items(decision, extracted=None):
         )
     for eye in decision.get("eyes") or []:
         eye_id = eye.get("eye", "GLOBAL")
+        if eye.get("status") == "POST-REFRACTIVE PATHWAY REQUIRED":
+            items.append((eye_id, "POST-REFRACTIVE PATHWAY REQUIRED"))
         for message in eye.get("missing") or []:
             if not is_quality_only_issue(message):
-                items.append((eye_id, str(message)))
+                items.extend(_expanded_ps3_missing(eye_id, message, decision, extracted))
     if not decision.get("eyes"):
         items.append(("GLOBAL", "No classifiable OD/OS tomography was extracted."))
     return list(dict.fromkeys(items))
@@ -79,7 +126,13 @@ def _with_region(item, extracted):
     return item
 
 
-def _source_number_request(eye, key, label, extracted):
+def _required_system(message):
+    prefix = str(message).split(":", 1)[0].strip()
+    return prefix if prefix in {"Randleman", "NICE", "PS3", "Safety"} else "CER-AI"
+
+
+def _source_number_request(eye, key, label, extracted, *, required_for="CER-AI"):
+    source = canonical_source_region(key) or {}
     return _with_region(
         {
             "eye": eye,
@@ -87,6 +140,9 @@ def _source_number_request(eye, key, label, extracted):
             "kind": "number",
             "key": key,
             "destination": "measurement",
+            "required_for": [required_for],
+            "source_screen": source.get("screen", "Canonical source not available in registry"),
+            "source_box": source.get("box", label),
             "help": "Enter the value only after confirming the indicated canonical Pentacam source box.",
         },
         extracted,
@@ -101,6 +157,9 @@ def _srax_request(eye):
         "key": "srax",
         "destination": "measurement",
         "options": ["YES", "NO"],
+        "required_for": ["Randleman", "PS3"],
+        "source_screen": "4 Maps Refractive",
+        "source_box": "Axial/Sagittal Curvature (Front) map",
         "help": (
             "Inspect only the Axial/Sagittal Curvature (Front) map. Choose YES only when the skew amount is greater than 20°. "
             "Exact 20.0° is NO. Do not infer SRAX from KISA, I-S, Kmax, BAD-D, elevation, or another surrogate."
@@ -116,11 +175,27 @@ def _request(eye, message, extracted):
     text = str(message)
     lower = text.lower()
 
+    if text == "POST-REFRACTIVE PATHWAY REQUIRED":
+        return {
+            "eye": eye,
+            "label": "Previous LASIK/PRK/SMILE documented — virgin-cornea assessment is blocked",
+            "kind": "instruction",
+            "key": "prior_surgery_pathway",
+            "destination": "separate_pathway",
+            "required_for": ["CER-AI"],
+            "source_screen": "Clinical history",
+            "source_box": "Previous corneal refractive surgery",
+            "help": "Use the separate prior-refractive-surgery pathway. Do not generate a virgin-cornea CER-AI report.",
+        }
+
     if eye == "PATIENT" and (lower == "age" or "patient age" in lower):
         return {
             "eye": "PATIENT", "label": "Patient age (years)", "kind": "form",
             "key": "age", "destination": "source", "form_id": "age",
             "help": "Enter the patient's age in whole years.",
+            "required_for": ["Randleman"],
+            "source_screen": "Pentacam patient identity / surgeon entry",
+            "source_box": "Patient age",
         }
 
     if "contact lens" in lower or "contact-lens" in lower:
@@ -130,13 +205,16 @@ def _request(eye, message, extracted):
             "key": "contact_lens_discontinuation_days" if form_id == "contact_lens_days" else "contact_lens_type",
             "destination": "source", "form_id": form_id,
             "help": "Complete the contact-lens washout documentation before assessment.",
+            "required_for": ["Clinical readiness"],
+            "source_screen": "Clinical history",
+            "source_box": "Contact-lens type and discontinuation interval",
         }
 
     if lower in {"randleman: srax", "ps3: srax"} or ("srax" in lower and "20" in lower):
         return _srax_request(eye)
 
     if lower in {"randleman: i_s", "nice: i_s_d"} or "signed i-s" in lower:
-        return _source_number_request(eye, "I_S", "Signed I-S (D) — Show 2 Exams center indices", extracted)
+        return _source_number_request(eye, "I_S", "Signed I-S (D)", extracted, required_for=_required_system(text))
 
     exact_source_fields = {
         "nice: k2_d": "K2_D",
@@ -149,7 +227,7 @@ def _request(eye, message, extracted):
     }
     if lower in exact_source_fields:
         key = exact_source_fields[lower]
-        return _source_number_request(eye, key, NUMERIC_FIELDS[key], extracted)
+        return _source_number_request(eye, key, NUMERIC_FIELDS[key], extracted, required_for=_required_system(text))
 
     plan_missing = {
         "safety: intended_sphere_d": ("intended_sphere_D", "Intended sphere", f"{prefix}_sphere"),
@@ -159,6 +237,8 @@ def _request(eye, message, extracted):
         "safety: flap_um": ("flap_um", "LASIK flap thickness", f"{prefix}_flap"),
         "randleman: rsb": ("flap_um", "Complete LASIK flap thickness / ablation inputs for RSB", f"{prefix}_flap"),
         "randleman: mrse": ("manifest_entered_sphere_D", "Complete preoperative manifest refraction for MRSE", f"{prefix}_manifest_sphere"),
+        "ps3: manifest_cylinder_signed_d": ("manifest_cylinder_signed_D", "Manifest cylinder required for PS3 astigmatic study", f"{prefix}_manifest_cylinder"),
+        "ps3: manifest_axis_deg": ("manifest_axis_deg", "Manifest axis required for PS3 astigmatic study", f"{prefix}_axis"),
     }
     if lower in plan_missing:
         key, label, form_id = plan_missing[lower]
@@ -166,6 +246,9 @@ def _request(eye, message, extracted):
             "eye": eye, "label": label, "kind": "form", "key": key,
             "destination": "source", "form_id": form_id,
             "help": "Complete the treatment/refraction input required by the canonical calculation.",
+            "required_for": [_required_system(text)],
+            "source_screen": "Surgeon treatment/refraction inputs",
+            "source_box": label,
         }
 
     if lower.startswith("clinical eligibility: "):
@@ -179,6 +262,9 @@ def _request(eye, message, extracted):
             "label": f"Clinical eligibility: document {key.replace('_', ' ')}",
             "kind": "form", "key": key, "destination": "source", "form_id": form_id,
             "help": "Document this clinical eligibility item before a final assessment can be issued.",
+            "required_for": ["Clinical eligibility"],
+            "source_screen": "Clinical eligibility and stability",
+            "source_box": key.replace("_", " "),
         }
 
     if lower == "procedure" or "select lasik, prk, or smile" in lower:
@@ -186,12 +272,18 @@ def _request(eye, message, extracted):
             "eye": eye, "label": "Procedure", "kind": "form", "key": "procedure",
             "destination": "source", "form_id": f"{prefix}_procedure",
             "help": "Select LASIK, PRK, or SMILE.",
+            "required_for": ["Procedure planning"],
+            "source_screen": "Surgeon plan",
+            "source_box": "Procedure",
         }
     if lower == "prior" or "prior corneal refractive" in lower:
         return {
             "eye": eye, "label": "Prior corneal refractive surgery", "kind": "form", "key": "prior",
             "destination": "source", "form_id": f"{prefix}_prior",
             "help": "Document prior PRK/LASIK/SMILE status.",
+            "required_for": ["Pathway selection"],
+            "source_screen": "Clinical history",
+            "source_box": "Previous corneal refractive surgery",
         }
 
     # Canonical Pentacam field token, not arbitrary substring matching.
@@ -201,7 +293,7 @@ def _request(eye, message, extracted):
     ]
     if len(fields) == 1 and eye in {"OD", "OS"}:
         key = fields[0]
-        return _source_number_request(eye, key, NUMERIC_FIELDS[key], extracted)
+        return _source_number_request(eye, key, NUMERIC_FIELDS[key], extracted, required_for=_required_system(text))
 
     return {
         "eye": eye,
@@ -210,6 +302,9 @@ def _request(eye, message, extracted):
         "key": text,
         "destination": "source",
         "help": "Correct the clinical input or upload/inspect the canonical source identified by CER-AI.",
+        "required_for": [_required_system(text)],
+        "source_screen": "Canonical source identified in the message",
+        "source_box": text,
     }
 
 
@@ -219,6 +314,8 @@ def _dedupe_requests(requests):
     for item in requests:
         identity = (item.get("eye"), item.get("key"), item.get("form_id"))
         if identity in seen:
+            existing = next(item for item in result if (item.get("eye"), item.get("key"), item.get("form_id")) == identity)
+            existing["required_for"] = list(dict.fromkeys((existing.get("required_for") or []) + (item.get("required_for") or [])))
             continue
         seen.add(identity)
         result.append(item)
@@ -367,6 +464,7 @@ def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
         "assessment_token": token,
         "extracted": extracted,
         "effective_eye_plans": effective,
+        "procedure_transitions": deepcopy(decision.get("procedure_transitions") or []),
         "workflow_status": "NEEDS_INPUT" if missing else "READY",
         "missing": [],
         "input_requests": [],
@@ -380,6 +478,21 @@ def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
         ]
         response["input_requests"] = requests
         response["message"] = "Complete all decision-critical information before a clinical report can be produced."
+        stopped = [
+            {
+                "eye": eye.get("eye"),
+                "status": "STOP-DEFER",
+                "reasons": list(eye.get("reasons") or eye.get("hard_stops") or []),
+            }
+            for eye in decision.get("eyes") or []
+            if eye.get("status") == "STOP-DEFER"
+        ]
+        if stopped:
+            response["hard_stop_summary"] = {
+                "status": "STOP-DEFER",
+                "eyes": stopped,
+                "complete_report": False,
+            }
     else:
         report_token = secrets.token_urlsafe(32)
         session["ready"] = {
@@ -400,7 +513,25 @@ def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
     return response
 
 
+def _attributed_metadata(core, metadata):
+    """Bind report attribution to the authenticated user without changing clinical logic."""
+    attributed = deepcopy(metadata) if isinstance(metadata, dict) else metadata
+    current_principal = getattr(core, "_cerai_current_principal", None)
+    principal = current_principal() if callable(current_principal) else None
+    if principal is not None:
+        attributed["reviewer"] = principal.display_name
+    return attributed
+
+
+def _finalize_archive(core, response, session):
+    runtime = getattr(core, "_cerai_case_archive_runtime", None)
+    if runtime is None:
+        return response
+    return runtime.finalize_ready(core, response, deepcopy(session.get("ready")))
+
+
 def begin(core, extracted, age, plans, modifiers, metadata, source_images=None):
+    metadata = _attributed_metadata(core, metadata)
     with _lock:
         _prune()
         if len(_sessions) >= MAX_SESSIONS:
@@ -417,24 +548,37 @@ def begin(core, extracted, age, plans, modifiers, metadata, source_images=None):
             "source_images": list(source_images or []),
         }
         _sessions[token] = session
-        return _respond(core, token, session, age, plans, modifiers, metadata, {})
+        response = _respond(core, token, session, age, plans, modifiers, metadata, {})
+    runtime = getattr(core, "_cerai_case_archive_runtime", None)
+    if runtime is not None:
+        archive_state = runtime.begin_case(
+            token,
+            list(source_images or []),
+            patient_metadata=metadata,
+            extracted=deepcopy(extracted),
+        )
+        if archive_state:
+            response["archive"] = archive_state
+    return _finalize_archive(core, response, session)
 
 
 def complete(core, payload):
+    metadata = _attributed_metadata(core, payload.get("patient_metadata", {}))
     with _lock:
         token = payload.get("assessment_token")
         session = _session(token)
         session["ready"] = None
-        return _respond(
+        response = _respond(
             core,
             token,
             session,
             payload.get("age"),
             payload.get("eye_plans", {}),
             payload.get("patient_modifiers", {}),
-            payload.get("patient_metadata", {}),
+            metadata,
             payload.get("clinical_overrides", {}),
         )
+    return _finalize_archive(core, response, session)
 
 
 def export_payload(payload):

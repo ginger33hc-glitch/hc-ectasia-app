@@ -90,7 +90,7 @@ def test_exact_extractor_box_precedes_canonical_map_panel():
     assert region_hint(extracted, "OD", "surgeon_I_S_D") == exact
 
 
-def test_legacy_region_snapshot_remains_readable_without_becoming_primary_contract():
+def test_legacy_parallel_region_snapshot_cannot_populate_canonical_region_path():
     extracted = extracted_with_eyes()
     legacy = {
         "file": "od-legacy.png",
@@ -99,7 +99,7 @@ def test_legacy_region_snapshot_remains_readable_without_becoming_primary_contra
         "printed_label": "PPI Max",
     }
     extracted["eyes"][0]["targeted_unreadable_regions"] = {"PPI_max": legacy}
-    assert region_hint(extracted, "OD", "PPI_max") == legacy
+    assert region_hint(extracted, "OD", "PPI_max") is None
 
 
 def test_pattern_region_returns_each_same_eye_conflicting_source():

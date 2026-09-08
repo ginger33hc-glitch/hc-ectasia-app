@@ -15,6 +15,18 @@ _AI_LANDING = Path("static/corneal-ectasia-risk-assessment.html")
 _EVIDENCE_PAGE = Path("static/clinical-evidence.html")
 _REFERENCES_PAGE = Path("static/references.html")
 _TESTING_NOTICE = Path("static/testing-notice.html")
+_MOBILE_INSTALL_SECTION = """
+<div id="mobile-install" style="margin-top:34px;padding:26px;border:1px solid var(--line);border-radius:15px;background:#fff;box-shadow:0 6px 18px rgba(23,59,87,.045)">
+  <div class="section-kicker">Mobile access</div>
+  <h2 style="font-size:clamp(25px,3vw,34px);margin-bottom:10px">Install CER-AI on your phone</h2>
+  <p class="lead" style="font-size:16px">CER-AI can be added to your phone's Home Screen and opened like an app. No App Store or Google Play download is required.</p>
+  <div class="guide-grid" style="margin-top:22px">
+    <div class="guide-step"><div class="step-no">iOS</div><h3>iPhone or iPad</h3><p><strong>1.</strong> Open <strong>cer-ai.com</strong> in Safari.<br><strong>2.</strong> Tap <strong>Share</strong>.<br><strong>3.</strong> Choose <strong>Add to Home Screen</strong>.<br><strong>4.</strong> Tap <strong>Add</strong>.</p></div>
+    <div class="guide-step"><div class="step-no">AND</div><h3>Android</h3><p><strong>1.</strong> Open <strong>cer-ai.com</strong> in Chrome.<br><strong>2.</strong> Tap the browser menu <strong>⋮</strong>.<br><strong>3.</strong> Choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.<br><strong>4.</strong> Confirm.</p></div>
+  </div>
+  <div class="guide-alert"><strong>After installation:</strong> CER-AI appears on the Home Screen and opens the secure clinical application. An internet connection is required for clinical use.</div>
+</div>
+"""
 _PRIVATE_CRAWL_PATHS = (
     "/app",
     "/testing-app",
@@ -199,6 +211,10 @@ def _render_public_home(request: Request) -> HTMLResponse:
 </div></section>
 """
         html = html.replace("</main>", f"{references_section}</main>", 1)
+    if 'id="mobile-install"' not in html:
+        marker = '<div class="guide-alert"><strong>Clinical use:'
+        if marker in html:
+            html = html.replace(marker, _MOBILE_INSTALL_SECTION + marker, 1)
     return HTMLResponse(html)
 
 

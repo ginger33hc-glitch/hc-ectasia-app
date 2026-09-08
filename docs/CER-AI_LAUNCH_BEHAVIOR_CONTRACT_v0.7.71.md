@@ -212,6 +212,7 @@ The 10-day soft-lens readiness rule supersedes the legacy 14-day message retaine
 Clinical categories are exactly:
 
 - PASS
+- PASS WITH CAUTION
 - CAUTION
 - STOP-DEFER
 
@@ -222,13 +223,20 @@ Workflow/routing states are separate:
 
 Restrictiveness order:
 
-`PASS < CAUTION < POST-REFRACTIVE PATHWAY REQUIRED < DATA INSUFFICIENT < STOP-DEFER`
+`PASS < PASS WITH CAUTION < CAUTION < POST-REFRACTIVE PATHWAY REQUIRED < DATA INSUFFICIENT < STOP-DEFER`
+
+For each eye, count CAUTION results from the completed ERSS, NICE, PS3 and Final BAD-D systems:
+zero or one yields PASS; two yields PASS WITH CAUTION; three or four yields CAUTION. Count systems, not individual findings. Independent
+CAUTION findings retain CAUTION. Incomplete inputs block favorable final status;
+STOP-DEFER dominates incomplete and caution results. The bilateral result preserves
+the more restrictive eye result; two PASS WITH CAUTION eyes do not become CAUTION.
+Both caution categories use orange. Component scoring rules remain unchanged.
 
 No module may downgrade an independent hard stop.
 
 ## 13. Planning contract
 
-Planning is downstream of risk assessment. Favorable planning statuses are PASS and CAUTION only. Planning must not be used to erase or reinterpret an upstream risk classification.
+Planning is downstream of risk assessment. Favorable planning statuses are PASS, PASS WITH CAUTION and CAUTION. Planning must not be used to erase or reinterpret an upstream risk classification.
 
 LASIK/PRK tissue calculations, postoperative K constraints, optical/transition-zone rules, flap selection, MMC guidance, and microkeratome planning remain separate from ectasia-risk scoring.
 

@@ -24,7 +24,7 @@ def _eye(name="OD", **overrides):
         "PPI_max": 1.2,
         "I_S": 0.0,
         "topographic_astig_D": 1.0,
-        "topographic_steep_axis_deg": 90.0,
+        "bad_flat_axis_deg": 90.0, "topographic_steep_axis_deg": 90.0,
         "posterior_Kmean_D": -6.0 if name == "OD" else -6.05,
         "F_Ele_Th_um": 5.0,
         "B_Ele_Th_um": 10.0,
@@ -120,7 +120,8 @@ def test_missing_i_s_produces_one_canonical_i_s_request_for_eye():
         if item.get("eye") == "OD" and item.get("key") == "I_S"
     ]
     assert len(requests) == 1
-    assert "Show 2 Exams center indices" in requests[0]["label"]
+    assert requests[0]["source_screen"] == "Show 2 Exams – Topometric"
+    assert requests[0]["source_box"] == "center — Indices (in 8 mm zone) → I-S"
 
 
 def test_unresolved_srax_creates_one_question_shared_by_erss_and_ps3():

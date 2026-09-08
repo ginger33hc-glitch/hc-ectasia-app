@@ -8,12 +8,8 @@ Binding CER-AI rule: ONLY Four Maps Refractive pages are authoritative for the
 exam date. Dates printed on BAD Display, Show 2 Exams Topometric, or any other
 uploaded Pentacam source are excluded entirely from exam-date reconciliation.
 """
-from copy import deepcopy
 from datetime import date
 import re
-
-_CONFLICT = "Conflicting Pentacam examination dates across uploaded sources."
-_previous_merge_extractions = None
 
 
 def _valid_iso(year, month, day):
@@ -92,38 +88,11 @@ def dates_are_semantically_consistent(extractions):
     return len(common) == 1
 
 
-def reconcile_merged_exam_date_conflict(merged, extractions):
-    """Remove a date conflict unless authoritative Four Maps pages disagree."""
+def authoritative_exam_date_conflict(extractions) -> bool:
+    """Return whether two or more authoritative Four Maps dates conflict."""
     authoritative = _pentacam_date_possibilities(extractions)
-    if authoritative is None or not authoritative:
-        return merged
-    if len(authoritative) == 1:
-        consistent = True
-    else:
-        common = set.intersection(*authoritative)
-        consistent = len(common) == 1
-    if not consistent:
-        return merged
-    reconciled = deepcopy(merged)
-    reconciled["critical_input_issues"] = [
-        issue for issue in reconciled.get("critical_input_issues") or []
-        if str(issue) != _CONFLICT
-    ]
-    return reconciled
-
-
-def merge_extractions_with_exam_date_reconciliation(extractions):
-    """Compatibility wrapper for isolated tests; production composes this inside PS3 merge."""
-    if _previous_merge_extractions is None:
-        raise RuntimeError("Exam-date reconciliation wrapper was not initialized")
-    return reconcile_merged_exam_date_conflict(_previous_merge_extractions(extractions), extractions)
-
-
-def install(runtime_core):
-    """Compatibility installer only; production must not stack this outside the canonical merge adapter."""
-    global _previous_merge_extractions
-    if getattr(runtime_core, "_exam_date_reconciliation_policy_installed", False):
-        return
-    _previous_merge_extractions = runtime_core.merge_extractions
-    runtime_core.merge_extractions = merge_extractions_with_exam_date_reconciliation
-    runtime_core._exam_date_reconciliation_policy_installed = True
+    if authoritative is None:
+        return True
+    if len(authoritative) < 2:
+        return False
+    return len(set.intersection(*authoritative)) != 1

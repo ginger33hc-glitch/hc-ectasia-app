@@ -90,6 +90,9 @@ def test_patient_age_completion_uses_one_shared_field():
         'destination': 'source',
         'form_id': 'age',
         'help': "Enter the patient's age in whole years.",
+        'required_for': ['Randleman'],
+        'source_screen': 'Pentacam patient identity / surgeon entry',
+        'source_box': 'Patient age',
     }
     assert 'item.form_id===\'age\'' in readiness
     assert 'originalRow.hidden=true' in readiness

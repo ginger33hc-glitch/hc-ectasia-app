@@ -413,6 +413,9 @@ def label_supports_field(field: str, printed_label: Any, group_label: Any = None
         "TKC": {"tkc"}, "F_Ele_Th_um": {"feleth", "felethum", "fronteleth"},
         "posterior_Kmean_D": {"km", "kmean", "kmeand"},
         "topographic_astig_D": {"astig", "astigd"},
+        "ml7_bad_k1_d": {"k1", "k1d"},
+        "ml7_bad_k2_d": {"k2", "k2d"},
+        "bad_flat_axis_deg": {"axis"},
         "topographic_steep_axis_deg": {"axis", "axissteep", "steepaxis"},
         "B_Ele_Th_um": {"beleth", "belethum", "backeleth"},
     }

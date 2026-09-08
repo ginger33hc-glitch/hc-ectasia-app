@@ -180,3 +180,21 @@ def test_sub_one_percent_same_source_ppi_disagreement_remains_conflict():
     assert od["PPI_avg"] is None
     assert any(str(item).startswith("PPI_avg:") for item in od.get("data_conflicts", []))
 
+
+def test_srax_disagreement_remains_unresolved_after_a_third_read():
+    first = _eye()
+    first.update({"srax": "NO", "srax_deg": 10.0})
+    second = _eye()
+    second.update({"srax": "YES", "srax_deg": 25.0})
+    third = _eye()
+    third.update({"srax": "NO", "srax_deg": 10.0})
+    merged = core.merge_extractions([
+        _result(first, "fourmaps-1.jpg"),
+        _result(second, "fourmaps-2.jpg"),
+        _result(third, "fourmaps-3.jpg"),
+    ])
+    od = merged["eyes"][0]
+    assert od["srax"] is None
+    assert od["srax_deg"] is None
+    assert any(str(item).startswith("srax:") for item in od["data_conflicts"])
+    assert any(str(item).startswith("srax_deg:") for item in od["data_conflicts"])

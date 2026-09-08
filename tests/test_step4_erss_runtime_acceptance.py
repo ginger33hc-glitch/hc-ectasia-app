@@ -24,7 +24,7 @@ def _eye(name="OD", *, i_s=0.0, srax_deg=10.0):
         "PPI_max": 1.2,
         "I_S": i_s,
         "topographic_astig_D": 1.0,
-        "topographic_steep_axis_deg": 90.0,
+        "bad_flat_axis_deg": 90.0, "topographic_steep_axis_deg": 90.0,
         "posterior_Kmean_D": -6.0 if name == "OD" else -6.05,
         "F_Ele_Th_um": 5.0,
         "B_Ele_Th_um": 10.0,

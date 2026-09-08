@@ -3,25 +3,20 @@
 Clinical assessment is not assembled through runtime wrapper order;
 ``assessment_workflow`` calls the canonical runtime directly. This composition
 module installs extraction, transport, access, reporting and persistence concerns.
-Planning/report modules are retained only when they do not wrap clinical scoring;
-full planning migration belongs to the ordered Stage 9.
+Planning and reporting attach their canonical implementations directly. Archive
+persistence is called explicitly by the workflow and does not replace workflow,
+upload, or report functions.
 """
 import os
 
-import bootstrap
+import app as core
 import reports
-
-import report_export_guard  # noqa: F401,E402
-import critical_score_highlight  # noqa: E402
-import ps3_report_policy  # noqa: E402
-import microkeratome_report_policy  # noqa: E402
 
 import assessment_workflow  # noqa: E402
 import user_access  # noqa: E402
 import operational_security  # noqa: E402
 import public_site  # noqa: E402
 import analysis_job_service  # noqa: E402
-import mobile_install_section  # noqa: E402
 import case_archive  # noqa: E402
 import audit_log  # noqa: E402
 import case_catalog  # noqa: E402
@@ -29,18 +24,14 @@ import historical_report  # noqa: E402
 import research_export  # noqa: E402
 import named_user_ui  # noqa: E402
 
-core = bootstrap.core
-app = bootstrap.app
+app = core.app
 
 COMPOSITION_PHASES = {
-    "reporting_pending_stage10": (
-        "report_export_guard", "critical_score_highlight",
-        "ps3_report_policy", "microkeratome_report_policy",
-    ),
+    "canonical_reporting": ("reports",),
     "canonical_workflow": ("assessment_workflow",),
     "access_and_persistence": (
         "user_access", "operational_security", "public_site", "analysis_job_service",
-        "mobile_install_section", "case_archive", "audit_log", "case_catalog",
+        "case_archive", "audit_log", "case_catalog",
         "historical_report", "research_export", "named_user_ui",
     ),
 }
@@ -55,10 +46,11 @@ def compose(version: str):
     core.app.title = f"CER-AI v{version}"
     reports.APP_VERSION = version
 
-    # Presentation/report concerns remain until Stage 10; they may not score.
-    critical_score_highlight.install(core, reports)
-    ps3_report_policy.install(reports)
-    microkeratome_report_policy.install(reports)
+    # Direct renderer attachment. No report wrapper, policy installer, or
+    # import-order mutation is permitted.
+    core.build_pdf = reports.build_pdf
+    core.build_docx = reports.build_docx
+    core._cerai_report_builders_installed = True
 
     # Canonical workflow calls canonical_runtime_service directly; no clinical scorer install.
     assessment_workflow.install(core)
@@ -66,7 +58,6 @@ def compose(version: str):
     operational_security.install(core)
     public_site.install(core)
     analysis_job_service.install(core)
-    mobile_install_section.install(core)
 
     archive_required = os.getenv("CERAI_ARCHIVE_REQUIRED", "0").strip() == "1"
     archive_enabled = os.getenv("CERAI_ARCHIVE_ENABLED", "0").strip() == "1" or archive_required

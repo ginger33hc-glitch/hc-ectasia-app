@@ -28,7 +28,7 @@ def _eye(name="OD", **overrides):
         "PPI_max": 1.2,
         "I_S": 0.0,
         "topographic_astig_D": 1.0,
-        "topographic_steep_axis_deg": 90.0,
+        "bad_flat_axis_deg": 90.0, "topographic_steep_axis_deg": 90.0,
         "posterior_Kmean_D": -6.0 if name == "OD" else -6.05,
         "F_Ele_Th_um": 5.0,
         "B_Ele_Th_um": 10.0,
@@ -145,15 +145,26 @@ def test_surgeon_correction_recalculates_dependencies_and_is_audited():
     assert {"field": "I_S", "original": None, "value": 0.0, "label": "SURGEON_CONFIRMED"} in corrections
 
 
-def test_irrevocable_stop_does_not_request_non_decision_critical_srax():
-    # I-S >=1.40 independently gives ERSS 4 points / STOP-DEFER. PS3 would otherwise
-    # still list SRAX as missing, but obtaining SRAX cannot change the final decision.
+def test_irrevocable_stop_is_immediate_but_cannot_authorize_an_incomplete_full_report():
+    # I-S >=1.40 already establishes STOP-DEFER, but the revised master order requires
+    # PS3 completion before a complete report token can be issued.
     result = _respond(_session(od=_eye("OD", I_S=1.40, srax="UNCERTAIN", srax_deg=None)))
-    assert result["workflow_status"] == "READY"
-    assert result["decision"]["eyes"][0]["status"] == "STOP-DEFER"
-    assert result["report_token"]
-    assert not [item for item in result["input_requests"] if item.get("eye") == "OD" and item.get("key") == "srax"]
+    assert result["workflow_status"] == "NEEDS_INPUT"
+    assert result["report_token"] is None
+    assert result["hard_stop_summary"]["status"] == "STOP-DEFER"
+    assert result["hard_stop_summary"]["complete_report"] is False
+    assert [item for item in result["input_requests"] if item.get("eye") == "OD" and item.get("key") == "srax"]
 
 
 def test_retired_inferior_opposite_steepening_is_not_a_completion_field():
     assert "inferior_opposite_steepening_D" not in workflow.NUMERIC_FIELDS
+
+
+def test_ps3_high_factor_cannot_skip_shared_srax_to_authorize_full_report():
+    result = _respond(_session(od=_eye("OD", B_Ele_Th_um=16.0, I_S=1.40,
+                                     srax="UNCERTAIN", srax_deg=None)))
+    assert result["workflow_status"] == "NEEDS_INPUT"
+    assert result["report_token"] is None
+    assert result["hard_stop_summary"]["status"] == "STOP-DEFER"
+    assert any(item.get("eye") == "OD" and item.get("key") == "srax"
+               for item in result["input_requests"])

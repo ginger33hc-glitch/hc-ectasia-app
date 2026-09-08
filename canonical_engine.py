@@ -20,10 +20,12 @@ from clinical_core.rules import erss_age_points, erss_pachymetry_points
 from clinical_core.safety import (
     FINAL_KMEAN_MAX_D,
     FINAL_KMEAN_MIN_D,
+    LASIK_PTA_LIMIT_PERCENT,
     LASIK_RSB_MIN_UM,
     PREOP_THINNEST_HARD_STOP_UM,
     PRK_EPITHELIUM_UM,
     PRK_RST_MIN_UM,
+    lasik_pta_hard_stop,
 )
 from pentacam_canonical_source_lock import (
     CANONICAL_FIELD_SOURCES,
@@ -58,6 +60,10 @@ def runtime_invariants():
         errors.append("Canonical PRK epithelial convention is not 50 µm")
     if LASIK_RSB_MIN_UM != 300.0 or PRK_RST_MIN_UM != 310.0:
         errors.append("Canonical stromal safety minima are invalid")
+    if LASIK_PTA_LIMIT_PERCENT != 40.0 or [
+        lasik_pta_hard_stop(value) for value in (39.99, 40.0, 40.01)
+    ] != [False, True, True]:
+        errors.append("Canonical LASIK PTA boundary is invalid")
     if PREOP_THINNEST_HARD_STOP_UM != 480.0:
         errors.append("Canonical preoperative thickness hard stop is invalid")
     if FINAL_KMEAN_MIN_D != 36.0 or FINAL_KMEAN_MAX_D != 48.0:
@@ -68,12 +74,6 @@ def runtime_invariants():
         errors.append("Rmin is not source-locked to Show 2 Exams Cornea Back")
     if CANONICAL_FIELD_SOURCES.get("posterior_Kmean_D", (None,))[0] != SHOW_2_CORNEA_BACK:
         errors.append("Posterior Km is not source-locked to Show 2 Exams Cornea Back")
-
-    bootstrap_source = inspect.getsource(composition.bootstrap)
-    if "SCHEMA[" in bootstrap_source or "PROMPT +=" in bootstrap_source or "merge_extractions =" in bootstrap_source:
-        errors.append("Bootstrap still owns or mutates extraction policy")
-    if composition.bootstrap.core is not core:
-        errors.append("Bootstrap compatibility alias does not reference canonical app module")
 
     # Workflow must call the direct canonical runtime, never the legacy clinical engine.
     workflow_source = inspect.getsource(assessment_workflow._respond)
@@ -141,6 +141,8 @@ def runtime_invariants():
 
     if getattr(composition.reports, "APP_VERSION", None) != CANONICAL_VERSION:
         errors.append("Report version is not synchronized with canonical runtime")
+    if "reporting_pending_stage10" in composition.COMPOSITION_PHASES:
+        errors.append("Legacy Stage 10 report wrapper phase remains active")
     if getattr(core, "_cerai_composition_phases", None) != composition.COMPOSITION_PHASES:
         errors.append("Canonical composition manifest is not active")
     if not getattr(app.state, "cerai_canonical_runtime_ready", False):

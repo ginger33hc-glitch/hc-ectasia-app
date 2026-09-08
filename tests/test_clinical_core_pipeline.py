@@ -20,7 +20,7 @@ def complete_ps3_eye(**overrides):
         anterior_km_d=43.0,
         thinnest_um=560.0,
         topographic_astig_d=1.0,
-        topographic_steep_axis_deg=175.0,
+        bad_flat_axis_deg=175.0,
         manifest_astig_d=1.0,
         manifest_axis_deg=5.0,
         ppi_avg=1.0,
@@ -135,7 +135,7 @@ def test_multiple_cautions_do_not_auto_escalate_to_stop():
     ))
     assert result["bad_d"]["status"] == CAUTION
     assert result["nice_status"] == CAUTION
-    assert result["status"] == CAUTION
+    assert result["status"] == "PASS WITH CAUTION"
     assert {driver.key for driver in result["final_disposition"].caution_drivers} == {"bad_d", "nice"}
 
 
@@ -148,10 +148,11 @@ def test_multiple_stop_drivers_are_all_retained():
     assert {driver.key for driver in result["final_disposition"].stop_drivers} == {"bad_d", "procedural_safety"}
 
 
-def test_pta_is_reported_but_not_a_global_stop_driver():
+def test_pta_at_or_over_40_is_a_global_stop_driver():
     result = evaluate_normalized_case(normal_lasik(flap_um=120, ablation_um=120))
     assert result["procedural_safety"]["LASIK_PTA_percent"] > 40
-    assert "lasik_pta" not in result["procedural_safety"]["hard_stops"]
+    assert result["procedural_safety"]["hard_stops"]["lasik_pta"] is True
+    assert result["status"] == STOP_DEFER
 
 
 def test_erss_rsb_and_mrse_boundary_contract_is_canonical():

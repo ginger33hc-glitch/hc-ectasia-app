@@ -55,6 +55,14 @@ def test_skewed_geometry_over_20_is_srax_positive():
     assert 20.0 < result["srax_deg"] < 40.0
 
 
+def test_measurement_reports_both_hemimeridian_axes():
+    result = policy.measure_srax(_synthetic_four_maps(80.0, 260.0))
+    assert result["status"] == "CONFIDENT"
+    assert isinstance(result["superior_axis_deg"], float)
+    assert isinstance(result["inferior_axis_deg"], float)
+    assert result["algorithm"] == "srax-geom-v2"
+
+
 def test_exact_threshold_rule_is_strictly_greater_than_20():
     assert policy.SRAX_THRESHOLD_DEG == 20.0
     assert (20.0 > policy.SRAX_THRESHOLD_DEG) is False

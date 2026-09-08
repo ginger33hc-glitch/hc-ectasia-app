@@ -7,6 +7,7 @@ canonical safety callback supplied by the clinical pipeline/service.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 from typing import Any, Callable, Optional
 
 from .refraction import HYPEROPIC, MIXED, MYOPIC
@@ -16,6 +17,30 @@ LASIK_PLANS = (
     {"name": "Plan B", "flap_um": 100.0, "optical_zone_mm": 6.0, "transition_zone_mm": 8.5},
     {"name": "Plan C", "flap_um": 90.0, "optical_zone_mm": 6.0, "transition_zone_mm": 8.5},
 )
+
+MYOPIC_ABLATION_UM_PER_D = {6.0: 12.0, 6.5: 15.0, 7.0: 16.33}
+
+
+def estimate_myopic_ablation_um(intended_mrse_d, optical_zone_mm):
+    """Return the approved CER-AI myopic EX500 linear estimate.
+
+    This estimate is planning-only and must never be used for hyperopic or mixed
+    profiles. Actual planned maximum ablation remains preferred when available.
+    """
+    if (
+        not isinstance(intended_mrse_d, (int, float))
+        or isinstance(intended_mrse_d, bool)
+        or not isfinite(float(intended_mrse_d))
+    ):
+        return None
+    try:
+        zone = float(optical_zone_mm)
+    except (TypeError, ValueError):
+        return None
+    rate = MYOPIC_ABLATION_UM_PER_D.get(zone)
+    if rate is None:
+        return None
+    return abs(float(intended_mrse_d)) * rate
 
 MMC_MANDATORY = "MANDATORY"
 MMC_RECOMMENDED = "RECOMMENDED"

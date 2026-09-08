@@ -1,6 +1,10 @@
 # CER-AI Monday Step 2 — Pentacam Extraction Flattening Inventory
 
-Status: ACTIVE CONTROL DOCUMENT
+Status: **SUPERSEDED HISTORICAL INVENTORY — migration completed 2026-09-07**
+
+The wrapper chain below records the pre-flattening state. It is not a description of the current
+runtime. Current acceptance evidence is in `CERAI_MASTER_ORDER_66_ITEM_EVIDENCE_MATRIX.md` and
+`tests/test_step14_architecture_acceptance.py`.
 
 Governing invariant:
 

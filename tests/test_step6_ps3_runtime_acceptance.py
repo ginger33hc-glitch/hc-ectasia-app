@@ -21,7 +21,7 @@ def _eye(name="OD", **overrides):
         "PPI_max": 1.2,
         "I_S": 0.0,
         "topographic_astig_D": 1.0,
-        "topographic_steep_axis_deg": 90.0,
+        "bad_flat_axis_deg": 90.0, "topographic_steep_axis_deg": 90.0,
         "posterior_Kmean_D": -6.0 if name == "OD" else -6.05,
         "F_Ele_Th_um": 5.0,
         "B_Ele_Th_um": 10.0,
@@ -85,6 +85,23 @@ def test_ps3_runtime_complete_normal_is_allowed_for_all_procedures():
     assert result["status"] == "PASS"
 
 
+def test_low_cylinder_od_axis_discrepancy_has_no_ps3_risk_in_runtime_and_report():
+    plans = {"OD": _plan(), "OS": _plan()}
+    plans["OD"].update(manifest_entered_sphere_D=-1.25,
+                       manifest_cylinder_signed_D=-0.50, manifest_axis_deg=120)
+    result = evaluate_case(
+        {"eyes": [_eye("OD", topographic_astig_D=0.4, topographic_steep_axis_deg=84.5), _eye("OS")]},
+        21, plans, _modifiers(),
+    )
+    od = result["eyes"][0]
+    assert od["ps3"]["complete"]
+    assert od["ps3"]["moderate_count"] == od["ps3"]["high_count"] == 0
+    assert od["ps3"]["disposition"]["lasik"] == "ALLOWED"
+    report_finding = next(item for item in od["report_payload"]["ps3"]["findings"] if item["key"] == "astigmatic_study")
+    assert report_finding["status"] == "NOT_REQUIRED"
+    assert "no PS3 risk factor" in report_finding["detail"]
+
+
 def test_ps3_runtime_one_moderate_defers_lasik_only():
     result, by_eye = _evaluate(od=_eye("OD", Kmean_D=49.0))
     ps3 = by_eye["OD"]["ps3"]
@@ -92,8 +109,10 @@ def test_ps3_runtime_one_moderate_defers_lasik_only():
     assert ps3["moderate_count"] == 1
     assert ps3["high_count"] == 0
     assert ps3["disposition"] == {"prk": "ALLOWED", "smile": "ALLOWED", "lasik": "DEFER"}
-    assert by_eye["OD"]["status"] == "STOP-DEFER"
-    assert result["status"] == "STOP-DEFER"
+    assert by_eye["OD"]["lasik_assessment"]["status"] == "STOP-DEFER"
+    assert by_eye["OD"]["status"] == "PASS"
+    assert result["effective_eye_plans"]["OD"]["procedure"] == "PRK"
+    assert result["status"] == "PASS"
 
 
 def test_ps3_runtime_same_single_moderate_allows_prk():

@@ -24,7 +24,7 @@ jobs:
       - name: Critical static checks
         run: ruff check --select E9,F63,F7,F82 .
       - name: Compile decision-critical runtime modules
-        run: python -m py_compile app.py bootstrap.py runtime_composition.py canonical_readiness.py clinical_eligibility.py canonical_input_adapter.py canonical_runtime_service.py public_site.py exam_date_reconciliation_policy.py pentacam_field_registry.py pentacam_canonical_source_lock.py pentacam_provenance.py mandatory_source_set_policy.py ps3_policy.py ps3_report_policy.py microkeratome_report_policy.py user_access.py named_user_ui.py operational_security.py assessment_workflow.py case_archive.py archive_migration.py audit_log.py case_catalog.py historical_report.py research_export.py scripts/verify_case_archive.py scripts/verify_railway_archive_config.py scripts/migrate_case_archive.py scripts/generate_user_password_hash.py scripts/generate_research_pseudonym_key.py extraction_guard.py critical_score_highlight.py planning/microkeratome.py canonical_engine.py reports.py report_export_guard.py clinical_core/__init__.py clinical_core/bad.py clinical_core/rules.py clinical_core/erss.py clinical_core/nice.py clinical_core/disposition.py clinical_core/ps3.py clinical_core/safety.py clinical_core/planning.py clinical_core/refraction.py clinical_core/report_payload.py clinical_core/pipeline.py clinical_core/readiness.py clinical_core/version.py
+        run: python -m py_compile app.py runtime_composition.py canonical_readiness.py clinical_eligibility.py canonical_input_adapter.py canonical_runtime_service.py public_site.py analysis_job_service.py exam_date_reconciliation_policy.py pentacam_field_registry.py pentacam_canonical_source_lock.py pentacam_provenance.py mandatory_source_set_policy.py geometric_srax_policy.py ps3_policy.py user_access.py named_user_ui.py operational_security.py assessment_workflow.py case_archive.py archive_migration.py audit_log.py case_catalog.py historical_report.py research_export.py scripts/verify_case_archive.py scripts/verify_railway_archive_config.py scripts/migrate_case_archive.py scripts/generate_user_password_hash.py scripts/generate_research_pseudonym_key.py extraction_guard.py planning/microkeratome.py canonical_engine.py reports.py clinical_core/__init__.py clinical_core/bad.py clinical_core/rules.py clinical_core/erss.py clinical_core/nice.py clinical_core/disposition.py clinical_core/ps3.py clinical_core/safety.py clinical_core/planning.py clinical_core/refraction.py clinical_core/report_payload.py clinical_core/pipeline.py clinical_core/readiness.py clinical_core/version.py
       - name: Canonical startup invariants
         env:
           OPENAI_API_KEY: test-key-for-import-only
@@ -36,7 +36,7 @@ jobs:
       - name: Phase 2 canonical clinical core, readiness, eligibility, source registry, provenance, and boundary contract
         env:
           OPENAI_API_KEY: test-key-for-import-only
-        run: python -m pytest -q tests/test_canonical_readiness.py tests/test_clinical_eligibility.py tests/test_clinical_eligibility_integration.py tests/test_clinical_core_equivalence.py tests/test_clinical_core_bad.py tests/test_clinical_core_nice_disposition_equivalence.py tests/test_clinical_core_ps3_safety_equivalence.py tests/test_clinical_core_planning_equivalence.py tests/test_clinical_core_refraction.py tests/test_clinical_core_pipeline.py tests/test_clinical_core_shadow_equivalence.py tests/test_clinical_core_report_payload.py tests/test_clinical_core_readiness_equivalence.py tests/test_pentacam_canonical_source_lock.py tests/test_pentacam_provenance.py tests/test_phase2_boundary_contract.py
+        run: python -m pytest -q tests/test_canonical_readiness.py tests/test_clinical_eligibility.py tests/test_clinical_eligibility_integration.py tests/test_clinical_core_equivalence.py tests/test_clinical_core_bad.py tests/test_clinical_core_nice_disposition_equivalence.py tests/test_clinical_core_ps3_safety_equivalence.py tests/test_clinical_core_planning_equivalence.py tests/test_clinical_core_refraction.py tests/test_clinical_core_pipeline.py tests/test_clinical_core_shadow_equivalence.py tests/test_clinical_core_report_payload.py tests/test_clinical_core_readiness_equivalence.py tests/test_pentacam_canonical_source_lock.py tests/test_pentacam_provenance.py tests/test_source_interchange_regression.py tests/test_phase2_boundary_contract.py
       - name: Phase 3 direct canonical input, runtime, and workflow boundary
         env:
           OPENAI_API_KEY: test-key-for-import-only
@@ -52,7 +52,31 @@ jobs:
       - name: Behavior-lock, equivalence, and clinical regression tests
         env:
           OPENAI_API_KEY: test-key-for-import-only
-        run: python -m pytest -q tests/test_behavior_lock_v0743.py tests/test_microkeratome_planning.py tests/test_microkeratome_report_policy.py tests/test_reconciliation_behavior_lock.py tests/test_exam_date_reconciliation_policy.py tests/test_rmin_front_source_policy.py tests/test_erss_runtime.py tests/test_mandatory_source_set_policy.py tests/test_ps3_report_policy.py tests/test_negative_is_boundary.py tests/test_contact_lens_washout_gate.py
+        run: python -m pytest -q tests/test_behavior_lock_v0743.py tests/test_microkeratome_planning.py tests/test_reconciliation_behavior_lock.py tests/test_exam_date_reconciliation_policy.py tests/test_rmin_front_source_policy.py tests/test_erss_runtime.py tests/test_mandatory_source_set_policy.py tests/test_negative_is_boundary.py tests/test_contact_lens_washout_gate.py
+      - name: Step 9 canonical procedure-planning acceptance
+        env:
+          OPENAI_API_KEY: test-key-for-import-only
+        run: python -m pytest -q tests/test_step9_planning_runtime_acceptance.py
+      - name: Step 10 canonical report acceptance
+        env:
+          OPENAI_API_KEY: test-key-for-import-only
+        run: python -m pytest -q tests/test_step10_canonical_reports.py
+      - name: Step 11 Analyze and surgeon-completion workflow acceptance
+        env:
+          OPENAI_API_KEY: test-key-for-import-only
+        run: python -m pytest -q tests/test_step11_analyze_completion_workflow.py
+      - name: Step 12 canonical archive and access acceptance
+        env:
+          OPENAI_API_KEY: test-key-for-import-only
+        run: python -m pytest -q tests/test_step12_archive_access_acceptance.py
+      - name: Step 13 mobile and PWA workflow acceptance
+        env:
+          OPENAI_API_KEY: test-key-for-import-only
+        run: python -m pytest -q tests/test_step13_mobile_pwa_acceptance.py
+      - name: Step 14 architecture acceptance
+        env:
+          OPENAI_API_KEY: test-key-for-import-only
+        run: python -m pytest -q tests/test_step14_architecture_acceptance.py
       - name: Complete application regression suite
         env:
           OPENAI_API_KEY: test-key-for-import-only

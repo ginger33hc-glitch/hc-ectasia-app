@@ -1,7 +1,7 @@
 """Migration scenarios for the canonical linear clinical pipeline.
 
 These tests verify accepted Monday behavior. They do not require parity with
-retired production rules such as the former independent PTA hard stop.
+accepted production rules including the LASIK PTA plan hard stop.
 """
 
 from clinical_core import (
@@ -20,7 +20,7 @@ def _ps3_normal(**overrides):
         anterior_km_d=47.0,
         thinnest_um=520.0,
         topographic_astig_d=1.0,
-        topographic_steep_axis_deg=90.0,
+        bad_flat_axis_deg=90.0,
         manifest_astig_d=1.0,
         manifest_axis_deg=90.0,
         ppi_avg=1.0,
@@ -101,7 +101,7 @@ def test_migration_nice_caution_remains_caution_not_auto_stop():
     ))
     assert result["nice_status"] == CAUTION
     assert result["erss_status"] == CAUTION
-    assert result["status"] == CAUTION
+    assert result["status"] == "PASS WITH CAUTION"
 
 
 def test_migration_erss_high_risk_still_stops():
@@ -124,7 +124,7 @@ def test_lasik_rsb_below_300_is_structural_stop():
     assert result["status"] == STOP_DEFER
 
 
-def test_retired_pta_cutoff_is_not_an_independent_stop():
+def test_pta_cutoff_is_an_independent_lasik_stop():
     result = evaluate_normalized_case(_base(
         thinnest_um=560.0,
         flap_um=120.0,
@@ -133,8 +133,9 @@ def test_retired_pta_cutoff_is_not_an_independent_stop():
     ))
     assert result["procedural_safety"]["LASIK_PTA_percent"] > 40.0
     assert result["procedural_safety"]["hard_stops"]["lasik_rsb"] is False
-    assert "lasik_pta" not in result["procedural_safety"]["hard_stops"]
-    assert result["procedural_safety"]["status"] == "PASS"
+    assert result["procedural_safety"]["hard_stops"]["lasik_pta"] is True
+    assert result["procedural_safety"]["status"] == STOP_DEFER
+    assert result["status"] == STOP_DEFER
 
 
 def test_prk_rst_below_310_is_structural_stop():

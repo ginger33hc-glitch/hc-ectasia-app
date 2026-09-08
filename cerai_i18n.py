@@ -152,6 +152,7 @@ TR = {
     "Source files": "Kaynak dosyalar",
     "PASS": "UYGUN",
     "CAUTION": "DİKKAT",
+    "PASS WITH CAUTION": "DİKKATLE UYGUN",
     "STOP-DEFER": "DURDUR-ERTELE",
     "REVIEW - NOT CLEARED": "DEĞERLENDİR — ONAYLANMADI",
     "DATA INSUFFICIENT": "VERİ YETERSİZ",

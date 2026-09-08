@@ -1,45 +1,38 @@
-"""Professional PDF and Word exports for CER-AI reports."""
+"""Canonical PDF and DOCX renderers for CER-AI.
 
+Both formats consume the renderer-neutral payload created by
+``clinical_core.report_payload``. This module formats already-computed values;
+it contains no clinical threshold, score, formula, or disposition logic.
+"""
 from __future__ import annotations
 
+from html import escape
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any, Mapping
 
 import reportlab
 from docx import Document
-from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
+from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import (
-    KeepTogether,
-    PageBreak,
-    Paragraph,
-    SimpleDocTemplate,
-    Spacer,
-    Table,
-    TableStyle,
-)
+from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from cerai_i18n import authorship_notice, liability_notice, normalize_locale, translate_text
-from pentacam_quality_policy import WARNING_HEADING, warnings_for_extracted
 
 
 NAVY = "173B57"
-BLUE = "1F5E8C"
-BLUE_FILL = "EAF3FA"
 GREEN = "176B3A"
 GREEN_FILL = "E6F4EA"
-AMBER = "9A5A00"
+AMBER = "B45309"
 AMBER_FILL = "FFF2DB"
 RED = "A31212"
 RED_FILL = "FDE8E8"
@@ -49,36 +42,7 @@ LINE = "D7E0E7"
 INK = "17212B"
 APP_VERSION = "0.7.71"
 PROGRAM_NAME = "Cornea Ectasia Risk Assessment Intelligence"
-LIABILITY_NOTICE = (
-    "The final surgical decision and all associated responsibility and liability rest with the surgeon. "
-    "This application is a clinical decision-support aid only."
-)
-AUTHORSHIP_NOTICE = (
-    "Developed by Hüseyin Cengiz, MD. All rights reserved. "
-    "Final responsibility rests with the surgeon at all times and under all circumstances."
-)
-RANDLEMAN_TOPOGRAPHY_REFERENCE = (
-    ("Normal / symmetric", "Normal or symmetric map", "0"),
-    ("Asymmetric bow-tie", "Mild asymmetric bow-tie: >0.5 D and <1.0 D, with no SRA/SRAX", "1"),
-    ("Inferior steepening / SRA", "Inferior point >=1.0 D steeper than the matching superior point with I-S <1.4 D, or SRAX >=20 degrees", "3"),
-    ("Abnormal / ectatic", "Abnormal or ectatic pattern, or I-S >=1.4 D", "4"),
-)
-RANDLEMAN_TOPOGRAPHY_SAFETY = (
-    "If CER-AI cannot read the complete map with HIGH confidence, it asks the surgeon to choose the category. "
-    "It never guesses a number. Only the highest applicable single category is scored; categories are not added."
-)
-RANDLEMAN_SUPERIOR_NOTE = (
-    "Superior steepening alone is not automatically assigned 3 points and requires surgeon review. "
-    "BAD-D and other tomography indices are not substituted for Randleman topography."
-)
-RANDLEMAN_ACTIVE_ERSS_REFERENCE = (
-    ("Variable", "Finding", "Points"),
-    ("Anterior topography", "Use the category table above", "0 / 1 / 3 / 4"),
-    ("Residual stromal bed", "<240 / 240-259 / 260-279 / 280-299 / >=300 um", "4 / 3 / 2 / 1 / 0"),
-    ("Age - active CER-AI policy", "18 / 19-20 / >=21 years", "3 / 2 / 0"),
-    ("Preop corneal thickness - active CER-AI policy", "<480 / 480-499 / 500-509 / >=510 um", "Hard stop / 2 / 1 / 0"),
-    ("Manifest MRSE", "<-14 / -14-<-12 / -12-<-10 / -10-<-8 / >=-8 D", "4 / 3 / 2 / 1 / 0"),
-)
+
 PDF_UNICODE_REGULAR = "CER-AI-Vera"
 PDF_UNICODE_BOLD = "CER-AI-Vera-Bold"
 pdfmetrics.registerFont(TTFont(
@@ -91,746 +55,374 @@ pdfmetrics.registerFont(TTFont(
 ))
 
 
+class ReportContractError(ValueError):
+    """The supplied assessment is not a complete canonical report snapshot."""
+
+
+FIELD_LABELS = {
+    "K1_D": "K1", "K1_axis_deg": "K1 axis", "K2_D": "K2",
+    "K2_axis_deg": "K2 axis", "Kmean_D": "Km",
+    "topographic_astig_D": "Astigmatism",
+    "ml7_bad_k1_d": "ML7 K1 (BAD Display)",
+    "ml7_bad_k2_d": "ML7 K2 (BAD Display)",
+    "bad_flat_axis_deg": "PS3 BAD Axis (flat meridian, beside K1)",
+    "topographic_steep_axis_deg": "Displayed steep/astigmatic axis",
+    "Rmin_mm": "Posterior Rmin", "topometric_RMin": "Topometric RMin",
+    "ISV": "ISV", "IVA": "IVA", "KI": "KI", "CKI": "CKI",
+    "IHA": "IHA", "IHD": "IHD", "TKC": "TKC", "KISA": "KISA",
+    "I_S": "Signed I-S", "central_pachy_um": "Pupil Center pachymetry",
+    "pachy_thinnest_um": "Thinnest pachymetry", "Kmax_D": "Kmax (Front)",
+    "corneal_diameter_mm": "HWTW", "F_Ele_Th_um": "F.Ele.Th",
+    "B_Ele_Th_um": "B.Ele.Th", "PPI_min": "PPI Min",
+    "PPI_avg": "PPI Avg", "PPI_max": "PPI Max", "ARTmax_um": "ARTmax",
+    "Df": "Df", "Db": "Db", "Dp": "Dp", "Dt": "Dt", "Da": "Da",
+    "BAD_D": "Final BAD-D", "srax_deg": "SRAX",
+}
+ERSS_LABELS = {
+    "topography": "Topography", "RSB": "Residual stromal bed",
+    "age": "Age", "pachymetry": "Preoperative pachymetry", "MRSE": "Manifest MRSE",
+}
+
+
+REPORT_BLANK_LINE_PT = 12
+
+
 def _rl(value: str):
     return colors.HexColor(f"#{value}")
+
+
+def _status_palette(value):
+    """Presentation of an existing disposition; never infer or rescore risk."""
+    return {
+        "PASS": (GREEN, GREEN_FILL),
+        "CAUTION": (AMBER, AMBER_FILL),
+        "PASS WITH CAUTION": (AMBER, AMBER_FILL),
+        "STOP-DEFER": (RED, RED_FILL),
+    }.get(str(value).strip().upper().split(" / ")[-1])
+
+
+def _cell_palette(row, index, selected_plan_status=None):
+    label = str(row[0]).strip().lower()
+    if label == "selected_plan" and str(row[1]) not in {"", "Not documented"} and selected_plan_status in {"PASS", "PASS WITH CAUTION"}:
+        return _status_palette(selected_plan_status)
+    if label in {"df", "db", "dp", "dt", "da", "ppi min", "ppi avg", "ppi max", "artmax"} and index > 0:
+        classification = str(row[2]).split(" / ")[0]
+        return {"NORMAL": (GREEN, GREEN_FILL),
+                "SUSPICIOUS": (AMBER, AMBER_FILL),
+                "ABNORMAL": (RED, RED_FILL)}.get(classification)
+    if label == "procedure_transition":
+        return AMBER, AMBER_FILL
+    if "warning" in label and str(row[index]) not in {"", "Not documented"}:
+        return AMBER, AMBER_FILL
+    return _status_palette(row[index])
 
 
 def _text(value: Any, fallback: str = "Not documented") -> str:
     if value is None or value == "":
         return fallback
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if isinstance(value, float):
+        return f"{value:.3f}".rstrip("0").rstrip(".")
+    if isinstance(value, (list, tuple)):
+        return "; ".join(_text(item) for item in value) or fallback
+    if isinstance(value, Mapping):
+        return "; ".join(f"{key}: {_text(item)}" for key, item in value.items()) or fallback
     return str(value)
 
 
-def _ascii(value: Any, fallback: str = "Not documented") -> str:
-    return (
-        _text(value, fallback)
-        .replace("\u2014", "-")
-        .replace("\u2013", "-")
-        .replace("\u2265", ">=")
-        .replace("\u2264", "<=")
-        .replace("\u00b5", "u")
-        .replace("\u00b0", " degrees")
-    )
+def _provenance(entries: Any) -> str:
+    if not entries:
+        return "Not documented"
+    rendered = []
+    for item in entries if isinstance(entries, list) else [entries]:
+        if isinstance(item, Mapping):
+            parts = [str(item[key]) for key in ("source", "region", "file") if item.get(key)]
+            rendered.append(" / ".join(parts) or _text(item))
+        else:
+            rendered.append(str(item))
+    return "; ".join(rendered)
 
 
-def _status_palette(status: str) -> tuple[str, str]:
-    if status == "PASS":
-        return GREEN, GREEN_FILL
-    if status == "STOP-DEFER":
-        return RED, RED_FILL
-    if status == "CAUTION":
-        return AMBER, AMBER_FILL
-    return GRAY, GRAY_FILL
+def _canonical_eyes(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+    decision = payload.get("decision") or {}
+    eyes = [eye for eye in decision.get("eyes") or [] if isinstance(eye, Mapping)]
+    ordered = sorted(eyes, key=lambda item: {"OD": 0, "OS": 1}.get(str(item.get("eye")), 2))
+    if not ordered:
+        raise ReportContractError("A complete CER-AI report requires at least one assessed eye.")
+    result = []
+    for eye in ordered:
+        report = eye.get("report_payload")
+        if not isinstance(report, Mapping):
+            raise ReportContractError(f"{eye.get('eye', 'Eye')}: canonical report payload is unavailable.")
+        result.append(dict(report))
+    return result
 
 
-def _fmt(value: Any, digits: int = 1, unit: str = "") -> str:
-    if value is None:
-        return "Not available"
-    if isinstance(value, (int, float)) and not isinstance(value, bool):
-        rendered = f"{value:.{digits}f}"
+def assert_complete_report_payload(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Enforce the full-report gate without calculating clinical results."""
+    reports = _canonical_eyes(payload)
+    errors = []
+    for report in reports:
+        eye = report.get("eye") or "Eye"
+        procedure = str(report.get("procedure") or "").upper()
+        randleman = report.get("randleman")
+        if procedure in {"LASIK", "PRK"} and (
+            not isinstance(randleman, Mapping)
+            or randleman.get("total") is None
+            or any(value is None for value in (randleman.get("rows") or {}).values())
+        ):
+            errors.append(f"{eye}: Randleman/ERSS is incomplete")
+        nice = report.get("nice") or {}
+        if nice.get("total") is None or nice.get("missing"):
+            errors.append(f"{eye}: NICE is incomplete")
+        ps3 = report.get("ps3") or {}
+        if not ps3.get("complete") or ps3.get("missing_keys"):
+            errors.append(f"{eye}: PS3 is incomplete")
+    if errors:
+        raise ReportContractError("; ".join(errors))
+    return reports
+
+
+def _report_sections(report: Mapping[str, Any]) -> list[tuple[str, list[list[str]]]]:
+    sections: list[tuple[str, list[list[str]]]] = []
+    procedure = str(report.get("procedure") or "")
+    randleman = report.get("randleman")
+    if isinstance(randleman, Mapping):
+        rows = [["Component", "Points"]]
+        for key in ("topography", "RSB", "age", "pachymetry", "MRSE"):
+            rows.append([ERSS_LABELS[key], _text((randleman.get("rows") or {}).get(key))])
+        rows.extend([
+            ["Total", _text(randleman.get("total"))],
+            ["Topography category", _text(randleman.get("category"))],
+            ["Disposition", _text(randleman.get("status"))],
+        ])
     else:
-        rendered = str(value)
-    return f"{rendered}{unit}"
-
-
-def _eye_metrics(eye: Dict[str, Any], locale: str = "en") -> List[tuple[str, str]]:
-    values = eye.get("values") or {}
-    score = eye.get("score") or {}
-    erss_evidence = eye.get("erss_topography_evidence") or {}
-    correction = "Not documented"
-    if values.get("intended_sphere_D") is not None and values.get("intended_cylinder_magnitude_D") is not None:
-        axis = (
-            f" x {_fmt(values.get('correction_axis_deg'), 0, ' degrees')}"
-            if values.get("correction_axis_deg") is not None else " (axis unavailable)"
-        )
-        correction = (
-            f"{_fmt(values.get('intended_sphere_D'), 2, ' D')} / "
-            f"-{_fmt(values.get('intended_cylinder_magnitude_D'), 2, ' D')}{axis}"
-        )
-    manifest = "Not documented"
-    if values.get("manifest_sphere_D") is not None and values.get("manifest_cylinder_magnitude_D") is not None:
-        manifest_axis = (
-            f" x {_fmt(values.get('manifest_normalized_axis_deg'), 0, ' degrees')}"
-            if values.get("manifest_normalized_axis_deg") is not None else " (axis unavailable)"
-        )
-        manifest = (
-            f"{_fmt(values.get('manifest_sphere_D'), 2, ' D')} / "
-            f"-{_fmt(values.get('manifest_cylinder_magnitude_D'), 2, ' D')}{manifest_axis}"
-        )
-    def entered_refraction(role: str) -> str:
-        sphere = values.get(f"{role}_entered_sphere_D")
-        cylinder = values.get(f"{role}_cylinder_signed_D")
-        axis = values.get(f"{role}_entered_axis_deg")
-        if sphere is None or cylinder is None:
-            return "Not documented"
-        axis_text = f" x {_fmt(axis, 0, ' degrees')}" if axis is not None else " (axis unavailable)"
-        return f"{float(sphere):+.2f} D / {float(cylinder):+.2f} D{axis_text}"
-    transition = (
-        "Not applicable"
-        if values.get("transition_zone_mm") is None and values.get("transition_zone_not_applicable") == "yes"
-        else _fmt(values.get("transition_zone_mm"), 1, " mm")
-    )
-    rows = [("Procedure", _text(values.get("procedure")))]
-    if str(values.get("procedure") or "").upper() == "PRK":
-        rows.append((
-            "CER-AI provisional PRK-EWSS score / category",
-            f"{_text(score.get('total'), '-')} / {_text(score.get('category'), '-')}",
-        ))
-    rows.extend([
-        ("Prior refractive surgery", _text(values.get("prior_refractive_surgery"))),
-        ("Stability / progression / CDVA flag", (
-            f"{_text(values.get('refractive_stability'))} / "
-            f"{_text(values.get('documented_progression'))} / "
-            f"{_text(values.get('unexplained_CDVA_below_20_20'))}"
-        )),
-        ("Manifest entered notation", entered_refraction("manifest")),
-        ("Manifest normalized (minus-cylinder)", manifest),
-        ("Intended entered notation", entered_refraction("intended")),
-        ("Intended normalized (minus-cylinder)", correction),
-        ("Correction source", _text(values.get("correction_source"), "Manual / not documented")),
-        ("Randleman ERSS / category", f"{_text((eye.get('randleman_erss') or {}).get('total'))} / {_text((eye.get('randleman_erss') or {}).get('category'))}"),
-        ("Final BAD-D / class", f"{_fmt((eye.get('bad_summary') or {}).get('value'), 2)} / {_text((eye.get('bad_summary') or {}).get('category'))}"),
-        ("CER-AI-adapted NICE / class", f"{_text((eye.get('nice') or {}).get('total'))} / {_text((eye.get('nice') or {}).get('category'))}"),
-        ("Thinnest pachymetry", _fmt(values.get("pachy_thinnest_um"), 0, " um")),
-        ("Manifest MRSE", _fmt(values.get("MRSE_D"), 2, " D")),
-        ("Intended MRSE", _fmt(values.get("intended_MRSE_D"), 2, " D")),
-        ("Manifest / intended pattern", (
-            f"{_text(values.get('manifest_refractive_pattern'))} / "
-            f"{_text(values.get('intended_refractive_pattern'))}"
-        )),
-        ("Intended principal meridians", " / ".join(
-            _fmt(item, 2, " D") for item in (values.get("intended_principal_meridians_D") or [])
-        ) or "Not documented"),
-        ("Preoperative / estimated final Kmean", (
-            f"{_fmt(values.get('preoperative_Kmean_D'), 2, ' D')} / "
-            f"{_fmt(values.get('estimated_final_Kmean_D'), 2, ' D')}"
-        )),
-        ("Maximum ablation", _fmt(values.get("max_ablation_um"), 1, " um")),
-        ("Laser platform", _text(values.get("laser_platform"))),
-        ("PRK epithelium", _fmt(values.get("PRK_epithelium_um"), 0, " um")),
-        ("Selected LASIK plan", _text(eye.get("lasik_selected_plan") or values.get("LASIK_selected_plan"))),
-        ("Optical / transition zone", f"{_fmt(values.get('optical_zone_mm'), 1, ' mm')} / {transition}"),
-        ("Enhancement anticipated", _text(values.get("enhancement_anticipated"))),
-        ("PRK RST / PTA", f"{_fmt(values.get('PRK_RST_um'), 0, ' um')} / {_fmt(values.get('PRK_PTA_percent'), 1, '%')}"),
-        ("LASIK RSB / PTA", f"{_fmt(values.get('LASIK_RSB_um'), 0, ' um')} / {_fmt(values.get('LASIK_PTA_percent'), 1, '%')}"),
-        ("Tomography review", _text((eye.get("tomography_review") or {}).get("status"))),
-        ("Morphology category", _text((eye.get("topography_classification") or {}).get("scoring_category"))),
-        ("Randleman I-S / source", (
-            f"{_fmt(erss_evidence.get('I_S_D'), 2, ' D')} / "
-            f"{_text(erss_evidence.get('I_S_source'))}"
-        )),
-        ("Validated Randleman topography", (
-            f"{_text(erss_evidence.get('validated_category'))} / "
-            f"{_text(erss_evidence.get('category_source'))}"
-        )),
-        ("Anterior-map read confidence", _text(erss_evidence.get("image_category_confidence"))),
-        ("Pentacam QS", _text(values.get("pentacam_qs"))),
-    ])
-    return [(translate_text(label, locale), translate_text(value, locale)) for label, value in rows]
-
-
-def _findings(eye: Dict[str, Any], locale: str = "en") -> Iterable[tuple[str, List[str]]]:
-    bad_display = (eye.get("tomography_review") or {}).get("BAD_display") or {}
-    groups = [
-        ("Hard stops", eye.get("hard_stops") or []),
-        ("Decision reasons", eye.get("reasons") or []),
-        ("Missing or unresolved data", eye.get("missing") or []),
-        ("Surgical-load evidence flags", eye.get("surgical_load_flags") or []),
-        ("Clinical modifiers", eye.get("clinical_modifiers") or []),
-        ("Warnings", eye.get("warnings") or []),
-        ("PRK Mitomycin-C guidance", eye.get("prk_mitomycin_c_guidance") or []),
-        ("NICE component audit", [f"{key}: {value} point(s)" for key, value in (eye.get("nice") or {}).get("rows", {}).items()]
-         + [f"Input {key}: {value}" for key, value in (eye.get("nice") or {}).get("values", {}).items()]
-         + [f"Source {key}: {value}" for key, value in (eye.get("nice") or {}).get("input_sources", {}).items()]
-         + (eye.get("nice") or {}).get("evidence_notes", [])),
-        ("NICE interpretation note", [(eye.get("nice") or {})["note"]] if (eye.get("nice") or {}).get("note") else []),
-        ("Surgeon attention - hyperopic/mixed pathway", eye.get("surgeon_attention") or []),
-        ("Tomography concern flags", (eye.get("tomography_review") or {}).get("cross_sectional_flags") or []),
-        ("BAD display interpretation", [f"{key}: {value}" for key, value in bad_display.items()]),
-    ]
-    return (
-        (translate_text(title, locale), [translate_text(item, locale) for item in items])
-        for title, items in groups if items
-    )
-
-
-def _extracted_eye(extracted: Dict[str, Any], eye_id: str) -> Dict[str, Any]:
-    for eye in extracted.get("eyes") or []:
-        if eye.get("eye") == eye_id:
-            return eye
-    return {}
-
-
-def _tomography_rows(extracted: Dict[str, Any], eye_id: str, locale: str = "en") -> List[tuple[str, str]]:
-    eye = _extracted_eye(extracted, eye_id)
-    keys = [
-        ("K1", "K1_D", " D", 2), ("K1 axis", "K1_axis_deg", " degrees", 0),
-        ("K2", "K2_D", " D", 2), ("K2 axis", "K2_axis_deg", " degrees", 0),
-        ("Horizontal white-to-white (HWTW)", "corneal_diameter_mm", " mm", 2),
-        ("Kmax", "Kmax_D", " D", 2), ("Thinnest pachymetry", "pachy_thinnest_um", " um", 0),
-        ("BAD-D final", "BAD_D", "", 2), ("BAD-Df", "Df", "", 2),
-        ("BAD-Db", "Db", "", 2), ("BAD-Dp", "Dp", "", 2),
-        ("BAD-Dt", "Dt", "", 3), ("BAD-Da", "Da", "", 3),
-        ("ARTmax", "ARTmax_um", " um", 0), ("PPI min", "PPI_min", "", 2),
-        ("PPI avg", "PPI_avg", "", 2), ("PPI max", "PPI_max", "", 2),
-        ("ISV", "ISV", "", 0), ("IVA", "IVA", "", 3),
-        ("KI", "KI", "", 3), ("CKI", "CKI", "", 3),
-        ("IHA", "IHA", "", 3), ("IHD", "IHD", "", 3),
-        ("I-S", "I_S", " D", 2), ("KISA", "KISA", "%", 1),
-        ("Rmin", "Rmin_mm", " mm", 2), ("SRAX", "srax_deg", " degrees", 1),
-        ("Thinnest X", "thinnest_x_mm", " mm", 2), ("Thinnest Y", "thinnest_y_mm", " mm", 2),
-        ("Corneal volume", "corneal_volume_mm3", " mm3", 2),
-        ("RMS-HOA", "RMS_HOA_um", " um", 3), ("Vertical coma", "vertical_coma_um", " um", 3),
-        ("Morphology", "morphology", "", 0), ("Anterior pattern", "anterior_pattern", "", 0),
-        ("Posterior pattern", "posterior_pattern", "", 0), ("Image quality", "quality", "", 0),
-        ("Pentacam QS", "pentacam_qs", "", 0), ("Source files", "source_files", "", 0),
-    ]
-    return [
-        (translate_text(label, locale), translate_text(_fmt(eye.get(key), digits, unit), locale))
-        for label, key, unit, digits in keys
-    ]
-
-
-def _microkeratome_rows(eye: Dict[str, Any], locale: str = "en") -> List[tuple[str, str]]:
-    plan = eye.get("microkeratome_planning") or {}
-    if not plan.get("applicable"):
-        return []
-    blades = ", ".join(str(item) for item in plan.get("blade_recommendations") or []) or "Not documented"
-    projected = (
-        f"{_fmt(plan.get('alternative_rsb_um'), 1, ' um')} / "
-        f"{_fmt(plan.get('alternative_pta_percent'), 1, '%')}"
-        if plan.get("alternative_safety") != "NOT_APPLICABLE"
-        else "Not applicable"
-    )
-    rows = [
-        ("Assessment gate", _text(plan.get("assessment_gate"))),
-        ("Steep-flat K spread", _fmt(plan.get("delta_k_d"), 2, " D")),
-        ("Vacuum ring", _fmt(plan.get("vacuum_ring_mm"), 1, " mm")),
-        ("Vacuum pressure", _text(plan.get("vacuum_pressure_mmhg"), "Not determined") + " mmHg" if plan.get("vacuum_pressure_mmhg") else "Not determined"),
-        ("Blade recommendation(s)", blades),
-        ("Primary hinge", _text(plan.get("primary_hinge"), "No CER-AI K-spread hinge override")),
-        ("Conditional alternative", _text(plan.get("alternative_hinge"), "Not cleared / not applicable")),
-        ("Alternative projected RSB / PTA", projected),
-        ("Alternative safety", _text(plan.get("alternative_safety"))),
-        ("Ring-zone clearance", _fmt(plan.get("ring_tzone_clearance_mm"), 2, " mm")),
-        ("Source", _text(plan.get("source"))),
-    ]
-    return [(translate_text(label, locale), translate_text(value, locale)) for label, value in rows]
-
-
-def _paired_rows(rows: List[tuple[str, str]]) -> List[List[str]]:
-    paired: List[List[str]] = []
-    for index in range(0, len(rows), 2):
-        left = rows[index]
-        right = rows[index + 1] if index + 1 < len(rows) else ("", "")
-        paired.append([left[0], left[1], right[0], right[1]])
-    return paired
-
-
-def _ordered_eyes(decision: Dict[str, Any]) -> List[Dict[str, Any]]:
-    order = {"OD": 0, "OS": 1}
-    eyes = [eye for eye in decision.get("eyes") or [] if isinstance(eye, dict)]
-    return sorted(eyes, key=lambda eye: order.get(str(eye.get("eye")), 2))
-
-
-def build_pdf(payload: Dict[str, Any]) -> bytes:
-    locale = normalize_locale(payload.get("locale"))
-    tr = lambda value: translate_text(value, locale)
-    regular_font = PDF_UNICODE_REGULAR if locale == "tr" else "Helvetica"
-    bold_font = PDF_UNICODE_BOLD if locale == "tr" else "Helvetica-Bold"
-    patient = payload.get("patient") or {}
-    decision = payload.get("decision") or {}
-    extracted = payload.get("extracted") or {}
-    report_eyes = _ordered_eyes(decision)
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer, pagesize=letter, rightMargin=0.65 * inch, leftMargin=0.65 * inch,
-        topMargin=0.72 * inch, bottomMargin=0.82 * inch,
-        title=f"CER-AI — {PROGRAM_NAME} | {tr('CER-AI Preoperative Ectasia Risk Assessment')}",
-        author="CER-AI",
-    )
-    styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name="ReportTitle", parent=styles["Title"], fontName=bold_font, fontSize=17, leading=20, textColor=_rl(NAVY), alignment=TA_LEFT, spaceAfter=3))
-    styles.add(ParagraphStyle(name="ReportSub", parent=styles["Normal"], fontName=regular_font, fontSize=8.5, leading=11, textColor=_rl(GRAY), spaceAfter=12))
-    styles.add(ParagraphStyle(name="Section", parent=styles["Heading2"], fontName=bold_font, fontSize=10.5, leading=13, textColor=_rl(NAVY), spaceBefore=10, spaceAfter=5))
-    styles.add(ParagraphStyle(name="BodySmall", parent=styles["BodyText"], fontName=regular_font, fontSize=8.5, leading=11, textColor=_rl(INK), spaceAfter=3))
-    styles.add(ParagraphStyle(name="Tiny", parent=styles["BodyText"], fontName=regular_font, fontSize=7.2, leading=9, textColor=_rl(GRAY)))
-    styles.add(ParagraphStyle(name="Liability", parent=styles["BodyText"], fontName=bold_font, fontSize=9, leading=12, textColor=_rl(RED), backColor=_rl(RED_FILL), borderColor=_rl(RED), borderWidth=0.8, borderPadding=7, spaceAfter=11))
-    styles.add(ParagraphStyle(name="QualityWarning", parent=styles["BodyText"], fontName=bold_font, fontSize=9, leading=12, textColor=_rl(AMBER), backColor=_rl(AMBER_FILL), borderColor=_rl(AMBER), borderWidth=1, borderPadding=8, spaceBefore=10, spaceAfter=6))
-    styles.add(ParagraphStyle(name="PatientName", parent=styles["BodyText"], fontName=PDF_UNICODE_BOLD, fontSize=15, leading=18, textColor=_rl(NAVY), spaceBefore=2, spaceAfter=6))
-    styles.add(ParagraphStyle(name="TableText", parent=styles["BodyText"], fontName=regular_font, fontSize=7.5, leading=9, textColor=_rl(INK), spaceAfter=0))
-    styles.add(ParagraphStyle(name="TableLabel", parent=styles["BodyText"], fontName=bold_font, fontSize=7.3, leading=8.7, textColor=_rl(INK), spaceAfter=0))
-    styles.add(ParagraphStyle(name="TableHead", parent=styles["BodyText"], fontName=bold_font, fontSize=7.5, leading=9, textColor=colors.white, spaceAfter=0))
-    table_text = lambda value: Paragraph(_ascii(value, ""), styles["TableText"])
-    table_label = lambda value: Paragraph(_ascii(value, ""), styles["TableLabel"])
-    table_head = lambda value: Paragraph(_ascii(value, ""), styles["TableHead"])
-
-    story: List[Any] = []
-    story.append(Paragraph(tr("CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT"), styles["ReportTitle"]))
-    story.append(Paragraph(PROGRAM_NAME + " | " + tr("Corneal refractive surgery clinical decision-support report") + f" | {tr('Software')} v{APP_VERSION}", styles["ReportSub"]))
-    story.append(Paragraph(liability_notice(locale), styles["Liability"]))
-
-    metadata = [
-        [table_label(tr("Patient")), table_text(_text(patient.get("name"), tr("Not documented"))), table_label(tr("Patient ID")), table_text(_text(patient.get("id"), tr("Not documented")))],
-        [table_label(tr("Age")), table_text(_text(patient.get("age"), tr("Not documented"))), table_label(tr("Assessment date")), table_text(_text(patient.get("report_date"), tr("Not documented")))],
-        [table_label(tr("Reviewer")), table_text(_text(patient.get("reviewer"), tr("Not documented"))), table_label(tr("Eyes assessed")), table_text(", ".join(_ascii(e.get("eye")) for e in report_eyes) or tr("None"))],
-    ]
-    meta_table = Table(metadata, colWidths=[0.85 * inch, 2.2 * inch, 1.0 * inch, 2.1 * inch], hAlign="LEFT")
-    meta_table.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (-1, -1), regular_font), ("FONTSIZE", (0, 0), (-1, -1), 8.3),
-        ("FONTNAME", (0, 0), (0, -1), bold_font), ("FONTNAME", (2, 0), (2, -1), bold_font),
-        ("TEXTCOLOR", (0, 0), (-1, -1), _rl(INK)),
-        ("BACKGROUND", (0, 0), (0, -1), _rl(GRAY_FILL)), ("BACKGROUND", (2, 0), (2, -1), _rl(GRAY_FILL)),
-        ("GRID", (0, 0), (-1, -1), 0.45, _rl(LINE)),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6), ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-    ]))
-    story.append(meta_table)
-    story.append(Spacer(1, 10))
-    patient_banner = _ascii(patient.get("name"), tr("PATIENT NAME NOT DOCUMENTED")).upper()
-    story.append(Paragraph(patient_banner, styles["PatientName"]))
-
-    overall = _ascii(tr(decision.get("status") or "NOT ASSESSED"))
-    accent, fill = _status_palette(decision.get("status") or "")
-    status_table = Table([[Paragraph(f"<b>{tr('OVERALL DISPOSITION')}</b><br/><font size='13'><b>{overall}</b></font><br/>{_ascii(tr(decision.get('action')), '')}", styles["BodySmall"])]], colWidths=[6.15 * inch])
-    status_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), _rl(fill)),
-        ("BOX", (0, 0), (-1, -1), 1.2, _rl(accent)),
-        ("LINEBEFORE", (0, 0), (0, -1), 6, _rl(accent)),
-        ("LEFTPADDING", (0, 0), (-1, -1), 12), ("RIGHTPADDING", (0, 0), (-1, -1), 10),
-        ("TOPPADDING", (0, 0), (-1, -1), 9), ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
-        ("TEXTCOLOR", (0, 0), (-1, -1), _rl(accent)),
-    ]))
-    story.append(status_table)
-    identity_warnings = decision.get("identity_warnings") or []
-    if identity_warnings:
-        story.append(Paragraph(tr("PATIENT IDENTITY NOT VERIFIED - SURGEON CONFIRMATION REQUIRED"), styles["Section"]))
-        for item in identity_warnings:
-            story.append(Paragraph(f"- {_ascii(tr(item))}", styles["BodySmall"]))
-    blockers = decision.get("critical_input_issues") or []
-    if blockers:
-        story.append(Paragraph(tr("Global clinical / source blockers"), styles["Section"]))
-        for item in blockers:
-            story.append(Paragraph(f"- {_ascii(tr(item))}", styles["BodySmall"]))
-
-    for eye in report_eyes:
-        eye_status = eye.get("status") or "NOT ASSESSED"
-        eye_accent, eye_fill = _status_palette(eye_status)
-        story.append(Paragraph(f"{_ascii(eye.get('eye'))} {tr('ASSESSMENT')}", styles["Section"]))
-        banner = Table([[table_label(tr(eye_status)), table_text(tr(eye.get("action"))) ]], colWidths=[1.7 * inch, 4.45 * inch])
-        banner.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), _rl(eye_fill)),
-            ("TEXTCOLOR", (0, 0), (0, 0), _rl(eye_accent)),
-            ("FONTNAME", (0, 0), (0, 0), bold_font), ("FONTNAME", (1, 0), (1, 0), regular_font),
-            ("FONTSIZE", (0, 0), (-1, -1), 8), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("BOX", (0, 0), (-1, -1), 0.6, _rl(eye_accent)),
-            ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-            ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ]))
-        story.append(banner)
-        metric_rows = [[table_head(tr("Parameter")), table_head(tr("Result"))]] + [[table_label(k), table_text(v)] for k, v in _eye_metrics(eye, locale)]
-        metric_table = Table(metric_rows, colWidths=[2.25 * inch, 3.9 * inch], repeatRows=1)
-        metric_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), _rl(NAVY)), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), bold_font), ("FONTNAME", (0, 1), (0, -1), bold_font),
-            ("FONTNAME", (1, 1), (1, -1), regular_font), ("FONTSIZE", (0, 0), (-1, -1), 7.8),
-            ("GRID", (0, 0), (-1, -1), 0.35, _rl(LINE)), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, _rl("F7F9FB")]),
-            ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-            ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ]))
-        story.append(metric_table)
-        for title, items in _findings(eye, locale):
-            story.append(Paragraph(_ascii(title), styles["Section"]))
-            for item in items:
-                story.append(Paragraph(f"- {_ascii(item)}", styles["BodySmall"]))
-
-        planning_rows = _microkeratome_rows(eye, locale)
-        if planning_rows:
-            story.append(Paragraph(tr("Post-assessment ML7 microkeratome planning"), styles["Section"]))
-            planning_table = Table(
-                [[table_head(tr("Parameter")), table_head(tr("Surgeon-review recommendation"))]]
-                + [[table_label(key), table_text(value)] for key, value in planning_rows],
-                colWidths=[2.25 * inch, 3.9 * inch], repeatRows=1,
-            )
-            planning_table.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), _rl(BLUE)), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), bold_font), ("FONTNAME", (0, 1), (0, -1), bold_font),
-                ("FONTNAME", (1, 1), (1, -1), regular_font),
-                ("FONTSIZE", (0, 0), (-1, -1), 7.8), ("GRID", (0, 0), (-1, -1), 0.35, _rl(LINE)),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-                ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ]))
-            story.append(planning_table)
-            for title, items in (
-                ("Planning warnings", (eye.get("microkeratome_planning") or {}).get("warnings") or []),
-                ("Planning notes", (eye.get("microkeratome_planning") or {}).get("notes") or []),
-            ):
-                if items:
-                    story.append(Paragraph(tr(title), styles["Section"]))
-                    for item in items:
-                        story.append(Paragraph(f"- {_ascii(tr(item))}", styles["BodySmall"]))
-
-        story.append(Paragraph(tr("Extracted tomography"), styles["Section"]))
-        tomo = [[table_label(tr("Parameter")), table_label(tr("Value")), table_label(tr("Parameter")), table_label(tr("Value"))]] + [
-            [table_label(value) if index in (0, 2) else table_text(value) for index, value in enumerate(row)]
-            for row in _paired_rows(_tomography_rows(extracted, eye.get("eye"), locale))
+        rows = [["Component", "Points"]] + [
+            [ERSS_LABELS[key], "Not applicable to selected procedure"]
+            for key in ("topography", "RSB", "age", "pachymetry", "MRSE")
         ]
-        tomo_table = Table(tomo, colWidths=[1.45 * inch, 1.55 * inch, 1.45 * inch, 1.7 * inch], repeatRows=1)
-        tomo_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), _rl(GRAY_FILL)), ("FONTNAME", (0, 0), (-1, 0), bold_font),
-            ("FONTNAME", (0, 1), (0, -1), bold_font), ("FONTNAME", (2, 1), (2, -1), bold_font),
-            ("FONTNAME", (1, 1), (1, -1), regular_font), ("FONTNAME", (3, 1), (3, -1), regular_font),
-            ("FONTSIZE", (0, 0), (-1, -1), 7.2),
-            ("GRID", (0, 0), (-1, -1), 0.35, _rl(LINE)), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-            ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ]))
-        story.append(tomo_table)
+        rows.append(["Disposition", "NOT APPLICABLE"])
+    sections.append(("Randleman / ERSS", rows))
 
-    warnings = extracted.get("global_warnings") or []
-    if warnings:
-        story.append(Paragraph(tr("Extraction warnings"), styles["Section"]))
-        for item in warnings:
-            story.append(Paragraph(f"- {_ascii(tr(item))}", styles["BodySmall"]))
+    nice = report.get("nice") or {}
+    nice_rows = [["Component", "Input", "Points"]]
+    value_keys = {"K2": "K2_D", "central_pachymetry": "central_pachy_um", "B_Ele_Th": "B_Ele_Th_um", "I_S": "I_S_D"}
+    for key in ("K2", "central_pachymetry", "B_Ele_Th", "I_S"):
+        nice_rows.append([key, _text((nice.get("values") or {}).get(value_keys[key])), _text((nice.get("rows") or {}).get(key))])
+    nice_rows.extend([["Total", "", _text(nice.get("total"))], ["Classification", _text(nice.get("category")), _text(nice.get("status"))]])
+    sections.append(("NICE", nice_rows))
 
-    story.append(Spacer(1, 12))
-    story.append(Paragraph(tr("Interpretation note"), styles["Section"]))
-    story.append(Paragraph(
-        tr("This report is generated under the CER-AI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. "
-           "CAUTION requires explicit surgeon review but does not automatically defer surgery. "
-           "STOP-DEFER means surgery must not proceed unless the stated stop/defer condition is resolved. "
-           "DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review."),
-        styles["Tiny"],
-    ))
-    quality_warnings = decision.get("source_quality_warnings") or warnings_for_extracted(extracted)
-    if quality_warnings:
-        warning_text = "<b>" + _ascii(tr(WARNING_HEADING)) + "</b><br/>" + "<br/>".join(
-            "- " + _ascii(tr(item)) for item in quality_warnings
-        )
-        story.append(Paragraph(warning_text, styles["QualityWarning"]))
+    ps3 = report.get("ps3") or {}
+    ps3_rows = [["Factor", "Status", "Exact finding"]]
+    for finding in ps3.get("findings") or []:
+        ps3_rows.append([_text(finding.get("key")), _text(finding.get("status")), _text(finding.get("detail"))])
+    ps3_rows.extend([
+        ["Moderate / High", _text(ps3.get("moderate_count")), _text(ps3.get("high_count"))],
+        ["Procedure disposition", _text(ps3.get("status")), _text(ps3.get("disposition"))],
+    ])
+    sections.append(("PS3", ps3_rows))
 
-    def page_footer(canvas, pdf_doc):
-        canvas.saveState()
-        canvas.setStrokeColor(_rl(LINE))
-        canvas.line(0.65 * inch, 0.62 * inch, 7.85 * inch, 0.62 * inch)
-        canvas.setFillColor(_rl(GRAY))
-        canvas.setFont(PDF_UNICODE_REGULAR, 6.1)
-        canvas.drawCentredString(4.25 * inch, 0.43 * inch, authorship_notice(locale))
-        canvas.setFont(regular_font, 6.5)
-        canvas.drawString(0.65 * inch, 0.23 * inch, "CER-AI | " + tr("Clinical decision-support report"))
-        canvas.drawRightString(7.85 * inch, 0.23 * inch, f"{tr('Page')} {pdf_doc.page}")
-        canvas.restoreState()
+    bad = report.get("bad") or {}
+    context = bad.get("context") or {}
+    bad_rows = [["Parameter", "Value", "Interpretation"], ["Final BAD-D", _text(bad.get("final_d")), f"{_text(bad.get('classification'))} / {_text(bad.get('status'))}"]]
+    for label, key in (("Df", "df"), ("Db", "db"), ("Dp", "dp"), ("Dt", "dt"), ("Da", "da"),
+                       ("PPI Min", "ppi_min"), ("PPI Avg", "ppi_avg"), ("PPI Max", "ppi_max"), ("ARTmax", "artmax_um")):
+        interpretation = (bad.get("component_interpretations") or {}).get(key) or {}
+        bad_rows.append([label, _text(context.get(key)),
+                         f"{interpretation.get('classification', 'UNAVAILABLE')} / {interpretation.get('range', 'Not documented')}; information only"])
+    sections.append(("Belin/Ambrósio BAD-D", bad_rows))
 
-    doc.build(story, onFirstPage=page_footer, onLaterPages=page_footer)
-    return buffer.getvalue()
+    safety = report.get("tissue_safety") or {}
+    sections.append(("Procedural safety", [["Parameter", "Canonical result"]] + [[key, _text(value)] for key, value in safety.items()]))
+    planning = report.get("planning") or {}
+    planning_rows = [["Planning item", "Canonical result"], ["Procedure", procedure]] + [[key, _text(value)] for key, value in planning.items()]
+    planning_rows.extend([[f"ML7 {key}", _text(value)] for key, value in (report.get("microkeratome_planning") or {}).items()])
+    sections.append(("Procedure planning", planning_rows))
 
+    drivers = report.get("decision_drivers") or {}
+    driver_rows = [["Level", "Canonical decision driver"]]
+    for level in ("stop", "caution", "incomplete"):
+        driver_rows.extend([[level.upper(), _text(finding)] for finding in drivers.get(level) or []])
+    sections.append(("Decision basis", driver_rows))
 
-def _set_cell_shading(cell, fill: str) -> None:
-    tc_pr = cell._tc.get_or_add_tcPr()
-    shd = tc_pr.find(qn("w:shd"))
-    if shd is None:
-        shd = OxmlElement("w:shd")
-        tc_pr.append(shd)
-    shd.set(qn("w:fill"), fill)
+    values = report.get("source_values") or {}
+    provenance = report.get("source_provenance") or {}
+    source_rows = [["Canonical field", "Value", "Provenance"]] + [[FIELD_LABELS.get(key, key), _text(value), _provenance(provenance.get(key))] for key, value in values.items()]
+    sections.append(("Canonical Pentacam values and provenance", source_rows))
 
-
-def _set_cell_margins(cell, top=80, start=120, bottom=80, end=120) -> None:
-    tc = cell._tc
-    tc_pr = tc.get_or_add_tcPr()
-    tc_mar = tc_pr.first_child_found_in("w:tcMar")
-    if tc_mar is None:
-        tc_mar = OxmlElement("w:tcMar")
-        tc_pr.append(tc_mar)
-    for margin, value in (("top", top), ("start", start), ("bottom", bottom), ("end", end)):
-        node = tc_mar.find(qn(f"w:{margin}"))
-        if node is None:
-            node = OxmlElement(f"w:{margin}")
-            tc_mar.append(node)
-        node.set(qn("w:w"), str(value))
-        node.set(qn("w:type"), "dxa")
+    corrections = report.get("manual_corrections") or []
+    if corrections:
+        correction_rows = [["Field", "Original", "Surgeon-entered value", "Provenance"]]
+        correction_rows.extend([[_text(item.get("field")), _text(item.get("original")), _text(item.get("value")), _text(item.get("label"))] for item in corrections])
+        sections.append(("Surgeon-completed values", correction_rows))
+    versions = report.get("versions") or {}
+    sections.append(("Version provenance", [["Layer", "Version"]] + [[key, _text(value)] for key, value in versions.items()]))
+    return sections
 
 
-def _style_doc_table(table, widths: List[float], header=True) -> None:
-    table.alignment = WD_TABLE_ALIGNMENT.LEFT
-    table.autofit = False
-    for row in table.rows:
-        for idx, cell in enumerate(row.cells):
-            cell.width = Inches(widths[idx])
-            cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
-            _set_cell_margins(cell)
-            for paragraph in cell.paragraphs:
-                paragraph.paragraph_format.space_before = Pt(0)
-                paragraph.paragraph_format.space_after = Pt(0)
-                paragraph.paragraph_format.line_spacing = 1.05
-                for run in paragraph.runs:
-                    run.font.name = "Arial"
-                    run._element.rPr.rFonts.set(qn("w:ascii"), "Arial")
-                    run._element.rPr.rFonts.set(qn("w:hAnsi"), "Arial")
-                    run.font.size = Pt(8.5)
-    if header:
-        for cell in table.rows[0].cells:
-            _set_cell_shading(cell, NAVY)
-            for run in cell.paragraphs[0].runs:
-                run.font.color.rgb = RGBColor(255, 255, 255)
-                run.bold = True
-
-
-def _add_heading(document: Document, text: str, level: int = 1) -> None:
-    p = document.add_paragraph(style=f"Heading {level}")
-    p.add_run(text)
-
-
-def _add_bullet(document: Document, text: str) -> None:
-    p = document.add_paragraph(style="List Bullet")
-    p.paragraph_format.space_after = Pt(3)
-    p.paragraph_format.line_spacing = 1.1
-    p.add_run(text)
-
-
-def build_docx(payload: Dict[str, Any]) -> bytes:
-    locale = normalize_locale(payload.get("locale"))
-    tr = lambda value: translate_text(value, locale)
-    patient = payload.get("patient") or {}
+def canonical_report_model(payload: Mapping[str, Any]) -> dict[str, Any]:
+    reports = assert_complete_report_payload(payload)
     decision = payload.get("decision") or {}
-    extracted = payload.get("extracted") or {}
-    report_eyes = _ordered_eyes(decision)
-    document = Document()
-    document.core_properties.title = f"CER-AI — {PROGRAM_NAME}"
-    document.core_properties.subject = tr("CER-AI Preoperative Ectasia Risk Assessment")
-    document.core_properties.author = "CER-AI"
-    section = document.sections[0]
-    section.top_margin = Inches(0.72)
-    section.bottom_margin = Inches(0.72)
-    section.left_margin = Inches(0.8)
-    section.right_margin = Inches(0.8)
-    section.header_distance = Inches(0.35)
-    section.footer_distance = Inches(0.35)
+    return {
+        "locale": normalize_locale(payload.get("locale")),
+        "patient": dict(payload.get("patient") or {}),
+        "status": decision.get("status"), "action": decision.get("action"),
+        "identity_warnings": list(decision.get("identity_warnings") or []),
+        "source_quality_warnings": list(decision.get("source_quality_warnings") or []),
+        "eyes": [{"eye": report.get("eye"), "status": report.get("status"), "procedure": report.get("procedure"), "sections": _report_sections(report)} for report in reports],
+    }
 
-    normal = document.styles["Normal"]
-    normal.font.name = "Arial"
-    normal._element.rPr.rFonts.set(qn("w:ascii"), "Arial")
-    normal._element.rPr.rFonts.set(qn("w:hAnsi"), "Arial")
-    normal.font.size = Pt(9.5)
-    normal.paragraph_format.space_after = Pt(5)
-    normal.paragraph_format.line_spacing = 1.1
-    for level, size, before, after in ((1, 14, 12, 6), (2, 11, 9, 4)):
-        style = document.styles[f"Heading {level}"]
-        style.font.name = "Arial"
-        style._element.rPr.rFonts.set(qn("w:ascii"), "Arial")
-        style._element.rPr.rFonts.set(qn("w:hAnsi"), "Arial")
-        style.font.size = Pt(size)
-        style.font.bold = True
-        style.font.color.rgb = RGBColor.from_string(NAVY if level == 1 else BLUE)
-        style.paragraph_format.space_before = Pt(before)
-        style.paragraph_format.space_after = Pt(after)
 
-    header = section.header.paragraphs[0]
-    header.text = "CER-AI  |  " + tr("PREOPERATIVE RISK ASSESSMENT")
-    header.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    for run in header.runs:
-        run.font.name = "Arial"
-        run.font.size = Pt(7.5)
-        run.font.color.rgb = RGBColor.from_string(GRAY)
+def _pdf_table(rows, styles, regular_font, bold_font, selected_plan_status=None):
+    width = len(rows[0])
+    col_widths = {2: [2.15 * inch, 4.0 * inch], 3: [1.35 * inch, 1.25 * inch, 3.55 * inch], 4: [1.25 * inch, 1.25 * inch, 1.7 * inch, 1.95 * inch]}[width]
+    data = []
+    highlights = []
+    for row_index, row in enumerate(rows):
+        cells = []
+        for column, cell in enumerate(row):
+            style = styles["Head"] if row_index == 0 else styles["Cell"]
+            palette = _cell_palette(row, column, selected_plan_status) if row_index else None
+            if palette:
+                foreground, background = palette
+                style = ParagraphStyle(name="StatusCell", parent=style, textColor=_rl(foreground))
+                highlights.append(("BACKGROUND", (column, row_index), (column, row_index), _rl(background)))
+            cells.append(Paragraph(escape(_text(cell, "")), style))
+        data.append(cells)
+    table = Table(data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), _rl(NAVY)), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), bold_font), ("FONTNAME", (0, 1), (-1, -1), regular_font),
+        ("GRID", (0, 0), (-1, -1), .35, _rl(LINE)), ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, _rl("F7F9FB")]),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ] + highlights))
+    return table
 
-    footer = section.footer.paragraphs[0]
-    footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer.paragraph_format.space_after = Pt(1)
-    footer.add_run(authorship_notice(locale))
-    for run in footer.runs:
-        run.font.name = "Arial"
-        run.font.size = Pt(6.5)
-        run.font.color.rgb = RGBColor.from_string(GRAY)
 
-    footer_meta = section.footer.add_paragraph()
-    footer_meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    footer_meta.paragraph_format.space_before = Pt(0)
-    footer_meta.paragraph_format.space_after = Pt(0)
-    footer_meta.add_run("CER-AI | " + tr("Clinical decision-support report") + " | ")
-    fld = OxmlElement("w:fldSimple")
-    fld.set(qn("w:instr"), "PAGE")
-    footer_meta._p.append(fld)
-    for run in footer_meta.runs:
-        run.font.name = "Arial"
-        run.font.size = Pt(6.5)
-        run.font.color.rgb = RGBColor.from_string(GRAY)
-
-    title = document.add_paragraph()
-    title.paragraph_format.space_after = Pt(2)
-    run = title.add_run(tr("CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT"))
-    run.font.name = "Arial"
-    run.font.size = Pt(18)
-    run.bold = True
-    run.font.color.rgb = RGBColor.from_string(NAVY)
-    subtitle = document.add_paragraph(PROGRAM_NAME + " | " + tr("Corneal refractive surgery clinical decision-support report") + f" | {tr('Software')} v{APP_VERSION}")
-    subtitle.paragraph_format.space_after = Pt(10)
-    for run in subtitle.runs:
-        run.font.name = "Arial"
-        run.font.size = Pt(8.5)
-        run.font.color.rgb = RGBColor.from_string(GRAY)
-
-    liability = document.add_paragraph()
-    liability.paragraph_format.space_after = Pt(10)
-    liability.paragraph_format.left_indent = Inches(0.08)
-    liability_run = liability.add_run(liability_notice(locale))
-    liability_run.font.name = "Arial"
-    liability_run.font.size = Pt(9)
-    liability_run.font.bold = True
-    liability_run.font.color.rgb = RGBColor.from_string(RED)
-
-    meta = document.add_table(rows=3, cols=4)
-    meta.style = "Table Grid"
-    rows = [
-        (tr("Patient"), _text(patient.get("name"), tr("Not documented")), tr("Patient ID"), _text(patient.get("id"), tr("Not documented"))),
-        (tr("Age"), _text(patient.get("age"), tr("Not documented")), tr("Assessment date"), _text(patient.get("report_date"), tr("Not documented"))),
-        (tr("Reviewer"), _text(patient.get("reviewer"), tr("Not documented")), tr("Eyes assessed"), ", ".join(_text(e.get("eye")) for e in report_eyes) or tr("None")),
-    ]
-    for r_idx, values in enumerate(rows):
-        for c_idx, value in enumerate(values):
-            meta.cell(r_idx, c_idx).text = value
-            if c_idx in (0, 2):
-                _set_cell_shading(meta.cell(r_idx, c_idx), GRAY_FILL)
-                meta.cell(r_idx, c_idx).paragraphs[0].runs[0].bold = True
-    _style_doc_table(meta, [0.8, 2.1, 1.0, 1.95], header=False)
-
-    patient_banner = document.add_paragraph()
-    patient_banner.paragraph_format.space_before = Pt(10)
-    patient_banner.paragraph_format.space_after = Pt(6)
-    patient_banner_run = patient_banner.add_run(
-        _text(patient.get("name"), tr("PATIENT NAME NOT DOCUMENTED")).upper()
-    )
-    patient_banner_run.font.name = "Arial"
-    patient_banner_run.font.size = Pt(15)
-    patient_banner_run.font.bold = True
-    patient_banner_run.font.color.rgb = RGBColor.from_string(NAVY)
-
-    status = decision.get("status") or "NOT ASSESSED"
-    accent, fill = _status_palette(status)
-    box = document.add_table(rows=1, cols=1)
-    box.style = "Table Grid"
-    box.cell(0, 0).text = f"{tr('OVERALL DISPOSITION')}\n{tr(status)}\n{tr(_text(decision.get('action'), ''))}"
-    _set_cell_shading(box.cell(0, 0), fill)
-    _set_cell_margins(box.cell(0, 0), top=150, bottom=150, start=180, end=180)
-    for idx, run in enumerate(box.cell(0, 0).paragraphs[0].runs):
-        run.font.name = "Arial"
-        run.font.color.rgb = RGBColor.from_string(accent)
-        run.bold = idx < 2
-
-    identity_warnings = decision.get("identity_warnings") or []
-    if identity_warnings:
-        _add_heading(document, tr("PATIENT IDENTITY NOT VERIFIED - SURGEON CONFIRMATION REQUIRED"), 1)
-        for item in identity_warnings:
-            _add_bullet(document, tr(item))
-
-    blockers = decision.get("critical_input_issues") or []
-    if blockers:
-        _add_heading(document, tr("Global clinical / source blockers"), 1)
-        for item in blockers:
-            _add_bullet(document, tr(item))
-
-    for eye in report_eyes:
-        _add_heading(document, f"{_text(eye.get('eye'))} {tr('assessment')}", 1)
-        eye_status = eye.get("status") or "NOT ASSESSED"
-        eye_accent, eye_fill = _status_palette(eye_status)
-        banner = document.add_table(rows=1, cols=2)
-        banner.style = "Table Grid"
-        banner.cell(0, 0).text = tr(eye_status)
-        banner.cell(0, 1).text = tr(_text(eye.get("action"), ""))
-        for cell in banner.rows[0].cells:
-            _set_cell_shading(cell, eye_fill)
-            _set_cell_margins(cell, top=110, bottom=110)
-        banner.cell(0, 0).paragraphs[0].runs[0].bold = True
-        banner.cell(0, 0).paragraphs[0].runs[0].font.color.rgb = RGBColor.from_string(eye_accent)
-        _style_doc_table(banner, [1.7, 4.15], header=False)
-
-        table = document.add_table(rows=1, cols=2)
-        table.style = "Table Grid"
-        table.rows[0].cells[0].text = tr("Parameter")
-        table.rows[0].cells[1].text = tr("Result")
-        for label, value in _eye_metrics(eye, locale):
-            cells = table.add_row().cells
-            cells[0].text = label
-            cells[1].text = value.replace(" um", " µm")
-            cells[0].paragraphs[0].runs[0].bold = True
-        _style_doc_table(table, [2.15, 3.7], header=True)
-
-        for heading, items in _findings(eye, locale):
-            _add_heading(document, heading, 2)
-            for item in items:
-                _add_bullet(document, item)
-
-        planning_rows = _microkeratome_rows(eye, locale)
-        if planning_rows:
-            _add_heading(document, tr("Post-assessment ML7 microkeratome planning"), 2)
-            planning_table = document.add_table(rows=1, cols=2)
-            planning_table.style = "Table Grid"
-            planning_table.rows[0].cells[0].text = tr("Parameter")
-            planning_table.rows[0].cells[1].text = tr("Surgeon-review recommendation")
-            for label, value in planning_rows:
-                cells = planning_table.add_row().cells
-                cells[0].text = label
-                cells[1].text = value.replace(" um", " µm")
-                cells[0].paragraphs[0].runs[0].bold = True
-            _style_doc_table(planning_table, [2.15, 3.7], header=True)
-            for heading, items in (
-                ("Planning warnings", (eye.get("microkeratome_planning") or {}).get("warnings") or []),
-                ("Planning notes", (eye.get("microkeratome_planning") or {}).get("notes") or []),
-            ):
-                if items:
-                    _add_heading(document, tr(heading), 2)
-                    for item in items:
-                        _add_bullet(document, tr(item))
-
-        _add_heading(document, tr("Extracted tomography"), 2)
-        tomo = document.add_table(rows=1, cols=4)
-        tomo.style = "Table Grid"
-        tomo.rows[0].cells[0].text = tr("Parameter")
-        tomo.rows[0].cells[1].text = tr("Value")
-        tomo.rows[0].cells[2].text = tr("Parameter")
-        tomo.rows[0].cells[3].text = tr("Value")
-        for row in _paired_rows(_tomography_rows(extracted, eye.get("eye"), locale)):
-            cells = tomo.add_row().cells
-            for index, value in enumerate(row):
-                cells[index].text = value.replace(" um", " µm")
-            cells[0].paragraphs[0].runs[0].bold = True
-            if cells[2].paragraphs[0].runs:
-                cells[2].paragraphs[0].runs[0].bold = True
-        _style_doc_table(tomo, [1.35, 1.575, 1.35, 1.575], header=True)
-
-    warnings = extracted.get("global_warnings") or []
-    if warnings:
-        _add_heading(document, tr("Extraction warnings"), 1)
-        for item in warnings:
-            _add_bullet(document, tr(item))
-
-    _add_heading(document, tr("Interpretation note"), 1)
-    note = document.add_paragraph(
-        tr("This report is generated under the CER-AI Preoperative Ectasia Risk Assessment Protocol for corneal refractive surgery. "
-           "CAUTION requires explicit surgeon review but does not automatically defer surgery. "
-           "STOP-DEFER means surgery must not proceed unless the stated stop/defer condition is resolved. "
-           "DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. This clinical decision-support report does not replace independent surgeon review.")
-    )
-    note.style = document.styles["Normal"]
-    for run in note.runs:
-        run.font.size = Pt(8)
-        run.font.color.rgb = RGBColor.from_string(GRAY)
-
-    quality_warnings = decision.get("source_quality_warnings") or warnings_for_extracted(extracted)
-    if quality_warnings:
-        quality_box = document.add_table(rows=1, cols=1)
-        quality_box.style = "Table Grid"
-        quality_box.cell(0, 0).text = tr(WARNING_HEADING) + "\n" + "\n".join(
-            "• " + tr(item) for item in quality_warnings
-        )
-        _set_cell_shading(quality_box.cell(0, 0), AMBER_FILL)
-        _set_cell_margins(quality_box.cell(0, 0), top=140, bottom=140, start=170, end=170)
-        for run in quality_box.cell(0, 0).paragraphs[0].runs:
-            run.font.name = "Arial"
-            run.font.size = Pt(9)
-            run.font.bold = True
-            run.font.color.rgb = RGBColor.from_string(AMBER)
-
+def build_pdf(payload: Mapping[str, Any]) -> bytes:
+    model = canonical_report_model(payload)
+    locale = model["locale"]
+    tr = lambda value: translate_text(value, locale)
+    regular = PDF_UNICODE_REGULAR if locale == "tr" else "Helvetica"
+    bold = PDF_UNICODE_BOLD if locale == "tr" else "Helvetica-Bold"
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name="CERTitle", parent=styles["Title"], fontName=bold, fontSize=17, leading=20, textColor=_rl(NAVY), spaceAfter=4))
+    styles.add(ParagraphStyle(name="CERSection", parent=styles["Heading2"], fontName=bold, fontSize=10.5, leading=13, textColor=_rl(NAVY), spaceBefore=9, spaceAfter=4, keepWithNext=True))
+    styles.add(ParagraphStyle(name="Cell", parent=styles["BodyText"], fontName=regular, fontSize=7.3, leading=9, textColor=_rl(INK)))
+    styles.add(ParagraphStyle(name="Head", parent=styles["BodyText"], fontName=bold, fontSize=7.3, leading=9, textColor=colors.white))
+    styles.add(ParagraphStyle(name="Notice", parent=styles["BodyText"], fontName=bold, fontSize=8.5, leading=11, textColor=_rl(GRAY), backColor=_rl(GRAY_FILL), borderPadding=7, spaceAfter=8))
+    styles.add(ParagraphStyle(name="Warning", parent=styles["Notice"], textColor=_rl(AMBER), backColor=_rl(AMBER_FILL)))
     output = BytesIO()
-    document.save(output)
+    doc = SimpleDocTemplate(output, pagesize=letter, leftMargin=.65 * inch, rightMargin=.65 * inch, topMargin=.65 * inch, bottomMargin=.75 * inch)
+    story = [Paragraph(tr("CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT"), styles["CERTitle"]), Paragraph(escape(PROGRAM_NAME), styles["Cell"]), Spacer(1, 6), Paragraph(escape(liability_notice(locale)), styles["Notice"])]
+    story.append(Spacer(1, REPORT_BLANK_LINE_PT))
+    patient = model["patient"]
+    story.append(_pdf_table([
+        [tr("Patient"), _text(patient.get("name")), tr("Patient ID"), _text(patient.get("id"))],
+        [tr("Age"), _text(patient.get("age")), tr("Assessment date"), _text(patient.get("report_date"))],
+        [tr("Reviewer"), _text(patient.get("reviewer")), tr("Overall disposition"), _text(model.get("status"))],
+    ], styles, regular, bold))
+    story.append(Spacer(1, REPORT_BLANK_LINE_PT))
+    if model.get("action"):
+        foreground, background = _status_palette(model.get("status")) or (GRAY, GRAY_FILL)
+        action_style = ParagraphStyle(name="ResultNotice", parent=styles["Notice"], textColor=_rl(foreground), backColor=_rl(background))
+        story.append(Paragraph(escape(_text(model["action"])), action_style))
+    for warning in model["identity_warnings"] + model["source_quality_warnings"]:
+        story.append(Paragraph(escape(_text(warning)), styles["Warning"]))
+    for eye in model["eyes"]:
+        if eye["eye"] == "OD":
+            story.append(Spacer(1, 2 * REPORT_BLANK_LINE_PT))
+        if eye["eye"] == "OS":
+            story.append(PageBreak())
+        foreground, _ = _status_palette(eye.get("status")) or (GRAY, GRAY_FILL)
+        eye_style = ParagraphStyle(name="EyeResult", parent=styles["CERSection"], fontSize=15.75, leading=19.5, textColor=_rl(foreground))
+        story.append(Paragraph(f"{escape(_text(eye['eye']))} — {escape(_text(eye['status']))}", eye_style))
+        for title, rows in eye["sections"]:
+            section_content = [Paragraph(escape(tr(title)), styles["CERSection"]),
+                               _pdf_table(rows, styles, regular, bold, eye["status"] if title == "Procedure planning" and eye.get("procedure") == "LASIK" else None)]
+            if title in {"Randleman / ERSS", "NICE", "PS3"}:
+                story.append(KeepTogether(section_content))
+            else:
+                story.extend(section_content)
+
+    def footer(canvas, pdf_doc):
+        canvas.saveState(); canvas.setFont(regular, 6.2); canvas.setFillColor(_rl(GRAY))
+        canvas.drawCentredString(4.25 * inch, .38 * inch, authorship_notice(locale))
+        canvas.drawRightString(7.85 * inch, .2 * inch, f"{tr('Page')} {pdf_doc.page}"); canvas.restoreState()
+
+    doc.build(story, onFirstPage=footer, onLaterPages=footer)
     return output.getvalue()
+
+
+def _shade(cell, fill):
+    props = cell._tc.get_or_add_tcPr(); node = OxmlElement("w:shd"); node.set(qn("w:fill"), fill); props.append(node)
+
+
+def _docx_table(document, rows, selected_plan_status=None):
+    table = document.add_table(rows=1, cols=len(rows[0])); table.style = "Table Grid"; table.alignment = WD_TABLE_ALIGNMENT.LEFT
+    for index, value in enumerate(rows[0]):
+        table.rows[0].cells[index].text = _text(value, ""); _shade(table.rows[0].cells[index], NAVY)
+        for run in table.rows[0].cells[index].paragraphs[0].runs:
+            run.bold = True; run.font.color.rgb = RGBColor(255, 255, 255)
+    for row in rows[1:]:
+        cells = table.add_row().cells
+        for index, value in enumerate(row):
+            cells[index].text = _text(value, "")
+            palette = _cell_palette(row, index, selected_plan_status)
+            if palette:
+                foreground, background = palette
+                _shade(cells[index], background)
+                for run in cells[index].paragraphs[0].runs:
+                    run.font.color.rgb = RGBColor.from_string(foreground)
+    for row in table.rows:
+        for cell in row.cells:
+            for paragraph in cell.paragraphs:
+                paragraph.paragraph_format.space_after = Pt(0)
+                for run in paragraph.runs: run.font.name = "Arial"; run.font.size = Pt(8)
+    return table
+
+
+def build_docx(payload: Mapping[str, Any]) -> bytes:
+    model = canonical_report_model(payload); locale = model["locale"]; tr = lambda value: translate_text(value, locale)
+    document = Document(); document.core_properties.title = f"CER-AI — {PROGRAM_NAME}"
+    section = document.sections[0]; section.left_margin = section.right_margin = Inches(.75)
+    title = document.add_paragraph(); run = title.add_run(tr("CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT")); run.bold = True; run.font.size = Pt(18); run.font.color.rgb = RGBColor.from_string(NAVY)
+    document.add_paragraph(PROGRAM_NAME)
+    notice = document.add_paragraph(liability_notice(locale))
+    for run in notice.runs: run.bold = True; run.font.color.rgb = RGBColor.from_string(GRAY)
+    notice.paragraph_format.space_after = Pt(REPORT_BLANK_LINE_PT)
+    patient = model["patient"]
+    _docx_table(document, [
+        [tr("Patient"), _text(patient.get("name")), tr("Patient ID"), _text(patient.get("id"))],
+        [tr("Age"), _text(patient.get("age")), tr("Assessment date"), _text(patient.get("report_date"))],
+        [tr("Reviewer"), _text(patient.get("reviewer")), tr("Overall disposition"), _text(model.get("status"))],
+    ])
+    gap = document.add_paragraph()
+    gap.paragraph_format.line_spacing = Pt(REPORT_BLANK_LINE_PT)
+    gap.paragraph_format.space_before = Pt(0)
+    gap.paragraph_format.space_after = Pt(0)
+    if model.get("action"):
+        paragraph = document.add_paragraph(_text(model["action"]))
+        foreground, _ = _status_palette(model.get("status")) or (GRAY, GRAY_FILL)
+        for run in paragraph.runs:
+            run.font.color.rgb = RGBColor.from_string(foreground)
+    for warning in model["identity_warnings"] + model["source_quality_warnings"]:
+        paragraph = document.add_paragraph(_text(warning))
+        for run in paragraph.runs: run.bold = True; run.font.color.rgb = RGBColor.from_string(AMBER)
+    for eye in model["eyes"]:
+        paragraph = document.add_heading(f"{_text(eye['eye'])} — {_text(eye['status'])}", level=1)
+        if eye["eye"] == "OD":
+            paragraph.paragraph_format.space_before = Pt(2 * REPORT_BLANK_LINE_PT)
+        if eye["eye"] == "OS":
+            paragraph.paragraph_format.page_break_before = True
+        foreground, _ = _status_palette(eye.get("status")) or (GRAY, GRAY_FILL)
+        for run in paragraph.runs:
+            run.font.color.rgb = RGBColor.from_string(foreground)
+            run.font.size = Pt(document.styles["Heading 1"].font.size.pt * 1.5)
+        for heading, rows in eye["sections"]:
+            document.add_heading(tr(heading), level=2); _docx_table(document, rows, eye["status"] if heading == "Procedure planning" and eye.get("procedure") == "LASIK" else None)
+    footer = section.footer.paragraphs[0]; footer.alignment = WD_ALIGN_PARAGRAPH.CENTER; footer.add_run(authorship_notice(locale))
+    output = BytesIO(); document.save(output); return output.getvalue()

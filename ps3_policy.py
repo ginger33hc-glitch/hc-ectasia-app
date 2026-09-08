@@ -16,6 +16,7 @@ NOT_REQUIRED = "NOT_REQUIRED"
 ALLOWED = "ALLOWED"
 DEFER = "DEFER"
 INCOMPLETE = "INCOMPLETE"
+ASTIGMATIC_COMPARISON_ACTIVATION_D = 3.0
 
 AUTOMATED_KEYS = (
     "anterior_km",
@@ -39,7 +40,7 @@ class PS3EyeInput:
     anterior_km_d: Optional[float] = None
     thinnest_um: Optional[float] = None
     topographic_astig_d: Optional[float] = None
-    topographic_steep_axis_deg: Optional[float] = None
+    bad_flat_axis_deg: Optional[float] = None
     manifest_astig_d: Optional[float] = None
     manifest_axis_deg: Optional[float] = None
     ppi_avg: Optional[float] = None
@@ -206,18 +207,51 @@ def evaluate_ps3(eye, inter_eye=None):
 
     topo_astig = _num(eye.topographic_astig_d)
     manifest_astig = _num(eye.manifest_astig_d)
-    axis_difference = _axis_difference_deg(eye.topographic_steep_axis_deg, eye.manifest_axis_deg)
-    if topo_astig is None or manifest_astig is None or axis_difference is None:
+    comparison_inactive = (
+        topo_astig is not None
+        and manifest_astig is not None
+        and max(abs(topo_astig), abs(manifest_astig)) <= ASTIGMATIC_COMPARISON_ACTIVATION_D
+    )
+    axis_is_meaningful = (
+        not comparison_inactive
+        and topo_astig is not None
+        and manifest_astig is not None
+        and abs(topo_astig) > 1e-12
+        and abs(manifest_astig) > 1e-12
+    )
+    axis_difference = (
+        _axis_difference_deg(eye.bad_flat_axis_deg, eye.manifest_axis_deg)
+        if axis_is_meaningful
+        else None
+    )
+    if comparison_inactive:
+        findings.append(PS3Finding(
+            "astigmatic_study", NOT_REQUIRED,
+            f"Manifest astigmatism {abs(manifest_astig):g} D and topographic astigmatism "
+            f"{abs(topo_astig):g} D are both <={ASTIGMATIC_COMPARISON_ACTIVATION_D:.2f} D; "
+            "comparison inactive, no PS3 risk factor.",
+        ))
+    elif (
+        topo_astig is None
+        or manifest_astig is None
+        or (axis_is_meaningful and axis_difference is None)
+    ):
         findings.append(PS3Finding(
             "astigmatic_study", NOT_EVALUATED,
             "Manifest/topographic astigmatism magnitude or axis unavailable.",
         ))
     else:
         magnitude_difference = abs(abs(manifest_astig) - abs(topo_astig))
-        status = MODERATE if magnitude_difference > 1 or axis_difference > 10 else NORMAL
+        axis_abnormal = axis_difference is not None and axis_difference > 10
+        status = MODERATE if magnitude_difference > 1 or axis_abnormal else NORMAL
+        axis_detail = (
+            f"BAD flat-axis versus minus-cylinder manifest axis difference {axis_difference:.1f}°"
+            if axis_difference is not None
+            else "axis comparison not applicable because an astigmatic magnitude is zero"
+        )
         findings.append(PS3Finding(
             "astigmatic_study", status,
-            f"Astigmatism difference {magnitude_difference:.2f} D; axis difference {axis_difference:.1f}°.",
+            f"Astigmatism difference {magnitude_difference:.2f} D; {axis_detail}.",
         ))
 
     findings.append(_elevation_finding(eye))
@@ -233,38 +267,30 @@ def evaluate_ps3(eye, inter_eye=None):
     inter_eye_score, inter_eye_finding = _inter_eye_score(inter_eye)
     findings.append(inter_eye_finding)
 
-    moderate_before_srax, high_before_srax = _count(findings)
     srax_deg = _num(eye.srax_deg)
-    if high_before_srax >= 1 or moderate_before_srax >= 2:
+    srax_state = str(eye.srax or "UNCERTAIN").upper()
+    if srax_deg is not None:
+        status = HIGH if srax_deg > 20 else NORMAL
+        relation = ">" if srax_deg > 20 else "<="
         findings.append(PS3Finding(
-            "srax", NOT_REQUIRED,
-            "SRAX not required because PS3 disposition is already irrevocably DEFER.",
+            "srax", status,
+            f"Front-map SRAX {srax_deg:.1f}° {relation} 20°. Source: Axial/Sagittal Curvature (Front).",
         ))
-        srax_deg = None
+    elif srax_state == "YES":
+        findings.append(PS3Finding(
+            "srax", HIGH,
+            "Surgeon/front-map confirmation: SRAX >20°.",
+        ))
+    elif srax_state == "NO":
+        findings.append(PS3Finding(
+            "srax", NORMAL,
+            "Surgeon/front-map confirmation: SRAX is not >20°.",
+        ))
     else:
-        srax_state = str(eye.srax or "UNCERTAIN").upper()
-        if srax_deg is not None:
-            status = HIGH if srax_deg > 20 else NORMAL
-            relation = ">" if srax_deg > 20 else "<="
-            findings.append(PS3Finding(
-                "srax", status,
-                f"Front-map SRAX {srax_deg:.1f}° {relation} 20°. Source: Axial/Sagittal Curvature (Front).",
-            ))
-        elif srax_state == "YES":
-            findings.append(PS3Finding(
-                "srax", HIGH,
-                "Surgeon/front-map confirmation: SRAX >20°.",
-            ))
-        elif srax_state == "NO":
-            findings.append(PS3Finding(
-                "srax", NORMAL,
-                "Surgeon/front-map confirmation: SRAX is not >20°.",
-            ))
-        else:
-            findings.append(PS3Finding(
-                "srax", NOT_EVALUATED,
-                "SRAX cannot be determined from the Axial/Sagittal Curvature (Front) map; ask surgeon whether skewed axis is >20°.",
-            ))
+        findings.append(PS3Finding(
+            "srax", NOT_EVALUATED,
+            "SRAX cannot be determined from the Axial/Sagittal Curvature (Front) map; ask surgeon whether skewed axis is >20°.",
+        ))
 
     review_notes = (
         "Corneal Thickness Map morphology: manual surgeon review only; not counted in automated PS3.",

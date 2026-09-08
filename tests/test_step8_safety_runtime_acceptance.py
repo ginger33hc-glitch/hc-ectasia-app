@@ -21,7 +21,7 @@ def _eye(name="OD", **overrides):
         "PPI_max": 1.2,
         "I_S": 0.0,
         "topographic_astig_D": 1.0,
-        "topographic_steep_axis_deg": 90.0,
+        "bad_flat_axis_deg": 90.0, "topographic_steep_axis_deg": 90.0,
         "posterior_Kmean_D": -6.0 if name == "OD" else -6.05,
         "F_Ele_Th_um": 5.0,
         "B_Ele_Th_um": 10.0,
@@ -92,18 +92,17 @@ def test_lasik_rsb_300_allowed_but_299_hard_stops():
         procedure="LASIK",
         od_plan=_plan("LASIK", flap_um=100.0, ablation_um=145.0),
     )
-    assert at_300["OD"]["values"]["LASIK_RSB_um"] == 300.0
-    assert "lasik_rsb" not in at_300["OD"]["hard_stops"]
-    assert at_300["OD"]["status"] == "PASS"
+    plan_a_300 = at_300["OD"]["planning"]["sequence"][0]
+    assert plan_a_300["ablation_um"] == 145.0
+    assert "lasik_rsb" not in plan_a_300["rejection_reasons"]
 
-    result, at_299 = _evaluate(
+    _, at_299 = _evaluate(
         procedure="LASIK",
         od_plan=_plan("LASIK", flap_um=100.0, ablation_um=146.0),
     )
-    assert at_299["OD"]["values"]["LASIK_RSB_um"] == 299.0
-    assert "lasik_rsb" in at_299["OD"]["hard_stops"]
-    assert at_299["OD"]["status"] == "STOP-DEFER"
-    assert result["status"] == "STOP-DEFER"
+    plan_a_299 = at_299["OD"]["planning"]["sequence"][0]
+    assert plan_a_299["ablation_um"] == 146.0
+    assert "lasik_rsb" in plan_a_299["rejection_reasons"]
 
 
 def test_prk_rst_310_allowed_but_309_hard_stops():
@@ -194,12 +193,13 @@ def test_mixed_astigmatism_never_uses_scalar_final_k_clearance():
     assert result["status"] == "ASSESSMENT INCOMPLETE"
 
 
-def test_pta_over_40_percent_is_reported_but_not_an_independent_stop():
+def test_pta_at_or_over_40_percent_is_a_lasik_hard_stop():
     _, by_eye = _evaluate(
         procedure="LASIK",
-        od_plan=_plan("LASIK", flap_um=120.0, ablation_um=100.0),
+        od_plan=_plan("LASIK", flap_um=100.0, ablation_um=118.0),
     )
-    od = by_eye["OD"]
-    assert od["values"]["LASIK_PTA_percent"] > 40.0
-    assert "lasik_pta" not in od["hard_stops"]
-    assert od["status"] == "PASS"
+    planning = by_eye["OD"]["planning"]
+    assert planning["sequence"][0]["safe"] is False
+    assert "lasik_pta" in planning["sequence"][0]["rejection_reasons"]
+    assert planning["selected_plan"] == "Plan B"
+    assert planning["sequence"][1]["safe"] is True

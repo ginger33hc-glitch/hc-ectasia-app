@@ -12,8 +12,9 @@ def test_public_homepage_is_the_root_and_home_alias():
         for path in ("/", "/home"):
             response = client.get(path)
             assert response.status_code == 200
-            assert "Corneal Ectasia Risk Assessment Intelligence" in response.text
-            assert "HC Ectasia App" in response.text
+            assert "CER-AI — Cornea Ectasia Risk Assessment Intelligence" in response.text
+            assert "HC Ectasia App" not in response.text
+            assert "Risk Analysis Intelligence" not in response.text
             assert "Hüseyin Cengiz, M.D." in response.text
 
 

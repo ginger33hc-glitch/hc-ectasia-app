@@ -11,6 +11,7 @@ from clinical_core.safety import (
     PRK_EPITHELIUM_UM,
     estimated_final_kmean_d,
     final_kmean_hard_stop,
+    lasik_pta_hard_stop,
     lasik_pta_percent,
     lasik_rsb_hard_stop,
     lasik_rsb_um,
@@ -26,7 +27,7 @@ def complete_eye(**overrides):
         anterior_km_d=43.0,
         thinnest_um=520.0,
         topographic_astig_d=1.0,
-        topographic_steep_axis_deg=90.0,
+        bad_flat_axis_deg=90.0,
         manifest_astig_d=1.0,
         manifest_axis_deg=90.0,
         ppi_avg=1.0,
@@ -88,11 +89,11 @@ def test_procedural_hard_stop_boundaries_are_exact():
     assert sphere_magnitude_hard_stop(6.01)
 
 
-def test_pta_is_calculated_but_has_no_independent_hard_stop_function_in_clean_core():
-    import clinical_core.safety as safety
+def test_pta_40_percent_boundary_is_a_canonical_lasik_hard_stop():
     assert lasik_pta_percent(500, 100, 100) == 40.0
-    assert not hasattr(safety, "lasik_pta_hard_stop")
-    assert not hasattr(safety, "LASIK_PTA_CUTOFF_PERCENT")
+    assert not lasik_pta_hard_stop(39.99)
+    assert lasik_pta_hard_stop(40.0)
+    assert lasik_pta_hard_stop(40.01)
 
 
 def test_ps3_clinical_core_facade_is_the_same_pure_policy():

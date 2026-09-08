@@ -92,7 +92,10 @@ def test_every_runtime_topic_is_owned_by_one_phase():
     extraction_source = inspect.getsource(canonical_engine.core.extract_one_image)
     assert "pentacam_targeted_reread.enrich_extraction(" in extraction_source
     assert "geometric_srax_policy.enrich_extraction(" in extraction_source
-    assert owners["report_export_guard"] == "reporting_pending_stage10"
+    assert owners["reports"] == "canonical_reporting"
+    assert "report_export_guard" not in owners
+    assert "ps3_report_policy" not in owners
+    assert "microkeratome_report_policy" not in owners
     assert owners["operational_security"] == "access_and_persistence"
 
 
@@ -114,6 +117,10 @@ def test_runtime_manifest_contains_no_retired_clinical_wrapper():
         "lasik_planning",
         "nice_policy",
         "nice_scoring",
+        "report_export_guard",
+        "ps3_report_policy",
+        "microkeratome_report_policy",
+        "critical_score_highlight",
     }
     assert not (modules & retired)
 

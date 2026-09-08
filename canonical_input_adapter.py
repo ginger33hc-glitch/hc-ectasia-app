@@ -233,6 +233,12 @@ def resolve_eye_plan(
 ) -> dict[str, Any]:
     """Resolve source precedence without mutating the caller's plan."""
     resolved = deepcopy(dict(plan or {}))
+    procedure = str(resolved.get("procedure") or "").strip().upper()
+    if procedure in {"PRK", "SMILE"}:
+        resolved["flap_um"] = None
+        resolved["flap_status"] = "NOT_APPLICABLE"
+    elif procedure == "LASIK" and resolved.get("flap_status") == "NOT_APPLICABLE":
+        resolved.pop("flap_status", None)
     correction = _card_correction(extracted, eye_name)
 
     manifest_supplied = _role_supplied(resolved, "manifest")
@@ -309,7 +315,7 @@ def _ps3_eye(eye, manifest):
         anterior_km_d=_first_number(eye, "Kmean_D"),
         thinnest_um=_first_number(eye, "pachy_thinnest_um"),
         topographic_astig_d=_first_number(eye, "topographic_astig_D"),
-        topographic_steep_axis_deg=_first_number(eye, "topographic_steep_axis_deg"),
+        bad_flat_axis_deg=_first_number(eye, "bad_flat_axis_deg"),
         manifest_astig_d=abs(manifest.cylinder_d) if manifest is not None else None,
         manifest_axis_deg=manifest.axis_deg if manifest is not None else None,
         ppi_avg=_first_number(eye, "PPI_avg"),
@@ -343,11 +349,17 @@ def build_inter_eye_ps3(extracted):
     )
 
 
-def build_clinical_core_input(eye, plan, *, age_years, extracted=None):
-    resolved = resolve_eye_plan(
-        plan,
-        extracted=extracted,
-        eye_name=eye.get("eye") if isinstance(eye, Mapping) else None,
+def build_clinical_core_input(
+    eye, plan, *, age_years, extracted=None, plan_already_resolved: bool = False
+):
+    resolved = (
+        deepcopy(dict(plan or {}))
+        if plan_already_resolved
+        else resolve_eye_plan(
+            plan,
+            extracted=extracted,
+            eye_name=eye.get("eye") if isinstance(eye, Mapping) else None,
+        )
     )
     manifest = _refraction(resolved, "manifest")
     intended = _refraction(resolved, "intended")
@@ -376,6 +388,7 @@ def build_clinical_core_input(eye, plan, *, age_years, extracted=None):
         thinnest_um=_first_number(eye, "pachy_thinnest_um"),
         i_s_d=i_s,
         derived_srax_deg=_front_map_srax(eye),
+        srax_gt20_confirmed={"YES": True, "NO": False}.get(_surgeon_confirmed_srax(eye)),
         manifest_mrse_d=manifest_mrse,
         intended_sphere_d=intended_sphere,
         intended_cylinder_d=intended_cylinder,

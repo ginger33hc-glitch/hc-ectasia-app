@@ -6,8 +6,8 @@ defined in this module.
 """
 
 TARGET_FIELDS = (
-    "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmax_D",
-    "topographic_astig_D", "topographic_steep_axis_deg", "posterior_Kmean_D",
+    "ml7_bad_k1_d", "ml7_bad_k2_d", "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmax_D",
+    "topographic_astig_D", "topographic_steep_axis_deg", "bad_flat_axis_deg", "posterior_Kmean_D",
     "corneal_diameter_mm", "pachy_thinnest_um", "central_pachy_um", "F_Ele_Th_um", "B_Ele_Th_um", "BAD_D", "Df", "Db",
     "Dp", "Dt", "Da", "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um",
     "ISV", "IVA", "KI", "CKI", "IHD", "I_S", "KISA", "IHA", "TKC", "topometric_RMin",
@@ -34,6 +34,9 @@ COMPLETION_NUMERIC_FIELDS = {
     "I_S": "Signed I-S (D; not ISV/IVA)", "TKC": "TKC (Show 2 Exams center indices)",
     "topographic_astig_D": "Topographic Astig. (D; Cornea Front)",
     "topographic_steep_axis_deg": "Topographic Axis (steep) (degrees; Cornea Front)",
+    "ml7_bad_k1_d": "ML7 K1 (D; BAD Display upper-middle K1 box)",
+    "ml7_bad_k2_d": "ML7 K2 (D; BAD Display upper-middle K2 box)",
+    "bad_flat_axis_deg": "PS3 BAD Axis (degrees; upper-middle box beside K1; flat meridian)",
     "posterior_Kmean_D": "Posterior Km (D; Cornea Back)",
     "F_Ele_Th_um": "F. Ele.Th (µm; BAD Display labeled box)",
     "B_Ele_Th_um": "B. Ele.Th (µm; BAD Display labeled box)",

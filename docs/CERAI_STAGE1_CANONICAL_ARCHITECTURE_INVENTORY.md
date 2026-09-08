@@ -20,9 +20,9 @@ Stage 1 is complete. Production clinical assessment no longer uses the legacy `a
 8. `clinical_core/bad.py` — sole BAD-D classifier.
 9. `clinical_core/safety.py` — sole hard-stop/tissue-safety owner.
 10. `clinical_core/disposition.py` — sole final disposition owner.
-11. `clinical_core/planning.py` — canonical planning primitives; runtime integration remains Stage 9 work.
-12. `clinical_core/report_payload.py` — canonical renderer-neutral payload; renderer cutover remains Stage 10 work.
-13. `pentacam_canonical_source_lock.py` — canonical Pentacam source specification pending Stage 2-3 extraction flattening.
+11. `clinical_core/planning.py` — canonical planning primitives; direct runtime integration was completed in Stage 9.
+12. `clinical_core/report_payload.py` — canonical renderer-neutral payload consumed directly by the Stage 10 PDF/DOCX renderers.
+13. `pentacam_canonical_source_lock.py` — sole canonical Pentacam source specification; Stage 2-3 extraction flattening is complete.
 14. `pentacam_provenance.py` — canonical provenance/conflict semantics.
 
 ## Physically retired clinical architecture
@@ -61,7 +61,13 @@ The obsolete `nice_policy.attach_readings` pass was also removed. `/analyze` now
 
 A permanent regression lock in `tests/test_phase4_cleanup_contract.py` fails if these legacy functions or the NICE attach-readings path reappear.
 
-## Extraction/source modules retained only for Stage 2-3 migration
+## Extraction/source migration outcome
+
+The following list is the original Stage-1 inventory. Stage 2 subsequently moved the accepted
+behavior into direct extraction/merge ownership and physically deleted the superseded wrappers.
+The current acceptance state is recorded in `CERAI_MASTER_ORDER_66_ITEM_EVIDENCE_MATRIX.md`.
+
+## Extraction/source modules originally retained for Stage 2-3 migration
 
 These modules remain temporarily because they currently own extraction/source behavior. They are **not accepted as final architecture** and must be flattened into one direct canonical extraction path before Stage 2-3 close:
 
@@ -78,16 +84,20 @@ These modules remain temporarily because they currently own extraction/source be
 
 Stage 2-3 rule: migrate accepted behavior into the canonical extraction/merge/source registry, update callers, then delete the superseded wrapper. Do not add another wrapper.
 
-## Reporting/planning modules retained for their later ordered stages
+## Reporting/planning Stage 10 update
 
-These remain temporarily and may not become independent clinical scorers:
+Stage 10 has now retired the temporary report modifiers listed below. They are
+kept here only as an architecture-history record:
 
 - `ps3_report_policy.py`
 - `microkeratome_report_policy.py`
 - `critical_score_highlight.py`
 - `report_export_guard.py`
-- `reports.py`
-- `planning/microkeratome.py`
+
+The surviving modules are:
+
+- `reports.py` — the sole presentation renderer; consumes only the canonical report payload.
+- `planning/microkeratome.py` — the canonical ML7 planning implementation completed in Stage 9.
 
 ## Operational modules retained
 
@@ -97,13 +107,16 @@ These are non-clinical or persistence/access concerns and may remain installed:
 - `operational_security.py`
 - `public_site.py`
 - `analysis_job_service.py`
-- `mobile_install_section.py`
 - `case_archive.py`
 - `audit_log.py`
 - `case_catalog.py`
 - `historical_report.py`
 - `research_export.py`
 - `named_user_ui.py`
+
+Stage 13 retired `mobile_install_section.py`. Its presentation-only behavior now belongs
+directly to the authoritative public renderer in `public_site.py`; the former module replaced
+that renderer at import-composition time and was therefore an unnecessary wrapper.
 
 ## Stage 1 validation record
 

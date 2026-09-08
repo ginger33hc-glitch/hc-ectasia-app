@@ -21,6 +21,16 @@ BAD_CENTER = "BELIN_AMBROSIO_CENTER_NUMERIC_BOX"
 BAD_PPI = "BELIN_AMBROSIO_PROGRESSION_INDEX_BOX"
 BAD_STRIP = "BELIN_AMBROSIO_BOTTOM_BAD_D_STRIP"
 
+CANONICAL_SOURCE_REGIONS = {
+    SHOW_2_CORNEA_FRONT: ("Show 2 Exams – Topometric", "Cornea Front"),
+    SHOW_2_CORNEA_BACK: ("Show 2 Exams – Topometric", "Cornea Back"),
+    SHOW_2_INDICES: ("Show 2 Exams – Topometric", "center — Indices (in 8 mm zone)"),
+    FOUR_MAPS_LOWER_LEFT: ("4 Maps Refractive", "lower-left labeled numerical box"),
+    BAD_CENTER: ("Belin/Ambrósio Display", "central numeric box"),
+    BAD_PPI: ("Belin/Ambrósio Display", "Progression Index section"),
+    BAD_STRIP: ("Belin/Ambrósio Display", "bottom BAD-D strip"),
+}
+
 CANONICAL_FIELD_SOURCES = {
     # Show 2 Exams -> Cornea Front.
     "K1_D": (SHOW_2_CORNEA_FRONT, "K1"),
@@ -30,6 +40,12 @@ CANONICAL_FIELD_SOURCES = {
     "Kmean_D": (SHOW_2_CORNEA_FRONT, "Km"),
     "topographic_astig_D": (SHOW_2_CORNEA_FRONT, "Astig"),
     "topographic_steep_axis_deg": (SHOW_2_CORNEA_FRONT, "Astig/steep axis"),
+
+    "ml7_bad_k1_d": (BAD_CENTER, "K1 (upper-middle numeric box; ML7 only)"),
+    "ml7_bad_k2_d": (BAD_CENTER, "K2 (upper-middle numeric box; ML7 only)"),
+
+    # PS3 prescription-axis comparison only; independent of steep-axis and SRAX sources.
+    "bad_flat_axis_deg": (BAD_CENTER, "Axis (upper middle, beside K1; flat meridian)"),
 
     # Show 2 Exams -> Cornea Back.
     "Rmin_mm": (SHOW_2_CORNEA_BACK, "Rmin"),
@@ -87,6 +103,17 @@ def canonical_source_id(field: str):
 def canonical_label(field: str):
     spec = canonical_source(field)
     return spec[1] if spec else None
+
+
+def canonical_source_region(field: str):
+    """Return the registry-owned user-facing screen and exact source box."""
+    source = canonical_source_id(field)
+    region = CANONICAL_SOURCE_REGIONS.get(source)
+    if region is None:
+        return None
+    screen, box = region
+    label = canonical_label(field)
+    return {"screen": screen, "box": f"{box} → {label}" if label else box}
 
 
 def source_family(field: str):

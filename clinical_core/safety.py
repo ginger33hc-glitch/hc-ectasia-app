@@ -1,8 +1,7 @@
 """Pure CER-AI procedural safety calculations.
 
-Only hard stops explicitly present in the Monday acceptance matrix are defined
-here. PTA remains a calculated tissue-load metric but has no independent hard-
-stop threshold in the canonical clean core.
+Only hard stops explicitly accepted in the Monday master order are defined
+here. LASIK PTA at or above 40.0% fails the evaluated plan.
 """
 from __future__ import annotations
 
@@ -11,6 +10,7 @@ from math import isfinite
 PRK_EPITHELIUM_UM = 50.0
 LASIK_RSB_MIN_UM = 300.0
 PRK_RST_MIN_UM = 310.0
+LASIK_PTA_LIMIT_PERCENT = 40.0
 CORNEAL_EFFECT_PER_INTENDED_MRSE_D = 0.8
 FINAL_KMEAN_MIN_D = 36.0
 FINAL_KMEAN_MAX_D = 48.0
@@ -53,6 +53,10 @@ def preop_thickness_hard_stop(thinnest_um) -> bool:
 
 def lasik_rsb_hard_stop(rsb_um) -> bool:
     return _finite(rsb_um) and float(rsb_um) < LASIK_RSB_MIN_UM
+
+
+def lasik_pta_hard_stop(pta_percent) -> bool:
+    return _finite(pta_percent) and float(pta_percent) >= LASIK_PTA_LIMIT_PERCENT
 
 
 def prk_rst_hard_stop(rst_um) -> bool:

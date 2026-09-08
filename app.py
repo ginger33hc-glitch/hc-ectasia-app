@@ -20,7 +20,7 @@ import pentacam_targeted_reread
 import geometric_srax_policy
 
 import mandatory_source_set_policy
-from clinical_disposition import combine_status as combine_clinical_status
+from exam_date_reconciliation_policy import authoritative_exam_date_conflict
 from pentacam_canonical_source_lock import (
     CANONICAL_FIELD_SOURCES, LOCKED_FIELDS, canonical_source_id,
 )
@@ -30,7 +30,7 @@ from pentacam_field_registry import (
     KERATOMETRY_SOURCE_VALUES,
 )
 from pentacam_quality_policy import is_quality_only_issue, warnings_for_extracted
-from reports import build_docx, build_pdf
+from reports import ReportContractError, build_docx, build_pdf
 
 
 @asynccontextmanager
@@ -62,19 +62,15 @@ _analysis_request_lock = RLock()
 _analysis_request_tasks: Dict[tuple[str, str], tuple[float, asyncio.Task]] = {}
 
 EYES = ("OD", "OS")
-PRK_EPITHELIUM_UM = 50
-CORNEAL_EFFECT_PER_INTENDED_MRSE_D = 0.8
-FINAL_KMEAN_MIN_D = 36.0
-FINAL_KMEAN_MAX_D = 48.0
 TABLE_NUMERIC_FIELDS = (
-    "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmax_D", "corneal_diameter_mm",
+    "ml7_bad_k1_d", "ml7_bad_k2_d", "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmax_D", "corneal_diameter_mm",
     "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp",
     "Dt", "Da", "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI",
     "CKI", "IHD", "I_S", "KISA", "IHA", "Rmin_mm", "thinnest_x_mm", "thinnest_y_mm",
     "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um", "Kmean_D",
     "total_RMS_um", "spherical_aberration_um",
     "central_pachy_um", "B_Ele_Th_um", "F_Ele_Th_um", "posterior_Kmean_D",
-    "topographic_astig_D", "topographic_steep_axis_deg", "topometric_RMin", "TKC",
+    "topographic_astig_D", "topographic_steep_axis_deg", "bad_flat_axis_deg", "topometric_RMin", "TKC",
 )
 SCHEMA = {
     "type": "object",
@@ -133,6 +129,8 @@ SCHEMA = {
                         "type": "string",
                         "enum": list(KERATOMETRY_SOURCE_VALUES),
                     },
+                    "ml7_bad_k1_d": {"type": ["number", "null"]},
+                    "ml7_bad_k2_d": {"type": ["number", "null"]},
                     "K1_D": {"type": ["number", "null"]},
                     "K1_axis_deg": {"type": ["number", "null"]},
                     "K2_D": {"type": ["number", "null"]},
@@ -144,6 +142,7 @@ SCHEMA = {
                     "posterior_Kmean_D": {"type": ["number", "null"]},
                     "topographic_astig_D": {"type": ["number", "null"]},
                     "topographic_steep_axis_deg": {"type": ["number", "null"]},
+                    "bad_flat_axis_deg": {"type": ["number", "null"]},
                     "topometric_RMin": {"type": ["number", "null"]},
                     "TKC": {"type": ["number", "null"]},
                     "corneal_diameter_mm": {"type": ["number", "null"]},
@@ -181,7 +180,7 @@ SCHEMA = {
                 "required": [
                     "eye", "screen_types", "quality", "missing_or_unreadable",
                     "table_verified_numeric_fields", "keratometry_source",
-                    "K1_D", "K1_axis_deg",
+                    "ml7_bad_k1_d", "ml7_bad_k2_d", "K1_D", "K1_axis_deg",
                     "K2_D", "K2_axis_deg", "Kmax_D", "corneal_diameter_mm", "pachy_thinnest_um",
                     "BAD_D", "Df", "Db", "Dp", "Dt", "Da",
                     "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI", "CKI", "IHD",
@@ -189,7 +188,7 @@ SCHEMA = {
                     "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um", "Kmean_D",
                     "total_RMS_um", "spherical_aberration_um",
                     "central_pachy_um", "B_Ele_Th_um", "F_Ele_Th_um", "posterior_Kmean_D",
-                    "topographic_astig_D", "topographic_steep_axis_deg", "topometric_RMin", "TKC",
+                    "topographic_astig_D", "topographic_steep_axis_deg", "bad_flat_axis_deg", "topometric_RMin", "TKC",
                     "srax", "srax_deg",
                 ],
             },
@@ -311,16 +310,16 @@ explicitly visible acceptable/OK QS. Use NOT_OK for a visible non-OK status, UNR
 area is present but cannot be read, and NOT_SHOWN when no QS field is visible. Treatment cards and
 non-Pentacam documents use NOT_APPLICABLE.
 
-PENTACAM NUMERIC-SOURCE RULE — this rule has priority over map interpretation:
-First inspect the labeled parameter panels, side tables, summary tables, and the labeled numeric
-boxes around the edge of the Pentacam display. Every numeric output in TABLE_NUMERIC_FIELDS must be
-copied preferentially from its own explicitly labeled printed field. Add the exact output-field name to
+PENTACAM NUMERIC-SOURCE RULE — source-locked values are never read from maps:
+Inspect only the canonical labeled parameter panel or numerical box registered for each field.
+Every numeric output in TABLE_NUMERIC_FIELDS must be copied only from its own explicitly labeled
+printed field at that canonical source. Add the exact output-field name to
 table_verified_numeric_fields only when that labeled field is visible and the value was transcribed
 from it. The list must exactly match the non-null table-derived numeric outputs.
 
-I-S SOURCE LOCK: transcribe I_S only from the explicitly labeled "IS:" or "I-S:" field, preferentially
-from the Pentacam Topometric/Keratoconus panel headed "Indices (in 8 mm zone)". Preserve its printed
-sign. Never substitute ISV, IVA, IHD, IHA, KISA, Q-value, a color, or a curvature-map spot for I_S.
+I-S SOURCE LOCK: transcribe I_S only from the explicitly labeled "IS:" or "I-S:" field in
+Show 2 Exams Topometric center "Indices (in 8 mm zone)". Preserve its printed sign. Never substitute
+ISV, IVA, IHD, IHA, KISA, Q-value, a color, or a curvature-map spot for I_S.
 If the IS label, sign, digits, or eye laterality is uncertain, return I_S=null; never calculate I-S.
 
 No numeric map fallback is permitted. If the authoritative labeled field is absent, obscured, or unreadable, return null. Never substitute a local map number, color-scale value, or neighboring measurement.
@@ -340,6 +339,8 @@ EXCLUSIVE LABELED-BOX SOURCE LOCK:
 - B_Ele_Th_um and F_Ele_Th_um: use only the BAD Display central labeled B.Ele.Th/F.Ele.Th boxes.
 - posterior_Kmean_D: use only Show 2 Exams Topometric -> Cornea Back -> printed Km.
 - topographic_astig_D and topographic_steep_axis_deg: use only Show 2 Exams Topometric -> Cornea Front.
+- ml7_bad_k1_d and ml7_bad_k2_d: ML7 planning ONLY. Read K1 and K2 directly from the BAD Display upper-middle numeric boxes. Do not substitute Show 2 Exams K1/K2 or Kmax. HWTW remains in the 4 Maps Refractive lower-left HWTW box.
+- bad_flat_axis_deg: for PS3 prescription-axis comparison ONLY, read the Axis box beside K1 in the BAD Display upper-middle numeric area. Never substitute the steep axis or derive a rotated value. Preserve all other axis sources and SRAX geometry.
 - topometric_RMin and TKC: use only Show 2 Exams Topometric center Indices (in 8 mm zone).
 - Kmax_D: use only the numeric value in the explicitly printed "KMax"/"Kmax" row.
 - ARTmax_um: use only the numeric value in the explicitly printed "ARTmax" row beneath the
@@ -356,8 +357,8 @@ calculated value, average, or visual estimate for K1, K2, their axes, horizontal
 Rmin, BAD-D/components, PPI, ARTmax, topometric
 indices, coordinates, corneal volume, HOA, or coma. Those summary/calculated fields must remain null
 when their own labeled table value is unreadable. A labeled BAD-display center/bottom numeric box
-counts as a printed parameter field; an unlabeled number inside the map does not. The table source
-always overrides a local-map fallback when both are visible.
+counts as a printed parameter field; an unlabeled number inside the map does not. A local-map
+fallback is prohibited even when the canonical field is unreadable.
 
 ERSS VISUAL MORPHOLOGY DISABLED:
 General ERSS/Randleman visual morphology classification is disabled. Do not visually score asymmetric
@@ -409,7 +410,7 @@ PROMPT += (
 )
 PROMPT += "\n" + mandatory_source_set_policy.BAD_DISPLAY_RECOGNITION_PROMPT
 
-# Canonical EX500 transcription rule; no bootstrap prompt mutation.
+# Canonical EX500 transcription rule; no later prompt mutation.
 PROMPT += """
 
 ALCON WAVELIGHT EX500 PLANNING-SCREEN RULE:
@@ -440,154 +441,12 @@ def openai_client() -> OpenAI:
 def is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
-
-def tri(value: Any) -> str:
-    return value if value in ("yes", "no", "unknown") else "unknown"
-
-
-def combine_status(current: str, new: str) -> str:
-    return combine_clinical_status(current, new)
-
-
-def _transpose_axis(axis: Optional[float]) -> Optional[float]:
-    """Rotate a plus-cylinder axis into its equivalent minus-cylinder axis."""
-    if not is_number(axis):
-        return None
-    rotated = (float(axis) + 90.0) % 180.0
-    return 180.0 if abs(rotated) < 1e-9 else rotated
-
-
-def normalize_signed_refraction_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
-    """Preserve entered notation and provide one canonical minus-cylinder plan to the engine.
-
-    Legacy/API plans that already provide ``*_cylinder_magnitude_D`` remain supported. The
-    browser sends the explicit entered fields, so a positive cylinder is transposed rather than
-    silently converted to an absolute magnitude.
-    """
-    normalized = dict(plan or {})
-    warnings = list(normalized.get("correction_warnings", []))
-    entered_axis = normalized.get("entered_axis_deg")
-    if entered_axis is None and any(
-        normalized.get(field) is not None
-        for field in ("manifest_entered_sphere_D", "manifest_cylinder_signed_D",
-                      "intended_entered_sphere_D", "intended_cylinder_signed_D")
-    ):
-        entered_axis = normalized.get("correction_axis_deg")
-    if entered_axis is not None:
-        normalized["entered_axis_deg"] = entered_axis
-
-    for role in ("manifest", "intended"):
-        entered_sphere_field = f"{role}_entered_sphere_D"
-        signed_cylinder_field = f"{role}_cylinder_signed_D"
-        sphere_field = f"{role}_sphere_D"
-        magnitude_field = f"{role}_cylinder_magnitude_D"
-        entered_sphere = normalized.get(entered_sphere_field)
-        signed_cylinder = normalized.get(signed_cylinder_field)
-        raw_supplied = entered_sphere is not None or signed_cylinder is not None
-        if not raw_supplied:
-            continue
-        if not is_number(entered_sphere) or not is_number(signed_cylinder):
-            normalized[sphere_field] = None
-            normalized[magnitude_field] = None
-            continue
-
-        entered_sphere = float(entered_sphere)
-        signed_cylinder = float(signed_cylinder)
-        plus_cylinder = signed_cylinder > 0
-        normalized[sphere_field] = entered_sphere + signed_cylinder if plus_cylinder else entered_sphere
-        normalized[magnitude_field] = abs(signed_cylinder)
-        normalized_axis = _transpose_axis(entered_axis) if plus_cylinder else entered_axis
-        normalized[f"{role}_normalized_axis_deg"] = normalized_axis
-        if role == "intended":
-            normalized["correction_axis_deg"] = normalized_axis
-        if plus_cylinder:
-            note = (
-                f"{role.capitalize()} plus-cylinder notation was transposed for calculation: "
-                f"{entered_sphere:+.2f} {signed_cylinder:+.2f} D"
-                + (f" x {float(entered_axis):.0f}°" if is_number(entered_axis) else " (axis unavailable)")
-                + f" -> {normalized[sphere_field]:+.2f} {-normalized[magnitude_field]:+.2f} D"
-                + (f" x {float(normalized_axis):.0f}°." if is_number(normalized_axis) else ".")
-            )
-            warnings.append(note)
-
-    normalized["correction_warnings"] = list(dict.fromkeys(warnings))
-    return normalized
-
-
-def validate_plan(plan: Dict[str, Any]) -> List[str]:
-    """Return decision-blocking input errors; invalid values are never used in calculations."""
-    errors: List[str] = []
-    numeric_ranges = {
-        "manifest_sphere_D": (-30, 20),
-        "manifest_cylinder_magnitude_D": (0, 15),
-        "intended_sphere_D": (-30, 20),
-        "intended_cylinder_magnitude_D": (0, 15),
-        "manifest_entered_sphere_D": (-30, 20),
-        "manifest_cylinder_signed_D": (-15, 15),
-        "intended_entered_sphere_D": (-30, 20),
-        "intended_cylinder_signed_D": (-15, 15),
-        "entered_axis_deg": (0, 180),
-        "correction_axis_deg": (0, 180),
-        "ablation_um": (0, 400),
-    }
-    for field, (low, high) in numeric_ranges.items():
-        value = plan.get(field)
-        if value is not None and (not is_number(value) or not low <= float(value) <= high):
-            errors.append(f"invalid {field}: expected {low} to {high}")
-    if plan.get("flap_um") is not None and plan.get("flap_um") not in (90, 100, 110, 120):
-        errors.append("invalid flap_um: CER-AI options are 90, 100, 110, or 120 µm")
-    if plan.get("optical_zone_mm") is not None and plan.get("optical_zone_mm") not in (6.0, 6.5, 7.0):
-        errors.append("invalid optical_zone_mm: CER-AI options are 6.0, 6.5, or 7.0 mm")
-    if plan.get("transition_zone_mm") is not None and plan.get("transition_zone_mm") not in (8.0, 8.5, 9.0):
-        errors.append("invalid transition_zone_mm: CER-AI options are 8.0, 8.5, or 9.0 mm")
-    return errors
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     merged: Dict[str, Any] = {
         "eyes": [], "treatment_corrections": [], "laser_plans": [], "global_warnings": [], "identity_warnings": [],
         "document_contexts": [], "critical_input_issues": [], "extraction_models": [],
     }
     by_eye: Dict[str, Dict[str, Any]] = {}
-    conservative = {
-        "BAD_D": "max", "Df": "max", "Db": "max",
-        "Dp": "max", "Dt": "max", "Da": "max", "PPI_max": "max",
-        "PPI_avg": "max", "PPI_min": "max", "ISV": "max", "IVA": "max",
-        "KI": "max", "CKI": "max", "IHD": "max", "I_S": "max", "KISA": "max",
-        "IHA": "max", "Rmin_mm": "min", "RMS_HOA_um": "max", "vertical_coma_um": "max",
-        "srax_deg": "max",
-    }
     quality_rank = {"INADEQUATE": 0, "LIMITED": 1, "ADEQUATE": 2}
     # Descriptive values that do not drive a CER-AI decision must never become unresolved conflicts
     # that prohibit PASS. Canonical numeric disagreements are never tolerance-reconciled.
@@ -598,6 +457,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     def normalized_eye(raw_eye: Dict[str, Any]) -> Dict[str, Any]:
         eye = dict(raw_eye)
+        eye.pop("targeted_unreadable_regions", None)
         verified = eye.get("table_verified_numeric_fields")
         if isinstance(verified, list):
             verified_set = set(verified)
@@ -711,6 +571,10 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 continue
             target = by_eye[eye_id]
             target.setdefault("data_conflicts", [])
+            target["data_conflicts"].extend(
+                conflict for conflict in (eye.get("data_conflicts") or [])
+                if conflict not in target["data_conflicts"]
+            )
             target["screen_types"] = sorted(set(target.get("screen_types", []) + eye.get("screen_types", [])))
             target["source_files"] = sorted(set(target.get("source_files", []) + eye.get("source_files", [])))
             target.setdefault("quality_by_source", {}).update(eye.get("quality_by_source", {}))
@@ -742,9 +606,6 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                         json.dumps(record, sort_keys=True): record for record in combined
                     }.values()
                 ]
-            target.setdefault("targeted_unreadable_regions", {})
-            for field, region in (eye.get("targeted_unreadable_regions") or {}).items():
-                target["targeted_unreadable_regions"].setdefault(field, dict(region))
             target.setdefault("unreadable_source_regions", {})
             for field, region in (eye.get("unreadable_source_regions") or {}).items():
                 target["unreadable_source_regions"].setdefault(field, dict(region))
@@ -772,16 +633,15 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     "source_files", "quality_by_source", "_source_filename",
                     "_pentacam_qs", "pentacam_qs", "scoring_morphology", "field_provenance",
                     "planning_data_issues", "targeted_reread_evidence",
-                    "canonical_source_ids", "targeted_unreadable_regions",
-                    "unreadable_source_regions",
+                    "canonical_source_ids", "unreadable_source_regions", "data_conflicts",
                 ):
                     continue
-                # Once a locked canonical field conflicts, no later duplicate may silently refill it.
-                existing_locked_conflict = key in LOCKED_FIELDS and any(
+                # Once a field conflicts, no later duplicate may silently refill it.
+                existing_unresolved_conflict = any(
                     str(item).split(":", 1)[0].strip() == key
                     for item in target.get("data_conflicts", [])
                 )
-                if existing_locked_conflict:
+                if existing_unresolved_conflict:
                     continue
                 old = target.get(key)
                 if old is None and value is not None:
@@ -804,15 +664,11 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     continue
 
                 target["data_conflicts"].append(f"{key}: {old} vs {value}")
-                if key in conservative and is_number(old) and is_number(value):
-                    target[key] = min(old, value) if conservative[key] == "min" else max(old, value)
-                    merged["global_warnings"].append(
-                        f"Conflicting {key} values for {eye_id}; conservative limiting value retained."
-                    )
-                elif old != value:
-                    merged["global_warnings"].append(
-                        f"Conflicting {key} values for {eye_id}: {old} vs {value}; first value retained."
-                    )
+                target[key] = None
+                merged["global_warnings"].append(
+                    f"Conflicting {key} values for {eye_id}: {old} vs {value}; "
+                    "value left unresolved for surgeon confirmation."
+                )
 
     for eye in by_eye.values():
         # Remove any legacy/non-decision entries defensively before returning the payload.
@@ -845,9 +701,6 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         for c in pentacam_contexts
     ]
     names = {name for name in normalized_names if name}
-    pentacam_dates = {
-        str(c.get("exam_date")).strip() for c in pentacam_contexts if c.get("exam_date")
-    }
     pentacam_ages = {
         int(c["patient_age_years"]) for c in pentacam_contexts
         if is_number(c.get("patient_age_years"))
@@ -890,7 +743,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             merged["identity_warnings"].append(
                 "PATIENT IDENTITY NOT VERIFIED: conflicting patient IDs were read across Pentacam sources. Surgeon confirmation is required."
             )
-    if len(pentacam_dates) > 1:
+    if authoritative_exam_date_conflict(results):
         merged["critical_input_issues"].append("Conflicting Pentacam examination dates across uploaded sources.")
 
     assessed_eyes = {
@@ -949,7 +802,10 @@ def service_worker() -> FileResponse:
 def report_pdf(payload: Dict[str, Any] = Body(...)) -> StreamingResponse:
     from assessment_workflow import export_payload
     payload = export_payload(payload)
-    content = build_pdf(payload)
+    try:
+        content = build_pdf(payload)
+    except ReportContractError as exc:
+        raise HTTPException(409, f"Complete canonical report unavailable: {exc}") from exc
     return StreamingResponse(
         BytesIO(content), media_type="application/pdf",
         headers={"Content-Disposition": 'attachment; filename="CER-AI_Report.pdf"'},
@@ -960,7 +816,10 @@ def report_pdf(payload: Dict[str, Any] = Body(...)) -> StreamingResponse:
 def report_word(payload: Dict[str, Any] = Body(...)) -> StreamingResponse:
     from assessment_workflow import export_payload
     payload = export_payload(payload)
-    content = build_docx(payload)
+    try:
+        content = build_docx(payload)
+    except ReportContractError as exc:
+        raise HTTPException(409, f"Complete canonical report unavailable: {exc}") from exc
     return StreamingResponse(
         BytesIO(content),
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",

@@ -32,6 +32,7 @@ from .refraction import MIXED, normalize_minus_cylinder, refractive_group, scala
 from .safety import (
     estimated_final_kmean_d,
     final_kmean_hard_stop,
+    lasik_pta_hard_stop,
     lasik_pta_percent,
     lasik_rsb_hard_stop,
     lasik_rsb_um,
@@ -132,6 +133,7 @@ def _safety_status(
     inp: ClinicalCoreInput,
     rsb,
     rst,
+    pta,
     final_k,
     intended_group,
 ) -> tuple[str, dict, list[str]]:
@@ -139,6 +141,7 @@ def _safety_status(
         "preop_thickness": preop_thickness_hard_stop(inp.thinnest_um),
         "sphere_magnitude": sphere_magnitude_hard_stop(inp.intended_sphere_d),
         "lasik_rsb": procedure == "LASIK" and lasik_rsb_hard_stop(rsb),
+        "lasik_pta": procedure == "LASIK" and lasik_pta_hard_stop(pta),
         "prk_rst": procedure == "PRK" and prk_rst_hard_stop(rst),
         "final_kmean": final_kmean_hard_stop(final_k),
     }
@@ -195,13 +198,13 @@ def evaluate_normalized_case(
 
     erss = None
     erss_status = PASS
-    if procedure == "LASIK":
+    if procedure in {"LASIK", "PRK"}:
         erss = erss_total(
             inp.age_years,
             inp.thinnest_um,
             inp.i_s_d,
             inp.derived_srax_deg,
-            rsb,
+            rsb if procedure == "LASIK" else rst,
             inp.manifest_mrse_d,
             inp.srax_gt20_confirmed,
         )
@@ -235,7 +238,7 @@ def evaluate_normalized_case(
     ps3_status = _ps3_procedure_disposition(ps3_result, procedure)
 
     safety_status, safety_stops, safety_missing = _safety_status(
-        procedure, inp, rsb, rst, final_k, intended_group
+        procedure, inp, rsb, rst, pta, final_k, intended_group
     )
 
     safety_detail = "Independent tissue/refractive safety gates"
@@ -243,7 +246,7 @@ def evaluate_normalized_case(
         safety_detail += "; scalar MRSE/Kmean final-K model prohibited for mixed astigmatism"
 
     core_findings = (
-        DecisionFinding("randleman_erss", erss_status, "LASIK ERSS" if procedure == "LASIK" else "Not applicable"),
+        DecisionFinding("randleman_erss", erss_status, "ERSS" if procedure in {"LASIK", "PRK"} else "Not applicable"),
         DecisionFinding("bad_d", bad_status, f"Final BAD-D: {bad.classification}"),
         DecisionFinding("nice", nice_status, f"NICE total: {nice.get('total')!r}"),
         DecisionFinding("ps3", ps3_status, "PS3 procedure disposition"),

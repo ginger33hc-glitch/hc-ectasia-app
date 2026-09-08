@@ -11,6 +11,21 @@ from dataclasses import asdict, is_dataclass
 from typing import Any, Iterable, Mapping
 
 
+# Presentation-only copy list. These are canonical extraction field names, not
+# alternate sources or report-side calculations. Keeping the list here lets both
+# renderers consume the exact same source values and provenance.
+REPORT_EXTRACTION_FIELDS = (
+    "ml7_bad_k1_d", "ml7_bad_k2_d", "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmean_D",
+    "topographic_astig_D", "topographic_steep_axis_deg", "bad_flat_axis_deg",
+    "Rmin_mm", "ISV", "IVA", "KI", "CKI", "IHA", "IHD",
+    "topometric_RMin", "TKC", "KISA", "I_S",
+    "central_pachy_um", "pachy_thinnest_um", "Kmax_D",
+    "corneal_diameter_mm", "F_Ele_Th_um", "B_Ele_Th_um",
+    "PPI_min", "PPI_avg", "PPI_max", "ARTmax_um",
+    "Df", "Db", "Dp", "Dt", "Da", "BAD_D", "srax_deg",
+)
+
+
 def _plain(value: Any) -> Any:
     if is_dataclass(value):
         return {key: _plain(item) for key, item in asdict(value).items()}
@@ -39,7 +54,9 @@ def build_report_payload(
     clinical_policy_version: str,
     source_registry_version: str,
     srax_algorithm_version: str,
+    source_eye: Mapping[str, Any] | None = None,
     planning: Any = None,
+    microkeratome_planning: Any = None,
     manual_corrections: Iterable[Any] = (),
 ) -> dict[str, Any]:
     """Project one completed canonical assessment into a renderer-neutral payload."""
@@ -77,6 +94,7 @@ def build_report_payload(
         "classification": bad_block.get("classification"),
         "status": bad_block.get("status"),
         "context": _plain(getattr(bad_result, "context", {})),
+        "component_interpretations": _plain(getattr(bad_result, "component_interpretations", {})),
     }
 
     corrections = []
@@ -85,6 +103,18 @@ def build_report_payload(
         if isinstance(plain, dict):
             plain = {**plain, "label": "SURGEON_CONFIRMED"}
         corrections.append(plain)
+
+    source_eye = source_eye or {}
+    source_values = {
+        field: _plain(source_eye_value)
+        for field in REPORT_EXTRACTION_FIELDS
+        if (source_eye_value := source_eye.get(field)) is not None
+    }
+    source_provenance = {
+        field: _plain(entries)
+        for field, entries in (source_eye.get("field_provenance") or {}).items()
+        if field in REPORT_EXTRACTION_FIELDS
+    }
 
     return {
         "eye": eye,
@@ -103,6 +133,9 @@ def build_report_payload(
         "ps3": ps3_payload,
         "tissue_safety": _plain(assessment.get("procedural_safety") or {}),
         "planning": _plain(planning),
+        "microkeratome_planning": _plain(microkeratome_planning),
+        "source_values": source_values,
+        "source_provenance": source_provenance,
         "procedure_display": {
             "flap": "N/A" if procedure == "PRK" else None,
         },

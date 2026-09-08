@@ -20,7 +20,7 @@ def _eye(name="OD"):
         "central_pachy_um": 540.0, "pachy_thinnest_um": 530.0,
         "BAD_D": 1.0, "I_S": 0.0, "B_Ele_Th_um": 10.0,
         "F_Ele_Th_um": 5.0, "PPI_avg": 1.0,
-        "topographic_astig_D": 0.0, "topographic_steep_axis_deg": 90.0,
+        "topographic_astig_D": 0.0, "bad_flat_axis_deg": 90.0, "topographic_steep_axis_deg": 90.0,
         "posterior_Kmean_D": -6.0, "srax_deg": 0.0,
     }
 

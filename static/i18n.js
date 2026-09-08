@@ -87,7 +87,7 @@
     "Vacuum pressure":"Vakum basıncı","Blade recommendation(s)":"Bıçak önerisi/önerileri","Primary hinge":"Birincil menteşe","Conditional alternative":"Koşullu alternatif","Horizontal white-to-white (HWTW)":"Horizontal white-to-white (HWTW)",
     "Alternative projected RSB / PTA":"Alternatif tahmini RSB / PTA","Alternative safety":"Alternatif güvenliği","Ring-zone clearance":"Halka-zon açıklığı","Source":"Kaynak",
     "Recommendation":"Öneri","Surgeon-review recommendation only; this module does not alter the ectasia disposition.":"Yalnızca cerrah değerlendirme önerisidir; bu modül ektazi kararını değiştirmez.",
-    "PASS":"UYGUN","CAUTION":"DİKKAT","STOP-DEFER":"DURDUR-ERTELE",
+    "PASS":"UYGUN","PASS WITH CAUTION":"DİKKATLE UYGUN","CAUTION":"DİKKAT","STOP-DEFER":"DURDUR-ERTELE",
     "DATA INSUFFICIENT":"VERİ YETERSİZ","ERROR":"HATA","ASSESSING...":"DEĞERLENDİRİLİYOR...",
     "Required information — no report has been generated":"Gerekli bilgiler — henüz rapor oluşturulmadı",
     "PATIENT":"Hasta","Patient age (years)":"Hasta yaşı (yıl)",

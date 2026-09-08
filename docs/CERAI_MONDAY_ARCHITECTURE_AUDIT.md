@@ -1,6 +1,9 @@
 # CER-AI Monday Clean Architecture Audit
 
-Status: WORKING CONTROL DOCUMENT — branch `monday-clean-architecture`
+Status: **SUPERSEDED HISTORICAL BASELINE — branch `monday-clean-architecture`**
+
+This document records the pre-refactor problem and deletion plan. It is not the current runtime
+description. See `CERAI_MASTER_ORDER_66_ITEM_EVIDENCE_MATRIX.md` for the current 66-item audit.
 
 ## Governing rule
 
