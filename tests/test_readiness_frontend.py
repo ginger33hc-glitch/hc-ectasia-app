@@ -99,6 +99,22 @@ def test_patient_age_completion_uses_one_shared_field():
     assert 'original.required=false;input.required=true' in readiness
 
 
+def test_nice_measurements_are_requested_only_after_canonical_reading_fails():
+    html = (ROOT / 'static/index.html').read_text()
+    assert 'nice_confirmation' not in html
+    assert 'nice_central' not in html
+    assert 'nice_pe' not in html
+    assert 'surgeon_nice_' not in html
+
+    central = assessment_workflow._request('OD', 'NICE: central_pachy_um', {})
+    posterior = assessment_workflow._request('OD', 'NICE: B_Ele_Th_um', {})
+    assert central['kind'] == posterior['kind'] == 'number'
+    assert central['key'] == 'central_pachy_um'
+    assert posterior['key'] == 'B_Ele_Th_um'
+    assert 'Pupil Center (+)' in central['label']
+    assert 'B. Ele.Th' in posterior['label']
+
+
 def test_only_unread_fields_can_request_a_temporary_source_region():
     workflow = (ROOT / 'assessment_workflow.py').read_text()
     readiness = (ROOT / 'static/assessment-readiness.js').read_text()

@@ -130,7 +130,7 @@
 </main>
 <footer class="app-legal-footer">Developed by Hüseyin Cengiz, MD. All rights reserved. Final responsibility rests with the surgeon at all times and under all circumstances.</footer>
 
-<script src="/static/i18n.js?v=6"></script>
+<script src="/static/i18n.js?v=7"></script>
 <script src="/static/assessment-readiness.js?v=5"></script>
 <script>
 const i18n=window.CERAI_I18N;
@@ -173,12 +173,6 @@ const eyeTemplate = (eye) => `
       <p class="note">ERSS topography uses signed Topometric I-S and derived SRAX only. Visual morphology is not evaluated.</p>
       <div class="row"><label>Surgeon-confirmed I-S (D)</label><div class="signed-number"><input id="${eye}_surgeon_i_s" type="text" inputmode="decimal" autocomplete="off"><button type="button" class="sign-button" data-positive-target="${eye}_surgeon_i_s" aria-label="Make I-S positive">+</button><button type="button" class="sign-button" data-negative-target="${eye}_surgeon_i_s" aria-label="Make I-S negative">−</button></div></div>
     </div>
-  </details>
-  <details id="${eye}_nice_confirmation" class="clinical-select-group">
-    <summary>NICE — optional surgeon-confirmed measurements</summary>
-    <p class="note">Leave blank for image reading. Enter only when requested or to explicitly correct a reading. Central pachymetry is read only from Pupil Center (+). NICE posterior elevation is read only from the B. Ele.Th box on the BAD Display page.</p>
-    <div class="row"><label>Central pachymetry (µm)</label><input id="${eye}_nice_central" type="text" inputmode="decimal" autocomplete="off"></div>
-    <div class="row"><label>B. Ele.Th (µm; BAD Display)</label><input id="${eye}_nice_pe" type="text" inputmode="decimal" autocomplete="off"></div>
   </details>
   <details id="${eye}_clinical" class="clinical-select-group">
     <summary>Clinical eligibility and stability</summary>
@@ -517,7 +511,6 @@ function plan(prefix){
   laser_platform:"Alcon EX500", optical_zone_mm:numberOrNull(`${prefix}_optical`),
   transition_zone_mm:numberOrNull(`${prefix}_transition`), transition_zone_not_applicable:"no",
   surgeon_I_S_D:numberOrNull(`${prefix}_surgeon_i_s`),
-  surgeon_nice_central_um:numberOrNull(`${prefix}_nice_central`), surgeon_nice_pe_um:numberOrNull(`${prefix}_nice_pe`),
   stable:value(`${prefix}_stable`), progression:value(`${prefix}_progression`),
   cdva_below_20_20:value(`${prefix}_cdva`), enhancement_anticipated:value(`${prefix}_enhancement`)
 }}
@@ -653,10 +646,6 @@ f.addEventListener("submit", async (e) => {
   e.preventDefault();
   document.querySelector('#procedureTransitionWarning').hidden=true;
   reportCard.hidden=true;lastReport=null;
-  for(const eye of ['od','os'])for(const suffix of ['nice_central','nice_pe']){
-    const id=`${eye}_${suffix}`,raw=value(id).trim();
-    if(raw&&parsedClinicalNumber(id).state!=='valid'){showFormMessage(`Enter a valid numeric ${eye.toUpperCase()} ${suffix} value.`);return;}
-  }
   const invalidRefraction=validateRefractionInputs();
   if(invalidRefraction){
     showFormMessage(invalidRefraction.validationMessage);
