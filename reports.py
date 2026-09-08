@@ -84,6 +84,15 @@ ERSS_LABELS = {
 }
 
 
+# Measurement values, original source evidence, filenames and version identifiers
+# are audit data, not translation input. Both renderers use the same protection.
+PATIENT_LITERAL_CELLS = frozenset({(0, 1), (0, 3), (1, 1), (1, 3), (2, 1)})
+PROTECTED_COLUMNS = {
+    "Canonical Pentacam values and provenance": (1, 2),
+    "Surgeon-completed values": (1, 2),
+    "Version provenance": (1,),
+}
+
 REPORT_BLANK_LINE_PT = 12
 
 
@@ -277,7 +286,13 @@ def canonical_report_model(payload: Mapping[str, Any]) -> dict[str, Any]:
 TABLE_WIDTHS_IN = {2: [2.15, 4.0], 3: [1.35, 1.25, 3.55], 4: [1.25, 1.25, 1.7, 1.95]}
 
 
-def _pdf_table(rows, styles, regular_font, bold_font, selected_plan_status=None):
+def _cell_text(value, locale, literal=False):
+    text = _text(value, "")
+    # Missing markers are presentation text even inside protected metadata.
+    return text if literal and text != "Not documented" else translate_text(text, locale)
+
+
+def _pdf_table(rows, styles, regular_font, bold_font, selected_plan_status=None, locale="en", protected_columns=(), protected_cells=()):
     width = len(rows[0])
     col_widths = [value * inch for value in TABLE_WIDTHS_IN[width]]
     data = []
@@ -291,7 +306,8 @@ def _pdf_table(rows, styles, regular_font, bold_font, selected_plan_status=None)
                 foreground, background = palette
                 style = ParagraphStyle(name="StatusCell", parent=style, textColor=_rl(foreground))
                 highlights.append(("BACKGROUND", (column, row_index), (column, row_index), _rl(background)))
-            cells.append(Paragraph(escape(_text(cell, "")), style))
+            cell_text = _cell_text(cell, locale, (row_index, column) in protected_cells or (row_index > 0 and column in protected_columns))
+            cells.append(Paragraph(escape(cell_text), style))
         data.append(cells)
     table = Table(data, colWidths=col_widths, repeatRows=1, hAlign="LEFT")
     table.setStyle(TableStyle([
@@ -324,17 +340,17 @@ def build_pdf(payload: Mapping[str, Any]) -> bytes:
     story.append(Spacer(1, REPORT_BLANK_LINE_PT))
     patient = model["patient"]
     story.append(_pdf_table([
-        [tr("Patient"), _text(patient.get("name")), tr("Patient ID"), _text(patient.get("id"))],
-        [tr("Age"), _text(patient.get("age")), tr("Assessment date"), _text(patient.get("report_date"))],
-        [tr("Reviewer"), _text(patient.get("reviewer")), tr("Overall disposition"), _text(model.get("status"))],
-    ], styles, regular, bold))
+        [tr("Patient"), _text(patient.get("name"), tr("Not documented")), tr("Patient ID"), _text(patient.get("id"), tr("Not documented"))],
+        [tr("Age"), _text(patient.get("age"), tr("Not documented")), tr("Assessment date"), _text(patient.get("report_date"), tr("Not documented"))],
+        [tr("Reviewer"), _text(patient.get("reviewer"), tr("Not documented")), tr("Overall disposition"), _text(model.get("status"))],
+    ], styles, regular, bold, locale=locale, protected_cells=PATIENT_LITERAL_CELLS))
     story.append(Spacer(1, REPORT_BLANK_LINE_PT))
     if model.get("action"):
         foreground, background = _status_palette(model.get("status")) or (GRAY, GRAY_FILL)
         action_style = ParagraphStyle(name="ResultNotice", parent=styles["Notice"], textColor=_rl(foreground), backColor=_rl(background))
-        story.append(Paragraph(escape(_text(model["action"])), action_style))
+        story.append(Paragraph(escape(tr(_text(model["action"]))), action_style))
     for warning in model["identity_warnings"] + model["source_quality_warnings"]:
-        story.append(Paragraph(escape(_text(warning)), styles["Warning"]))
+        story.append(Paragraph(escape(tr(_text(warning))), styles["Warning"]))
     for eye in model["eyes"]:
         if eye["eye"] == "OD":
             story.append(Spacer(1, 2 * REPORT_BLANK_LINE_PT))
@@ -342,10 +358,11 @@ def build_pdf(payload: Mapping[str, Any]) -> bytes:
             story.append(PageBreak())
         foreground, _ = _status_palette(eye.get("status")) or (GRAY, GRAY_FILL)
         eye_style = ParagraphStyle(name="EyeResult", parent=styles["CERSection"], fontSize=15.75, leading=19.5, textColor=_rl(foreground))
-        story.append(Paragraph(f"{escape(_text(eye['eye']))} — {escape(_text(eye['status']))}", eye_style))
+        story.append(Paragraph(f"{escape(_text(eye['eye']))} — {escape(tr(_text(eye['status'])))}", eye_style))
         for title, rows in eye["sections"]:
             section_content = [Paragraph(escape(tr(title)), styles["CERSection"]),
-                               _pdf_table(rows, styles, regular, bold, eye["status"] if title == "Procedure planning" and eye.get("procedure") == "LASIK" else None)]
+                               _pdf_table(rows, styles, regular, bold, eye["status"] if title == "Procedure planning" and eye.get("procedure") == "LASIK" else None,
+                                          locale=locale, protected_columns=PROTECTED_COLUMNS.get(title, ()))]
             if title in {"Randleman / ERSS", "NICE", "PS3"}:
                 story.append(KeepTogether(section_content))
             else:
@@ -378,7 +395,7 @@ def _docx_notice(document, text, foreground, background):
     return paragraph
 
 
-def _docx_table(document, rows, selected_plan_status=None, keep_together=False):
+def _docx_table(document, rows, selected_plan_status=None, keep_together=False, locale="en", protected_columns=(), protected_cells=()):
     table = document.add_table(rows=1, cols=len(rows[0])); table.style = "Table Grid"; table.alignment = WD_TABLE_ALIGNMENT.LEFT
     table.autofit = False
     widths = TABLE_WIDTHS_IN[len(rows[0])]
@@ -397,13 +414,14 @@ def _docx_table(document, rows, selected_plan_status=None, keep_together=False):
     props.append(borders)
     table.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:tblHeader"))
     for index, value in enumerate(rows[0]):
-        table.rows[0].cells[index].text = _text(value, ""); _shade(table.rows[0].cells[index], NAVY)
+        table.rows[0].cells[index].text = _cell_text(value, locale, (0, index) in protected_cells); _shade(table.rows[0].cells[index], NAVY)
         for run in table.rows[0].cells[index].paragraphs[0].runs:
             run.bold = True; run.font.color.rgb = RGBColor(255, 255, 255)
     for row_number, row in enumerate(rows[1:], 1):
         cells = table.add_row().cells
         for index, value in enumerate(row):
-            cells[index].text = _text(value, "")
+            cell_text = _cell_text(value, locale, (row_number, index) in protected_cells or index in protected_columns)
+            cells[index].text = cell_text
             _shade(cells[index], "FFFFFF" if row_number % 2 else "F7F9FB")
             palette = _cell_palette(row, index, selected_plan_status)
             if palette:
@@ -426,12 +444,14 @@ def _docx_table(document, rows, selected_plan_status=None, keep_together=False):
 
 def build_docx(payload: Mapping[str, Any]) -> bytes:
     model = canonical_report_model(payload); locale = model["locale"]; tr = lambda value: translate_text(value, locale)
-    document = Document(); document.core_properties.title = f"CER-AI — {PROGRAM_NAME}"
+    document = Document(); document.core_properties.title = f"CER-AI — {PROGRAM_NAME}"; document.core_properties.language = "tr-TR" if locale == "tr" else "en-US"
     section = document.sections[0]
     section.page_width = Inches(8.5); section.page_height = Inches(11)
     section.left_margin = section.right_margin = section.top_margin = Inches(.65)
     section.bottom_margin = Inches(.75); section.footer_distance = Inches(.2)
     normal = document.styles["Normal"]
+    language = OxmlElement("w:lang"); language.set(qn("w:val"), "tr-TR" if locale == "tr" else "en-US")
+    normal.element.get_or_add_rPr().append(language)
     normal.font.name = "Arial"; normal.font.size = Pt(7.3); normal.font.color.rgb = RGBColor.from_string(INK)
     normal.paragraph_format.space_after = Pt(0); normal.paragraph_format.line_spacing = Pt(9)
     for name in ("Heading 1", "Heading 2"):
@@ -448,21 +468,21 @@ def build_docx(payload: Mapping[str, Any]) -> bytes:
     notice.paragraph_format.space_after = Pt(8 + REPORT_BLANK_LINE_PT)
     patient = model["patient"]
     _docx_table(document, [
-        [tr("Patient"), _text(patient.get("name")), tr("Patient ID"), _text(patient.get("id"))],
-        [tr("Age"), _text(patient.get("age")), tr("Assessment date"), _text(patient.get("report_date"))],
-        [tr("Reviewer"), _text(patient.get("reviewer")), tr("Overall disposition"), _text(model.get("status"))],
-    ])
+        [tr("Patient"), _text(patient.get("name"), tr("Not documented")), tr("Patient ID"), _text(patient.get("id"), tr("Not documented"))],
+        [tr("Age"), _text(patient.get("age"), tr("Not documented")), tr("Assessment date"), _text(patient.get("report_date"), tr("Not documented"))],
+        [tr("Reviewer"), _text(patient.get("reviewer"), tr("Not documented")), tr("Overall disposition"), _text(model.get("status"))],
+    ], locale=locale, protected_cells=PATIENT_LITERAL_CELLS)
     gap = document.add_paragraph()
     gap.paragraph_format.line_spacing = Pt(REPORT_BLANK_LINE_PT)
     gap.paragraph_format.space_before = Pt(0)
     gap.paragraph_format.space_after = Pt(0)
     if model.get("action"):
         foreground, background = _status_palette(model.get("status")) or (GRAY, GRAY_FILL)
-        _docx_notice(document, _text(model["action"]), foreground, background)
+        _docx_notice(document, tr(_text(model["action"])), foreground, background)
     for warning in model["identity_warnings"] + model["source_quality_warnings"]:
-        _docx_notice(document, _text(warning), AMBER, AMBER_FILL)
+        _docx_notice(document, tr(_text(warning)), AMBER, AMBER_FILL)
     for eye in model["eyes"]:
-        paragraph = document.add_heading(f"{_text(eye['eye'])} — {_text(eye['status'])}", level=1)
+        paragraph = document.add_heading(f"{_text(eye['eye'])} — {tr(_text(eye['status']))}", level=1)
         paragraph.paragraph_format.line_spacing = Pt(19.5)
         if eye["eye"] == "OD":
             paragraph.paragraph_format.space_before = Pt(2 * REPORT_BLANK_LINE_PT)
@@ -474,7 +494,7 @@ def build_docx(payload: Mapping[str, Any]) -> bytes:
             run.font.size = Pt(15.75)
         for heading, rows in eye["sections"]:
             document.add_heading(tr(heading), level=2)
-            _docx_table(document, rows, eye["status"] if heading == "Procedure planning" and eye.get("procedure") == "LASIK" else None, keep_together=heading in {"Randleman / ERSS", "NICE", "PS3"})
+            _docx_table(document, rows, eye["status"] if heading == "Procedure planning" and eye.get("procedure") == "LASIK" else None, keep_together=heading in {"Randleman / ERSS", "NICE", "PS3"}, locale=locale, protected_columns=PROTECTED_COLUMNS.get(heading, ()))
     footer = section.footer.paragraphs[0]; footer.alignment = WD_ALIGN_PARAGRAPH.CENTER; footer.add_run(authorship_notice(locale))
     for run in footer.runs: run.font.size = Pt(6.2); run.font.color.rgb = RGBColor.from_string(GRAY)
     page = section.footer.add_paragraph(tr("Page") + " "); page.alignment = WD_ALIGN_PARAGRAPH.RIGHT
