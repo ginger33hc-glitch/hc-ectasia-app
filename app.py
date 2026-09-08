@@ -447,6 +447,42 @@ def openai_client() -> OpenAI:
 def is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
+def normalized_eye(raw_eye: Dict[str, Any]) -> Dict[str, Any]:
+    eye = dict(raw_eye)
+    # UNCERTAIN means no SRAX observation on this source, not a measured
+    # disagreement with the Front-map geometry from another page.
+    if eye.get("srax") == "UNCERTAIN":
+        eye["srax"] = None
+    eye.pop("targeted_unreadable_regions", None)
+    verified = eye.get("table_verified_numeric_fields")
+    if isinstance(verified, list):
+        verified_set = set(verified)
+        if eye.get("keratometry_source") != CORNEA_FRONT_KERATOMETRY_SOURCE:
+            missing = list(eye.get("missing_or_unreadable", []))
+            for field in CORNEA_FRONT_KERATOMETRY_FIELDS:
+                missing.append(field)
+                eye[field] = None
+            verified_set -= CORNEA_FRONT_KERATOMETRY_FIELDS
+            eye["missing_or_unreadable"] = list(dict.fromkeys(missing))
+        missing = list(eye.get("missing_or_unreadable", []))
+        source_ids = eye.get("canonical_source_ids")
+        source_ids = source_ids if isinstance(source_ids, dict) else {}
+        for field in LOCKED_FIELDS:
+            if eye.get(field) is None:
+                continue
+            if source_ids.get(field) != canonical_source_id(field):
+                eye[field] = None
+                verified_set.discard(field)
+                missing.append(field)
+        for field in TABLE_NUMERIC_FIELDS:
+            if eye.get(field) is not None and field not in verified_set:
+                eye[field] = None
+                missing.append(field)
+        eye["missing_or_unreadable"] = list(dict.fromkeys(missing))
+        eye["table_verified_numeric_fields"] = sorted(verified_set)
+    return eye
+
+
 def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     merged: Dict[str, Any] = {
         "eyes": [], "treatment_corrections": [], "laser_plans": [], "global_warnings": [], "identity_warnings": [],
@@ -461,40 +497,6 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
     planning_conflict_fields = {"K1_axis_deg", "K2_axis_deg", "corneal_diameter_mm"}
 
-    def normalized_eye(raw_eye: Dict[str, Any]) -> Dict[str, Any]:
-        eye = dict(raw_eye)
-        # UNCERTAIN means no SRAX observation on this source, not a measured
-        # disagreement with the Front-map geometry from another page.
-        if eye.get("srax") == "UNCERTAIN":
-            eye["srax"] = None
-        eye.pop("targeted_unreadable_regions", None)
-        verified = eye.get("table_verified_numeric_fields")
-        if isinstance(verified, list):
-            verified_set = set(verified)
-            if eye.get("keratometry_source") != CORNEA_FRONT_KERATOMETRY_SOURCE:
-                missing = list(eye.get("missing_or_unreadable", []))
-                for field in CORNEA_FRONT_KERATOMETRY_FIELDS:
-                    missing.append(field)
-                    eye[field] = None
-                verified_set -= CORNEA_FRONT_KERATOMETRY_FIELDS
-                eye["missing_or_unreadable"] = list(dict.fromkeys(missing))
-            missing = list(eye.get("missing_or_unreadable", []))
-            source_ids = eye.get("canonical_source_ids")
-            source_ids = source_ids if isinstance(source_ids, dict) else {}
-            for field in LOCKED_FIELDS:
-                if eye.get(field) is None:
-                    continue
-                if source_ids.get(field) != canonical_source_id(field):
-                    eye[field] = None
-                    verified_set.discard(field)
-                    missing.append(field)
-            for field in TABLE_NUMERIC_FIELDS:
-                if eye.get(field) is not None and field not in verified_set:
-                    eye[field] = None
-                    missing.append(field)
-            eye["missing_or_unreadable"] = list(dict.fromkeys(missing))
-            eye["table_verified_numeric_fields"] = sorted(verified_set)
-        return eye
 
     for result in results:
         if result.get("extraction_model"):
@@ -907,6 +909,8 @@ def extract_one_image(raw: bytes, filename: str) -> Dict[str, Any]:
         for eye in result.get("eyes", []):
             eye["_source_filename"] = filename
             eye["_pentacam_qs"] = context.get("pentacam_qs", "NOT_SHOWN")
+        # Validate primary values before deciding which fields need a reread.
+        result["eyes"] = [normalized_eye(eye) for eye in result.get("eyes", [])]
         result = pentacam_targeted_reread.enrich_extraction(
             sys.modules[__name__], result, raw, filename
         )
