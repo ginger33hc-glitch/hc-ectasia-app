@@ -82,10 +82,14 @@ def test_pta_boundary_is_a_startup_locked_canonical_rule():
     assert canonical_engine.runtime_invariants() is True
 
 
-def test_current_branding_is_text_owned_and_obsolete_logo_is_retired():
-    assert not (REPO / "static" / "branding" / "cer-ai-logo-final.png").exists()
+def test_current_branding_uses_approved_original_logo_asset():
+    logo = REPO / "static" / "branding" / "cer-ai-logo-final.png"
+    assert logo.exists()
+    assert logo.stat().st_size == 87330
     for relative in ("static/index.html", "static/public-home.html"):
         source = (REPO / relative).read_text(encoding="utf-8")
+        assert '/static/branding/cer-ai-logo-final.png?v=5' in source
+        assert "brand-wordmark" not in source
         assert "CER-AI — Cornea Ectasia Risk Assessment Intelligence" in source
         assert "Corneal Ectasia Risk Assessment Intelligence" not in source
         assert "Risk Analysis Intelligence" not in source
