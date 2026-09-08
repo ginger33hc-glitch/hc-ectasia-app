@@ -6,8 +6,8 @@ adapter submits the original plus four overlapping crops and, when needed, one
 focused header crop to a structured reread. It accepts only high-confidence
 label/value pairs. Conflicting authoritative Four Maps examination dates are
 reread here but promoted only by the case-level date policy after both eyes agree.
-An existing BAD flat-axis value may be replaced only during the explicit PS3
-threshold-verification pass; its primary value remains in audit evidence.
+An existing BAD flat-axis value may be replaced only during the explicit
+astigmatic-disparity verification pass; its primary value remains in audit evidence.
 """
 
 from __future__ import annotations
@@ -775,18 +775,18 @@ def enrich_extraction(
         return result
 
 
-def verify_ps3_bad_flat_axes(
+def verify_astigmatic_disparity_bad_flat_axes(
     core: Any,
     result: dict[str, Any],
     raw: bytes,
     filename: str,
     eye_ids: set[str],
 ) -> dict[str, Any]:
-    """Focused-reread risk-triggering BAD axes before they enter PS3 scoring.
+    """Focused-reread threshold-level BAD axes before disparity reporting.
 
     Only the canonical BAD flat-axis field is eligible. If the focused reading
-    is not confident and source-valid, the value is left unresolved for surgeon
-    completion instead of retaining an unverified Moderate trigger.
+    is not confident and source-valid, the value is left unresolved rather than
+    retaining an unverified validation warning. This path cannot affect PS3.
     """
     requested: dict[str, list[str]] = {}
     originals: dict[str, float] = {}
@@ -812,7 +812,7 @@ def verify_ps3_bad_flat_axes(
         apply_targeted_readings(core, result, reread, requested, filename)
     except Exception as exc:
         result.setdefault("global_warnings", []).append(
-            f"PS3-trigger BAD flat-axis verification failed for {filename}: "
+            f"Astigmatic-disparity BAD flat-axis verification failed for {filename}: "
             f"{type(exc).__name__}; surgeon confirmation is required."
         )
 
@@ -823,7 +823,7 @@ def verify_ps3_bad_flat_axes(
     for eye_id, primary_value in originals.items():
         eye = eyes[eye_id]
         verified_value = eye.get("bad_flat_axis_deg")
-        eye.setdefault("ps3_axis_verification_evidence", {})["bad_flat_axis_deg"] = {
+        eye.setdefault("astigmatic_disparity_verification_evidence", {})["bad_flat_axis_deg"] = {
             "file": filename,
             "primary_value": primary_value,
             "verified_value": verified_value,
@@ -837,7 +837,7 @@ def verify_ps3_bad_flat_axes(
                 )
         else:
             result.setdefault("global_warnings", []).append(
-                f"{eye_id} BAD flat axis that would trigger PS3 Moderate could not be "
-                "verified; surgeon confirmation is required before scoring."
+                f"{eye_id} BAD flat axis associated with an astigmatic-disparity warning "
+                "could not be verified; surgeon confirmation is recommended."
             )
     return result

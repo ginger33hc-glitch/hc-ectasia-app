@@ -587,7 +587,7 @@ function renderEye(r){
   const ps3Rows=(ps3.findings||[]).map(item=>[item.key,item.status,item.detail]).concat([["Moderate / High",ps3.moderate_count,ps3.high_count],["Procedure disposition",ps3.status,ps3.disposition]]);
   const badRows=[["Final BAD-D",bad.final_d,`${displayValue(bad.classification)} / ${displayValue(bad.status)}`],...["df","db","dp","dt","da"].map(key=>[key.toUpperCase(),badContext[key],"Displayed component; not recalculated"]),...["ppi_min","ppi_avg","ppi_max","artmax_um"].map(key=>[key,badContext[key],"Information / QC only"])];
   const safetyRows=Object.entries(p.tissue_safety||{}).map(([key,value])=>[key,value]);
-  const ml7Labels={hinge_axis_deg:"Hinge axis",hinge_location_preference:"Preferred hinge location",hinge_location_alternative:"Secondary hinge location"};
+  const ml7Labels={steep_meridian_axis_deg:"Steep meridian axis",hinge_location_preference:"Preferred hinge location",hinge_location_alternative:"Secondary hinge location"};
   const planningLabels={selected_plan:"Selected LASIK plan",selected_plan_definition:"Selected plan parameters",selection_rule:"Plan-selection priority"};
   const planningRows=[["Procedure",p.procedure],...Object.entries(p.planning||{}).map(([key,value])=>[planningLabels[key]||key,i18n.clinical(value)]),...Object.entries(p.microkeratome_planning||{}).map(([key,value])=>[`ML7 ${ml7Labels[key]||key}`,i18n.clinical(value)])];
   const driverRows=["stop","caution","incomplete"].flatMap(level=>(p.decision_drivers?.[level]||[]).map(item=>[level.toUpperCase(),item]));

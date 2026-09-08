@@ -89,7 +89,7 @@
     "Global clinical / source blockers":"Genel klinik / kaynak engelleri","Post-assessment ML7 microkeratome planning":"Değerlendirme sonrası ML7 mikrokeratom planlaması",
     "PENTACAM ACQUISITION QUALITY — SURGEON ATTENTION":"PENTACAM ÇEKİM KALİTESİ — CERRAHIN DİKKATİNE",
     "Planning warnings":"Planlama uyarıları","Planning notes":"Planlama notları","Assessment gate":"Değerlendirme geçidi","Vacuum ring":"Vakum halkası",
-    "Vacuum pressure":"Vakum basıncı","Blade recommendation(s)":"Bıçak önerisi/önerileri","Primary hinge":"Birincil menteşe","Conditional alternative":"Koşullu alternatif","Hinge axis":"Menteşe aksı","Preferred hinge location":"Tercih edilen menteşe konumu","Secondary hinge location":"İkincil menteşe konumu","Horizontal white-to-white (HWTW)":"Horizontal white-to-white (HWTW)",
+    "Vacuum pressure":"Vakum basıncı","Blade recommendation(s)":"Bıçak önerisi/önerileri","Primary hinge":"Birincil menteşe","Conditional alternative":"Koşullu alternatif","Steep meridian axis":"Dik meridyen aksı","Preferred hinge location":"Tercih edilen menteşe konumu","Secondary hinge location":"İkincil menteşe konumu","Horizontal white-to-white (HWTW)":"Horizontal white-to-white (HWTW)",
     "Alternative projected RSB / PTA":"Alternatif tahmini RSB / PTA","Alternative safety":"Alternatif güvenliği","Ring-zone clearance":"Halka-zon açıklığı","Source":"Kaynak",
     "Recommendation":"Öneri","Surgeon-review recommendation only; this module does not alter the ectasia disposition.":"Yalnızca cerrah değerlendirme önerisidir; bu modül ektazi kararını değiştirmez.",
     "PASS":"UYGUN","PASS WITH CAUTION":"DİKKATLE UYGUN","CAUTION":"DİKKAT","STOP-DEFER":"DURDUR-ERTELE",
@@ -176,11 +176,9 @@
       .replace(/The assessment was generated from the readable data, but acquisition quality is not confirmed as OK\. The surgeon must review the source images and interpret all findings with caution\./g,"Değerlendirme okunabilen verilerden oluşturuldu; ancak çekim kalitesinin uygun olduğu doğrulanmadı. Cerrah kaynak görüntüleri incelemeli ve tüm bulguları dikkatle yorumlamalıdır.")
       .replace(/Hard stops are independent of this numeric score and are not counted as score points\./g,"Kesin durdurma kuralları bu sayısal puandan bağımsızdır ve puana eklenmez.")
       .replace(/NICE is an independent screening pathway and is not added to the CER-AI numeric score\./g,"NICE bağımsız bir tarama yoludur ve CER-AI sayısal puanına eklenmez.")
-      .replace(/Perpendicular to steep axis/g,"Dik meridyene dik doğrultuda")
-      .replace(/hinge axis/g,"menteşe aksı")
-      .replace(/superior hinge preferred/g,"superior menteşe tercih edilir")
-      .replace(/temporal hinge preferred \(nasal secondary\)/g,"temporal menteşe tercih edilir (nazal ikincil)")
-      .replace(/oblique meridian — follow the numeric perpendicular hinge axis/g,"oblik meridyen — sayısal dik menteşe aksını izleyin")
+      .replace(/Superior hinge at the vertical steep meridian/g,"Dikey dik meridyende superior menteşe")
+      .replace(/Temporal hinge preferred at the horizontal steep meridian/g,"Yatay dik meridyende temporal menteşe tercih edilir")
+      .replace(/surgeon determines the anatomical hinge location/g,"cerrah anatomik menteşe konumunu belirler")
       .replace(/^Superior$/,"Superior")
       .replace(/^Temporal$/,"Temporal")
       .replace(/^Nasal$/,"Nazal")

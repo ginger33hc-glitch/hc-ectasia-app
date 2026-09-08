@@ -26,10 +26,6 @@ def complete_eye(**overrides):
     values = dict(
         anterior_km_d=43.0,
         thinnest_um=520.0,
-        topographic_astig_d=1.0,
-        bad_flat_axis_deg=90.0,
-        manifest_astig_d=1.0,
-        manifest_axis_deg=90.0,
         ppi_avg=1.0,
         f_ele_th_um=10.0,
         b_ele_th_um=12.0,

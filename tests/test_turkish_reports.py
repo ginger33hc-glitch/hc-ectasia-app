@@ -34,7 +34,7 @@ def test_turkish_exports_translate_current_report_sections_and_preserve_snapshot
         for required in (
             'Genel karar', 'OD — UYGUN', 'Cerrahi güvenlik', 'Cerrahi planlama',
             'Kararın gerekçesi', 'Pentacam değerleri ve kaynak bilgileri',
-            'Topografi kategorisi', 'Astigmatizma karşılaştırması', 'Gözler arası puan 0/5.',
+                'Topografi kategorisi', 'Astigmatik uyumsuzluk doğrulaması', 'Gözler arası puan 0/5.',
             'Kornea kalınlık haritası morfolojisi: değerlendirilmedi; cerrah değerlendirmesi gerekir;',
             'Göreli kalınlık haritası: değerlendirilmedi; cerrah değerlendirmesi gerekir;',
             'PTI/CTSP kalınlık profili morfolojisi: değerlendirilmedi; cerrah değerlendirmesi gerekir;',
@@ -43,7 +43,7 @@ def test_turkish_exports_translate_current_report_sections_and_preserve_snapshot
             'Kaynak: Axial/Sagittal Curvature (Front).',
             'No Source Şule Işık', 'PASS-NO-035', 'Dr. Çağrı Şen',
             'SHOW_2_CORNEA_BACK / show2.png', 'BAD_D_STRIP / OD-bad.png',
-                'CER-AI-2026-09-08-SHARED-PTA-LT40-ELIGIBILITY-V2-SURGEON-FIRST',
+                'CER-AI-2026-09-08-PS3-DISPARITY-SEPARATED-ML7-HINGE-V3',
         ):
             assert required in content
         for obsolete in ('Canonical result', 'Procedure disposition', 'selected_plan',

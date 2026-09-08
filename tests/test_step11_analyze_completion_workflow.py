@@ -141,15 +141,14 @@ def test_ps3_intereye_requirement_identifies_the_actual_eye_and_field():
     assert request["source_box"] == "Cornea Back → Km"
 
 
-def test_ps3_astigmatic_study_requests_missing_map_and_manifest_inputs_separately():
+def test_missing_astigmatic_disparity_inputs_do_not_block_ps3_or_request_completion():
     response = _respond(
         od=_eye("OD", topographic_astig_D=None, bad_flat_axis_deg=None),
         plans={"OD": _plan(manifest_cylinder_signed_D=None, manifest_axis_deg=None), "OS": _plan()},
     )
-    od = {item["key"]: item for item in response["input_requests"] if item.get("eye") == "OD"}
-    assert {"topographic_astig_D", "bad_flat_axis_deg", "manifest_cylinder_signed_D", "manifest_axis_deg"} <= set(od)
-    assert od["topographic_astig_D"]["source_box"] == "Cornea Front → Astig"
-    assert od["manifest_cylinder_signed_D"]["form_id"] == "od_manifest_cylinder"
+    od_keys = {item["key"] for item in response["input_requests"] if item.get("eye") == "OD"}
+    assert "topographic_astig_D" not in od_keys
+    assert "bad_flat_axis_deg" not in od_keys
 
 
 def test_prior_surgery_cannot_receive_virgin_cornea_report_token():

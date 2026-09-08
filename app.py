@@ -37,9 +37,11 @@ from pentacam_field_registry import (
     KERATOMETRY_SOURCE_VALUES,
     PASSIVE_INFORMATIONAL_FIELDS,
 )
-from pentacam_quality_policy import is_quality_only_issue, warnings_for_extracted
 from reports import ReportContractError, build_docx, build_pdf
-from canonical_input_adapter import resolve_case_plans, ps3_axis_verification_eyes
+from canonical_input_adapter import (
+    astigmatic_disparity_verification_eyes,
+    resolve_case_plans,
+)
 
 
 @asynccontextmanager
@@ -1019,12 +1021,12 @@ async def _run_image_assessment(
             if exam_date_reread_required:
                 promote_consistent_targeted_exam_dates(extraction_results)
 
-            # A >10-degree BAD-flat/manifest comparison creates a procedure-changing
-            # PS3 Moderate factor. Re-read that exact canonical BAD box before scoring
-            # so a decimal/digit OCR error cannot defer LASIK and redirect to PRK.
+            # A threshold-level BAD-flat/manifest disparity is a measurement-
+            # validation warning, never a PS3 factor. Re-read the exact canonical
+            # BAD box so the warning itself does not rest on a decimal/digit OCR error.
             preliminary = merge_extractions(extraction_results)
             preliminary_plans = resolve_case_plans(preliminary, plans)
-            axis_verification_eyes = ps3_axis_verification_eyes(
+            axis_verification_eyes = astigmatic_disparity_verification_eyes(
                 preliminary, preliminary_plans,
             )
             if axis_verification_eyes:
@@ -1033,7 +1035,7 @@ async def _run_image_assessment(
                 ) -> Dict[str, Any]:
                     async with semaphore:
                         return await asyncio.to_thread(
-                            pentacam_targeted_reread.verify_ps3_bad_flat_axes,
+                            pentacam_targeted_reread.verify_astigmatic_disparity_bad_flat_axes,
                             sys.modules[__name__], result, raw, filename,
                             axis_verification_eyes,
                         )

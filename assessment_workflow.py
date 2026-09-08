@@ -60,17 +60,6 @@ def _expanded_ps3_missing(eye_id, message, decision, extracted):
     if factor in direct:
         missing = [key for key in direct[factor] if not _finite(eye.get(key))]
         return [(eye_id, f"PS3: {key}") for key in missing] or [(eye_id, str(message))]
-    if factor == "astigmatic_study":
-        missing = [
-            key for key in ("topographic_astig_D", "bad_flat_axis_deg")
-            if not _finite(eye.get(key))
-        ]
-        plan = (decision.get("effective_eye_plans") or {}).get(eye_id) or {}
-        if not _finite(plan.get("manifest_cylinder_signed_D")):
-            missing.append("manifest_cylinder_signed_D")
-        if not any(_finite(plan.get(key)) for key in ("manifest_axis_deg", "manifest_entered_axis_deg", "entered_axis_deg")):
-            missing.append("manifest_axis_deg")
-        return [(eye_id, f"PS3: {key}") for key in missing] or [(eye_id, str(message))]
     if factor == "inter_eye_asymmetry":
         missing = []
         for candidate_eye in ("OD", "OS"):

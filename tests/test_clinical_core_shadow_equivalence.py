@@ -19,10 +19,6 @@ def _ps3_normal(**overrides):
     values = dict(
         anterior_km_d=47.0,
         thinnest_um=520.0,
-        topographic_astig_d=1.0,
-        bad_flat_axis_deg=90.0,
-        manifest_astig_d=1.0,
-        manifest_axis_deg=90.0,
         ppi_avg=1.0,
         srax="NO",
         srax_deg=0.0,

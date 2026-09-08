@@ -235,6 +235,19 @@ def _report_sections(report: Mapping[str, Any]) -> list[tuple[str, list[list[str
     ])
     sections.append(("PS3", ps3_rows))
 
+    disparity = report.get("astigmatic_disparity") or {}
+    if disparity:
+        disparity_rows = [
+            ["Status", "Magnitude difference", "Axis difference"],
+            [
+                _text(disparity.get("status")),
+                _text(disparity.get("magnitude_difference_d")),
+                _text(disparity.get("axis_difference_deg")),
+            ],
+            ["Interpretation", _text(disparity.get("detail")), "Non-scoring; no independent procedure restriction"],
+        ]
+        sections.append(("Astigmatic disparity validation", disparity_rows))
+
     bad = report.get("bad") or {}
     context = bad.get("context") or {}
     bad_rows = [["Parameter", "Value", "Interpretation"], ["Final BAD-D", _text(bad.get("final_d")), f"{_text(bad.get('classification'))} / {_text(bad.get('status'))}"]]

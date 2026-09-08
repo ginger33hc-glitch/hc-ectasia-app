@@ -74,7 +74,8 @@ def test_model_contains_every_canonical_clinical_report_section_without_recalcul
     assert [eye["eye"] for eye in model["eyes"]] == ["OD", "OS"]
     headings = [heading for heading, _ in model["eyes"][0]["sections"]]
     assert headings == [
-        "Randleman / ERSS", "NICE", "PS3", "Belin/Ambrósio BAD-D",
+        "Randleman / ERSS", "NICE", "PS3", "Astigmatic disparity validation",
+        "Belin/Ambrósio BAD-D",
         "Procedural safety", "Procedure planning", "Decision basis",
         "Canonical Pentacam values and provenance", "Version provenance",
     ]

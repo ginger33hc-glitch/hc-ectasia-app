@@ -9,7 +9,6 @@ from ps3_policy import (
     MODERATE,
     NORMAL,
     NOT_EVALUATED,
-    NOT_REQUIRED,
     PS3EyeInput,
     PS3InterEyeInput,
     evaluate_ps3,
@@ -24,10 +23,6 @@ def normal_eye(**overrides):
     values = dict(
         anterior_km_d=47.0,
         thinnest_um=520.0,
-        topographic_astig_d=1.0,
-        bad_flat_axis_deg=175.0,
-        manifest_astig_d=1.0,
-        manifest_axis_deg=5.0,
         ppi_avg=1.1,
         f_ele_th_um=8.0,
         b_ele_th_um=10.0,
@@ -63,67 +58,6 @@ def test_anterior_km_boundaries(km, status):
 @pytest.mark.parametrize("thinnest,status", [(500.01, NORMAL), (500.0, MODERATE), (470.0, MODERATE), (469.99, HIGH)])
 def test_thinnest_boundaries(thinnest, status):
     assert finding(evaluate_ps3(normal_eye(thinnest_um=thinnest), normal_inter_eye()), "thinnest").status == status
-
-
-def test_axis_difference_wraps_at_180_degrees():
-    assert finding(evaluate_ps3(normal_eye(topographic_astig_d=3.1, manifest_astig_d=3.1, bad_flat_axis_deg=175, manifest_axis_deg=5), normal_inter_eye()), "astigmatic_study").status == NORMAL
-
-
-def test_bad_flat_axis_1_point_1_vs_manifest_axis_2_is_0_point_9_and_allows_lasik():
-    result = evaluate_ps3(
-        normal_eye(
-            topographic_astig_d=3.1,
-            manifest_astig_d=3.1,
-            bad_flat_axis_deg=1.1,
-            manifest_axis_deg=2.0,
-        ),
-        normal_inter_eye(),
-    )
-    item = finding(result, "astigmatic_study")
-    assert item.status == NORMAL
-    assert "difference 0.9°" in item.detail
-    assert result.moderate_count == 0
-    assert result.disposition.lasik == ALLOWED
-
-
-def test_astigmatic_study_moderate_if_magnitude_difference_exceeds_one_diopter():
-    assert finding(evaluate_ps3(normal_eye(manifest_astig_d=3.01), normal_inter_eye()), "astigmatic_study").status == MODERATE
-
-
-def test_astigmatic_study_moderate_if_axis_difference_exceeds_ten_degrees():
-    assert finding(evaluate_ps3(normal_eye(topographic_astig_d=3.1, manifest_astig_d=3.1, bad_flat_axis_deg=0, manifest_axis_deg=10.1), normal_inter_eye()), "astigmatic_study").status == MODERATE
-
-
-def test_spherical_manifest_does_not_invent_an_axis_discrepancy():
-    item = finding(
-        evaluate_ps3(
-            normal_eye(
-                topographic_astig_d=0.5,
-                bad_flat_axis_deg=107.0,
-                manifest_astig_d=0.0,
-                manifest_axis_deg=0.0,
-            ),
-            normal_inter_eye(),
-        ),
-        "astigmatic_study",
-    )
-    assert item.status == NOT_REQUIRED
-    assert "comparison inactive" in item.detail
-
-
-def test_zero_cylinder_still_scores_a_large_magnitude_discrepancy():
-    item = finding(
-        evaluate_ps3(
-            normal_eye(
-                topographic_astig_d=3.01,
-                manifest_astig_d=0.0,
-                manifest_axis_deg=None,
-            ),
-            normal_inter_eye(),
-        ),
-        "astigmatic_study",
-    )
-    assert item.status == MODERATE
 
 
 def test_ppi_average_boundary():
@@ -260,44 +194,8 @@ def test_irrevocable_defer_still_requires_srax_for_complete_ps3():
     assert result.disposition.smile == DEFER
 
 
-@pytest.mark.parametrize("manifest,topographic", [(0.5, 0.4), (3.0, 0.0), (0.0, 3.0), (-3.0, 3.0), (2.99, 2.99)])
-def test_both_magnitudes_at_or_below_three_never_score_or_require_axes(manifest, topographic):
-    result = evaluate_ps3(normal_eye(manifest_astig_d=manifest, topographic_astig_d=topographic,
-                                    manifest_axis_deg=None, bad_flat_axis_deg=None), normal_inter_eye())
-    assert finding(result, "astigmatic_study").status == NOT_REQUIRED
-    assert result.complete
-    assert result.moderate_count == result.high_count == 0
-
-
-@pytest.mark.parametrize("manifest,topographic", [(3.01, 3.0), (3.0, 3.01), (-3.01, 3.0)])
-def test_either_magnitude_over_three_activates_axis_comparison(manifest, topographic):
-    result = evaluate_ps3(normal_eye(manifest_astig_d=manifest, topographic_astig_d=topographic,
-                                    manifest_axis_deg=120, bad_flat_axis_deg=84.5), normal_inter_eye())
-    assert finding(result, "astigmatic_study").status == MODERATE
-
-
-@pytest.mark.parametrize("manifest,topographic", [(None, 0.5), (0.5, None)])
-def test_missing_magnitude_is_not_assumed_below_activation_limit(manifest, topographic):
-    result = evaluate_ps3(normal_eye(manifest_astig_d=manifest, topographic_astig_d=topographic), normal_inter_eye())
-    assert finding(result, "astigmatic_study").status == NOT_EVALUATED
-    assert not result.complete
-
-
 def test_existing_high_factor_does_not_discard_shared_numeric_srax():
     result = evaluate_ps3(normal_eye(thinnest_um=469, srax_deg=20.01), normal_inter_eye())
     assert result.srax_deg == 20.01
     assert finding(result, "srax").status == HIGH
     assert result.high_count == 2
-
-
-def test_active_comparison_with_missing_axis_remains_incomplete():
-    result = evaluate_ps3(normal_eye(manifest_astig_d=3.01, manifest_axis_deg=None), normal_inter_eye())
-    assert finding(result, "astigmatic_study").status == NOT_EVALUATED
-    assert not result.complete
-
-
-@pytest.mark.parametrize("manifest,status", [(4.0, NORMAL), (4.01, MODERATE)])
-def test_active_magnitude_difference_boundary(manifest, status):
-    result = evaluate_ps3(normal_eye(manifest_astig_d=manifest, topographic_astig_d=3.0,
-                                    manifest_axis_deg=90, bad_flat_axis_deg=90), normal_inter_eye())
-    assert finding(result, "astigmatic_study").status == status

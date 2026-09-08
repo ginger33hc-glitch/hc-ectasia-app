@@ -84,7 +84,7 @@ def test_ps3_runtime_complete_normal_is_allowed_for_all_procedures():
     assert result["status"] == "PASS"
 
 
-def test_low_cylinder_od_axis_discrepancy_has_no_ps3_risk_in_runtime_and_report():
+def test_axis_disparity_is_a_non_scoring_validation_warning_not_ps3():
     plans = {"OD": _plan(), "OS": _plan()}
     plans["OD"].update(manifest_entered_sphere_D=-1.25,
                        manifest_cylinder_signed_D=-0.50, manifest_axis_deg=120)
@@ -96,9 +96,10 @@ def test_low_cylinder_od_axis_discrepancy_has_no_ps3_risk_in_runtime_and_report(
     assert od["ps3"]["complete"]
     assert od["ps3"]["moderate_count"] == od["ps3"]["high_count"] == 0
     assert od["ps3"]["disposition"]["lasik"] == "ALLOWED"
-    report_finding = next(item for item in od["report_payload"]["ps3"]["findings"] if item["key"] == "astigmatic_study")
-    assert report_finding["status"] == "NOT_REQUIRED"
-    assert "no PS3 risk factor" in report_finding["detail"]
+    assert all(item["key"] != "astigmatic_study" for item in od["report_payload"]["ps3"]["findings"])
+    assert od["astigmatic_disparity"]["status"] == "VALIDATION_REQUIRED"
+    assert od["report_payload"]["astigmatic_disparity"]["affects_ps3"] is False
+    assert od["report_payload"]["procedure"] == "LASIK"
 
 
 def test_ps3_runtime_one_moderate_defers_lasik_only():

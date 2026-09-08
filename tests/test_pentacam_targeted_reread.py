@@ -58,7 +58,7 @@ def _axis_result(value):
     return result
 
 
-def test_ps3_trigger_verification_replaces_bad_axis_from_same_canonical_box(monkeypatch):
+def test_disparity_verification_replaces_bad_axis_from_same_canonical_box(monkeypatch):
     result = _axis_result(13.1)
     response = {
         "screen_family": "BAD_DISPLAY",
@@ -67,11 +67,11 @@ def test_ps3_trigger_verification_replaces_bad_axis_from_same_canonical_box(monk
     }
     monkeypatch.setattr(targeted, "targeted_reread", lambda *args, **kwargs: response)
 
-    targeted.verify_ps3_bad_flat_axes(Core, result, b"image", "os-bad.png", {"OD"})
+    targeted.verify_astigmatic_disparity_bad_flat_axes(Core, result, b"image", "os-bad.png", {"OD"})
 
     eye = result["eyes"][0]
     assert eye["bad_flat_axis_deg"] == 1.1
-    assert eye["ps3_axis_verification_evidence"]["bad_flat_axis_deg"] == {
+    assert eye["astigmatic_disparity_verification_evidence"]["bad_flat_axis_deg"] == {
         "file": "os-bad.png",
         "primary_value": 13.1,
         "verified_value": 1.1,
@@ -80,18 +80,18 @@ def test_ps3_trigger_verification_replaces_bad_axis_from_same_canonical_box(monk
     assert any("from 13.1° to 1.1°" in warning for warning in result["global_warnings"])
 
 
-def test_unresolved_ps3_trigger_axis_cannot_retain_false_moderate_value(monkeypatch):
+def test_unresolved_disparity_axis_does_not_retain_unverified_warning_value(monkeypatch):
     result = _axis_result(13.1)
     monkeypatch.setattr(targeted, "targeted_reread", lambda *args, **kwargs: {
         "screen_family": "BAD_DISPLAY", "readings": [], "warnings": [],
     })
 
-    targeted.verify_ps3_bad_flat_axes(Core, result, b"image", "os-bad.png", {"OD"})
+    targeted.verify_astigmatic_disparity_bad_flat_axes(Core, result, b"image", "os-bad.png", {"OD"})
 
     eye = result["eyes"][0]
     assert eye["bad_flat_axis_deg"] is None
-    assert eye["ps3_axis_verification_evidence"]["bad_flat_axis_deg"]["status"] == "UNRESOLVED"
-    assert any("surgeon confirmation is required" in warning for warning in result["global_warnings"])
+    assert eye["astigmatic_disparity_verification_evidence"]["bad_flat_axis_deg"]["status"] == "UNRESOLVED"
+    assert any("surgeon confirmation is recommended" in warning for warning in result["global_warnings"])
 
 
 def test_canonical_eye_fields_suppress_duplicate_targeted_reread_requests():

@@ -57,6 +57,7 @@ def build_report_payload(
     source_eye: Mapping[str, Any] | None = None,
     planning: Any = None,
     microkeratome_planning: Any = None,
+    astigmatic_disparity: Any = None,
     manual_corrections: Iterable[Any] = (),
 ) -> dict[str, Any]:
     """Project one completed canonical assessment into a renderer-neutral payload."""
@@ -131,6 +132,7 @@ def build_report_payload(
         },
         "bad": bad_payload,
         "ps3": ps3_payload,
+        "astigmatic_disparity": _plain(astigmatic_disparity),
         "tissue_safety": _plain(assessment.get("procedural_safety") or {}),
         "planning": _plain(planning),
         "microkeratome_planning": _plain(microkeratome_planning),
