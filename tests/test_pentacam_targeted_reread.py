@@ -169,6 +169,85 @@ def test_bad_display_b_ele_th_reread_writes_direct_canonical_eye_field():
     assert not result.get("nice_readings")
 
 
+def test_bad_elevations_are_always_reverified_and_primary_values_are_audit_only(monkeypatch):
+    result = pentacam_result(F_Ele_Th_um=41, B_Ele_Th_um=93)
+    eye = result["eyes"][0]
+    eye["table_verified_numeric_fields"] = ["F_Ele_Th_um", "B_Ele_Th_um"]
+    eye["canonical_source_ids"] = {
+        "F_Ele_Th_um": BAD_CENTER,
+        "B_Ele_Th_um": BAD_CENTER,
+    }
+    payload = {
+        "screen_family": "BAD_DISPLAY",
+        "readings": [
+            reading("F_Ele_Th_um", 4, "F. Ele.Th", tile="LOWER_LEFT"),
+            reading("B_Ele_Th_um", 9, "B. Ele.Th", tile="LOWER_RIGHT"),
+        ],
+        "warnings": [],
+    }
+    monkeypatch.setattr(targeted, "targeted_reread", lambda *args, **kwargs: payload)
+
+    targeted.enrich_extraction(Core, result, b"image", "od-bad.png")
+
+    assert eye["F_Ele_Th_um"] == 4
+    assert eye["B_Ele_Th_um"] == 9
+    assert eye["bad_elevation_verification_evidence"] == {
+        "F_Ele_Th_um": {
+            "file": "od-bad.png", "primary_value": 41,
+            "verified_value": 4.0, "status": "VERIFIED",
+        },
+        "B_Ele_Th_um": {
+            "file": "od-bad.png", "primary_value": 93,
+            "verified_value": 9.0, "status": "VERIFIED",
+        },
+    }
+    assert all(
+        eye["targeted_reread_evidence"][field][0]["source"]
+        == "TARGETED_LABELED_TILE_REREAD"
+        for field in targeted.BAD_ELEVATION_FIELDS
+    )
+    assert any("from 41 to 4" in warning for warning in result["global_warnings"])
+    assert any("from 93 to 9" in warning for warning in result["global_warnings"])
+
+
+def test_unresolved_bad_elevation_does_not_retain_primary_ocr_value(monkeypatch):
+    result = pentacam_result(F_Ele_Th_um=41, B_Ele_Th_um=93)
+    eye = result["eyes"][0]
+    eye["table_verified_numeric_fields"] = ["F_Ele_Th_um", "B_Ele_Th_um"]
+    eye["canonical_source_ids"] = {
+        "F_Ele_Th_um": BAD_CENTER,
+        "B_Ele_Th_um": BAD_CENTER,
+    }
+    payload = {
+        "screen_family": "BAD_DISPLAY",
+        "readings": [
+            reading(
+                "F_Ele_Th_um", None, "F. Ele.Th", status="UNREADABLE",
+                tile="LOWER_LEFT", source_box=[100, 100, 400, 250],
+            ),
+            reading(
+                "B_Ele_Th_um", None, "B. Ele.Th", status="UNREADABLE",
+                tile="LOWER_RIGHT", source_box=[100, 100, 400, 250],
+            ),
+        ],
+        "warnings": [],
+    }
+    monkeypatch.setattr(targeted, "targeted_reread", lambda *args, **kwargs: payload)
+
+    targeted.enrich_extraction(Core, result, b"image", "od-bad.png")
+
+    assert eye["F_Ele_Th_um"] is None
+    assert eye["B_Ele_Th_um"] is None
+    assert not set(targeted.BAD_ELEVATION_FIELDS) & set(eye["table_verified_numeric_fields"])
+    assert not set(targeted.BAD_ELEVATION_FIELDS) & set(eye["canonical_source_ids"])
+    assert set(targeted.BAD_ELEVATION_FIELDS) <= set(eye["missing_or_unreadable"])
+    assert all(
+        eye["bad_elevation_verification_evidence"][field]["status"] == "UNRESOLVED"
+        for field in targeted.BAD_ELEVATION_FIELDS
+    )
+    assert all(field in eye["unreadable_source_regions"] for field in targeted.BAD_ELEVATION_FIELDS)
+
+
 def test_unreadable_b_ele_th_uses_canonical_numeric_prompt_with_source_region():
     result = pentacam_result()
     reread = {

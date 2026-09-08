@@ -8,6 +8,8 @@ label/value pairs. Conflicting authoritative Four Maps examination dates are
 reread here but promoted only by the case-level date policy after both eyes agree.
 An existing BAD flat-axis value may be replaced only during the explicit
 astigmatic-disparity verification pass; its primary value remains in audit evidence.
+F.Ele.Th and B.Ele.Th are always verified from their own labeled BAD central-box
+cells before either value can enter a clinical score or report.
 """
 
 from __future__ import annotations
@@ -40,6 +42,8 @@ PENTACAM_SCREEN_FAMILIES = {
     "OTHER_PENTACAM",
     "SHOW_2_EXAMS_TOPOMETRIC",
 }
+
+BAD_ELEVATION_FIELDS = ("F_Ele_Th_um", "B_Ele_Th_um")
 
 SOURCE_TILES = (
     "ORIGINAL", "TOP_HEADER", "UPPER_LEFT", "UPPER_RIGHT", "LOWER_LEFT", "LOWER_RIGHT"
@@ -202,9 +206,13 @@ PENTACAM LANDMARK LABELS:
 - central_pachy_um is the pachymetry number identified as "Pupil Center" by the PLUS-SHAPED (+)
   marker beside it. Pachy Vertex N., the circle-marked Thinnest Locat. value, and map numbers are
   not central_pachy_um.
-- B_Ele_Th_um is only the signed value in the explicitly printed "B. Ele.Th" box on a Pentacam
-  BAD Display page. Never use an Elevation (Back) map, pupil boundary, BFS/Float or BFTE value,
-  another elevation field, neighboring number, or a calculated value.
+- F_Ele_Th_um is only the signed value attached to the explicitly printed "F. Ele.Th" label in
+  the BAD Display central numeric box. B_Ele_Th_um is only the signed value in the
+  explicitly printed "B. Ele.Th" box in that central numeric area. Read each label/value pair independently;
+  never swap the front and back values or copy one into the other. Never use an Elevation (Back) map
+  or Elevation (Front) map, pupil boundary, BFS/Float or BFTE value, another elevation field, neighboring
+  number, or a calculated value. If either label, sign, or number is unclear, return that field as
+  UNCERTAIN or UNREADABLE with value=null.
 - corneal_diameter_mm is only the explicitly printed HWTW/horizontal white-to-white value.
 
 The printed_label response must contain the visible row/field label associated with the value. If
@@ -312,6 +320,100 @@ def pentacam_qs_is_missing(result: dict[str, Any]) -> bool:
         return False
     context = result.get("document_context") or {}
     return context.get("pentacam_qs") not in {"OK", "NOT_OK"}
+
+
+def bad_elevation_targets_by_eye(result: dict[str, Any]) -> dict[str, list[str]]:
+    """Require focused F/B labeled-cell evidence for every identified BAD page."""
+    if not _looks_like_pentacam(result):
+        return {}
+    targets: dict[str, list[str]] = {}
+    for eye in result.get("eyes") or []:
+        eye_id = eye.get("eye")
+        if eye_id not in {"OD", "OS"}:
+            continue
+        screen_tokens = {
+            _normalize_label(item) for item in eye.get("screen_types") or []
+        }
+        source_ids = eye.get("canonical_source_ids") or {}
+        is_bad_page = any(
+            "baddisplay" in token or ("belin" in token and "ambrosio" in token)
+            for token in screen_tokens
+        ) or any(
+            source_ids.get(field) == canonical_source_id(field)
+            for field in BAD_ELEVATION_FIELDS
+        )
+        if is_bad_page:
+            targets[eye_id] = list(BAD_ELEVATION_FIELDS)
+    return targets
+
+
+def _prepare_bad_elevation_verification(
+    result: dict[str, Any], requested: dict[str, list[str]], filename: str,
+) -> dict[tuple[str, str], Any]:
+    """Quarantine primary F/B OCR values while retaining them only as audit evidence."""
+    originals: dict[tuple[str, str], Any] = {}
+    for eye in result.get("eyes") or []:
+        eye_id = eye.get("eye")
+        fields = requested.get(eye_id, [])
+        if not fields:
+            continue
+        verified = set(eye.get("table_verified_numeric_fields") or [])
+        source_ids = eye.setdefault("canonical_source_ids", {})
+        missing = list(eye.get("missing_or_unreadable") or [])
+        evidence = eye.setdefault("bad_elevation_verification_evidence", {})
+        targeted_evidence = eye.setdefault("targeted_reread_evidence", {})
+        for field in fields:
+            primary_value = eye.get(field)
+            originals[(eye_id, field)] = primary_value
+            evidence[field] = {
+                "file": filename,
+                "primary_value": primary_value,
+                "verified_value": None,
+                "status": "PENDING",
+            }
+            eye[field] = None
+            verified.discard(field)
+            source_ids.pop(field, None)
+            targeted_evidence.pop(field, None)
+            if field not in missing:
+                missing.append(field)
+        eye["table_verified_numeric_fields"] = sorted(verified)
+        eye["missing_or_unreadable"] = missing
+    return originals
+
+
+def _finalize_bad_elevation_verification(
+    core: Any,
+    result: dict[str, Any],
+    requested: dict[str, list[str]],
+    originals: dict[tuple[str, str], Any],
+    filename: str,
+) -> None:
+    eyes = {
+        eye.get("eye"): eye for eye in result.get("eyes") or []
+        if eye.get("eye") in requested
+    }
+    for (eye_id, field), primary_value in originals.items():
+        eye = eyes[eye_id]
+        verified_value = eye.get(field)
+        status = "VERIFIED" if core.is_number(verified_value) else "UNRESOLVED"
+        eye.setdefault("bad_elevation_verification_evidence", {})[field] = {
+            "file": filename,
+            "primary_value": primary_value,
+            "verified_value": verified_value,
+            "status": status,
+        }
+        if status == "VERIFIED":
+            if core.is_number(primary_value) and abs(float(primary_value) - float(verified_value)) > 1e-9:
+                result.setdefault("global_warnings", []).append(
+                    f"{eye_id} {field} corrected by focused BAD labeled-cell reread "
+                    f"from {float(primary_value):g} to {float(verified_value):g} µm."
+                )
+        else:
+            result.setdefault("global_warnings", []).append(
+                f"{eye_id} {field} could not be verified in its labeled BAD central-box cell; "
+                "surgeon entry is required."
+            )
 
 
 def build_overlapping_tiles(raw: bytes, *, include_top_header: bool = False) -> list[tuple[str, bytes]]:
@@ -750,10 +852,19 @@ def enrich_extraction(
     *, exam_date_requested: bool = False,
 ) -> dict[str, Any]:
     """Run the targeted second pass explicitly after primary extraction."""
+    elevation_requested = bad_elevation_targets_by_eye(result)
+    elevation_originals = _prepare_bad_elevation_verification(
+        result, elevation_requested, filename,
+    )
     requested = missing_targets_by_eye(result)
     patient_age_requested = patient_age_is_missing(result)
     pentacam_qs_requested = pentacam_qs_is_missing(result)
-    if not _enabled() or (
+    if not _enabled():
+        _finalize_bad_elevation_verification(
+            core, result, elevation_requested, elevation_originals, filename,
+        )
+        return result
+    if (
         not requested and not patient_age_requested and not pentacam_qs_requested
         and not exam_date_requested
     ):
@@ -763,14 +874,21 @@ def enrich_extraction(
             core, raw, filename, requested, patient_age_requested, pentacam_qs_requested,
             exam_date_requested,
         )
-        return apply_targeted_readings(
+        apply_targeted_readings(
             core, result, reread, requested, filename, patient_age_requested,
             pentacam_qs_requested, exam_date_requested,
         )
+        _finalize_bad_elevation_verification(
+            core, result, elevation_requested, elevation_originals, filename,
+        )
+        return result
     except Exception as exc:
         result.setdefault("global_warnings", []).append(
             f"Targeted Pentacam numeric reread failed for {filename}: "
-            f"{type(exc).__name__}; original extraction retained."
+            f"{type(exc).__name__}; unresolved fields require surgeon entry."
+        )
+        _finalize_bad_elevation_verification(
+            core, result, elevation_requested, elevation_originals, filename,
         )
         return result
 
