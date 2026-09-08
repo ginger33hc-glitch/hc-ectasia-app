@@ -1,6 +1,8 @@
 import inspect
 import json
 
+import pytest
+
 from canonical_runtime_service import POST_REFRACTIVE, evaluate_case
 
 
@@ -298,3 +300,69 @@ def test_incomplete_lasik_does_not_trigger_prk_fallback():
     assert result['eyes'][0]['status'] == 'ASSESSMENT INCOMPLETE'
     assert not result['procedure_transitions']
     assert result['effective_eye_plans']['OD']['procedure'] == 'LASIK'
+
+
+@pytest.mark.parametrize('ablation,expected_pta,expected_status', [
+    (166, 36.0, 'PASS'),
+    (189.94, 39.99, 'PASS'),
+    (190, 40.0, 'STOP-DEFER'),
+    (190.06, 40.01, 'STOP-DEFER'),
+])
+@pytest.mark.parametrize('requested_procedure', ['PRK', 'LASIK'])
+def test_shared_pta_gate_in_direct_prk_and_automatic_transition(
+    ablation, expected_pta, expected_status, requested_procedure,
+):
+    extracted = _case(
+        _eye('OD', pachy_thinnest_um=600, central_pachy_um=605,
+             PPI_avg=1.3 if requested_procedure == 'LASIK' else 1.0),
+        _eye('OS', pachy_thinnest_um=600, central_pachy_um=605),
+    )
+    result = _evaluate(extracted=extracted, plans={
+        'OD': _plan(requested_procedure, ablation_um=ablation,
+                    optical_zone_mm=6.5, transition_zone_mm=9.0),
+        'OS': _plan(),
+    })
+    od, os = result['eyes']
+    safety = od['report_payload']['tissue_safety']
+    assert od['report_payload']['procedure'] == 'PRK'
+    assert od['status'] == od['report_payload']['status'] == expected_status
+    assert safety['PRK_PTA_percent'] == pytest.approx(expected_pta)
+    assert od['values']['PRK_PTA_percent'] == safety['PRK_PTA_percent']
+    assert safety['LASIK_PTA_percent'] is None
+    assert safety['hard_stops']['prk_pta'] is (expected_status == 'STOP-DEFER')
+    assert not safety['hard_stops']['prk_rst']
+    assert not od['missing']
+    assert os['status'] == 'PASS'
+    assert 'lasik_assessment' not in os
+    if requested_procedure == 'LASIK':
+        assert od['lasik_assessment']['status'] == 'STOP-DEFER'
+        assert result['effective_eye_plans']['OD']['flap_um'] is None
+        assert result['effective_eye_plans']['OD']['ablation_um'] == ablation
+        assert result['effective_eye_plans']['OD']['optical_zone_mm'] == 6.5
+        assert len(result['procedure_transitions']) == 1
+
+
+def test_prk_rst_stop_remains_independent_of_passing_pta():
+    result = _evaluate(
+        extracted=_case(*[_eye(name, pachy_thinnest_um=480, central_pachy_um=485)
+                          for name in ('OD', 'OS')]),
+        plans={name: _plan('PRK', ablation_um=125) for name in ('OD', 'OS')},
+    )
+    for eye in result['eyes']:
+        safety = eye['report_payload']['tissue_safety']
+        assert safety['PRK_RST_um'] == 305
+        assert safety['PRK_PTA_percent'] < 40
+        assert safety['hard_stops']['prk_rst']
+        assert not safety['hard_stops']['prk_pta']
+        assert eye['status'] == 'STOP-DEFER'
+
+
+def test_prk_missing_actual_hyperopic_ablation_cannot_clear_pta():
+    plans = {name: _plan('PRK', ablation_um=None,
+                        intended_entered_sphere_D=2, intended_cylinder_signed_D=0)
+             for name in ('OD', 'OS')}
+    result = _evaluate(plans=plans)
+    for eye in result['eyes']:
+        assert eye['values']['PRK_PTA_percent'] is None
+        assert eye['status'] == 'ASSESSMENT INCOMPLETE'
+        assert any('ablation' in field for field in eye['missing'])

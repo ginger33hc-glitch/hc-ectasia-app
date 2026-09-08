@@ -2,6 +2,24 @@
 
 This record implements Monday Master Order Step 60.
 
+## Shared LASIK/PRK PTA amendment (2026-09-08)
+
+**Previous behavior:** LASIK alone used the canonical 40% gate; PRK did not expose PTA in the
+canonical safety projection. Older documentation separately described a 35.28% review flag.
+
+**Approved rule:** surgeon instruction “for prk,too, same pta rule as lasik shall apply.”
+Both procedures use one `pta_percent` calculation and `pta_hard_stop` gate in
+`clinical_core/safety.py`. PRK uses fixed 50 µm epithelium. Exact 40% and higher fail the plan
+in direct PRK and automatic LASIK→PRK. No separate 35.28% operational flag remains.
+LASIK-specific helper names were replaced directly, without compatibility wrappers; ML7 uses
+the same canonical formula/gate. Existing LASIK planning expectations remain unchanged.
+The Step 8 RST=310 fixture at CCT=545/ablation=185 previously expected overall PASS despite
+PTA=43.12%. It now expects the independent PTA stop while retaining the allowed RST boundary.
+A CCT=500/ablation=140 fixture verifies RST=310 with PTA=38% still passes.
+
+**Evidence:** boundary tests cover 39.99/40/40.01, PRK between 35.28 and 40, retained original
+plan during transition, report/runtime equality, independent RST failure and missing ablation.
+
 ## Stage 10 full-report completion clarification (2026-09-07)
 
 **Old rule / test:** `test_irrevocable_stop_does_not_request_non_decision_critical_srax`

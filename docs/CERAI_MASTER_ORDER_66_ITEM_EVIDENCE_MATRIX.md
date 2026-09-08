@@ -66,7 +66,7 @@ represented as known-image, real-case, Railway, mobile-device, or production val
 | 27 | Thinnest CCT `<480` stop | **PASS (LOCAL)** | 479 stops; 480 and 481 do not stop from this rule. One constant/function in `clinical_core.safety`. |
 | 28 | LASIK RSB `<300` stop | **PASS (LOCAL)** | 299 stops; 300 and 301 pass this boundary. One safety owner. |
 | 29 | PRK RST `<310`, epithelium 50 | **PASS (LOCAL)** | 309/310/311 and fixed 50-µm epithelium are tested in canonical safety/runtime. |
-| 30 | PTA `<40` only; A→B→C; all fail STOP-DEFER | **PASS (LOCAL)** | Binding clarification implemented at one `40.0` constant. Exact 40.0 fails Plan A, Plan B, and Plan C in runtime tests; the first safe later plan is selected, otherwise STOP-DEFER. |
+| 30 | PTA `<40` only; A→B→C; all fail STOP-DEFER | **PASS (LOCAL)** | One shared `40.0` constant/gate. September 8 approval extends PTA `<40%` to direct PRK and automatic LASIK→PRK using 50 µm epithelium. LASIK retains A→B→C, first safe candidate, otherwise STOP-DEFER; PRK retains its requested treatment settings. |
 | 31 | Signed refractive magnitude hard stops | **PASS (LOCAL)** | One normalized-refraction/safety path handles myopic and hyperopic sides; boundary tests protect both directions and negative-sign behavior. |
 | 32 | Postoperative K 36–48 inclusive | **PASS (LOCAL)** | 35.99 and 48.01 stop; 36.00 and 48.00 are allowed. |
 | 33 | One postoperative K formula, 0.8× intended MRSE | **PASS (LOCAL)** | `clinical_core.safety.estimated_final_kmean_d` is the sole formula; report and planning consume the computed result. |
@@ -97,7 +97,7 @@ represented as known-image, real-case, Railway, mobile-device, or production val
 | 58 | Current branding only | **PASS (LOCAL)** | The staging app/public site/title/footer use `CER-AI — Cornea Ectasia Risk Assessment Intelligence`; accepted branding is retained. No new branding change is authorized by this audit. |
 | 59 | Surgeon responsibility notice | **PASS (LOCAL)** | Visible in application, reports, public site, and localization; remains presentation/legal content, separate from assessment findings. |
 | 60 | Test retirement discipline | **PASS (LOCAL)** | `CERAI_STEP1_TEST_RETIREMENTS.md` records old rule → new owner/rule → reason, including the 2026-09-07 PTA clarification. |
-| 61 | Complete local regression suite | **PASS (LOCAL, ACCEPTED CHECKPOINT)** | Latest accepted checkpoint: 697 tests passed. Stage 14 records the earlier dependency/static/compile/startup and independent-process checks. Eight sample Word pages were visually checked and accepted. No full-suite or visual-QA rerun is claimed by this documentation reconciliation. Exact-head GitHub Actions acceptance remains a release gate. |
+| 61 | Complete local regression suite | **PASS (LOCAL, SHARED-PTA AMENDMENT)** | Accepted checkpoint: 697 tests and eight-page Word visual QA. After the approved PRK PTA amendment: 708 tests passed, with one dependency deprecation warning; static checks and startup invariants passed. Exact-head GitHub Actions acceptance remains a release gate. |
 | 62 | Architecture acceptance matrix | **PASS (LOCAL)** | `test_step14_architecture_acceptance.py` locks one runtime, no parallel engine, no browser clinical override, no report-side scoring, no reconciliation, PTA boundary, and current branding. |
 | 63 | 30-target validation on real Pentacam screenshots | **PARTIAL** | Historical canonical-box transcription and bilateral geometric SRAX checks exist. Subsequent staging model extraction is evidenced by recovered responses and Railway logs. Complete field-by-field equality/sign-off for the exact release candidate is not established. Dedicated PS3 BAD flat axis is distinct from the historical unreadable Show 2 K1 axis. |
 | 64 | Real-case end-to-end validation | **PARTIAL / ARCHIVE BLOCKED** | Accepted sample-report review and staging analysis/completion transport evidence exist; they do not establish complete clinical input sign-off or archive/reopen success. Staging rendered variable names contain no archive backend configuration. Complete source comparison, confirmed eligibility/treatment inputs, and deployed report/archive/reopen attribution still require evidence. |
@@ -125,8 +125,8 @@ policies, not new claims of clinical validation.
 Local canonical-engine work and accepted report formatting remain complete. The staging deployment
 is verified, while production remains unchanged. Items 57, 63 and 64 need their remaining evidence;
 item 65 is only staging-complete, and item 66 waits for explicitly authorized production promotion.
-One newly identified policy conflict remains open: the old compliance audit required a standalone
-PRK PTA >35.28% CAUTION, whereas the current canonical runtime contains no such gate. No explicit
-approval for this isolated flag's retirement/retention was recovered. Local test passes do not
-resolve that discrepancy; clinical behavior remains unchanged pending surgeon clarification.
+The PRK PTA policy conflict is resolved by the September 8 surgeon instruction: “for prk,too,
+same pta rule as lasik shall apply.” Direct PRK and automatic LASIK→PRK now require PTA `<40%`,
+with STOP-DEFER at exact 40% or higher. The 35.28% cohort maximum has no separate operational
+flag. This amendment supersedes the checkpoint behavior; it is not yet deployed.
 See `CERAI_PRODUCTION_REVIEW_2026-09-08.md` for the concrete release sequence and blockers.

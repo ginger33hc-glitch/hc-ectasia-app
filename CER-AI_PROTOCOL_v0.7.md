@@ -93,6 +93,17 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 - Intended sphere `>+6.00 D`; exactly +6.00 is allowed by this rule.
 - PRK epithelium is fixed at 50 µm for CER-AI calculations.
 
+## Shared PTA amendment — September 8, 2026
+
+Surgeon instruction: “for prk,too, same pta rule as lasik shall apply.”
+Both procedures require PTA `<40%`; exact 40% and higher fail the evaluated plan.
+PRK applies this independent STOP-DEFER gate in direct selection and automatic LASIK→PRK
+assessment, retaining the original requested PRK treatment settings and the 50 µm epithelial
+convention. LASIK retains its existing A→B→C candidate sequence; no flap-based Plan C is
+introduced for PRK. Passing PTA alone does not clear any other clinical requirement.
+The historical 35.28% cohort maximum has no separate operational caution or stop.
+This is approved CER-AI policy, not a claim of a validated PRK literature threshold.
+
 ## Tissue formulas
 
 - PRK `RST = CCT − 50 − maximum stromal ablation`.

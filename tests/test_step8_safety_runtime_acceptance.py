@@ -109,7 +109,16 @@ def test_prk_rst_310_allowed_but_309_hard_stops():
     _, at_310 = _evaluate(od_plan=_plan("PRK", ablation_um=185.0))
     assert at_310["OD"]["values"]["PRK_RST_um"] == 310.0
     assert "prk_rst" not in at_310["OD"]["hard_stops"]
-    assert at_310["OD"]["status"] == "PASS"
+    assert "prk_pta" in at_310["OD"]["hard_stops"]
+    assert at_310["OD"]["status"] == "STOP-DEFER"
+
+    _, safe_310 = _evaluate(
+        od_eye=_eye("OD", pachy_thinnest_um=500.0),
+        od_plan=_plan("PRK", ablation_um=140.0),
+    )
+    assert safe_310["OD"]["values"]["PRK_RST_um"] == 310.0
+    assert safe_310["OD"]["values"]["PRK_PTA_percent"] == 38.0
+    assert safe_310["OD"]["status"] == "PASS"
 
     result, at_309 = _evaluate(od_plan=_plan("PRK", ablation_um=186.0))
     assert at_309["OD"]["values"]["PRK_RST_um"] == 309.0

@@ -4,9 +4,9 @@ Status: **DRAFT — release gates remain open; production deployment is not auth
 
 ## Scope and preserved checkpoint
 
-This documentation follow-up reconciles evidence relative to the accepted staging checkpoint. It changes no executable
-code, clinical threshold, model setting, report renderer, credential, deployment configuration,
-or patient data. The working staging branch/service remains separate from production.
+This review reconciles evidence relative to the accepted staging checkpoint and implements the
+subsequently approved shared LASIK/PRK PTA rule. The amendment is on the isolated review branch;
+the working staging branch/service remains separate from production.
 
 | Target | Branch / commit | Railway deployment | Verified state |
 |---|---|---|---|
@@ -18,7 +18,8 @@ GitHub staging: `4628b13bc6ec02c796b8cc55d9016665cc149c11`. Different local/remo
 identifiers therefore do not indicate different source files. The review branch must descend
 from the actual GitHub staging commit, not replace staging with the local history.
 
-Application label: `0.7.71`. Clinical policy: `CER-AI-2026-09-08-PRK-ERSS-SHARED-ABLATION`.
+Application label: `0.7.71`. Checkpoint policy: `CER-AI-2026-09-08-PRK-ERSS-SHARED-ABLATION`.
+Amended review policy: `CER-AI-2026-09-08-SHARED-PTA-LT40`.
 The label alone is insufficient to identify a deployment; retain commit and policy identifiers.
 
 ## Evidence already accepted
@@ -60,7 +61,6 @@ been validated here. Do not copy production patient storage or keys into staging
 
 | Matrix item | Required evidence | Current limitation |
 |---|---|---|
-| Policy reconciliation | Explicit disposition of the old standalone PRK PTA >35.28% CAUTION | Historical compliance text and current runtime disagree; no specific resolving approval was recovered |
 | 57 | Physical phone: install/share, first upload, completion, PDF/Word access and archive reopen | Automated tests and HTTP logs are not a physical-device run |
 | 63 | Compare every canonical target against labeled source boxes for the exact candidate; include BAD flat axis, dedicated ML7 K1/K2, bilateral geometric SRAX and unreadable/conflict behavior | Historical transcription and extracted responses do not establish complete equality/sign-off |
 | 64 | Surgeon-confirmed eligibility and treatment inputs; complete case through report, durable save, search, reopen, original artifact and attribution | Incomplete recovered responses; staging archive is unconfigured |
@@ -75,23 +75,42 @@ been validated here. Do not copy production patient storage or keys into staging
 - Replace obsolete soft-lens 14-day operational text with the existing canonical 10-day readiness gate.
 - Correct matrix item 45 and distinguish earlier local audit evidence from later staging deployment and accepted report QA.
 
-### Open policy decision: standalone PRK PTA >35.28% flag
+### Resolved PTA policy and source provenance
 
-The earlier compliance audit says this value independently causes CAUTION. The current canonical
-core/runtime contains no such gate. Searches of repository history, the master-order text and
-prior-session context did not recover explicit approval retaining or retiring this isolated flag.
-Retirement of the PRK-EWSS scorer alone is not assumed to resolve it. The surgeon must decide
-whether the flag is retired or is an intended independent caution before policy acceptance closes.
-Clinical code remains unchanged. This is separate from the approved LASIK PTA >=40% plan-failure rule.
+September 8 surgeon instruction: “for prk,too, same pta rule as lasik shall apply.”
+Both procedures now require PTA <40%; exact 40% or higher fails the plan. The canonical owner
+is `clinical_core/safety.py`; direct PRK and automatic LASIK→PRK consume it through the same
+pipeline. PRK uses `(50 + maximum stromal ablation) / thinnest CCT × 100`, retaining independent
+RST and other safety stops. LASIK retains its existing A→B→C sequence. No PRK flap-plan sequence
+or separate 35.28% operational flag is introduced.
+
+The old number was the maximum observed PTA in Li et al.'s 408-eye TPRK cohort (range
+24.29–35.28%, RST 310–348 µm, two-year follow-up); the abstract does not establish a validated
+35.28% threshold. [Primary paper](https://link.springer.com/article/10.1007/s00417-022-05814-3).
+An August 24 project protocol called it an evidence-envelope review flag, not a validated
+standalone cutoff. Git history first applied it in `96bd7391715a6a0cc37f89ad6b4da753fa8b248d`,
+made it block automatic PASS in `fff8ae35340da9ce974ae4d7a4aac236897325fb`, changed the disposition
+to CAUTION in `c53e541f984cfb547826cf12ec627af21724e9ac`, and later removed legacy implementations.
+The current explicit instruction resolves the intervening documentation/runtime conflict.
+The new PRK 40% boundary is approved CER-AI policy, not a claim that this cohort validated it.
+
+## Shared-PTA amendment validation
+
+- Local complete regression suite: **708 passed**, one Starlette/AnyIO deprecation warning.
+- Critical static checks, diff whitespace checks and canonical startup invariants passed.
+- Direct PRK and automatic LASIK→PRK tests cover 36%, 39.99%, exact 40%, and 40.01%;
+  retained treatment settings, runtime/report equality, independent RST stops, and missing ablation.
+- Accepted Word/PDF layout is preserved; no renderer implementation was changed.
+- The review PR must record exact-commit CI outcomes before promotion; local results alone do not close that gate.
 
 ## Concrete promotion sequence
 
-1. Keep the documentation/release review on `review/production-readiness-2026-09-08`, descended
+1. Keep the clinical/release review on `review/production-readiness-2026-09-08`, descended
    from the exact staging checkpoint. Open a draft PR to `main`; do not merge it or enable auto-merge.
 2. Inspect the existing Canonical Runtime Safety workflow on that PR. Record actual results;
    a missing, queued or failed workflow is not a pass. The initial staging head had no Actions
    runs because the workflow triggers on `main` pushes and PRs targeting `main`.
-3. Resolve the isolated PRK PTA policy conflict with the surgeon, then close items 63–64 with verified source values and surgeon-confirmed case inputs. Provision
+3. Close items 63–64 with verified source values and surgeon-confirmed case inputs. Provision
    an isolated staging archive only after its storage destination and access configuration are
    known; never substitute production patient storage. Record the actual persistent cycle.
 4. Complete the physical-device portions of item 57. Preserve the already accepted Word sample.

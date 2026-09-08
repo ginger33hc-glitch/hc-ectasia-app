@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 import canonical_engine
-from clinical_core.safety import LASIK_PTA_LIMIT_PERCENT, lasik_pta_hard_stop
+from clinical_core.safety import PTA_LIMIT_PERCENT, pta_hard_stop
 
 
 REPO = Path(__file__).resolve().parent.parent
@@ -61,7 +61,7 @@ def test_report_renderer_has_no_clinical_scorer_or_threshold_owner():
     assert not any(module.startswith("clinical_core") for module in imported_modules)
     assert {
         "erss_total", "score_nice", "evaluate_ps3", "evaluate_bad",
-        "finalize_disposition", "lasik_pta_percent", "estimated_final_kmean_d",
+        "finalize_disposition", "pta_percent", "estimated_final_kmean_d",
     }.isdisjoint(called_names)
 
 
@@ -77,8 +77,8 @@ def test_merge_has_no_first_highest_lowest_or_tolerance_reconciliation():
 
 
 def test_pta_boundary_is_a_startup_locked_canonical_rule():
-    assert LASIK_PTA_LIMIT_PERCENT == 40.0
-    assert [lasik_pta_hard_stop(x) for x in (39.99, 40.0, 40.01)] == [False, True, True]
+    assert PTA_LIMIT_PERCENT == 40.0
+    assert [pta_hard_stop(x) for x in (39.99, 40.0, 40.01)] == [False, True, True]
     assert canonical_engine.runtime_invariants() is True
 
 

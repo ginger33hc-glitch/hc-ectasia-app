@@ -112,6 +112,7 @@ def _values(core_result: Mapping[str, Any]) -> dict[str, Any]:
         "LASIK_RSB_um": safety.get("LASIK_RSB_um"),
         "PRK_RST_um": safety.get("PRK_RST_um"),
         "LASIK_PTA_percent": safety.get("LASIK_PTA_percent"),
+        "PRK_PTA_percent": safety.get("PRK_PTA_percent"),
         "estimated_final_Kmean_D": safety.get("estimated_final_Kmean_D"),
         "intended_refractive_group": core_result.get("intended_refractive_group"),
     }

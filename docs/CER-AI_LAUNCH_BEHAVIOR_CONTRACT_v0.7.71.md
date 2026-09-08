@@ -2,7 +2,7 @@
 
 Status: **Reconciled with the approved September 8, 2026 staging checkpoint**
 
-Purpose: this document describes the approved canonical candidate at staging commit `0d36e06981b48d1147eb2123c2b46a0df077f70a`. It does not claim this candidate is deployed to production. The 66-item evidence matrix records acceptance; later approved amendments in the protocol and test-retirement record supersede the original Phase 1 freeze. Clinical changes require explicit approval and direct changes to the owning implementation.
+Purpose: this document describes the approved canonical candidate based on staging commit `0d36e06981b48d1147eb2123c2b46a0df077f70a`, with the subsequent September 8 shared-PTA amendment. It does not claim this candidate is deployed to production. The 66-item evidence matrix records acceptance; later approved amendments in the protocol and test-retirement record supersede the original Phase 1 freeze. Clinical changes require explicit approval and direct changes to the owning implementation.
 
 ## 1. Canonical production flow
 
@@ -173,6 +173,7 @@ Independent hard-stop / safety rules include at least:
 - intended hyperopic sphere beyond +6.00 D → STOP-DEFER
 - estimated postoperative Kmean outside 36–48 D → STOP-DEFER
 - LASIK PTA >=40.0% fails the evaluated candidate; evaluate A→B→C and retain the first candidate satisfying every applicable requirement
+- PRK PTA >=40.0% → STOP-DEFER for both direct PRK and automatic LASIK→PRK; no separate 35.28% flag
 - PRK epithelium convention = 50 µm
 
 PRK selection must not retain an active LASIK flap plan.

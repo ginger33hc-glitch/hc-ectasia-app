@@ -135,9 +135,10 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Planned LASIK flap thickness is selected per eye from `90`, `100`, `110`, or `120 µm`; PRK plans leave the flap selection blank.
 - Refraction stability, documented progression, unexplained CDVA loss, and anticipated enhancement remain separate eye-specific values inside one compact clinical-eligibility dropdown box.
 - PRK epithelial thickness is shown per eye as a fixed, read-only `50 µm` CER-AI value and is used in the PRK RST/PTA calculations.
-- Procedure-correct PTA formulas for LASIK and PRK. A LASIK candidate at PTA `>=40%`
-  fails; planning evaluates Plan A, then B, then C, and returns STOP-DEFER when none has
-  PTA `<40%` together with the other canonical safety requirements.
+- Procedure-correct PTA formulas for LASIK and PRK share one safety limit: PTA must be `<40%`;
+  `>=40%` fails the evaluated plan. LASIK planning evaluates A→B→C and retains the first safe
+  candidate. Direct PRK and automatic LASIK→PRK assessments apply the same limit to the PRK
+  plan, using fixed 50 µm epithelium; other safety requirements remain independent.
 - BAD-D/component display interpretation plus adjunctive ARTmax/TP/Dt/Da evidence flags.
 - Positive tomography concern flags require review and cannot receive automatic PASS.
 - Limited/inadequate image quality produces a prominent final report warning without suppressing
@@ -145,7 +146,6 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
   unresolved decision-critical cross-image value conflicts still prohibit PASS. Same-provenance
   numeric differences `<=1%` retain the parameter-specific safety-limiting value: lower for
   pachymetry, ARTmax, and Rmin; higher for the remaining supported numeric fields.
-- PRK PTA above the supplied 35.28% direct-cohort envelope requires review and cannot receive automatic PASS.
 - Expanded extraction/reporting of anterior and posterior elevation, pachymetric progression,
   topometric, thinnest-point location, corneal-volume, and HOA/coma fields when visibly available.
 - Required clinical modifiers and treatment-plan inputs; missing/unreadable critical data prohibit PASS.

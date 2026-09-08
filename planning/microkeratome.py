@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Optional, Tuple
 import math
 from clinical_core.disposition import CAUTION, PASS, PASS_WITH_CAUTION
-from clinical_core.safety import LASIK_PTA_LIMIT_PERCENT, LASIK_RSB_MIN_UM
+from clinical_core.safety import lasik_rsb_hard_stop, lasik_rsb_um, pta_hard_stop, pta_percent
 
 FAVORABLE_PLANNING_STATUSES = frozenset({PASS, PASS_WITH_CAUTION, CAUTION})
 
@@ -114,9 +114,9 @@ def _alternative_tissue_safety(
     if pachy is None or flap is None or ablation is None or pachy <= 0:
         return None, None, "UNAVAILABLE"
     alternative_flap = flap + 10.0
-    rsb = pachy - alternative_flap - ablation
-    pta = 100.0 * (alternative_flap + ablation) / pachy
-    allowed = rsb >= LASIK_RSB_MIN_UM and pta < LASIK_PTA_LIMIT_PERCENT
+    rsb = lasik_rsb_um(pachy, alternative_flap, ablation)
+    pta = pta_percent(pachy, alternative_flap, ablation)
+    allowed = not lasik_rsb_hard_stop(rsb) and not pta_hard_stop(pta)
     return round(rsb, 2), round(pta, 3), "ALLOWED" if allowed else "NOT_ALLOWED"
 
 

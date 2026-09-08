@@ -20,12 +20,12 @@ from clinical_core.rules import erss_age_points, erss_pachymetry_points
 from clinical_core.safety import (
     FINAL_KMEAN_MAX_D,
     FINAL_KMEAN_MIN_D,
-    LASIK_PTA_LIMIT_PERCENT,
+    PTA_LIMIT_PERCENT,
     LASIK_RSB_MIN_UM,
     PREOP_THINNEST_HARD_STOP_UM,
     PRK_EPITHELIUM_UM,
     PRK_RST_MIN_UM,
-    lasik_pta_hard_stop,
+    pta_hard_stop,
 )
 from pentacam_canonical_source_lock import (
     CANONICAL_FIELD_SOURCES,
@@ -60,10 +60,10 @@ def runtime_invariants():
         errors.append("Canonical PRK epithelial convention is not 50 µm")
     if LASIK_RSB_MIN_UM != 300.0 or PRK_RST_MIN_UM != 310.0:
         errors.append("Canonical stromal safety minima are invalid")
-    if LASIK_PTA_LIMIT_PERCENT != 40.0 or [
-        lasik_pta_hard_stop(value) for value in (39.99, 40.0, 40.01)
+    if PTA_LIMIT_PERCENT != 40.0 or [
+        pta_hard_stop(value) for value in (39.99, 40.0, 40.01)
     ] != [False, True, True]:
-        errors.append("Canonical LASIK PTA boundary is invalid")
+        errors.append("Canonical LASIK/PRK PTA boundary is invalid")
     if PREOP_THINNEST_HARD_STOP_UM != 480.0:
         errors.append("Canonical preoperative thickness hard stop is invalid")
     if FINAL_KMEAN_MIN_D != 36.0 or FINAL_KMEAN_MAX_D != 48.0:

@@ -11,8 +11,8 @@ from clinical_core.safety import (
     PRK_EPITHELIUM_UM,
     estimated_final_kmean_d,
     final_kmean_hard_stop,
-    lasik_pta_hard_stop,
-    lasik_pta_percent,
+    pta_hard_stop,
+    pta_percent,
     lasik_rsb_hard_stop,
     lasik_rsb_um,
     preop_thickness_hard_stop,
@@ -67,7 +67,7 @@ def test_structural_calculations_match_matrix_examples():
     assert lasik_rsb_um(520, 100, 121) == 299
     assert prk_rst_um(520, 160) == 310
     assert prk_rst_um(520, 161) == 309
-    assert lasik_pta_percent(500, 100, 100) == 40.0
+    assert pta_percent(500, 100, 100) == 40.0
     assert estimated_final_kmean_d(44.0, -10.0) == 36.0
     assert estimated_final_kmean_d(43.2, 6.0) == 48.0
 
@@ -89,11 +89,21 @@ def test_procedural_hard_stop_boundaries_are_exact():
     assert sphere_magnitude_hard_stop(6.01)
 
 
-def test_pta_40_percent_boundary_is_a_canonical_lasik_hard_stop():
-    assert lasik_pta_percent(500, 100, 100) == 40.0
-    assert not lasik_pta_hard_stop(39.99)
-    assert lasik_pta_hard_stop(40.0)
-    assert lasik_pta_hard_stop(40.01)
+def test_pta_40_percent_boundary_is_a_shared_canonical_hard_stop():
+    assert pta_percent(500, 100, 100) == 40.0
+    assert pta_percent(600, PRK_EPITHELIUM_UM, 190) == 40.0
+    assert not pta_hard_stop(39.99)
+    assert pta_hard_stop(40.0)
+    assert pta_hard_stop(40.01)
+
+
+def test_shared_pta_rejects_missing_and_nonfinite_inputs():
+    for invalid in (None, float('nan'), float('inf'), True):
+        assert pta_percent(invalid, 50, 190) is None
+        assert pta_percent(600, invalid, 190) is None
+        assert pta_percent(600, 50, invalid) is None
+    assert pta_percent(0, 50, 190) is None
+    assert pta_percent(-600, 50, 190) is None
 
 
 def test_ps3_clinical_core_facade_is_the_same_pure_policy():
