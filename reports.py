@@ -274,9 +274,12 @@ def canonical_report_model(payload: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+TABLE_WIDTHS_IN = {2: [2.15, 4.0], 3: [1.35, 1.25, 3.55], 4: [1.25, 1.25, 1.7, 1.95]}
+
+
 def _pdf_table(rows, styles, regular_font, bold_font, selected_plan_status=None):
     width = len(rows[0])
-    col_widths = {2: [2.15 * inch, 4.0 * inch], 3: [1.35 * inch, 1.25 * inch, 3.55 * inch], 4: [1.25 * inch, 1.25 * inch, 1.7 * inch, 1.95 * inch]}[width]
+    col_widths = [value * inch for value in TABLE_WIDTHS_IN[width]]
     data = []
     highlights = []
     for row_index, row in enumerate(rows):
@@ -358,42 +361,91 @@ def build_pdf(payload: Mapping[str, Any]) -> bytes:
 
 
 def _shade(cell, fill):
-    props = cell._tc.get_or_add_tcPr(); node = OxmlElement("w:shd"); node.set(qn("w:fill"), fill); props.append(node)
+    props = cell._tc.get_or_add_tcPr()
+    for old in props.findall(qn("w:shd")):
+        props.remove(old)
+    node = OxmlElement("w:shd"); node.set(qn("w:fill"), fill); props.append(node)
 
 
-def _docx_table(document, rows, selected_plan_status=None):
+def _docx_notice(document, text, foreground, background):
+    paragraph = document.add_paragraph(text)
+    paragraph.paragraph_format.line_spacing = Pt(11)
+    paragraph.paragraph_format.space_after = Pt(8)
+    node = OxmlElement("w:shd"); node.set(qn("w:fill"), background)
+    paragraph._p.get_or_add_pPr().append(node)
+    for run in paragraph.runs:
+        run.bold = True; run.font.size = Pt(8.5); run.font.color.rgb = RGBColor.from_string(foreground)
+    return paragraph
+
+
+def _docx_table(document, rows, selected_plan_status=None, keep_together=False):
     table = document.add_table(rows=1, cols=len(rows[0])); table.style = "Table Grid"; table.alignment = WD_TABLE_ALIGNMENT.LEFT
+    table.autofit = False
+    widths = TABLE_WIDTHS_IN[len(rows[0])]
+    for column, width in zip(table.columns, widths):
+        column.width = Inches(width)
+    props = table._tbl.tblPr
+    props.find(qn("w:tblW")).set(qn("w:w"), str(round(sum(widths) * 1440)))
+    props.find(qn("w:tblW")).set(qn("w:type"), "dxa")
+    margins = OxmlElement("w:tblCellMar")
+    for side, points in (("top", 4), ("bottom", 4), ("left", 5), ("right", 5)):
+        node = OxmlElement(f"w:{side}"); node.set(qn("w:w"), str(points * 20)); node.set(qn("w:type"), "dxa"); margins.append(node)
+    props.append(margins)
+    borders = OxmlElement("w:tblBorders")
+    for side in ("top", "bottom", "left", "right", "insideH", "insideV"):
+        node = OxmlElement(f"w:{side}"); node.set(qn("w:val"), "single"); node.set(qn("w:sz"), "3"); node.set(qn("w:color"), LINE); borders.append(node)
+    props.append(borders)
+    table.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:tblHeader"))
     for index, value in enumerate(rows[0]):
         table.rows[0].cells[index].text = _text(value, ""); _shade(table.rows[0].cells[index], NAVY)
         for run in table.rows[0].cells[index].paragraphs[0].runs:
             run.bold = True; run.font.color.rgb = RGBColor(255, 255, 255)
-    for row in rows[1:]:
+    for row_number, row in enumerate(rows[1:], 1):
         cells = table.add_row().cells
         for index, value in enumerate(row):
             cells[index].text = _text(value, "")
+            _shade(cells[index], "FFFFFF" if row_number % 2 else "F7F9FB")
             palette = _cell_palette(row, index, selected_plan_status)
             if palette:
                 foreground, background = palette
                 _shade(cells[index], background)
                 for run in cells[index].paragraphs[0].runs:
                     run.font.color.rgb = RGBColor.from_string(foreground)
-    for row in table.rows:
-        for cell in row.cells:
+    for row_number, row in enumerate(table.rows):
+        row._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+        for cell, width in zip(row.cells, widths):
+            cell.width = Inches(width)
             for paragraph in cell.paragraphs:
                 paragraph.paragraph_format.space_after = Pt(0)
-                for run in paragraph.runs: run.font.name = "Arial"; run.font.size = Pt(8)
+                paragraph.paragraph_format.space_before = Pt(0)
+                paragraph.paragraph_format.line_spacing = Pt(9)
+                paragraph.paragraph_format.keep_with_next = row_number == 0 or (keep_together and row_number < len(table.rows) - 1)
+                for run in paragraph.runs: run.font.name = "Arial"; run.font.size = Pt(7.3)
     return table
 
 
 def build_docx(payload: Mapping[str, Any]) -> bytes:
     model = canonical_report_model(payload); locale = model["locale"]; tr = lambda value: translate_text(value, locale)
     document = Document(); document.core_properties.title = f"CER-AI — {PROGRAM_NAME}"
-    section = document.sections[0]; section.left_margin = section.right_margin = Inches(.75)
-    title = document.add_paragraph(); run = title.add_run(tr("CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT")); run.bold = True; run.font.size = Pt(18); run.font.color.rgb = RGBColor.from_string(NAVY)
-    document.add_paragraph(PROGRAM_NAME)
-    notice = document.add_paragraph(liability_notice(locale))
-    for run in notice.runs: run.bold = True; run.font.color.rgb = RGBColor.from_string(GRAY)
-    notice.paragraph_format.space_after = Pt(REPORT_BLANK_LINE_PT)
+    section = document.sections[0]
+    section.page_width = Inches(8.5); section.page_height = Inches(11)
+    section.left_margin = section.right_margin = section.top_margin = Inches(.65)
+    section.bottom_margin = Inches(.75); section.footer_distance = Inches(.2)
+    normal = document.styles["Normal"]
+    normal.font.name = "Arial"; normal.font.size = Pt(7.3); normal.font.color.rgb = RGBColor.from_string(INK)
+    normal.paragraph_format.space_after = Pt(0); normal.paragraph_format.line_spacing = Pt(9)
+    for name in ("Heading 1", "Heading 2"):
+        style = document.styles[name]; style.font.name = "Arial"; style.font.bold = True
+        style.font.size = Pt(10.5); style.font.color.rgb = RGBColor.from_string(NAVY)
+        style.paragraph_format.line_spacing = Pt(13)
+        style.paragraph_format.space_before = Pt(9); style.paragraph_format.space_after = Pt(4)
+        style.paragraph_format.keep_with_next = True
+    title = document.add_paragraph(); title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title.paragraph_format.line_spacing = Pt(20); title.paragraph_format.space_after = Pt(4)
+    run = title.add_run(tr("CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT")); run.bold = True; run.font.size = Pt(17); run.font.color.rgb = RGBColor.from_string(NAVY)
+    subtitle = document.add_paragraph(PROGRAM_NAME); subtitle.paragraph_format.space_after = Pt(6)
+    notice = _docx_notice(document, liability_notice(locale), GRAY, GRAY_FILL)
+    notice.paragraph_format.space_after = Pt(8 + REPORT_BLANK_LINE_PT)
     patient = model["patient"]
     _docx_table(document, [
         [tr("Patient"), _text(patient.get("name")), tr("Patient ID"), _text(patient.get("id"))],
@@ -405,15 +457,13 @@ def build_docx(payload: Mapping[str, Any]) -> bytes:
     gap.paragraph_format.space_before = Pt(0)
     gap.paragraph_format.space_after = Pt(0)
     if model.get("action"):
-        paragraph = document.add_paragraph(_text(model["action"]))
-        foreground, _ = _status_palette(model.get("status")) or (GRAY, GRAY_FILL)
-        for run in paragraph.runs:
-            run.font.color.rgb = RGBColor.from_string(foreground)
+        foreground, background = _status_palette(model.get("status")) or (GRAY, GRAY_FILL)
+        _docx_notice(document, _text(model["action"]), foreground, background)
     for warning in model["identity_warnings"] + model["source_quality_warnings"]:
-        paragraph = document.add_paragraph(_text(warning))
-        for run in paragraph.runs: run.bold = True; run.font.color.rgb = RGBColor.from_string(AMBER)
+        _docx_notice(document, _text(warning), AMBER, AMBER_FILL)
     for eye in model["eyes"]:
         paragraph = document.add_heading(f"{_text(eye['eye'])} — {_text(eye['status'])}", level=1)
+        paragraph.paragraph_format.line_spacing = Pt(19.5)
         if eye["eye"] == "OD":
             paragraph.paragraph_format.space_before = Pt(2 * REPORT_BLANK_LINE_PT)
         if eye["eye"] == "OS":
@@ -421,8 +471,13 @@ def build_docx(payload: Mapping[str, Any]) -> bytes:
         foreground, _ = _status_palette(eye.get("status")) or (GRAY, GRAY_FILL)
         for run in paragraph.runs:
             run.font.color.rgb = RGBColor.from_string(foreground)
-            run.font.size = Pt(document.styles["Heading 1"].font.size.pt * 1.5)
+            run.font.size = Pt(15.75)
         for heading, rows in eye["sections"]:
-            document.add_heading(tr(heading), level=2); _docx_table(document, rows, eye["status"] if heading == "Procedure planning" and eye.get("procedure") == "LASIK" else None)
+            document.add_heading(tr(heading), level=2)
+            _docx_table(document, rows, eye["status"] if heading == "Procedure planning" and eye.get("procedure") == "LASIK" else None, keep_together=heading in {"Randleman / ERSS", "NICE", "PS3"})
     footer = section.footer.paragraphs[0]; footer.alignment = WD_ALIGN_PARAGRAPH.CENTER; footer.add_run(authorship_notice(locale))
+    for run in footer.runs: run.font.size = Pt(6.2); run.font.color.rgb = RGBColor.from_string(GRAY)
+    page = section.footer.add_paragraph(tr("Page") + " "); page.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    field = OxmlElement("w:fldSimple"); field.set(qn("w:instr"), "PAGE"); page._p.append(field)
+    for run in page.runs: run.font.size = Pt(6.2); run.font.color.rgb = RGBColor.from_string(GRAY)
     output = BytesIO(); document.save(output); return output.getvalue()
