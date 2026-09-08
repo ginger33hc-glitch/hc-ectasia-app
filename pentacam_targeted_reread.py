@@ -24,8 +24,8 @@ from typing import Any
 from PIL import Image, ImageOps
 from exam_date_reconciliation_policy import possible_calendar_dates
 from pentacam_canonical_source_lock import (
-    CANONICAL_FIELD_SOURCES, LOCKED_FIELDS, SHOW_2_CORNEA_BACK, SHOW_2_CORNEA_FRONT, SHOW_2_INDICES,
-    canonical_source_id, canonical_visual_contract, source_family,
+    CANONICAL_FIELD_SOURCES, SHOW_2_CORNEA_BACK, SHOW_2_CORNEA_FRONT, SHOW_2_INDICES,
+    canonical_source_id, source_family,
 )
 from pentacam_field_registry import (
     CORNEA_FRONT_KERATOMETRY_FIELDS,
@@ -188,10 +188,9 @@ BAD_ELEVATION_CONFIRMATION_SCHEMA = {
                     "eye": {"type": "string", "enum": ["OD", "OS"]},
                     "field": {"type": "string", "enum": list(BAD_ELEVATION_FIELDS)},
                     "visible_field_label": {"type": ["string", "null"]},
-                    "visible_companion_label": {"type": ["string", "null"]},
-                    "row_identity": {
+                    "label_value_pair_status": {
                         "type": "string",
-                        "enum": ["CONFIRMED_ELEVATION_ROW", "WRONG_ROW", "UNREADABLE"],
+                        "enum": ["CONFIRMED_LABEL_ADJACENCY", "WRONG_LABEL", "UNREADABLE"],
                     },
                     "observed_value_text": {"type": ["string", "null"]},
                     "value": {"type": ["integer", "null"]},
@@ -201,8 +200,8 @@ BAD_ELEVATION_CONFIRMATION_SCHEMA = {
                     },
                 },
                 "required": [
-                    "eye", "field", "visible_field_label", "visible_companion_label",
-                    "row_identity", "observed_value_text", "value", "status",
+                    "eye", "field", "visible_field_label", "label_value_pair_status",
+                    "observed_value_text", "value", "status",
                 ],
             },
         },
@@ -212,13 +211,16 @@ BAD_ELEVATION_CONFIRMATION_SCHEMA = {
 }
 
 BAD_ELEVATION_CONFIRMATION_PROMPT = """You are a digit-only verification reader for two
-Pentacam BAD Display fields. Each requested field is supplied as a contextual crop that must visibly
-contain the complete F.Ele.Th/B.Ele.Th row, followed by an enlarged grayscale copy.
+Pentacam BAD Display fields. Each requested field is supplied as an UNTRUSTED crop, followed by an
+enlarged grayscale copy. Do not trust the crop caption or a prior claim about its identity.
 
-LABEL-FIRST SAFEGUARD: first find the literal F.Ele.Th and B.Ele.Th labels in the pixels. This is the
-single horizontal elevation row BELOW the K1/K2/Axis and pachymetry/distance rows and ABOVE the
-Progression Index rows. If both literal labels are not visible, or the crop instead shows K1, K2,
-Axis, Pachy, Dist., or another row, return WRONG_ROW with value=null. Never trust the crop caption.
+Use this strict order for each field:
+1. First find the literal printed definition: F.Ele.Th for front elevation or B.Ele.Th for back elevation.
+2. Then read only the numeric box immediately adjacent to that exact definition.
+
+These definitions are in the elevation row below the upper K1/K2/Axis boxes. If the crop instead
+shows K1, K2, Axis, or another definition, return WRONG_LABEL with value=null. A plausible number
+without the requested definition beside it is never acceptable.
 
 Read only the integer printed inside that field's value cell:
 - F_Ele_Th_um: the integer immediately attached to the printed F.Ele.Th label.
@@ -235,58 +237,6 @@ REQUESTED CROPS:
 {targets}
 """
 
-LABELED_CROP_CONFIRMATION_SCHEMA = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "readings": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "eye": {"type": "string", "enum": ["OD", "OS"]},
-                    "field": {"type": "string", "enum": list(TARGET_FIELDS)},
-                    "visible_section_label": {"type": ["string", "null"]},
-                    "visible_field_label": {"type": ["string", "null"]},
-                    "observed_value_text": {"type": ["string", "null"]},
-                    "value": {"type": ["number", "null"]},
-                    "adjacent_value": {"type": "boolean"},
-                    "status": {
-                        "type": "string",
-                        "enum": ["CONFIRMED", "WRONG_SECTION", "WRONG_LABEL", "UNREADABLE"],
-                    },
-                },
-                "required": [
-                    "eye", "field", "visible_section_label", "visible_field_label",
-                    "observed_value_text", "value", "adjacent_value", "status",
-                ],
-            },
-        },
-        "warnings": {"type": "array", "items": {"type": "string"}},
-    },
-    "required": ["readings", "warnings"],
-}
-
-LABELED_CROP_CONFIRMATION_PROMPT = """You are an independent pixel-level validator for Pentacam
-labeled values. Do not trust the supplied field name, crop caption, prior OCR, or source declaration.
-
-For each crop, use this mandatory order:
-1. Find the required section heading when one is specified.
-2. Find the exact requested printed row/field label inside that section.
-3. Read only the numeric value immediately attached to that label.
-
-Return CONFIRMED only if the pixels themselves show the required section, exact label, and adjacent
-value. If the section and label are proven but the digits are unreadable, return UNREADABLE while
-still reporting the visible labels. A matching number beside a different label is invalid. The same K1/K2/Km/Rmin label in a
-different panel is invalid. Preserve signs and decimal points. Do not calculate or infer anything.
-For BAD components, Df, Db, Dp, Dt, Da and final D are distinct literal labels; never substitute one
-for another. For panel-scoped fields, visible_section_label must contain the actual panel heading.
-
-CONTRACTS:
-{contracts}
-"""
-
 REREAD_PROMPT = """You are ONLY a targeted Pentacam labeled-numeric-field transcriber.
 The first image is the complete original screen. The remaining images are overlapping crops from
 that exact same screen, supplied only to make small printed text easier to read.
@@ -295,13 +245,6 @@ Read only the requested fields listed below. Return a reading only when the fiel
 label and its attached numeric value are both visible. Preserve decimal point, sign, and eye
 laterality exactly. Use CONFIDENT only when label, digits, sign, and OD/OS are unambiguous. If two
 tiles appear to disagree, return one UNCERTAIN reading with value=null rather than choosing.
-
-CANONICAL LABEL-FIRST ORDER: locate the exact screen, then the required section heading, then the
-definitive field label, and only then read the immediately attached value. Do not begin with a
-number. A K1, K2, Km, Rmin, Axis, Min/Avg/Max, or D-like label in another panel or row is a different
-field and must be rejected. For Cornea Front/Cornea Back/8-mm Indices fields, source_box must include
-the visible panel heading as well as the requested row label and value so a second reader can verify
-the hierarchy from pixels.
 
 Never calculate or reconstruct a missing value. In particular, do not calculate ARTmax from
 pachymetry/PPImax, do not back-calculate PPImax from ARTmax, and do not derive BAD components,
@@ -327,10 +270,10 @@ PENTACAM LANDMARK LABELS:
   not central_pachy_um.
 - F_Ele_Th_um is only the signed value attached to the explicitly printed "F. Ele.Th" label in
   the BAD Display central numeric box. B_Ele_Th_um is only the signed value in the
-  explicitly printed "B. Ele.Th" box in that central numeric area. The two fields occupy one row
-  below the K1/K2/Axis and pachymetry/distance rows and above Progression Index. Localize that whole
-  F.Ele.Th/B.Ele.Th row; a crop showing K1, K2, Axis, Pachy, or Distance is the wrong row.
-  Read each label/value pair independently;
+  explicitly printed "B. Ele.Th" box in that central numeric area. First locate the literal
+  F.Ele.Th or B.Ele.Th definition in the lower elevation row beneath K1/K2/Axis; then localize only
+  that definition and its immediately adjacent value box. A K1/K2/Axis crop is invalid even if its
+  number looks plausible. Read each label/value pair independently;
   never swap the front and back values or copy one into the other. Never use an Elevation (Back) map
   or Elevation (Front) map, pupil boundary, BFS/Float or BFTE value, another elevation field, neighboring
   number, or a calculated value. If either label, sign, or number is unclear, return that field as
@@ -504,36 +447,6 @@ def _prepare_bad_elevation_verification(
     return originals
 
 
-def _prepare_locked_visual_verification(
-    result: dict[str, Any], filename: str,
-) -> dict[tuple[str, str], Any]:
-    """Quarantine primary locked values until their pixels pass the visual contract."""
-    originals: dict[tuple[str, str], Any] = {}
-    for eye in result.get("eyes") or []:
-        eye_id = eye.get("eye")
-        if eye_id not in {"OD", "OS"}:
-            continue
-        verified = set(eye.get("table_verified_numeric_fields") or [])
-        source_ids = eye.setdefault("canonical_source_ids", {})
-        missing = list(eye.get("missing_or_unreadable") or [])
-        eye_changed = False
-        for field in LOCKED_FIELDS - set(BAD_ELEVATION_FIELDS):
-            value = eye.get(field)
-            if value is None or source_ids.get(field) != canonical_source_id(field):
-                continue
-            originals[(eye_id, field)] = value
-            eye_changed = True
-            eye[field] = None
-            verified.discard(field)
-            source_ids.pop(field, None)
-            if field not in missing:
-                missing.append(field)
-        if eye_changed:
-            eye["table_verified_numeric_fields"] = sorted(verified)
-            eye["missing_or_unreadable"] = missing
-    return originals
-
-
 def _enhance_numeric_crop(raw: bytes) -> bytes:
     """Enlarge a localized value cell without inventing or removing digit strokes."""
     with Image.open(BytesIO(raw)) as opened:
@@ -546,139 +459,6 @@ def _enhance_numeric_crop(raw: bytes) -> bytes:
     output = BytesIO()
     image.save(output, format="PNG", optimize=True)
     return output.getvalue()
-
-
-def _bad_elevation_row_crops(
-    raw: bytes,
-    localized: dict[tuple[str, str], dict[str, Any]],
-) -> dict[tuple[str, str], bytes]:
-    """Render one contextual F/B row per eye, never isolated guessed cells."""
-    crops: dict[tuple[str, str], bytes] = {}
-    by_eye: dict[str, list[tuple[str, dict[str, Any]]]] = defaultdict(list)
-    for (eye_id, field), reading in localized.items():
-        by_eye[eye_id].append((field, reading))
-    for eye_id, items in by_eye.items():
-        if {field for field, _reading in items} != set(BAD_ELEVATION_FIELDS):
-            continue
-        tiles = {reading.get("source_tile") for _field, reading in items}
-        boxes = [reading.get("source_box") for _field, reading in items]
-        if len(tiles) != 1 or any(not isinstance(box, (list, tuple)) or len(box) != 4 for box in boxes):
-            continue
-        x1 = min(int(box[0]) for box in boxes)
-        y1 = min(int(box[1]) for box in boxes)
-        x2 = max(int(box[2]) for box in boxes)
-        y2 = max(int(box[3]) for box in boxes)
-        row_height = max(1, y2 - y1)
-        # Include the neighboring rows so the independent reader can prove this
-        # is below K1/K2/Axis and above Progression Index.
-        contextual_box = [
-            max(0, x1 - 30), max(0, y1 - 4 * row_height),
-            min(999, x2 + 30), min(999, y2 + 3 * row_height),
-        ]
-        crop = render_source_region(raw, next(iter(tiles)), contextual_box)
-        for field, _reading in items:
-            crops[(eye_id, field)] = crop
-    return crops
-
-
-def confirm_labeled_reading_crops(
-    core: Any,
-    raw: bytes,
-    filename: str,
-    screen_family: Any,
-    readings: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    """Independently prove section -> label -> adjacent value for targeted reads."""
-    candidates = [
-        reading for reading in readings
-        if reading.get("eye") in {"OD", "OS"}
-        and reading.get("field") in TARGET_FIELDS
-        and reading.get("status") in {"CONFIDENT", "UNCERTAIN", "UNREADABLE"}
-        and reading.get("source_box") is not None
-    ]
-    if not candidates:
-        return []
-    contracts = []
-    content: list[dict[str, Any]] = []
-    for reading in candidates:
-        field = str(reading["field"])
-        contract = canonical_visual_contract(field) or {}
-        section = contract.get("section_label") or "no separate heading required"
-        contracts.append(
-            f"- {reading['eye']} {field}: section={section}; "
-            f"field label={contract.get('field_label')}"
-        )
-    content.append({
-        "type": "input_text",
-        "text": LABELED_CROP_CONFIRMATION_PROMPT.format(contracts="\n".join(contracts)),
-    })
-    for index, reading in enumerate(candidates, 1):
-        crop = render_source_region(raw, reading.get("source_tile"), reading.get("source_box"))
-        content.extend((
-            {
-                "type": "input_text",
-                "text": f"CROP {index}: {reading['eye']} {reading['field']} (untrusted caption)",
-            },
-            {
-                "type": "input_image",
-                "image_url": core.data_url(crop, f"verify-{index}-{filename}.png"),
-                "detail": "original",
-            },
-        ))
-    response = core.openai_client().responses.create(
-        model=core.MODEL,
-        store=False,
-        reasoning={"effort": "medium"},
-        input=[{"role": "user", "content": content}],
-        text={
-            "verbosity": "low",
-            "format": {
-                "type": "json_schema",
-                "name": "cerai_labeled_crop_confirmation",
-                "strict": True,
-                "schema": LABELED_CROP_CONFIRMATION_SCHEMA,
-            },
-        },
-    )
-    if not response.output_text or not response.output_text.strip():
-        raise RuntimeError("labeled crop confirmation returned empty output")
-    payload = json.loads(response.output_text)
-    confirmed: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
-    for item in payload.get("readings") or []:
-        key = (item.get("eye"), item.get("field"))
-        field = str(item.get("field"))
-        if (
-            item.get("status") in {"CONFIRMED", "UNREADABLE"}
-            and source_supports_field(
-                screen_family, field, item.get("visible_section_label")
-            )
-            and label_supports_field(
-                field, item.get("visible_field_label"),
-                item.get("visible_section_label"),
-            )
-        ):
-            confirmed[key].append(item)
-    accepted: list[dict[str, Any]] = []
-    for reading in candidates:
-        key = (reading.get("eye"), reading.get("field"))
-        if reading.get("status") == "CONFIDENT" and core.is_number(reading.get("value")):
-            matches = [
-                item for item in confirmed.get(key, [])
-                if item.get("status") == "CONFIRMED"
-                and item.get("adjacent_value") is True
-                and core.is_number(item.get("value"))
-                and abs(float(item["value"]) - float(reading["value"])) <= 1e-9
-            ]
-        else:
-            matches = list(confirmed.get(key, []))
-        if len(matches) == 1:
-            validated = dict(reading)
-            validated["printed_label"] = matches[0].get("visible_field_label")
-            if (canonical_visual_contract(str(reading["field"])) or {}).get("section_label"):
-                validated["group_label"] = matches[0].get("visible_section_label")
-            validated["pixel_label_value_confirmed"] = True
-            accepted.append(validated)
-    return accepted
 
 
 def confirm_bad_elevation_crops(
@@ -733,12 +513,8 @@ def confirm_bad_elevation_crops(
         observed = str(reading.get("observed_value_text") or "").strip()
         if (
             key in crops
-            and reading.get("row_identity") == "CONFIRMED_ELEVATION_ROW"
+            and reading.get("label_value_pair_status") == "CONFIRMED_LABEL_ADJACENCY"
             and label_supports_field(key[1], reading.get("visible_field_label"))
-            and label_supports_field(
-                "B_Ele_Th_um" if key[1] == "F_Ele_Th_um" else "F_Ele_Th_um",
-                reading.get("visible_companion_label"),
-            )
             and reading.get("status") == "CONFIDENT"
             and isinstance(value, int) and not isinstance(value, bool)
             and re.fullmatch(r"[+-]?\d+", observed)
@@ -805,13 +581,6 @@ def _finish_bad_elevation_verification(
             source_ids.pop(field, None)
             if field not in missing:
                 missing.append(field)
-            if localized_reading.get("source_box") is not None:
-                record_unreadable_region(
-                    eye, field, filename=filename,
-                    tile=localized_reading.get("source_tile"),
-                    source_box=localized_reading.get("source_box"),
-                    printed_label=localized_reading.get("printed_label"),
-                )
             result.setdefault("global_warnings", []).append(
                 f"{eye_id} {field} dedicated BAD value-cell reads did not reach consensus; "
                 "surgeon entry is required."
@@ -836,19 +605,25 @@ def verify_bad_elevation_fields(
     requested: dict[str, list[str]],
     originals: dict[tuple[str, str], Any],
 ) -> None:
-    """Locate the complete F/B row, prove its pixels, then require digit consensus."""
+    """Find each literal F/B definition, then verify only its adjacent value box."""
     localized: dict[tuple[str, str], dict[str, Any]] = {}
-    confirmation_runs: list[dict[tuple[str, str], int]] = []
     crops: dict[tuple[str, str], bytes] = {}
-    # A wrong K1/Axis crop is a localization failure, not an unreadable
-    # elevation value. Automatically localize the label row once more.
+    confirmation_runs: list[dict[tuple[str, str], int]] = []
+    unresolved = {
+        (eye_id, field) for eye_id, fields in requested.items() for field in fields
+    }
     for _attempt in range(2):
-        reread = targeted_reread(core, raw, filename, requested)
+        if not unresolved:
+            break
+        retry_request: dict[str, list[str]] = defaultdict(list)
+        for eye_id, field in unresolved:
+            retry_request[eye_id].append(field)
+        reread = targeted_reread(core, raw, filename, dict(retry_request))
         candidates: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
         for reading in reread.get("readings") or []:
             key = (reading.get("eye"), reading.get("field"))
             if (
-                key[0] in requested and key[1] in requested.get(key[0], [])
+                key in unresolved
                 and reading.get("status") == "CONFIDENT"
                 and core.is_number(reading.get("value"))
                 and source_supports_field(
@@ -868,22 +643,27 @@ def verify_bad_elevation_fields(
                 for reading in readings
             )
         }
-        attempt_crops = _bad_elevation_row_crops(raw, attempt_localized)
-        if not attempt_crops:
-            continue
-        confirmation = confirm_bad_elevation_crops(core, attempt_crops)
-        confirmation_runs.append(confirmation)
-        if confirmation:
-            localized = attempt_localized
-            crops = attempt_crops
-            break
-    if crops:
-        unresolved = {
-            key: crop for key, crop in crops.items()
-            if confirmation_runs[-1].get(key) != int(localized[key]["value"])
+        attempt_crops = {
+            key: render_source_region(
+                raw, reading.get("source_tile"), reading.get("source_box"),
+            )
+            for key, reading in attempt_localized.items()
         }
-        if unresolved:
-            confirmation_runs.append(confirm_bad_elevation_crops(core, unresolved))
+        confirmation = confirm_bad_elevation_crops(core, attempt_crops) if attempt_crops else {}
+        confirmation_runs.append(confirmation)
+        for key in set(confirmation) & set(attempt_localized):
+            localized[key] = attempt_localized[key]
+            crops[key] = attempt_crops[key]
+            unresolved.discard(key)
+    disagreement_crops = {
+        key: crop for key, crop in crops.items()
+        if not any(
+            run.get(key) == int(localized[key]["value"])
+            for run in confirmation_runs
+        )
+    }
+    if disagreement_crops:
+        confirmation_runs.append(confirm_bad_elevation_crops(core, disagreement_crops))
     _finish_bad_elevation_verification(
         core, result, requested, originals, filename, localized, confirmation_runs,
     )
@@ -1322,85 +1102,6 @@ def targeted_reread(
     return json.loads(response.output_text)
 
 
-def _visually_guard_numeric_readings(
-    core: Any,
-    raw: bytes,
-    filename: str,
-    reread: dict[str, Any],
-    requested: dict[str, list[str]],
-) -> tuple[dict[str, Any], dict[str, list[str]]]:
-    """Retain a confident number only after its returned crop proves its identity."""
-    localized = [
-        reading for reading in reread.get("readings") or []
-        if reading.get("eye") in requested
-        and reading.get("field") in requested.get(reading.get("eye"), [])
-        and reading.get("field") not in BAD_ELEVATION_FIELDS
-        and reading.get("status") in {"CONFIDENT", "UNCERTAIN", "UNREADABLE"}
-        and reading.get("source_box") is not None
-    ]
-    confirmed = confirm_labeled_reading_crops(
-        core, raw, filename, reread.get("screen_family"), localized,
-    ) if localized else []
-    confirmed_keys = {(item.get("eye"), item.get("field")) for item in confirmed}
-    rejected: dict[str, list[str]] = defaultdict(list)
-    for reading in localized:
-        key = (reading.get("eye"), reading.get("field"))
-        if key not in confirmed_keys:
-            rejected[str(key[0])].append(str(key[1]))
-    guarded = dict(reread)
-    guarded["readings"] = [
-        reading for reading in reread.get("readings") or []
-        if not (
-            reading.get("status") in {"CONFIDENT", "UNCERTAIN", "UNREADABLE"}
-            and reading.get("source_box") is not None
-            and reading.get("field") not in BAD_ELEVATION_FIELDS
-        )
-    ] + confirmed
-    return guarded, {eye: list(dict.fromkeys(fields)) for eye, fields in rejected.items()}
-
-
-def targeted_reread_with_visual_guard(
-    core: Any,
-    raw: bytes,
-    filename: str,
-    requested: dict[str, list[str]],
-    patient_age_requested: bool = False,
-    pentacam_qs_requested: bool = False,
-    exam_date_requested: bool = False,
-) -> dict[str, Any]:
-    """Run label-first reread, independently validate its crops, and retry mismatches once."""
-    first = targeted_reread(
-        core, raw, filename, requested, patient_age_requested, pentacam_qs_requested,
-        exam_date_requested,
-    )
-    guarded, rejected = _visually_guard_numeric_readings(
-        core, raw, filename, first, requested,
-    )
-    if not rejected:
-        return guarded
-    retry = targeted_reread(core, raw, filename, rejected)
-    guarded_retry, still_rejected = _visually_guard_numeric_readings(
-        core, raw, filename, retry, rejected,
-    )
-    retry_keys = {
-        (reading.get("eye"), reading.get("field"))
-        for reading in guarded_retry.get("readings") or []
-        if reading.get("pixel_label_value_confirmed") is True
-    }
-    guarded["readings"] = [
-        reading for reading in guarded.get("readings") or []
-        if (reading.get("eye"), reading.get("field")) not in retry_keys
-    ] + [
-        reading for reading in guarded_retry.get("readings") or []
-        if reading.get("pixel_label_value_confirmed") is True
-    ]
-    if still_rejected:
-        guarded.setdefault("warnings", []).append(
-            "Canonical visual contract rejected a label/section/value crop after automatic relocalization."
-        )
-    return guarded
-
-
 
 def enrich_extraction(
     core: Any, result: dict[str, Any], raw: bytes, filename: str,
@@ -1411,7 +1112,6 @@ def enrich_extraction(
     elevation_originals = _prepare_bad_elevation_verification(
         result, elevation_requested, filename,
     )
-    locked_originals = _prepare_locked_visual_verification(result, filename)
     requested = missing_targets_by_eye(result)
     for eye_id, fields in list(requested.items()):
         elevation_fields = set(elevation_requested.get(eye_id, []))
@@ -1427,7 +1127,7 @@ def enrich_extraction(
         return result
     if requested or patient_age_requested or pentacam_qs_requested or exam_date_requested:
         try:
-            reread = targeted_reread_with_visual_guard(
+            reread = targeted_reread(
                 core, raw, filename, requested, patient_age_requested, pentacam_qs_requested,
                 exam_date_requested,
             )
@@ -1435,16 +1135,6 @@ def enrich_extraction(
                 core, result, reread, requested, filename, patient_age_requested,
                 pentacam_qs_requested, exam_date_requested,
             )
-            eyes = {eye.get("eye"): eye for eye in result.get("eyes") or []}
-            for (eye_id, field), primary_value in locked_originals.items():
-                eye = eyes.get(eye_id) or {}
-                verified_value = eye.get(field)
-                eye.setdefault("visual_contract_verification_evidence", {})[field] = {
-                    "file": filename,
-                    "primary_value": primary_value,
-                    "verified_value": verified_value,
-                    "status": "VERIFIED" if core.is_number(verified_value) else "UNRESOLVED",
-                }
         except Exception as exc:
             result.setdefault("global_warnings", []).append(
                 f"Targeted Pentacam numeric reread failed for {filename}: "
@@ -1499,7 +1189,7 @@ def verify_astigmatic_disparity_bad_flat_axes(
         return result
 
     try:
-        reread = targeted_reread_with_visual_guard(core, raw, filename, requested)
+        reread = targeted_reread(core, raw, filename, requested)
         apply_targeted_readings(core, result, reread, requested, filename)
     except Exception as exc:
         result.setdefault("global_warnings", []).append(

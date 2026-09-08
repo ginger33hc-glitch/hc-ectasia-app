@@ -317,10 +317,6 @@ non-Pentacam documents use NOT_APPLICABLE.
 
 PENTACAM NUMERIC-SOURCE RULE — source-locked values are never read from maps:
 Inspect only the canonical labeled parameter panel or numerical box registered for each field.
-Use a strict label-first sequence for every locked field: first locate the exact screen, then the
-required section heading, then the field's own definitive printed label, and only then transcribe
-the immediately adjacent value. Never start from a plausible number and infer which field it is.
-Identically named rows in another section are different sources and are invalid.
 Every source-locked numeric output listed under CANONICAL EXACT-SOURCE PROVENANCE must be copied
 only from its own explicitly labeled printed field at that canonical source. Add the exact
 output-field name to
@@ -648,12 +644,6 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                         json.dumps(record, sort_keys=True): record for record in combined
                     }.values()
                 ]
-            target.setdefault("visual_contract_verification_evidence", {}).update(
-                eye.get("visual_contract_verification_evidence") or {}
-            )
-            target.setdefault("bad_elevation_verification_evidence", {}).update(
-                eye.get("bad_elevation_verification_evidence") or {}
-            )
             target.setdefault("unreadable_source_regions", {})
             for field, region in (eye.get("unreadable_source_regions") or {}).items():
                 target["unreadable_source_regions"].setdefault(field, dict(region))
@@ -681,7 +671,6 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     "source_files", "quality_by_source", "_source_filename",
                     "_pentacam_qs", "pentacam_qs", "scoring_morphology", "field_provenance",
                     "planning_data_issues", "targeted_reread_evidence",
-                    "visual_contract_verification_evidence", "bad_elevation_verification_evidence",
                     "canonical_source_ids", "unreadable_source_regions", "data_conflicts",
                 ):
                     continue

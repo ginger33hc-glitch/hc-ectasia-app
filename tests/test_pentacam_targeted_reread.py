@@ -69,10 +69,6 @@ def test_disparity_verification_replaces_bad_axis_from_same_canonical_box(monkey
         "warnings": [],
     }
     monkeypatch.setattr(targeted, "targeted_reread", lambda *args, **kwargs: response)
-    monkeypatch.setattr(
-        targeted, "confirm_labeled_reading_crops",
-        lambda _core, _raw, _filename, _family, readings: readings,
-    )
 
     targeted.verify_astigmatic_disparity_bad_flat_axes(Core, result, b"image", "os-bad.png", {"OD"})
 
@@ -316,8 +312,7 @@ def test_bad_cell_confirmation_reads_only_literal_integer_and_warns_about_cell_b
         "readings": [{
             "eye": "OS", "field": "F_Ele_Th_um",
             "visible_field_label": "F.Ele.Th",
-            "visible_companion_label": "B.Ele.Th",
-            "row_identity": "CONFIRMED_ELEVATION_ROW",
+            "label_value_pair_status": "CONFIRMED_LABEL_ADJACENCY",
             "observed_value_text": "3", "value": 3, "status": "CONFIDENT",
         }],
         "warnings": [],
@@ -337,6 +332,76 @@ def test_bad_cell_confirmation_reads_only_literal_integer_and_warns_about_cell_b
     prompt = captured["input"][0]["content"][0]["text"]
     assert "thin vertical edge of the white value cell is a border, not" in prompt.casefold()
     assert "do not" in prompt.casefold() and "infer" in prompt.casefold()
+
+
+def test_bad_elevation_confirmation_rejects_axis_k1_crop():
+    response_payload = {
+        "readings": [{
+            "eye": "OD", "field": "F_Ele_Th_um",
+            "visible_field_label": "Axis",
+            "label_value_pair_status": "WRONG_LABEL",
+            "observed_value_text": None, "value": None, "status": "UNREADABLE",
+        }],
+        "warnings": [],
+    }
+    core = Core()
+    core.openai_client = lambda: SimpleNamespace(responses=SimpleNamespace(
+        create=lambda **_kwargs: SimpleNamespace(output_text=json.dumps(response_payload)),
+    ))
+
+    assert targeted.confirm_bad_elevation_crops(
+        core, {("OD", "F_Ele_Th_um"): image_bytes(180, 80)},
+    ) == {}
+
+
+def test_bad_elevation_wrong_label_crop_is_relocalized_once(monkeypatch):
+    result = pentacam_result(F_Ele_Th_um=3, B_Ele_Th_um=9)
+    eye = result["eyes"][0]
+    eye["table_verified_numeric_fields"] = list(targeted.BAD_ELEVATION_FIELDS)
+    eye["canonical_source_ids"] = {
+        field: BAD_CENTER for field in targeted.BAD_ELEVATION_FIELDS
+    }
+    payload = {
+        "screen_family": "BAD_DISPLAY",
+        "readings": [
+            reading(
+                "F_Ele_Th_um", 3, "F.Ele.Th", tile="UPPER_RIGHT",
+                source_box=[100, 100, 400, 250],
+            ),
+            reading(
+                "B_Ele_Th_um", 9, "B.Ele.Th", tile="UPPER_RIGHT",
+                source_box=[500, 100, 800, 250],
+            ),
+        ],
+        "warnings": [],
+    }
+    locator_calls = []
+
+    def locate(_core, _raw, _filename, requested, *args, **kwargs):
+        locator_calls.append(requested)
+        return payload
+
+    monkeypatch.setattr(
+        targeted, "targeted_reread", locate,
+    )
+    monkeypatch.setattr(targeted, "render_source_region", lambda *args, **kwargs: b"crop")
+    confirmations = iter([
+        {},
+        {("OD", "F_Ele_Th_um"): 3, ("OD", "B_Ele_Th_um"): 9},
+    ])
+    monkeypatch.setattr(
+        targeted, "confirm_bad_elevation_crops", lambda *args, **kwargs: next(confirmations),
+    )
+
+    targeted.enrich_extraction(Core, result, b"image", "od-bad.png")
+
+    elevation_calls = [
+        requested for requested in locator_calls
+        if set(requested.get("OD", [])) == set(targeted.BAD_ELEVATION_FIELDS)
+    ]
+    assert len(elevation_calls) == 2
+    assert eye["F_Ele_Th_um"] == 3
+    assert eye["B_Ele_Th_um"] == 9
 
 
 def test_unreadable_b_ele_th_uses_canonical_numeric_prompt_with_source_region():

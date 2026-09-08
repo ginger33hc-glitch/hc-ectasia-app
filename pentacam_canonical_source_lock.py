@@ -97,41 +97,11 @@ CANONICAL_FIELD_SOURCES = {
     "BAD_D": (BAD_STRIP, "D"),
 }
 
-# Pixel-level acceptance contract for every locked value.  Extraction prompts,
-# focused rereads and crop confirmation all consume this registry: locate the
-# section first, then the literal field label, then its attached value cell.
-# ``section_label`` is a required visible heading when duplicate row names occur
-# in more than one panel.  ``companion_labels`` identify a shared row whose
-# geometry must be visible before either member can be accepted.
-_VISUAL_SECTIONS = {
-    SHOW_2_CORNEA_FRONT: "Cornea Front",
-    SHOW_2_CORNEA_BACK: "Cornea Back",
-    SHOW_2_INDICES: "Indices (in 8 mm zone)",
-}
-
-CANONICAL_VISUAL_CONTRACTS = {
-    field: {
-        "source_id": source_id,
-        "section_label": _VISUAL_SECTIONS.get(source_id),
-        "field_label": label,
-        "companion_labels": (
-            ("F.Ele.Th", "B.Ele.Th")
-            if field in {"F_Ele_Th_um", "B_Ele_Th_um"}
-            else ()
-        ),
-    }
-    for field, (source_id, label) in CANONICAL_FIELD_SOURCES.items()
-}
-
 LOCKED_FIELDS = frozenset(CANONICAL_FIELD_SOURCES)
 
 
 def canonical_source(field: str):
     return CANONICAL_FIELD_SOURCES.get(field)
-
-
-def canonical_visual_contract(field: str):
-    return CANONICAL_VISUAL_CONTRACTS.get(field)
 
 
 def canonical_source_id(field: str):
