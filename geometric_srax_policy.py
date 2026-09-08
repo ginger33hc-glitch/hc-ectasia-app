@@ -14,6 +14,7 @@ from typing import Any
 
 import numpy as np
 from PIL import Image, ImageOps
+from pentacam_canonical_source_lock import is_four_maps_eye
 
 ALGORITHM_VERSION = "srax-geom-v2"
 MAX_SOURCE_PIXELS = 60_000_000
@@ -22,14 +23,6 @@ SRAX_THRESHOLD_DEG = 20.0
 
 def _enabled() -> bool:
     return os.getenv("CERAI_GEOMETRIC_SRAX_ENABLED", "1").strip() == "1"
-
-
-def _is_four_maps_eye(eye: dict[str, Any]) -> bool:
-    for screen_type in eye.get("screen_types") or []:
-        text = str(screen_type).upper().replace("_", " ")
-        if "4 MAP" in text or "FOUR MAP" in text or "4MAP" in text:
-            return True
-    return False
 
 
 def _load_hsv(raw: bytes) -> np.ndarray:
@@ -217,7 +210,7 @@ def enrich_extraction(result: dict[str, Any], raw: bytes, filename: str) -> dict
         return result
     eyes = [
         eye for eye in result.get("eyes") or []
-        if eye.get("eye") in {"OD", "OS"} and _is_four_maps_eye(eye)
+        if eye.get("eye") in {"OD", "OS"} and is_four_maps_eye(eye)
     ]
     if len(eyes) != 1:
         return result

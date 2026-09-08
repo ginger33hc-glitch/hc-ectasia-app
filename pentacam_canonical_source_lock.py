@@ -13,6 +13,15 @@ SHOW2 = "SHOW_2_EXAMS_TOPOMETRIC"
 FOURMAPS = "FOUR_MAPS_REFRACTIVE"
 BAD = "BAD_DISPLAY"
 
+
+def is_four_maps_eye(eye):
+    """Recognize the Four Maps source family for extraction consumers."""
+    for screen_type in eye.get("screen_types") or []:
+        text = str(screen_type).upper().replace("_", " ")
+        if "4 MAP" in text or "FOUR MAP" in text or "4MAP" in text:
+            return True
+    return False
+
 SHOW_2_CORNEA_FRONT = "SHOW_2_EXAMS_TOPOMETRIC_CORNEA_FRONT"
 SHOW_2_CORNEA_BACK = "SHOW_2_EXAMS_TOPOMETRIC_CORNEA_BACK"
 SHOW_2_INDICES = "SHOW_2_EXAMS_TOPOMETRIC_CENTER_INDICES_8MM"

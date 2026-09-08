@@ -23,6 +23,7 @@ import mandatory_source_set_policy
 from exam_date_reconciliation_policy import authoritative_exam_date_conflict
 from patient_age_policy import resolve_patient_age
 from pentacam_canonical_source_lock import (
+    is_four_maps_eye,
     CANONICAL_FIELD_SOURCES, LOCKED_FIELDS, canonical_source_id,
 )
 from pentacam_field_registry import (
@@ -508,7 +509,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             context["four_maps_eyes"] = sorted({
                 eye.get("eye") for eye in result.get("eyes", [])
                 if isinstance(eye, dict) and eye.get("eye") in EYES
-                and geometric_srax_policy._is_four_maps_eye(eye)
+                and is_four_maps_eye(eye)
             })
             merged["document_contexts"].append(context)
             if context.get("document_type") == "PENTACAM_TOPOGRAPHY" and not (
