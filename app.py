@@ -29,7 +29,9 @@ from pentacam_canonical_source_lock import (
 from pentacam_field_registry import (
     CORNEA_FRONT_KERATOMETRY_FIELDS,
     CORNEA_FRONT_KERATOMETRY_SOURCE,
+    EXTRACTION_NUMERIC_FIELDS,
     KERATOMETRY_SOURCE_VALUES,
+    PASSIVE_INFORMATIONAL_FIELDS,
 )
 from pentacam_quality_policy import is_quality_only_issue, warnings_for_extracted
 from reports import ReportContractError, build_docx, build_pdf
@@ -64,16 +66,6 @@ _analysis_request_lock = RLock()
 _analysis_request_tasks: Dict[tuple[str, str], tuple[float, asyncio.Task]] = {}
 
 EYES = ("OD", "OS")
-TABLE_NUMERIC_FIELDS = (
-    "ml7_bad_k1_d", "ml7_bad_k2_d", "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmax_D", "corneal_diameter_mm",
-    "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp",
-    "Dt", "Da", "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI",
-    "CKI", "IHD", "I_S", "KISA", "IHA", "Rmin_mm", "thinnest_x_mm", "thinnest_y_mm",
-    "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um", "Kmean_D",
-    "total_RMS_um", "spherical_aberration_um",
-    "central_pachy_um", "B_Ele_Th_um", "F_Ele_Th_um", "posterior_Kmean_D",
-    "topographic_astig_D", "topographic_steep_axis_deg", "bad_flat_axis_deg", "topometric_RMin", "TKC",
-)
 SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -126,7 +118,7 @@ SCHEMA = {
                     "missing_or_unreadable": {"type": "array", "items": {"type": "string"}},
                     "table_verified_numeric_fields": {
                         "type": "array",
-                        "items": {"type": "string", "enum": list(TABLE_NUMERIC_FIELDS)},
+                        "items": {"type": "string", "enum": list(EXTRACTION_NUMERIC_FIELDS)},
                     },
                     "keratometry_source": {
                         "type": "string",
@@ -318,10 +310,18 @@ non-Pentacam documents use NOT_APPLICABLE.
 
 PENTACAM NUMERIC-SOURCE RULE — source-locked values are never read from maps:
 Inspect only the canonical labeled parameter panel or numerical box registered for each field.
-Every numeric output in TABLE_NUMERIC_FIELDS must be copied only from its own explicitly labeled
-printed field at that canonical source. Add the exact output-field name to
+Every source-locked numeric output listed under CANONICAL EXACT-SOURCE PROVENANCE must be copied
+only from its own explicitly labeled printed field at that canonical source. Add the exact
+output-field name to
 table_verified_numeric_fields only when that labeled field is visible and the value was transcribed
 from it. The list must exactly match the non-null table-derived numeric outputs.
+
+PASSIVE INFORMATIONAL FIELDS:
+Thinnest-location X/Y coordinates, corneal volume, RMS HOA, vertical coma, total RMS, and spherical
+aberration are optional descriptive values. Retain one only when its own printed label and value are
+immediately clear during the primary read. Otherwise return null without searching further, without
+adding it to missing_or_unreadable, and without issuing a warning. These fields are not requested in
+the targeted reread and do not enter surgeon completion, reports, scoring, or clinical decisions.
 
 I-S SOURCE LOCK: transcribe I_S only from the explicitly labeled "IS:" or "I-S:" field in
 Show 2 Exams Topometric center "Indices (in 8 mm zone)". Preserve its printed sign. Never substitute
@@ -474,11 +474,15 @@ def normalized_eye(raw_eye: Dict[str, Any]) -> Dict[str, Any]:
                 eye[field] = None
                 verified_set.discard(field)
                 missing.append(field)
-        for field in TABLE_NUMERIC_FIELDS:
+        for field in EXTRACTION_NUMERIC_FIELDS:
             if eye.get(field) is not None and field not in verified_set:
                 eye[field] = None
-                missing.append(field)
-        eye["missing_or_unreadable"] = list(dict.fromkeys(missing))
+                if field not in PASSIVE_INFORMATIONAL_FIELDS:
+                    missing.append(field)
+        eye["missing_or_unreadable"] = [
+            field for field in dict.fromkeys(missing)
+            if field not in PASSIVE_INFORMATIONAL_FIELDS
+        ]
         eye["table_verified_numeric_fields"] = sorted(verified_set)
     return eye
 
@@ -492,9 +496,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     quality_rank = {"INADEQUATE": 0, "LIMITED": 1, "ADEQUATE": 2}
     # Descriptive values that do not drive a CER-AI decision must never become unresolved conflicts
     # that prohibit PASS. Canonical numeric disagreements are never tolerance-reconciled.
-    non_decision_conflict_fields = {
-        "thinnest_x_mm", "thinnest_y_mm", "morphology_confidence"
-    }
+    non_decision_conflict_fields = set(PASSIVE_INFORMATIONAL_FIELDS) | {"morphology_confidence"}
     planning_conflict_fields = {"K1_axis_deg", "K2_axis_deg", "corneal_diameter_mm"}
 
 
@@ -698,7 +700,10 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
             if str(conflict).split(":", 1)[0].strip() not in non_decision_conflict_fields
         )
         eye["missing_or_unreadable"] = sorted(
-            set(key for key in eye.get("missing_or_unreadable", []) if eye.get(key) is None)
+            set(
+                key for key in eye.get("missing_or_unreadable", [])
+                if eye.get(key) is None and key not in PASSIVE_INFORMATIONAL_FIELDS
+            )
         )
 
     merged["eyes"] = list(by_eye.values())

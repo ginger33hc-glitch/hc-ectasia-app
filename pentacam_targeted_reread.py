@@ -426,13 +426,6 @@ def label_supports_field(field: str, printed_label: Any, group_label: Any = None
         "pachy_thinnest_um": (("thinnestlocat", "thinnestlocation"),),
         "central_pachy_um": (("pupilcenter",),),
         "ARTmax_um": (("artmax", "ambrosiorelationalthicknessmax"),),
-        "thinnest_x_mm": (("thinnestx", "thinlocationx", "pachythinx"),),
-        "thinnest_y_mm": (("thinnesty", "thinlocationy", "pachythiny"),),
-        "corneal_volume_mm3": (("cornealvolume", "corneavolume"),),
-        "RMS_HOA_um": (("rmshoa", "higherorderaberrationrms", "hoarms"),),
-        "vertical_coma_um": (("verticalcoma", "comavertical"),),
-        "total_RMS_um": (("totalrms", "rmstotal"),),
-        "spherical_aberration_um": (("sphericalaberration",),),
     }
     groups = requirements.get(field)
     return bool(groups) and all(any(token in label for token in alternatives) for alternatives in groups)
