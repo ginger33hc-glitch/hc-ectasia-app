@@ -37,8 +37,11 @@ from pentacam_field_registry import (
     KERATOMETRY_SOURCE_VALUES,
     PASSIVE_INFORMATIONAL_FIELDS,
 )
-from pentacam_quality_policy import is_quality_only_issue, warnings_for_extracted
 from reports import ReportContractError, build_docx, build_pdf
+from canonical_input_adapter import (
+    astigmatic_disparity_verification_eyes,
+    resolve_case_plans,
+)
 
 
 @asynccontextmanager
@@ -346,7 +349,14 @@ EXCLUSIVE LABELED-BOX SOURCE LOCK:
   another map/display, a color-map number, Kmax, or another K/Km-like field for these outputs.
 - Rmin_mm: exactly one accepted source: "Show 2 Exams Topometric" -> panel headed "Cornea Back" -> printed Rmin row. Never use Cornea Front Rmin, the center topometric RMin index, Four Maps, a map spot, or any calculated value.
 - central_pachy_um: use only 4 Maps Refractive lower-left Pupil Center (+) pachymetry.
-- B_Ele_Th_um and F_Ele_Th_um: use only the BAD Display central labeled B.Ele.Th/F.Ele.Th boxes.
+- F_Ele_Th_um: on the Belin/Ambrósio BAD Display, first locate the literal F.Ele.Th label in the
+  central results table's elevation row immediately above the Progression Index section, then
+  transcribe only the signed integer in the immediately adjacent value box. This is front/anterior elevation at the
+  thinnest corneal point in µm. Never use K1, K2, Axis, an elevation map, or an unlabeled number.
+- B_Ele_Th_um: on that same row immediately above Progression Index, first locate the literal B.Ele.Th label,
+  then transcribe only the signed integer in its immediately adjacent value box. This is back/posterior
+  elevation at the thinnest corneal point in µm. Never use K1, K2, Axis, an elevation map, or an
+  unlabeled number.
 - posterior_Kmean_D: use only Show 2 Exams Topometric -> Cornea Back -> printed Km.
 - topographic_astig_D and topographic_steep_axis_deg: use only Show 2 Exams Topometric -> Cornea Front.
 - ml7_bad_k1_d and ml7_bad_k2_d: ML7 planning ONLY. Read K1 and K2 directly from the BAD Display upper-middle numeric boxes. Do not substitute Show 2 Exams K1/K2 or Kmax. HWTW remains in the 4 Maps Refractive lower-left HWTW box.
@@ -510,6 +520,9 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         context = result.get("document_context")
         if isinstance(context, dict):
             context = dict(context)
+            passive_unreadable_card = (
+                context.get("optional_treatment_card_status") == "UNREADABLE"
+            )
             context["extracted_eyes"] = sorted({
                 eye.get("eye") for eye in result.get("eyes", [])
                 if isinstance(eye, dict) and eye.get("eye") in EYES
@@ -533,7 +546,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     f"{', '.join(missing_name_fields)} field(s) could not be read in "
                     f"{context.get('source_filename', 'an uploaded source')}. Surgeon confirmation is required."
                 )
-            if context.get("document_type") in ("UNKNOWN", "OTHER"):
+            if context.get("document_type") in ("UNKNOWN", "OTHER") and not passive_unreadable_card:
                 merged["critical_input_issues"].append(
                     f"Unclassified uploaded source: {context.get('source_filename', 'unknown file')}."
                 )
@@ -548,9 +561,14 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 not result.get("eyes")
                 and not result.get("treatment_corrections")
                 and not result.get("laser_plans")
+                and not passive_unreadable_card
             ):
                 merged["critical_input_issues"].append(
                     f"Uploaded source yielded no usable eye or treatment data: {context.get('source_filename', 'unknown file')}."
+                )
+            if passive_unreadable_card:
+                merged["global_warnings"].append(
+                    "Optional treatment card was unreadable; surgeon-entered manifest and intended refraction were used."
                 )
         merged["global_warnings"].extend(result.get("global_warnings", []))
         merged["treatment_corrections"].extend(
@@ -1009,6 +1027,30 @@ async def _run_image_assessment(
             ))
             if exam_date_reread_required:
                 promote_consistent_targeted_exam_dates(extraction_results)
+
+            # A threshold-level BAD-flat/manifest disparity is a measurement-
+            # validation warning, never a PS3 factor. Re-read the exact canonical
+            # BAD box so the warning itself does not rest on a decimal/digit OCR error.
+            preliminary = merge_extractions(extraction_results)
+            preliminary_plans = resolve_case_plans(preliminary, plans)
+            axis_verification_eyes = astigmatic_disparity_verification_eyes(
+                preliminary, preliminary_plans,
+            )
+            if axis_verification_eyes:
+                async def verify_axis_bounded(
+                    result: Dict[str, Any], raw: bytes, filename: str,
+                ) -> Dict[str, Any]:
+                    async with semaphore:
+                        return await asyncio.to_thread(
+                            pentacam_targeted_reread.verify_astigmatic_disparity_bad_flat_axes,
+                            sys.modules[__name__], result, raw, filename,
+                            axis_verification_eyes,
+                        )
+
+                extraction_results = await asyncio.gather(*(
+                    verify_axis_bounded(result, raw, filename)
+                    for result, (raw, filename) in zip(extraction_results, image_payloads)
+                ))
     except HTTPException:
         raise
     except Exception as exc:

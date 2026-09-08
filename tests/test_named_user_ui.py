@@ -8,9 +8,14 @@ import operational_security
 import user_access
 
 
-def make_client():
+def make_client(role="DOCTOR"):
     app = FastAPI()
-    principal = user_access.Principal("doctor-1", "doctor", "Doctor <One>", "DOCTOR")
+    principal = user_access.Principal(
+        "owner-1" if role == "OWNER" else "doctor-1",
+        "owner" if role == "OWNER" else "doctor",
+        "Owner" if role == "OWNER" else "Doctor <One>",
+        role,
+    )
 
     def authenticate(request):
         if request.cookies.get("cer_ai_session") == "valid":
@@ -99,11 +104,11 @@ def test_archive_page_requires_session_and_contains_role_aware_tools():
     assert "/archive/capabilities" in allowed.text
     assert "/archive/research/export.csv" in allowed.text
     assert "/archive/audit/search" in allowed.text
-    assert "Original PDF EN" in allowed.text
+    assert 'const reportLabel = capabilities?.owner_deidentified_access ? "De-identified" : "Original"' in allowed.text
     assert "Regenerate PDF EN" in allowed.text
     assert "Pentacam sources" in allowed.text
     assert "View source images" in allowed.text
-    assert "Download all source images (ZIP)" in allowed.text
+    assert "Download all ${capabilities?.owner_deidentified_access" in allowed.text
     assert allowed.headers["cache-control"] == "no-store"
 
 
@@ -118,8 +123,31 @@ def test_archive_capabilities_are_session_protected_and_role_aware():
     assert payload == {
         "role": "DOCTOR",
         "archive_enabled": True,
+        "identifiable_archive_access": True,
+        "retrospective_archive_access": True,
+        "owner_deidentified_access": False,
         "audit_enabled": True,
         "historical_report_enabled": True,
         "research_export_enabled": False,
     }
     assert user_access.current_principal() is None
+
+
+def test_owner_capabilities_allow_only_deidentified_retrospective_archive():
+    client, _core = make_client("OWNER")
+    client.cookies.set("cer_ai_session", "valid")
+
+    payload = client.get("/archive/capabilities").json()
+
+    assert payload["identifiable_archive_access"] is False
+    assert payload["retrospective_archive_access"] is True
+    assert payload["owner_deidentified_access"] is True
+
+
+def test_archive_page_hides_archive_until_retrospective_capability_is_confirmed():
+    text = named_user_ui.ARCHIVE_HTML.read_text(encoding="utf-8")
+    assert 'id="archiveSearch" class="card capability" hidden' in text
+    assert 'id="archiveResults" class="card capability" hidden' in text
+    assert "OWNER retrospective scope: all cases are available only" in text
+    assert "if(capabilities.retrospective_archive_access)" in text
+    assert "Masked in OWNER view" in text

@@ -7,11 +7,18 @@ retired and replaced with direct canonical enrichment assertions below.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import canonical_engine
-from pentacam_canonical_source_lock import BAD_CENTER, BAD_PPI, FOUR_MAPS_LOWER_LEFT
+from pentacam_canonical_source_lock import (
+    BAD_CENTER,
+    BAD_ELEVATION_ROW,
+    BAD_PPI,
+    FOUR_MAPS_LOWER_LEFT,
+)
 
 _LEGACY_PATH = Path(__file__).with_name("legacy_pentacam_targeted_reread_tests.py")
 _SPEC = importlib.util.spec_from_file_location("cerai_legacy_pentacam_targeted_reread_tests", _LEGACY_PATH)
@@ -32,6 +39,7 @@ _RETIRED = {
     "test_bad_display_b_ele_th_box_feeds_only_nice_posterior_input",
     "test_wrapper_runs_for_missing_age_even_when_no_eye_numeric_field_is_missing",
     "test_wrapper_fails_open_to_original_extraction_when_crop_decode_fails",
+    "test_targeted_reread_does_not_seek_keratometry_on_other_pentacam_screens",
 }
 for _name in _RETIRED:
     if not hasattr(_legacy, _name):
@@ -47,12 +55,58 @@ reading = _legacy.reading
 targeted = _legacy.targeted
 Core = _legacy.Core
 assessment_workflow = _legacy.assessment_workflow
+image_bytes = _legacy.image_bytes
+
+
+def _axis_result(value):
+    result = pentacam_result(bad_flat_axis_deg=value)
+    eye = result["eyes"][0]
+    eye["canonical_source_ids"] = {"bad_flat_axis_deg": BAD_CENTER}
+    eye["table_verified_numeric_fields"] = ["bad_flat_axis_deg"]
+    eye["missing_or_unreadable"] = []
+    return result
+
+
+def test_disparity_verification_replaces_bad_axis_from_same_canonical_box(monkeypatch):
+    result = _axis_result(13.1)
+    response = {
+        "screen_family": "BAD_DISPLAY",
+        "readings": [reading("bad_flat_axis_deg", 1.1, "Axis", tile="UPPER_RIGHT")],
+        "warnings": [],
+    }
+    monkeypatch.setattr(targeted, "targeted_reread", lambda *args, **kwargs: response)
+
+    targeted.verify_astigmatic_disparity_bad_flat_axes(Core, result, b"image", "os-bad.png", {"OD"})
+
+    eye = result["eyes"][0]
+    assert eye["bad_flat_axis_deg"] == 1.1
+    assert eye["astigmatic_disparity_verification_evidence"]["bad_flat_axis_deg"] == {
+        "file": "os-bad.png",
+        "primary_value": 13.1,
+        "verified_value": 1.1,
+        "status": "VERIFIED",
+    }
+    assert any("from 13.1° to 1.1°" in warning for warning in result["global_warnings"])
+
+
+def test_unresolved_disparity_axis_does_not_retain_unverified_warning_value(monkeypatch):
+    result = _axis_result(13.1)
+    monkeypatch.setattr(targeted, "targeted_reread", lambda *args, **kwargs: {
+        "screen_family": "BAD_DISPLAY", "readings": [], "warnings": [],
+    })
+
+    targeted.verify_astigmatic_disparity_bad_flat_axes(Core, result, b"image", "os-bad.png", {"OD"})
+
+    eye = result["eyes"][0]
+    assert eye["bad_flat_axis_deg"] is None
+    assert eye["astigmatic_disparity_verification_evidence"]["bad_flat_axis_deg"]["status"] == "UNRESOLVED"
+    assert any("surgeon confirmation is recommended" in warning for warning in result["global_warnings"])
 
 
 def test_canonical_eye_fields_suppress_duplicate_targeted_reread_requests():
     result = pentacam_result()
     eye = result["eyes"][0]
-    assert "central_pachy_um" in targeted.missing_targets_by_eye(result)["OD"]
+    assert "central_pachy_um" not in targeted.missing_targets_by_eye(result)["OD"]
     assert "B_Ele_Th_um" in targeted.missing_targets_by_eye(result)["OD"]
 
     eye["central_pachy_um"] = 542
@@ -60,12 +114,27 @@ def test_canonical_eye_fields_suppress_duplicate_targeted_reread_requests():
     eye["table_verified_numeric_fields"] = ["central_pachy_um", "B_Ele_Th_um"]
     eye["canonical_source_ids"] = {
         "central_pachy_um": FOUR_MAPS_LOWER_LEFT,
-        "B_Ele_Th_um": BAD_CENTER,
+        "B_Ele_Th_um": BAD_ELEVATION_ROW,
     }
     remaining = targeted.missing_targets_by_eye(result).get("OD", [])
     assert "central_pachy_um" not in remaining
     assert "B_Ele_Th_um" not in remaining
     assert not result.get("nice_readings")
+
+
+def test_standard_reread_requests_only_fields_owned_by_the_visible_screen():
+    bad = pentacam_result()
+    bad_missing = set(targeted.missing_targets_by_eye(bad)["OD"])
+    assert {"F_Ele_Th_um", "B_Ele_Th_um", "BAD_D"} <= bad_missing
+    assert "K1_D" not in bad_missing
+    assert "central_pachy_um" not in bad_missing
+
+    show2 = pentacam_result()
+    show2["eyes"][0]["screen_types"] = ["SHOW_2_EXAMS_TOPOMETRIC"]
+    show2_missing = set(targeted.missing_targets_by_eye(show2)["OD"])
+    assert {"K1_D", "K2_D", "Rmin_mm", "I_S"} <= show2_missing
+    assert "F_Ele_Th_um" not in show2_missing
+    assert "central_pachy_um" not in show2_missing
 
 
 def test_pupil_center_reread_writes_direct_canonical_eye_field_and_numeric_prompt():
@@ -119,9 +188,43 @@ def test_bad_display_b_ele_th_reread_writes_direct_canonical_eye_field():
     targeted.apply_targeted_readings(Core, result, reread, {"OD": ["B_Ele_Th_um"]}, "od.png")
     eye = result["eyes"][0]
     assert eye["B_Ele_Th_um"] == 23
-    assert eye["canonical_source_ids"]["B_Ele_Th_um"] == BAD_CENTER
+    assert eye["canonical_source_ids"]["B_Ele_Th_um"] == BAD_ELEVATION_ROW
     assert "B_Ele_Th_um" in eye["table_verified_numeric_fields"]
     assert not result.get("nice_readings")
+
+
+def test_bad_elevations_use_the_standard_single_targeted_reread_path(monkeypatch):
+    result = pentacam_result()
+    eye = result["eyes"][0]
+    for field in targeted.TARGET_FIELDS:
+        eye[field] = 1.0
+    eye["F_Ele_Th_um"] = None
+    eye["B_Ele_Th_um"] = None
+    result["document_context"].update({"patient_age_years": 40, "pentacam_qs": "OK"})
+    calls = []
+
+    def reread(_core, _raw, _filename, requested, *_args):
+        calls.append(requested)
+        return {
+            "screen_family": "BAD_DISPLAY",
+            "readings": [
+                reading("F_Ele_Th_um", 3, "F.Ele.Th", tile="LOWER_RIGHT"),
+                reading("B_Ele_Th_um", 8, "B.Ele.Th", tile="LOWER_RIGHT"),
+            ],
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(targeted, "targeted_reread", reread)
+    targeted.enrich_extraction(Core, result, b"image", "od-bad.png")
+
+    assert calls == [{"OD": ["F_Ele_Th_um", "B_Ele_Th_um"]}]
+    assert eye["F_Ele_Th_um"] == 3
+    assert eye["B_Ele_Th_um"] == 8
+    assert all(
+        eye["targeted_reread_evidence"][field][0]["source"]
+        == "TARGETED_LABELED_TILE_REREAD"
+        for field in ("F_Ele_Th_um", "B_Ele_Th_um")
+    )
 
 
 def test_unreadable_b_ele_th_uses_canonical_numeric_prompt_with_source_region():
@@ -220,16 +323,45 @@ def test_direct_enrichment_runs_for_missing_age_without_missing_eye_numeric_fiel
     assert result["document_context"]["patient_age_years"] == 61
 
 
-def test_direct_enrichment_fails_open_when_crop_decode_fails():
+def test_direct_enrichment_fails_open_after_five_crop_decode_failures():
     original = pentacam_result()
     result = targeted.enrich_extraction(Core, original, b"not-an-image", "od.png")
     assert result is original
     assert any(
-        "targeted pentacam numeric reread failed" in warning.casefold()
+        "had 5 failed attempt(s)" in warning.casefold()
         for warning in result["global_warnings"]
     )
     assert not hasattr(targeted, "make_targeted_extractor")
     assert not hasattr(targeted, "install")
+
+
+def test_required_field_can_resolve_on_fifth_standard_reread(monkeypatch):
+    result = pentacam_result()
+    eye = result["eyes"][0]
+    for field in targeted.TARGET_FIELDS:
+        eye[field] = 1.0
+    eye["B_Ele_Th_um"] = None
+    result["document_context"].update({"patient_age_years": 40, "pentacam_qs": "OK"})
+    calls = []
+
+    def reread(_core, _raw, _filename, requested, *_args):
+        calls.append(requested)
+        value = 8 if len(calls) == targeted.TARGETED_REREAD_MAX_ATTEMPTS else None
+        return {
+            "screen_family": "BAD_DISPLAY",
+            "readings": [reading(
+                "B_Ele_Th_um", value, "B.Ele.Th",
+                status="CONFIDENT" if value is not None else "UNREADABLE",
+            )],
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(targeted, "targeted_reread", reread)
+    targeted.enrich_extraction(Core, result, b"image", "od-bad.png")
+
+    assert len(calls) == targeted.TARGETED_REREAD_MAX_ATTEMPTS == 5
+    assert all(call == {"OD": ["B_Ele_Th_um"]} for call in calls)
+    assert eye["B_Ele_Th_um"] == 8
 
 
 def test_confident_four_maps_exam_date_reread_is_evidence_until_case_reconciliation():

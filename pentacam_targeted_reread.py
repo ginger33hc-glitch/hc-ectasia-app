@@ -1,12 +1,13 @@
 """Targeted second-pass transcription for Pentacam labeled fields.
 
-This module is an extraction-only adapter.  It never changes clinical policy,
-calculates a missing Pentacam index, or overwrites a value from the general
-extractor.  When a Pentacam image contains still-missing labeled values, the
+This module is an extraction-only adapter. It never changes clinical policy or
+calculates a missing Pentacam index. When a Pentacam image contains still-missing labeled values, the
 adapter submits the original plus four overlapping crops and, when needed, one
 focused header crop to a structured reread. It accepts only high-confidence
 label/value pairs. Conflicting authoritative Four Maps examination dates are
 reread here but promoted only by the case-level date policy after both eyes agree.
+An existing BAD flat-axis value may be replaced only during the explicit
+astigmatic-disparity verification pass; its primary value remains in audit evidence.
 """
 
 from __future__ import annotations
@@ -21,8 +22,8 @@ from typing import Any
 from PIL import Image, ImageOps
 from exam_date_reconciliation_policy import possible_calendar_dates
 from pentacam_canonical_source_lock import (
-    CANONICAL_FIELD_SOURCES, SHOW_2_CORNEA_BACK, SHOW_2_CORNEA_FRONT, SHOW_2_INDICES,
-    canonical_source_id, source_family,
+    BAD, FOURMAPS, SHOW2, CANONICAL_FIELD_SOURCES, SHOW_2_CORNEA_BACK,
+    SHOW_2_CORNEA_FRONT, SHOW_2_INDICES, canonical_source_id, source_family,
 )
 from pentacam_field_registry import (
     CORNEA_FRONT_KERATOMETRY_FIELDS,
@@ -39,6 +40,7 @@ PENTACAM_SCREEN_FAMILIES = {
     "OTHER_PENTACAM",
     "SHOW_2_EXAMS_TOPOMETRIC",
 }
+TARGETED_REREAD_MAX_ATTEMPTS = 5
 
 SOURCE_TILES = (
     "ORIGINAL", "TOP_HEADER", "UPPER_LEFT", "UPPER_RIGHT", "LOWER_LEFT", "LOWER_RIGHT"
@@ -201,9 +203,12 @@ PENTACAM LANDMARK LABELS:
 - central_pachy_um is the pachymetry number identified as "Pupil Center" by the PLUS-SHAPED (+)
   marker beside it. Pachy Vertex N., the circle-marked Thinnest Locat. value, and map numbers are
   not central_pachy_um.
-- B_Ele_Th_um is only the signed value in the explicitly printed "B. Ele.Th" box on a Pentacam
-  BAD Display page. Never use an Elevation (Back) map, pupil boundary, BFS/Float or BFTE value,
-  another elevation field, neighboring number, or a calculated value.
+- F_Ele_Th_um: on the BAD Display, locate the literal F.Ele.Th label in the central results table's
+  elevation row immediately above Progression Index, then transcribe only its adjacent signed µm value.
+- B_Ele_Th_um: in that same elevation row, locate the explicitly printed "B. Ele.Th" box, then
+  transcribe only its adjacent signed µm value. Never use an Elevation (Back) map, and never
+  substitute K1, K2, Axis, another map value, or an unlabeled number for either elevation field.
+  Never calculate either elevation value.
 - corneal_diameter_mm is only the explicitly printed HWTW/horizontal white-to-white value.
 
 The printed_label response must contain the visible row/field label associated with the value. If
@@ -284,12 +289,20 @@ def missing_targets_by_eye(result: dict[str, Any]) -> dict[str, list[str]]:
         eye_id = eye.get("eye")
         if eye_id not in {"OD", "OS"}:
             continue
+        screen_text = " ".join(
+            str(item).casefold().replace("_", " ")
+            for item in eye.get("screen_types") or []
+        )
+        visible_families = set()
+        if "bad display" in screen_text or ("belin" in screen_text and "ambrosio" in screen_text):
+            visible_families.add(BAD)
+        if any(token in screen_text for token in ("4 map", "four map", "4map")):
+            visible_families.add(FOURMAPS)
+        if "show 2 exams" in screen_text and "topometric" in screen_text:
+            visible_families.add(SHOW2)
         missing = [
             field for field in TARGET_FIELDS
-            if not (
-                field in CORNEA_FRONT_KERATOMETRY_FIELDS
-                and eye.get("keratometry_source") != CORNEA_FRONT_KERATOMETRY_SOURCE
-            )
+            if (not visible_families or source_family(field) in visible_families)
             and eye.get(field) is None
         ]
         if missing:
@@ -556,14 +569,17 @@ def apply_targeted_readings(
         eye.get("unreadable_source_regions", {}).pop(field, None)
         evidence = eye.setdefault("targeted_reread_evidence", {}).setdefault(field, [])
         best = readings[0]
-        evidence.append({
+        evidence_record = {
             "file": filename,
             "source": "TARGETED_LABELED_TILE_REREAD",
             "tile": best.get("source_tile"),
             "printed_label": best.get("printed_label"),
             "group_label": best.get("group_label"),
             "value": retained,
-        })
+        }
+        if best.get("source_box") is not None:
+            evidence_record["source_box"] = best.get("source_box")
+        evidence.append(evidence_record)
 
     if patient_age_requested:
         context = result.setdefault("document_context", {})
@@ -748,27 +764,113 @@ def enrich_extraction(
     core: Any, result: dict[str, Any], raw: bytes, filename: str,
     *, exam_date_requested: bool = False,
 ) -> dict[str, Any]:
-    """Run the targeted second pass explicitly after primary extraction."""
-    requested = missing_targets_by_eye(result)
-    patient_age_requested = patient_age_is_missing(result)
-    pentacam_qs_requested = pentacam_qs_is_missing(result)
-    if not _enabled() or (
-        not requested and not patient_age_requested and not pentacam_qs_requested
-        and not exam_date_requested
-    ):
+    """Retry unresolved required fields through the standard targeted pathway."""
+    if not _enabled():
         return result
+    attempt_errors: list[str] = []
+    for _attempt in range(TARGETED_REREAD_MAX_ATTEMPTS):
+        requested = missing_targets_by_eye(result)
+        patient_age_requested = patient_age_is_missing(result)
+        pentacam_qs_requested = pentacam_qs_is_missing(result)
+        date_requested = exam_date_requested and not result.get(
+            "document_context", {}
+        ).get("targeted_exam_date_reread_evidence")
+        if not (
+            requested or patient_age_requested or pentacam_qs_requested or date_requested
+        ):
+            break
+        try:
+            reread = targeted_reread(
+                core, raw, filename, requested, patient_age_requested, pentacam_qs_requested,
+                date_requested,
+            )
+            apply_targeted_readings(
+                core, result, reread, requested, filename, patient_age_requested,
+                pentacam_qs_requested, date_requested,
+            )
+        except Exception as exc:
+            attempt_errors.append(type(exc).__name__)
+    if attempt_errors and (
+        missing_targets_by_eye(result)
+        or patient_age_is_missing(result)
+        or pentacam_qs_is_missing(result)
+        or (
+            exam_date_requested
+            and not result.get("document_context", {}).get(
+                "targeted_exam_date_reread_evidence"
+            )
+        )
+    ):
+        result.setdefault("global_warnings", []).append(
+            f"Pentacam targeted reread had {len(attempt_errors)} failed attempt(s) "
+            f"for {filename}; unresolved required fields proceed to surgeon completion."
+        )
+    return result
+
+
+def verify_astigmatic_disparity_bad_flat_axes(
+    core: Any,
+    result: dict[str, Any],
+    raw: bytes,
+    filename: str,
+    eye_ids: set[str],
+) -> dict[str, Any]:
+    """Focused-reread threshold-level BAD axes before disparity reporting.
+
+    Only the canonical BAD flat-axis field is eligible. If the focused reading
+    is not confident and source-valid, the value is left unresolved rather than
+    retaining an unverified validation warning. This path cannot affect PS3.
+    """
+    requested: dict[str, list[str]] = {}
+    originals: dict[str, float] = {}
+    source_id = canonical_source_id("bad_flat_axis_deg")
+    for eye in result.get("eyes") or []:
+        eye_id = eye.get("eye")
+        if eye_id not in eye_ids or not core.is_number(eye.get("bad_flat_axis_deg")):
+            continue
+        if (eye.get("canonical_source_ids") or {}).get("bad_flat_axis_deg") != source_id:
+            continue
+        originals[eye_id] = float(eye["bad_flat_axis_deg"])
+        eye["bad_flat_axis_deg"] = None
+        missing = list(eye.get("missing_or_unreadable") or [])
+        if "bad_flat_axis_deg" not in missing:
+            missing.append("bad_flat_axis_deg")
+        eye["missing_or_unreadable"] = missing
+        requested[eye_id] = ["bad_flat_axis_deg"]
+    if not requested:
+        return result
+
     try:
-        reread = targeted_reread(
-            core, raw, filename, requested, patient_age_requested, pentacam_qs_requested,
-            exam_date_requested,
-        )
-        return apply_targeted_readings(
-            core, result, reread, requested, filename, patient_age_requested,
-            pentacam_qs_requested, exam_date_requested,
-        )
+        reread = targeted_reread(core, raw, filename, requested)
+        apply_targeted_readings(core, result, reread, requested, filename)
     except Exception as exc:
         result.setdefault("global_warnings", []).append(
-            f"Targeted Pentacam numeric reread failed for {filename}: "
-            f"{type(exc).__name__}; original extraction retained."
+            f"Astigmatic-disparity BAD flat-axis verification failed for {filename}: "
+            f"{type(exc).__name__}; surgeon confirmation is required."
         )
-        return result
+
+    eyes = {
+        eye.get("eye"): eye for eye in result.get("eyes") or []
+        if eye.get("eye") in requested
+    }
+    for eye_id, primary_value in originals.items():
+        eye = eyes[eye_id]
+        verified_value = eye.get("bad_flat_axis_deg")
+        eye.setdefault("astigmatic_disparity_verification_evidence", {})["bad_flat_axis_deg"] = {
+            "file": filename,
+            "primary_value": primary_value,
+            "verified_value": verified_value,
+            "status": "VERIFIED" if core.is_number(verified_value) else "UNRESOLVED",
+        }
+        if core.is_number(verified_value):
+            if abs(float(verified_value) - primary_value) > 1e-9:
+                result.setdefault("global_warnings", []).append(
+                    f"{eye_id} BAD flat axis corrected by focused canonical-box reread "
+                    f"from {primary_value:g}° to {float(verified_value):g}°."
+                )
+        else:
+            result.setdefault("global_warnings", []).append(
+                f"{eye_id} BAD flat axis associated with an astigmatic-disparity warning "
+                "could not be verified; surgeon confirmation is recommended."
+            )
+    return result

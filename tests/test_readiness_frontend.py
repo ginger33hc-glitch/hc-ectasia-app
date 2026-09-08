@@ -59,7 +59,8 @@ def test_preassessment_source_confirmation_and_refraction_prompt_are_visible():
     assert 'errorDetail.missing_refraction?.[0]' in html
     for label in (
         'Required image confirmation', 'Optional treatment card', 'present',
-        'missing', 'not provided', 'No treatment card was provided.',
+        'missing', 'not provided', 'unreadable — enter refraction',
+        'No treatment card was provided.', 'The optional treatment card was unreadable.',
     ):
         assert label in translations
 

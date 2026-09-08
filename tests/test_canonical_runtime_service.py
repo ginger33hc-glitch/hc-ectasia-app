@@ -260,19 +260,38 @@ def test_surgeon_confirmed_negative_srax_completes_both_erss_and_ps3():
     assert not eye['ps3']['complete']
 
 
-def test_ps3_compares_bad_flat_axis_only_and_never_substitutes_steep_axis():
+def test_astigmatic_disparity_is_separate_from_ps3_and_uses_bad_flat_axis():
     od = _eye('OD', topographic_astig_D=3.3, topographic_steep_axis_deg=92.8,
               bad_flat_axis_deg=2.8)
     plans = {name: _plan(manifest_cylinder_signed_D=-3, manifest_axis_deg=180)
              for name in ('OD', 'OS')}
     eye = _evaluate(extracted=_case(od), plans=plans)['eyes'][0]
-    factor = next(f for f in eye['ps3']['findings'] if f['key'] == 'astigmatic_study')
-    assert factor['status'] == 'NORMAL'
-    assert '2.8°' in factor['detail']
+    assert all(f['key'] != 'astigmatic_study' for f in eye['ps3']['findings'])
+    assert eye['astigmatic_disparity']['status'] == 'NORMAL'
+    assert eye['astigmatic_disparity']['axis_difference_deg'] == pytest.approx(2.8)
     assert eye['report_payload']['source_values']['topographic_steep_axis_deg'] == 92.8
     od['bad_flat_axis_deg'] = None
     eye = _evaluate(extracted=_case(od), plans=plans)['eyes'][0]
-    assert not eye['ps3']['complete']
+    assert eye['ps3']['complete']
+    assert eye['astigmatic_disparity']['status'] == 'NOT_EVALUATED'
+
+
+def test_astigmatic_disparity_does_not_redirect_safe_lasik_to_prk():
+    od = _eye(
+        'OD', topographic_astig_D=3.1, bad_flat_axis_deg=1.1,
+        topographic_steep_axis_deg=91.1,
+    )
+    plans = {
+        name: _plan(manifest_cylinder_signed_D=-3.1, manifest_axis_deg=2.0)
+        for name in ('OD', 'OS')
+    }
+    result = _evaluate(extracted=_case(od), plans=plans)
+    eye = result['eyes'][0]
+    assert eye['astigmatic_disparity']['status'] == 'NORMAL'
+    assert eye['astigmatic_disparity']['axis_difference_deg'] == pytest.approx(0.9)
+    assert eye['ps3']['disposition']['lasik'] == 'ALLOWED'
+    assert eye['report_payload']['procedure'] == 'LASIK'
+    assert 'lasik_assessment' not in eye
 
 
 def test_failed_lasik_automatically_evaluates_prk_and_retains_failed_assessment():

@@ -69,6 +69,28 @@ def test_regenerate_docx_does_not_modify_archive():
     assert after == before
 
 
+def test_owner_regeneration_masks_patient_identity_before_rendering():
+    archive = make_archive()
+    case_id, revision_id = "9" * 32, "a" * 24
+    store_assessment(archive, case_id, revision_id)
+
+    def pdf_builder(payload):
+        patient = payload["patient"]
+        return f"{patient['name']}|{patient['id']}".encode()
+
+    content = historical_report.regenerate_bytes(
+        archive,
+        case_id,
+        revision_id,
+        kind="pdf",
+        locale="en",
+        pdf_builder=pdf_builder,
+        docx_builder=lambda payload: b"unused",
+        owner_deidentified=True,
+    )
+    assert content == b"Masked for owner|Masked for owner"
+
+
 def test_regeneration_requires_existing_canonical_assessment():
     archive = make_archive()
     with pytest.raises(HTTPException) as exc:

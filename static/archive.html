@@ -15,7 +15,7 @@
 <body>
 <header class="top"><div class="top-inner"><div class="brand">CER-AI · Case Archive</div><div class="user"><span id="userLabel">Loading…</span><a href="/">Clinical workspace</a><button id="logoutButton" type="button">Sign out</button></div></div></header>
 <main>
-  <section class="card">
+  <section id="archiveSearch" class="card capability" hidden>
     <h1>Archived cases</h1>
     <p id="scopeNote" class="sub">Search archived case revisions.</p>
     <form id="searchForm">
@@ -32,7 +32,7 @@
     </form>
   </section>
 
-  <section class="card">
+  <section id="archiveResults" class="card capability" hidden>
     <h2>Results</h2>
     <div class="table-wrap"><table><thead><tr><th>Date</th><th>Patient</th><th>ID</th><th>Decision</th><th>Reviewer</th><th>Created by</th><th>Revision</th><th>Reports</th><th>Pentacam sources</th></tr></thead><tbody id="resultsBody"><tr><td colspan="9">Run a search to list cases.</td></tr></tbody></table></div>
   </section>
@@ -91,7 +91,8 @@
   const reportLinks = entry => {
     const c = encodeURIComponent(entry.case_id), r = encodeURIComponent(entry.revision_id);
     const base = `/archive/cases/${c}/revisions/${r}`;
-    const original = `<a href="${base}/report/pdf?locale=en" target="_blank" rel="noopener">Open Original PDF EN</a><a href="${base}/report/pdf?locale=tr" target="_blank" rel="noopener">Open Original PDF TR</a><a href="${base}/report/docx?locale=en">Download Original DOCX EN</a><a href="${base}/report/docx?locale=tr">Download Original DOCX TR</a>`;
+    const reportLabel = capabilities?.owner_deidentified_access ? "De-identified" : "Original";
+    const original = `<a href="${base}/report/pdf?locale=en" target="_blank" rel="noopener">Open ${reportLabel} PDF EN</a><a href="${base}/report/pdf?locale=tr" target="_blank" rel="noopener">Open ${reportLabel} PDF TR</a><a href="${base}/report/docx?locale=en">Download ${reportLabel} DOCX EN</a><a href="${base}/report/docx?locale=tr">Download ${reportLabel} DOCX TR</a>`;
     const regenerated = capabilities?.historical_report_enabled ? `<a href="${base}/regenerate/pdf?locale=en" target="_blank" rel="noopener">Regenerate PDF EN</a><a href="${base}/regenerate/pdf?locale=tr" target="_blank" rel="noopener">Regenerate PDF TR</a><a href="${base}/regenerate/docx?locale=en">Regenerate DOCX EN</a><a href="${base}/regenerate/docx?locale=tr">Regenerate DOCX TR</a>` : "";
     return `<div class="links">${original}${regenerated}</div>`;
   };
@@ -109,7 +110,7 @@
       const data=await response.json(),entry=data.catalog||{},assessment=data.assessment||{},patient=entry.patient||{},creator=entry.created_by||{},decision=assessment.decision||entry.decision||{};
       const eyes=(decision.eyes||[]).map(eye=>`${escapeHtml(eye.eye||"")}: <span class="decision ${decisionClass(eye.status)}">${escapeHtml(eye.status||"")}</span>`).join(" · ")||"Not documented";
       detail.innerHTML=`<div class="case-summary"><div><strong>Patient</strong>${escapeHtml(patient.name||"Not documented")}</div><div><strong>Patient ID</strong>${escapeHtml(patient.id||"Not documented")}</div><div><strong>Report date</strong>${escapeHtml(entry.report_date||"Not documented")}</div><div><strong>Surgeon / reviewer</strong>${escapeHtml(entry.reviewer||"Not documented")}</div><div><strong>Archived by</strong>${escapeHtml(creator.display_name||"Legacy / unassigned")}</div><div><strong>Overall decision</strong><span class="decision ${decisionClass(decision.status)}">${escapeHtml(decision.status||"Not documented")}</span></div><div><strong>Eye decisions</strong>${eyes}</div><div><strong>Revision</strong><span class="mono">${escapeHtml(entry.revision_id||revisionId)}</span></div></div>${reportLinks(entry)}`;
-      status.textContent="Archived canonical assessment reopened. Values are displayed from the saved snapshot; no clinical score was recalculated.";
+      status.textContent=capabilities?.owner_deidentified_access ? "De-identified archived assessment reopened. Patient identity and source filenames are masked; no clinical score was recalculated." : "Archived canonical assessment reopened. Values are displayed from the saved snapshot; no clinical score was recalculated.";
     } catch(exc){status.className="status error";status.textContent=exc.message||"Unable to reopen archived case.";}
   };
   const showSources = async (caseId, revisionId) => {
@@ -119,12 +120,12 @@
       const response=await request(`${base}/sources`); if(!response.ok) throw new Error(await readError(response));
       const data=await response.json(), sources=data.sources||[];
       if(!sources.length){status.textContent="No source images are archived for this case.";return;}
-      status.textContent=`${sources.length} source image(s). Original filenames are shown only inside this authenticated workspace.`;
-      actions.innerHTML=`<a href="${base}/sources.zip">Download all source images (ZIP)</a>`;
+      status.textContent=capabilities?.owner_deidentified_access ? `${sources.length} de-identified source image(s). Patient demographics are masked and original filenames are hidden.` : `${sources.length} source image(s). Original filenames are shown only inside this authenticated workspace.`;
+      actions.innerHTML=`<a href="${base}/sources.zip">Download all ${capabilities?.owner_deidentified_access?"de-identified ":""}source images (ZIP)</a>`;
       gallery.innerHTML=sources.map(source=>{
         const itemBase=`${base}/sources/${encodeURIComponent(source.ordinal)}`;
         const previewable=["image/bmp","image/gif","image/jpeg","image/png","image/tiff","image/webp"].includes(source.media_type);
-        const preview=previewable ? `<img src="${itemBase}/preview" alt="${escapeHtml(source.original_filename)}" loading="lazy">` : `<div class="source-placeholder">Preview unavailable for this file type.<br>Download the original source.</div>`;
+        const preview=previewable ? `<img src="${itemBase}/preview" alt="${escapeHtml(source.original_filename)}" loading="lazy">` : `<div class="source-placeholder">Preview unavailable for this file type.</div>`;
         const open=previewable ? `<a href="${itemBase}/preview" target="_blank" rel="noopener">Open full size</a>` : "";
         return `<article class="source-card">${preview}<div class="source-name">${escapeHtml(source.original_filename)}</div><div class="source-meta">Source ${escapeHtml(source.ordinal)} · ${escapeHtml(source.media_type)} · ${sourceSize(source.plaintext_bytes)}</div><div class="links">${open}<a href="${itemBase}/download">Download</a></div></article>`;
       }).join("");
@@ -154,7 +155,7 @@
     status.className = "status"; status.textContent = "Searching…";
     $("searchButton").disabled = true;
     const payload = {};
-    ["patient_name","patient_id","report_date","decision","reviewer"].forEach(id => { const value = $(id).value.trim(); if (value) payload[id] = value; });
+    ["patient_name","patient_id","report_date","decision","reviewer"].forEach(id => { const value = $(id).value.trim(); if (value && !(capabilities?.owner_deidentified_access && ["patient_name","patient_id"].includes(id))) payload[id] = value; });
     payload.limit = Number($("limit").value);
     try {
       const response = await request("/archive/search", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
@@ -208,8 +209,10 @@
     currentUser=(await responses[0].json()).user;
     capabilities=await responses[1].json();
     $("userLabel").textContent=`${currentUser.display_name} · ${currentUser.role}`;
-    $("scopeNote").textContent=currentUser.role==="OWNER" ? "OWNER scope: all archived cases and legacy/unassigned cases." : "DOCTOR scope: only cases created under your account.";
+    $("scopeNote").textContent=currentUser.role==="OWNER" ? "OWNER retrospective scope: all cases are available only with patient name, patient ID, source filenames, report identity, and image demographics masked." : "DOCTOR scope: only cases created under your account, with original identity and source material.";
     if(currentUser.role==="OWNER") {
+      $("patient_name").disabled=true; $("patient_name").placeholder="Masked in OWNER view";
+      $("patient_id").disabled=true; $("patient_id").placeholder="Masked in OWNER view";
       $("ownerTools").hidden=false;
       $("researchControls").hidden=!capabilities.research_export_enabled;
       $("auditControls").hidden=!capabilities.audit_enabled;
@@ -221,7 +224,11 @@
       renderResults([]);
       return;
     }
-    search();
+    if(capabilities.retrospective_archive_access) {
+      $("archiveSearch").hidden=false;
+      $("archiveResults").hidden=false;
+      search();
+    }
   }).catch(exc => { $("searchStatus").className="status error"; $("searchStatus").textContent=exc.message||"Unable to load archive workspace."; });
 })();
 </script>

@@ -5,7 +5,8 @@ produce a surgeon-review recommendation after a favorable LASIK assessment and
 can never change the CER-AI disposition.
 
 Source rules: the user-supplied Turkish ML7 reference (MED-LOGICS document
-200-0386, Rev. 22) plus the binding CER-AI hinge rule for a K spread >4.00 D.
+200-0386, Rev. 22) plus the binding CER-AI temporal-default hinge rule and
+steep-meridian amendment for a K spread >4.00 D.
 """
 from dataclasses import asdict, dataclass, field
 from typing import Optional, Tuple
@@ -34,7 +35,7 @@ class MicrokeratomePlanningInput:
     hyperopic: bool = False
     mixed_cylinder: bool = False
     hinge_site_lowest_k_d: Optional[float] = None
-    perpendicular_hinge_anatomically_possible: Optional[bool] = None
+    superior_hinge_anatomically_possible: Optional[bool] = None
     planned_flap_um: Optional[float] = None
     max_ablation_um: Optional[float] = None
 
@@ -47,6 +48,9 @@ class MicrokeratomePlan:
     vacuum_pressure_mmhg: Optional[str] = None
     blade_recommendations: Tuple[str, ...] = field(default_factory=tuple)
     primary_hinge: Optional[str] = None
+    steep_meridian_axis_deg: Optional[float] = None
+    hinge_location_preference: Optional[str] = None
+    hinge_location_alternative: Optional[str] = None
     alternative_hinge: Optional[str] = None
     delta_k_d: Optional[float] = None
     ring_tzone_clearance_mm: Optional[float] = None
@@ -120,6 +124,21 @@ def _alternative_tissue_safety(
     return round(rsb, 2), round(pta, 3), "ALLOWED" if allowed else "NOT_ALLOWED"
 
 
+def _hinge_location_for_steep_meridian(steep_axis_deg: float) -> tuple[Optional[str], Optional[str]]:
+    """Map the steep meridian directly to the physical hinge location.
+
+    Vertical steep meridians from 60 to 120 degrees use a superior hinge.
+    Horizontal steep meridians from 0 to 30 or 150 to 180 degrees use a
+    temporal hinge, with nasal secondary. No physical location is inferred for
+    intervening oblique meridians.
+    """
+    if 60.0 <= steep_axis_deg <= 120.0:
+        return "Superior", None
+    if steep_axis_deg <= 30.0 or steep_axis_deg >= 150.0:
+        return "Temporal", "Nasal"
+    return None, None
+
+
 def plan_microkeratome(inp: MicrokeratomePlanningInput) -> MicrokeratomePlan:
     """Return a non-eligibility-changing surgeon-review recommendation."""
     status = (inp.assessment_status or "").upper()
@@ -169,32 +188,66 @@ def plan_microkeratome(inp: MicrokeratomePlanningInput) -> MicrokeratomePlan:
             warnings.append("Ablation/transition zone is not 0.4-0.5 mm smaller than the selected ring (active ML7 reference optimum).")
 
     delta = round(steep - flat, 2) if steep is not None and flat is not None else None
-    primary_hinge = None
+    # Canonical baseline: temporal is the preferred hinge unless the high-
+    # astigmatism steep-meridian rule below explicitly changes it.
+    primary_hinge = "Temporal hinge (default)"
+    steep_meridian_axis = None
+    hinge_location = "Temporal"
+    hinge_location_alternative = None
     alternative_hinge = None
     alternative_rsb = alternative_pta = None
     alternative_safety = "NOT_APPLICABLE"
 
     # Binding CER-AI rule: strict >4.00 D, not >=4.00 D.
     if delta is not None and delta > 4.00:
-        primary_hinge = "Perpendicular to steep axis"
         if steep_axis is not None and 0 <= steep_axis <= 180:
-            primary_hinge += f" ({(steep_axis + 90.0) % 180.0:.0f}° hinge axis)"
+            steep_meridian_axis = steep_axis % 180.0
+            hinge_location, hinge_location_alternative = _hinge_location_for_steep_meridian(
+                steep_axis
+            )
+            if hinge_location == "Superior":
+                primary_hinge = (
+                    f"Superior hinge at the vertical steep meridian "
+                    f"({steep_meridian_axis:.0f}°)"
+                )
+            elif hinge_location == "Temporal":
+                primary_hinge = (
+                    f"Temporal hinge preferred at the horizontal steep meridian "
+                    f"({steep_meridian_axis:.0f}°); nasal secondary"
+                )
+            else:
+                primary_hinge = (
+                    f"Temporal hinge remains the default; oblique steep meridian "
+                    f"({steep_meridian_axis:.0f}°) requires surgeon judgment"
+                )
+                hinge_location = "Temporal"
         elif steep_axis is None:
-            warnings.append("K spread is >4.00 D, but the steep K axis is unavailable; the numeric hinge axis cannot be calculated.")
+            warnings.append(
+                "K spread is >4.00 D, but the steep K axis is unavailable; "
+                "temporal remains the default and no axis-based change was made."
+            )
         else:
-            warnings.append("Steep K axis is outside 0-180°; the numeric hinge axis was not calculated.")
+            warnings.append(
+                "Steep K axis is outside 0-180°; temporal remains the default "
+                "and no axis-based change was made."
+            )
 
-        alternative_rsb, alternative_pta, alternative_safety = _alternative_tissue_safety(
-            pachy, inp.planned_flap_um, inp.max_ablation_um
-        )
-        anatomy = inp.perpendicular_hinge_anatomically_possible
-        if anatomy is not True:
+        # The +10 temporal/nasal contingency is specific to a vertical steep
+        # meridian when the preferred superior hinge is anatomically impractical.
+        if hinge_location == "Superior":
+            alternative_rsb, alternative_pta, alternative_safety = _alternative_tissue_safety(
+                pachy, inp.planned_flap_um, inp.max_ablation_um
+            )
+            anatomy = inp.superior_hinge_anatomically_possible
+        else:
+            anatomy = True
+        if hinge_location == "Superior" and anatomy is not True:
             if alternative_safety == "ALLOWED":
                 alternative_hinge = "+10 blade; temporal or nasal hinge"
                 qualifier = (
-                    "because the perpendicular hinge was documented as anatomically impractical"
+                    "because the superior hinge was documented as anatomically impractical"
                     if anatomy is False
-                    else "only if the surgeon determines that the perpendicular hinge is anatomically impractical"
+                    else "only if the surgeon determines that the superior hinge is anatomically impractical"
                 )
                 notes.append(f"CER-AI contingency: {alternative_hinge} may be considered {qualifier}; projected RSB/PTA remain within CER-AI limits.")
             elif alternative_safety == "NOT_ALLOWED":
@@ -221,6 +274,11 @@ def plan_microkeratome(inp: MicrokeratomePlanningInput) -> MicrokeratomePlan:
         vacuum_pressure_mmhg=pressure,
         blade_recommendations=tuple(dict.fromkeys(blades)),
         primary_hinge=primary_hinge,
+        steep_meridian_axis_deg=(
+            round(steep_meridian_axis, 1) if steep_meridian_axis is not None else None
+        ),
+        hinge_location_preference=hinge_location,
+        hinge_location_alternative=hinge_location_alternative,
         alternative_hinge=alternative_hinge,
         delta_k_d=delta,
         ring_tzone_clearance_mm=clearance,

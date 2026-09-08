@@ -178,11 +178,13 @@ LASIK and PRK resolve requested myopic ablation through the same canonical estim
 
 ### PS3 prescription-axis source — 2026-09-08
 
-Only the PS3 manifest-versus-topographic astigmatism comparison uses `bad_flat_axis_deg`, read directly from the BAD Display upper-middle Axis box beside K1. Compare this flat-meridian axis to the normalized minus-cylinder manifest axis using the smaller separation modulo 180 degrees. Do not transpose the prescription again, rotate a steep-axis value, or substitute another map. The existing activation gate (either magnitude >3.00 D), magnitude and angular thresholds remain unchanged. Missing required BAD Axis prompts surgeon entry from this exact box. All steep-axis fields, their source locks, and SRAX geometry retain their existing independent roles.
+Manifest-versus-topographic astigmatic disparity is a separate measurement/refraction validation item, not a PS3 factor. It uses `bad_flat_axis_deg`, read directly from the BAD Display upper-middle Axis box beside K1, and the normalized minus-cylinder manifest axis, using the smaller separation modulo 180 degrees. A magnitude difference `>=1.00 D` or axis difference `>=10°` requests validation but does not change PS3 counts or independently restrict LASIK, PRK, or SMILE. Missing disparity inputs remain passive and do not make PS3 incomplete. Do not transpose the prescription again, rotate a steep-axis value, or substitute another map. All steep-axis fields, their source locks, and SRAX geometry retain their existing independent roles.
 
 ### ML7 keratometry source — 2026-09-08
 
 ML7 reads dedicated `ml7_bad_k1_d` and `ml7_bad_k2_d` directly from the BAD Display upper-middle K1/K2 boxes. The canonical ML7 input selects their maximum as steepest K and minimum as flattest K. No Kmax or general-scoring K1/K2 fallback is permitted. Existing scoring keratometry, axis sources, and SRAX are unchanged. HWTW remains source-locked to the 4 Maps Refractive lower-left HWTW box and requires verified provenance. Missing ML7 K1/K2 and missing verified HWTW are reported separately with exact source guidance; no ring is inferred when required inputs are absent.
+
+Temporal is the default preferred hinge location. When `steepest K - flattest K >4.00 D`, hinge planning may change according to the steep meridian: a vertical steep meridian (`60°–120°`, inclusive) changes the preference to superior; a horizontal steep meridian (`0°–30°` or `150°–180°`, inclusive) retains temporal, with nasal as the secondary location. Intervening oblique or unavailable axes retain temporal and require surgeon judgment before any change. If the preferred superior hinge is anatomically impractical, the surgeon may select a temporal or nasal hinge with a `+10` blade only when recalculated RSB is `>=300 µm` and PTA is `<40%`.
 
 ### Automatic PRK evaluation after LASIK failure — 2026-09-08
 

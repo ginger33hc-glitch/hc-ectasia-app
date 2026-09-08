@@ -34,7 +34,7 @@ def test_turkish_exports_translate_current_report_sections_and_preserve_snapshot
         for required in (
             'Genel karar', 'OD — UYGUN', 'Cerrahi güvenlik', 'Cerrahi planlama',
             'Kararın gerekçesi', 'Pentacam değerleri ve kaynak bilgileri',
-            'Topografi kategorisi', 'Astigmatizma karşılaştırması', 'Gözler arası puan 0/5.',
+                'Topografi kategorisi', 'Astigmatik uyumsuzluk doğrulaması', 'Gözler arası puan 0/5.',
             'Kornea kalınlık haritası morfolojisi: değerlendirilmedi; cerrah değerlendirmesi gerekir;',
             'Göreli kalınlık haritası: değerlendirilmedi; cerrah değerlendirmesi gerekir;',
             'PTI/CTSP kalınlık profili morfolojisi: değerlendirilmedi; cerrah değerlendirmesi gerekir;',
@@ -43,7 +43,7 @@ def test_turkish_exports_translate_current_report_sections_and_preserve_snapshot
             'Kaynak: Axial/Sagittal Curvature (Front).',
             'No Source Şule Işık', 'PASS-NO-035', 'Dr. Çağrı Şen',
             'SHOW_2_CORNEA_BACK / show2.png', 'BAD_D_STRIP / OD-bad.png',
-                'CER-AI-2026-09-08-SHARED-PTA-LT40-ELIGIBILITY-V2-SURGEON-FIRST',
+                'CER-AI-2026-09-08-PS3-DISPARITY-SEPARATED-ML7-HINGE-V3',
         ):
             assert required in content
         for obsolete in ('Canonical result', 'Procedure disposition', 'selected_plan',
@@ -129,7 +129,7 @@ def test_turkish_bad_classifications_and_selected_plan_keep_colors():
     assert db.cells[2].text == 'ŞÜPHELİ / 1.60 ile < 2.60; yalnızca bilgilendirme'
     assert df.cells[1]._tc.get_or_add_tcPr().find(qn('w:shd')).get(qn('w:fill')) == reports.RED_FILL
     assert db.cells[1]._tc.get_or_add_tcPr().find(qn('w:shd')).get(qn('w:fill')) == reports.AMBER_FILL
-    selected = next(row for t in doc.tables for row in t.rows if row.cells[0].text == 'Seçilen plan')
-    assert selected.cells[1].text == 'Plan A'
+    selected = next(row for t in doc.tables for row in t.rows if row.cells[0].text == 'Seçilen LASIK planı')
+    assert selected.cells[1].text == 'Plan A — flep 100 µm; optik zon 6,5 mm; geçiş zonu 9,0 mm'
     assert selected.cells[1]._tc.get_or_add_tcPr().find(qn('w:shd')).get(qn('w:fill')) == reports.GREEN_FILL
     assert 'pachymetry' not in translate_text('Inter-eye score 1/5; exceeded: thinnest pachymetry.', 'tr')

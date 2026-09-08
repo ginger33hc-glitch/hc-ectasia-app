@@ -142,6 +142,46 @@ def _is_treatment_card(result: dict[str, Any], tokens: set[str]) -> bool:
     return bool(result.get("treatment_corrections"))
 
 
+def _mandatory_labels_for(result: dict[str, Any]) -> set[str]:
+    """Return only the mandatory source roles established by this image."""
+    tokens = _screen_tokens(result)
+    eyes = _eyes(result)
+    labels: set[str] = set()
+    if _is_four_maps(tokens):
+        labels.update(
+            label for eye in eyes
+            if (label := f"{eye} Four Maps Refractive") in MANDATORY_LABELS
+        )
+    if _is_bad_display(tokens) or _has_bad_display_signature(result):
+        labels.update(
+            label for eye in eyes
+            if (label := f"{eye} Belin/Ambrosio Display") in MANDATORY_LABELS
+        )
+    if _is_show_two_topometric(tokens) or _has_show_two_numeric_signature(result):
+        labels.add("Show 2 Exams Topometric")
+    return labels
+
+
+def _unreadable_optional_card_results(
+    results: list[dict[str, Any]], *, mandatory_complete: bool,
+) -> list[dict[str, Any]]:
+    recognized = [
+        result for result in results
+        if _is_treatment_card(result, _screen_tokens(result))
+        and not result.get("treatment_corrections")
+    ]
+    residual = []
+    if mandatory_complete and len(results) == len(MANDATORY_LABELS) + 1:
+        residual = [
+            result for result in results
+            if not _mandatory_labels_for(result)
+            and not _is_treatment_card(result, _screen_tokens(result))
+        ]
+        if len(residual) != 1:
+            residual = []
+    return list({id(result): result for result in recognized + residual}.values())
+
+
 def classify_source_set(results: list[dict[str, Any]]) -> dict[str, Any]:
     present = {label: False for label in MANDATORY_LABELS}
     treatment_cards = 0
@@ -149,33 +189,32 @@ def classify_source_set(results: list[dict[str, Any]]) -> dict[str, Any]:
 
     for result in results:
         tokens = _screen_tokens(result)
-        eyes = _eyes(result)
-        recognized_this_image = False
-
-        if _is_four_maps(tokens):
-            for eye in eyes:
-                label = f"{eye} Four Maps Refractive"
-                if label in present:
-                    present[label] = True
-                    recognized_this_image = True
-
-        if _is_bad_display(tokens) or _has_bad_display_signature(result):
-            for eye in eyes:
-                label = f"{eye} Belin/Ambrosio Display"
-                if label in present:
-                    present[label] = True
-                    recognized_this_image = True
-
-        if _is_show_two_topometric(tokens) or _has_show_two_numeric_signature(result):
-            present["Show 2 Exams Topometric"] = True
-            recognized_this_image = True
-
+        mandatory_labels = _mandatory_labels_for(result)
+        for label in mandatory_labels:
+            present[label] = True
         if _is_treatment_card(result, tokens):
             treatment_cards += 1
-        if recognized_this_image:
+        if mandatory_labels:
             recognized_mandatory_images += 1
 
     missing = [label for label, available in present.items() if not available]
+    unreadable_cards = _unreadable_optional_card_results(
+        results, mandatory_complete=not missing,
+    )
+    recognized_unreadable_cards = [
+        result for result in unreadable_cards
+        if _is_treatment_card(result, _screen_tokens(result))
+    ]
+    recognized_unreadable_ids = {id(result) for result in recognized_unreadable_cards}
+    unreadable_card_candidates = [
+        result for result in unreadable_cards if id(result) not in recognized_unreadable_ids
+    ]
+    usable_cards = treatment_cards - len(recognized_unreadable_cards)
+    card_status = (
+        "READABLE" if usable_cards > 0
+        else "UNREADABLE" if unreadable_cards
+        else "NOT_PROVIDED"
+    )
     return {
         "present": present,
         "required_sources": [
@@ -188,8 +227,11 @@ def classify_source_set(results: list[dict[str, Any]]) -> dict[str, Any]:
         "treatment_card_count": treatment_cards,
         "optional_treatment_card": {
             "label": OPTIONAL_TREATMENT_CARD_LABEL,
-            "present": treatment_cards > 0,
-            "count": treatment_cards,
+            "present": treatment_cards > 0 or bool(unreadable_card_candidates),
+            "usable": usable_cards > 0,
+            "status": card_status,
+            "count": treatment_cards + len(unreadable_card_candidates),
+            "unreadable_count": len(unreadable_cards),
         },
         "confirmed": not missing,
         "uploaded_count": len(results),
@@ -282,23 +324,37 @@ def validate_preassessment_requirements(
 ) -> dict[str, Any]:
     """Confirm source identity and any conditional manual inputs before enrichment."""
     summary = validate_source_set(results)
-    card_present = summary["optional_treatment_card"]["present"]
-    missing_refraction = [] if card_present else missing_manual_refraction(plans)
+    card = summary["optional_treatment_card"]
+    card_usable = card["usable"]
+    if card["status"] == "UNREADABLE":
+        for result in _unreadable_optional_card_results(
+            results, mandatory_complete=summary["confirmed"],
+        ):
+            (result.setdefault("document_context", {}))[
+                "optional_treatment_card_status"
+            ] = "UNREADABLE"
+    missing_refraction = [] if card_usable else missing_manual_refraction(plans)
     summary["manual_refraction"] = {
-        "required": not card_present,
+        "required": not card_usable,
         "complete": not missing_refraction,
         "missing": missing_refraction,
     }
     if missing_refraction:
         labels = ", ".join(item["label"] for item in missing_refraction)
+        source_message = (
+            "No treatment card was provided."
+            if card["status"] == "NOT_PROVIDED"
+            else "The optional treatment card did not provide complete readable refraction."
+        )
         raise HTTPException(
             422,
             {
                 "code": "PREASSESSMENT_REFRACTION_REQUIRED",
                 "message": (
-                    "Assessment not started. No treatment card was provided. Enter the complete "
+                    f"Assessment not started. {source_message} Enter the complete "
                     f"manifest and intended refraction for both eyes: {labels}."
                 ),
+                "refraction_reason": card["status"],
                 "source_set": summary,
                 "missing_refraction": missing_refraction,
             },

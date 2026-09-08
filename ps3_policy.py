@@ -12,16 +12,12 @@ NORMAL = "NORMAL"
 MODERATE = "MODERATE"
 HIGH = "HIGH"
 NOT_EVALUATED = "NOT_EVALUATED"
-NOT_REQUIRED = "NOT_REQUIRED"
 ALLOWED = "ALLOWED"
 DEFER = "DEFER"
 INCOMPLETE = "INCOMPLETE"
-ASTIGMATIC_COMPARISON_ACTIVATION_D = 3.0
-
 AUTOMATED_KEYS = (
     "anterior_km",
     "thinnest",
-    "astigmatic_study",
     "elevation",
     "ppi_average",
     "inter_eye_asymmetry",
@@ -39,10 +35,6 @@ MANUAL_REVIEW_KEYS = (
 class PS3EyeInput:
     anterior_km_d: Optional[float] = None
     thinnest_um: Optional[float] = None
-    topographic_astig_d: Optional[float] = None
-    bad_flat_axis_deg: Optional[float] = None
-    manifest_astig_d: Optional[float] = None
-    manifest_axis_deg: Optional[float] = None
     ppi_avg: Optional[float] = None
     f_ele_th_um: Optional[float] = None
     b_ele_th_um: Optional[float] = None
@@ -96,15 +88,6 @@ def _num(value):
         return None
     value = float(value)
     return value if isfinite(value) else None
-
-
-def _axis_difference_deg(a, b):
-    a = _num(a)
-    b = _num(b)
-    if a is None or b is None:
-        return None
-    difference = abs((a % 180) - (b % 180))
-    return min(difference, 180 - difference)
 
 
 def _inter_eye_score(inp):
@@ -204,55 +187,6 @@ def evaluate_ps3(eye, inter_eye=None):
         findings.append(PS3Finding("thinnest", MODERATE, f"Thinnest {thinnest:g} µm is 470-500 µm."))
     else:
         findings.append(PS3Finding("thinnest", NORMAL, f"Thinnest {thinnest:g} µm > 500 µm."))
-
-    topo_astig = _num(eye.topographic_astig_d)
-    manifest_astig = _num(eye.manifest_astig_d)
-    comparison_inactive = (
-        topo_astig is not None
-        and manifest_astig is not None
-        and max(abs(topo_astig), abs(manifest_astig)) <= ASTIGMATIC_COMPARISON_ACTIVATION_D
-    )
-    axis_is_meaningful = (
-        not comparison_inactive
-        and topo_astig is not None
-        and manifest_astig is not None
-        and abs(topo_astig) > 1e-12
-        and abs(manifest_astig) > 1e-12
-    )
-    axis_difference = (
-        _axis_difference_deg(eye.bad_flat_axis_deg, eye.manifest_axis_deg)
-        if axis_is_meaningful
-        else None
-    )
-    if comparison_inactive:
-        findings.append(PS3Finding(
-            "astigmatic_study", NOT_REQUIRED,
-            f"Manifest astigmatism {abs(manifest_astig):g} D and topographic astigmatism "
-            f"{abs(topo_astig):g} D are both <={ASTIGMATIC_COMPARISON_ACTIVATION_D:.2f} D; "
-            "comparison inactive, no PS3 risk factor.",
-        ))
-    elif (
-        topo_astig is None
-        or manifest_astig is None
-        or (axis_is_meaningful and axis_difference is None)
-    ):
-        findings.append(PS3Finding(
-            "astigmatic_study", NOT_EVALUATED,
-            "Manifest/topographic astigmatism magnitude or axis unavailable.",
-        ))
-    else:
-        magnitude_difference = abs(abs(manifest_astig) - abs(topo_astig))
-        axis_abnormal = axis_difference is not None and axis_difference > 10
-        status = MODERATE if magnitude_difference > 1 or axis_abnormal else NORMAL
-        axis_detail = (
-            f"BAD flat-axis versus minus-cylinder manifest axis difference {axis_difference:.1f}°"
-            if axis_difference is not None
-            else "axis comparison not applicable because an astigmatic magnitude is zero"
-        )
-        findings.append(PS3Finding(
-            "astigmatic_study", status,
-            f"Astigmatism difference {magnitude_difference:.2f} D; {axis_detail}.",
-        ))
 
     findings.append(_elevation_finding(eye))
 

@@ -15,7 +15,11 @@ from __future__ import annotations
 from dataclasses import asdict, is_dataclass
 from typing import Any, Mapping
 
-from canonical_input_adapter import build_clinical_core_input, resolve_case_plans
+from canonical_input_adapter import (
+    astigmatic_disparity_from_plan,
+    build_clinical_core_input,
+    resolve_case_plans,
+)
 from clinical_core.disposition import (
     ASSESSMENT_INCOMPLETE,
     CAUTION,
@@ -28,9 +32,11 @@ from clinical_core.disposition import (
 from clinical_core.pipeline import evaluate_normalized_case
 from clinical_core.planning import (
     LASIK_PLANS,
+    LASIK_PLAN_SELECTION_RULE,
     PlanEvaluation,
     estimate_myopic_ablation_um,
     mmc_guidance,
+    lasik_plan_definition,
     select_first_safe_lasik_plan,
 )
 from clinical_core.refraction import (
@@ -146,6 +152,7 @@ def _report_payload(
     *,
     planning=None,
     microkeratome_planning=None,
+    astigmatic_disparity=None,
 ) -> dict[str, Any]:
     return build_report_payload(
         core_result,
@@ -157,6 +164,7 @@ def _report_payload(
         source_eye=source_eye,
         planning=planning,
         microkeratome_planning=microkeratome_planning,
+        astigmatic_disparity=astigmatic_disparity,
         manual_corrections=source_eye.get("surgeon_corrections") or (),
     )
 
@@ -171,6 +179,7 @@ def _virgin_eye_payload(
     eligibility_notes=(),
     planning=None,
     microkeratome_planning=None,
+    astigmatic_disparity=None,
 ) -> dict[str, Any]:
     safety = core_result.get("procedural_safety") or {}
     status = str(core_result.get("status") or ASSESSMENT_INCOMPLETE)
@@ -188,6 +197,7 @@ def _virgin_eye_payload(
         "bad": _plain(bad.get("result")),
         "nice": _plain(core_result.get("nice")),
         "ps3": _plain(ps3),
+        "astigmatic_disparity": _plain(astigmatic_disparity),
         "values": _values(core_result),
         "hard_stops": _hard_stop_reasons(safety),
         "reasons": _decision_reasons(core_result),
@@ -202,11 +212,17 @@ def _virgin_eye_payload(
             software_version,
             planning=planning,
             microkeratome_planning=microkeratome_planning,
+            astigmatic_disparity=astigmatic_disparity,
         ),
         "canonical_result": _plain(core_result),
     }
     if microkeratome_planning:
         payload["microkeratome_planning"] = _plain(microkeratome_planning)
+    if (
+        isinstance(astigmatic_disparity, Mapping)
+        and astigmatic_disparity.get("status") == "VALIDATION_REQUIRED"
+    ):
+        payload["warnings"].append(astigmatic_disparity.get("detail"))
     return payload
 
 
@@ -382,12 +398,19 @@ def _evaluate_lasik_planning(source_eye, resolved_plan, *, age_years, extracted,
         return PlanEvaluation(spec["name"], safe, reasons, core_result)
 
     selected = select_first_safe_lasik_plan(evaluator)
+    first_safe = next((item.plan for item in selected.sequence if item.safe), None)
+    if selected.selected_plan != first_safe:
+        raise RuntimeError(
+            "Canonical LASIK planning priority violated: the selected plan must be "
+            "the first safe candidate in Plan A → Plan B → Plan C order."
+        )
     sequence = []
     for evaluation in selected.sequence:
         spec = next(item for item in LASIK_PLANS if item["name"] == evaluation.plan)
         meta = candidate_meta[evaluation.plan]
         sequence.append({
             "plan": evaluation.plan,
+            "definition": lasik_plan_definition(evaluation.plan),
             "safe": evaluation.safe,
             "rejection_reasons": list(evaluation.rejection_reasons),
             "status": meta["status"],
@@ -399,6 +422,8 @@ def _evaluate_lasik_planning(source_eye, resolved_plan, *, age_years, extracted,
         })
     planning = {
         "selected_plan": selected.selected_plan,
+        "selected_plan_definition": lasik_plan_definition(selected.selected_plan),
+        "selection_rule": LASIK_PLAN_SELECTION_RULE,
         "sequence": sequence,
         "rejection_reasons": [],
         "mmc_guidance": "NOT_APPLICABLE",
@@ -481,7 +506,7 @@ def _microkeratome_planning(
         hyperopic=intended_group == HYPEROPIC,
         mixed_cylinder=intended_group == MIXED,
         hinge_site_lowest_k_d=None,
-        perpendicular_hinge_anatomically_possible=None,
+        superior_hinge_anatomically_possible=None,
         planned_flap_um=_plan_number(effective_plan, "flap_um"),
         max_ablation_um=_plan_number(effective_plan, "max_ablation_um", "ablation_um"),
     )).as_dict()
@@ -613,6 +638,7 @@ def evaluate_case(
             planning = _non_lasik_planning(procedure, normalized, core_result)
         lasik_assessment = None
         transition_message = None
+        astigmatic_disparity = astigmatic_disparity_from_plan(eye, plan).as_dict()
         if procedure == "LASIK" and core_result.get("status") == STOP_DEFER:
             # Keep the complete original LASIK assessment; PRK starts from the requested
             # correction and optical zone, never the last rejected LASIK candidate.
@@ -620,6 +646,7 @@ def evaluate_case(
                 eye_name, eye, core_result, software_version,
                 eligibility_missing=eligibility.missing, eligibility_notes=eligibility.notes,
                 planning=planning, microkeratome_planning=None,
+                astigmatic_disparity=astigmatic_disparity,
             )
             prk_plan = dict(plan, procedure="PRK", flap_um=None)
             normalized = build_clinical_core_input(
@@ -648,6 +675,7 @@ def evaluate_case(
             eligibility_notes=eligibility.notes,
             planning=planning,
             microkeratome_planning=microkeratome_planning,
+            astigmatic_disparity=astigmatic_disparity,
         ))
         if lasik_assessment is not None:
             results[-1]["lasik_assessment"] = lasik_assessment

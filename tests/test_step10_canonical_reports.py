@@ -74,13 +74,41 @@ def test_model_contains_every_canonical_clinical_report_section_without_recalcul
     assert [eye["eye"] for eye in model["eyes"]] == ["OD", "OS"]
     headings = [heading for heading, _ in model["eyes"][0]["sections"]]
     assert headings == [
-        "Randleman / ERSS", "NICE", "PS3", "Belin/Ambrósio BAD-D",
+        "Randleman / ERSS", "NICE", "PS3", "Astigmatic disparity validation",
+        "Belin/Ambrósio BAD-D",
         "Procedural safety", "Procedure planning", "Decision basis",
         "Canonical Pentacam values and provenance", "Version provenance",
     ]
     assert ["Total", "0"] in _section(model, "OD", "Randleman / ERSS")
     assert any(row[0] == "Final BAD-D" and row[1] == "1" for row in _section(model, "OD", "Belin/Ambrósio BAD-D"))
-    assert any(row[0] == "selected_plan" and row[1] == "Plan A" for row in _section(model, "OD", "Procedure planning"))
+    assert any(
+        row[0] == "Selected LASIK plan"
+        and row[1] == "Plan A — flap 100 µm; optical zone 6.5 mm; transition zone 9.0 mm"
+        for row in _section(model, "OD", "Procedure planning")
+    )
+    assert not any(row[0] == "Selected plan parameters" for row in _section(model, "OD", "Procedure planning"))
+    assert any(
+        row[0] == "Plan-selection priority"
+        and row[1] == "Select the first safe plan only: Plan A → Plan B → Plan C"
+        for row in _section(model, "OD", "Procedure planning")
+    )
+
+
+def test_safe_plan_and_ml7_hinge_vacuum_ring_are_green_without_highlighting_blade():
+    rows = _section(
+        reports.canonical_report_model(_payload(ml7_bad_k1_d=40, ml7_bad_k2_d=45)),
+        "OD",
+        "Procedure planning",
+    )
+    by_name = {row[0]: row for row in rows[1:]}
+    for label in (
+        "Selected LASIK plan",
+        "ML7 Preferred hinge location",
+        "ML7 Vacuum ring",
+        "ML7 Vacuum pressure",
+    ):
+        assert reports._cell_palette(by_name[label], 1, "PASS") == (reports.GREEN, reports.GREEN_FILL)
+    assert reports._cell_palette(by_name["ML7 blade_recommendations"], 1, "PASS") is None
 
 
 def test_locked_source_values_and_provenance_remain_distinct_in_report():

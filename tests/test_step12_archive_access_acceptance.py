@@ -203,7 +203,7 @@ def test_regenerated_report_uses_saved_snapshot_and_does_not_replace_original(mo
     assert original_before == original_after == b"ORIGINAL-PDF:tr"
 
 
-def test_doctor_cannot_reopen_or_download_another_doctors_case(monkeypatch):
+def test_other_doctor_is_denied_while_owner_receives_only_deidentified_case(monkeypatch):
     client, current, revision, _events = _route_client(monkeypatch)
     current["principal"] = _principal("doctor-2", "Dr. Other")
     base = f"/archive/cases/{CASE_ID}/revisions/{revision.revision_id}"
@@ -211,8 +211,32 @@ def test_doctor_cannot_reopen_or_download_another_doctors_case(monkeypatch):
     assert client.get(f"{base}/report/pdf").status_code == 403
     assert client.get(f"{base}/regenerate/pdf").status_code == 403
     current["principal"] = _principal("owner-1", "Owner", "OWNER")
-    assert client.get(base).status_code == 200
-    assert client.get(f"{base}/report/pdf").status_code == 200
+    search = client.post("/archive/search", json={})
+    assert search.status_code == 200
+    assert search.json()["results"][0]["patient"] == {
+        "name": "Masked for owner", "id": "Masked for owner", "age": 44,
+    }
+    assert client.post("/archive/search", json={"patient_name": "Archive Patient"}).status_code == 422
+    reopened = client.get(base)
+    assert reopened.status_code == 200
+    assert reopened.json()["assessment"]["patient"]["name"] == "Masked for owner"
+    assert reopened.json()["assessment"]["patient"]["id"] == "Masked for owner"
+    monkeypatch.setattr(
+        reports,
+        "build_pdf",
+        lambda payload: (
+            f"OWNER-PDF:{payload['patient']['name']}:{payload['patient']['id']}"
+        ).encode(),
+    )
+    report = client.get(f"{base}/report/pdf")
+    assert report.status_code == 200
+    assert report.content == b"OWNER-PDF:Masked for owner:Masked for owner"
+    assert report.headers["x-cer-ai-report-source"] == "owner-deidentified-canonical"
+    regenerated = client.get(f"{base}/regenerate/pdf")
+    assert regenerated.status_code == 200
+    assert regenerated.headers["x-cer-ai-report-source"] == (
+        "owner-deidentified-canonical-current-template"
+    )
 
 
 def test_archive_ui_has_authenticated_case_reopen_and_inline_pdf_actions():

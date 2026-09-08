@@ -129,7 +129,7 @@ Keep:
 
 `CERAI_ARCHIVE_REQUIRED=0`
 
-for the first controlled verification. Use only non-PHI or an explicitly approved test case. Confirm that the Case Archive UI can search the archived revision, retrieve the exact original PDF/DOCX, preview every supported raster Pentacam source, download each exact original source payload, and download the complete source ZIP. Verify both OWNER all-case access and DOCTOR own-case-only isolation before enabling patient-data use.
+for the first controlled verification. Use only non-PHI or an explicitly approved test case. Confirm that the creating DOCTOR account can search the archived revision, retrieve the exact original PDF/DOCX, preview every supported raster Pentacam source, download each exact original source payload, and download the complete source ZIP. Confirm that a different DOCTOR is denied every case, report, and source route. Confirm that OWNER can review all cases only through masked catalog/assessment data, dynamically de-identified reports, generic filenames, and source images with the patient-demographics header removed. Verify that no OWNER route returns immutable original report or source bytes before enabling patient-data use.
 
 ## 8. Enable fail-closed production behavior
 

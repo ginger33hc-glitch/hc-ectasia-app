@@ -22,6 +22,10 @@ from copy import deepcopy
 from typing import Any, Mapping, Optional
 
 from clinical_core.pipeline import ClinicalCoreInput
+from astigmatic_disparity_policy import (
+    axis_requires_targeted_verification,
+    evaluate_astigmatic_disparity,
+)
 from clinical_core.ps3 import PS3EyeInput, PS3InterEyeInput
 from clinical_core.refraction import normalize_minus_cylinder
 
@@ -307,21 +311,50 @@ def _surgeon_confirmed_srax(eye):
     return None
 
 
-def _ps3_eye(eye, manifest):
+def _ps3_eye(eye):
     srax_deg = _front_map_srax(eye)
     return PS3EyeInput(
         anterior_km_d=_first_number(eye, "Kmean_D"),
         thinnest_um=_first_number(eye, "pachy_thinnest_um"),
-        topographic_astig_d=_first_number(eye, "topographic_astig_D"),
-        bad_flat_axis_deg=_first_number(eye, "bad_flat_axis_deg"),
-        manifest_astig_d=abs(manifest.cylinder_d) if manifest is not None else None,
-        manifest_axis_deg=manifest.axis_deg if manifest is not None else None,
         ppi_avg=_first_number(eye, "PPI_avg"),
         f_ele_th_um=_first_number(eye, "F_Ele_Th_um"),
         b_ele_th_um=_first_number(eye, "B_Ele_Th_um"),
         srax=None if srax_deg is not None else _surgeon_confirmed_srax(eye),
         srax_deg=srax_deg,
     )
+
+
+def build_astigmatic_disparity(eye, manifest):
+    """Build the separate, non-scoring disparity validation result once."""
+    return evaluate_astigmatic_disparity(
+        tomographic_astig_d=_first_number(eye, "topographic_astig_D"),
+        tomographic_flat_axis_deg=_first_number(eye, "bad_flat_axis_deg"),
+        manifest_astig_d=abs(manifest.cylinder_d) if manifest is not None else None,
+        manifest_axis_deg=manifest.axis_deg if manifest is not None else None,
+    )
+
+
+def astigmatic_disparity_from_plan(eye, plan):
+    """Resolve manifest precedence, then evaluate the non-scoring comparison."""
+    return build_astigmatic_disparity(eye, _refraction(plan, "manifest"))
+
+
+def astigmatic_disparity_verification_eyes(
+    extracted: Mapping[str, Any],
+    resolved_plans: Mapping[str, Mapping[str, Any]],
+) -> set[str]:
+    """Return eyes whose disparity axis needs a focused source verification."""
+    eyes = {
+        item.get("eye"): item
+        for item in extracted.get("eyes", [])
+        if isinstance(item, Mapping) and item.get("eye") in {"OD", "OS"}
+    }
+    required: set[str] = set()
+    for eye_name, eye in eyes.items():
+        plan = resolved_plans.get(eye_name) or {}
+        if axis_requires_targeted_verification(astigmatic_disparity_from_plan(eye, plan)):
+            required.add(eye_name)
+    return required
 
 
 def build_inter_eye_ps3(extracted):
@@ -408,6 +441,6 @@ def build_clinical_core_input(
         nice_k2_d=_first_number(eye, "K2_D"),
         nice_central_pachy_um=_first_number(eye, "central_pachy_um"),
         nice_b_ele_th_um=_first_number(eye, "B_Ele_Th_um"),
-        ps3_eye=_ps3_eye(eye, manifest),
+        ps3_eye=_ps3_eye(eye),
         ps3_inter_eye=build_inter_eye_ps3(extracted) if extracted is not None else None,
     )

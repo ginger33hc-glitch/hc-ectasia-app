@@ -29,7 +29,12 @@ def complete_set(include_card=False):
         result("SHOW_2_EXAMS_TOPOMETRIC", "OD"),
     ]
     if include_card:
-        items.append(result("EXCIMER_LASER_TREATMENT_CARD", None, "TREATMENT_CARD"))
+        card = result("EXCIMER_LASER_TREATMENT_CARD", None, "TREATMENT_CARD")
+        card["treatment_corrections"] = [
+            {"eye": eye, "sphere_D": -2.0, "cylinder_D": -1.0}
+            for eye in ("OD", "OS")
+        ]
+        items.append(card)
     return items
 
 
@@ -41,7 +46,8 @@ def test_five_mandatory_images_are_accepted_without_treatment_card():
     assert summary["confirmed"] is True
     assert all(item["present"] for item in summary["required_sources"])
     assert summary["optional_treatment_card"] == {
-        "label": "Excimer laser treatment card", "present": False, "count": 0,
+        "label": "Excimer laser treatment card", "present": False, "usable": False,
+        "status": "NOT_PROVIDED", "count": 0, "unreadable_count": 0,
     }
 
 
@@ -123,6 +129,50 @@ def test_present_card_defers_refraction_resolution_to_canonical_card_adapter():
     assert summary["manual_refraction"] == {
         "required": False, "complete": True, "missing": [],
     }
+
+
+def test_unreadable_recognized_card_requests_manual_refraction_without_source_replacement():
+    sources = complete_set(False)
+    card = result("EXCIMER_LASER_TREATMENT_CARD", None, "TREATMENT_CARD")
+    sources.append(card)
+    with pytest.raises(HTTPException) as exc:
+        policy.validate_preassessment_requirements(sources, {})
+    detail = exc.value.detail
+    assert detail["code"] == "PREASSESSMENT_REFRACTION_REQUIRED"
+    assert detail["refraction_reason"] == "UNREADABLE"
+    assert detail["source_set"]["confirmed"] is True
+    assert detail["source_set"]["optional_treatment_card"]["status"] == "UNREADABLE"
+    assert card["document_context"]["optional_treatment_card_status"] == "UNREADABLE"
+
+
+def test_unclassified_sixth_image_is_passive_optional_card_evidence():
+    sources = complete_set(False)
+    card = result("UNKNOWN", None, "UNKNOWN")
+    card["document_context"]["source_filename"] = "only-treatment-card.jpg"
+    sources.append(card)
+    summary = policy.validate_preassessment_requirements(
+        sources, complete_refraction_plans()
+    )
+    assert summary["confirmed"] is True
+    assert summary["optional_treatment_card"] == {
+        "label": "Excimer laser treatment card", "present": True, "usable": False,
+        "status": "UNREADABLE", "count": 1, "unreadable_count": 1,
+    }
+    assert summary["manual_refraction"]["required"] is True
+    assert summary["manual_refraction"]["complete"] is True
+    merged = app.merge_extractions(sources)
+    assert not any(
+        "only-treatment-card.jpg" in issue
+        for issue in merged["critical_input_issues"]
+    )
+    assert not any(
+        "only-treatment-card.jpg" in warning and "conflict" in warning.lower()
+        for warning in merged["global_warnings"]
+    )
+    assert (
+        "Optional treatment card was unreadable; surgeon-entered manifest and intended refraction were used."
+        in merged["global_warnings"]
+    )
 
 
 def test_zero_cylinders_do_not_require_an_axis_at_the_intake_gate():

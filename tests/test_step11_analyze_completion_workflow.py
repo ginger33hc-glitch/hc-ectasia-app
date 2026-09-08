@@ -128,8 +128,14 @@ def test_ps3_factor_is_expanded_to_each_exact_missing_canonical_field():
         item["key"]: item for item in response["input_requests"]
         if item.get("eye") == "OD" and "PS3" in item.get("required_for", [])
     }
-    assert requests["F_Ele_Th_um"]["source_box"] == "central numeric box → F.Ele.Th"
-    assert requests["B_Ele_Th_um"]["source_box"] == "central numeric box → B.Ele.Th"
+    assert requests["F_Ele_Th_um"]["source_box"] == (
+        "central results table — elevation label/value row immediately above Progression Index "
+        "→ F.Ele.Th — adjacent signed µm value"
+    )
+    assert requests["B_Ele_Th_um"]["source_box"] == (
+        "central results table — elevation label/value row immediately above Progression Index "
+        "→ B.Ele.Th — adjacent signed µm value"
+    )
 
 
 def test_ps3_intereye_requirement_identifies_the_actual_eye_and_field():
@@ -141,15 +147,14 @@ def test_ps3_intereye_requirement_identifies_the_actual_eye_and_field():
     assert request["source_box"] == "Cornea Back → Km"
 
 
-def test_ps3_astigmatic_study_requests_missing_map_and_manifest_inputs_separately():
+def test_missing_astigmatic_disparity_inputs_do_not_block_ps3_or_request_completion():
     response = _respond(
         od=_eye("OD", topographic_astig_D=None, bad_flat_axis_deg=None),
         plans={"OD": _plan(manifest_cylinder_signed_D=None, manifest_axis_deg=None), "OS": _plan()},
     )
-    od = {item["key"]: item for item in response["input_requests"] if item.get("eye") == "OD"}
-    assert {"topographic_astig_D", "bad_flat_axis_deg", "manifest_cylinder_signed_D", "manifest_axis_deg"} <= set(od)
-    assert od["topographic_astig_D"]["source_box"] == "Cornea Front → Astig"
-    assert od["manifest_cylinder_signed_D"]["form_id"] == "od_manifest_cylinder"
+    od_keys = {item["key"] for item in response["input_requests"] if item.get("eye") == "OD"}
+    assert "topographic_astig_D" not in od_keys
+    assert "bad_flat_axis_deg" not in od_keys
 
 
 def test_prior_surgery_cannot_receive_virgin_cornea_report_token():
@@ -196,6 +201,21 @@ def test_browser_result_view_consumes_canonical_report_payload_only():
     assert "inferior_opposite_steepening_D" not in render_source
     assert "posterior_elevation_thinnest_um" not in render_source
     assert "extracted.eyes" not in render_source
+
+
+def test_browser_places_plan_definition_beside_name_and_marks_only_requested_safe_ml7_rows():
+    html = (ROOT / "static" / "index.html").read_text()
+    render_source = html[html.index("function renderEye("):html.index("function patientPayload(")]
+    assert 'key==="selected_plan"?(p.planning?.selected_plan_definition||value):value' in render_source
+    assert '.filter(([key])=>key!=="selected_plan_definition")' in render_source
+    for label in (
+        "Selected LASIK plan",
+        "ML7 Preferred hinge location",
+        "ML7 Vacuum ring",
+        "ML7 Vacuum pressure",
+    ):
+        assert label in render_source
+    assert '"ML7 blade_recommendations"' not in render_source
 
 
 def test_readiness_javascript_renders_contact_lens_status_as_visible():

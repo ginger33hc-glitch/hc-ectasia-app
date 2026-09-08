@@ -10,11 +10,13 @@
     "Pentacam/topography and treatment-card images":"Pentacam/topografi ve tedavi kartı görüntüleri",
     "Required image confirmation":"Zorunlu görüntü doğrulaması","Optional treatment card":"İsteğe bağlı tedavi kartı",
     "present":"mevcut","missing":"eksik","not provided":"sağlanmadı",
+    "unreadable — enter refraction":"okunamadı — refraksiyonu girin",
     "OD Four Maps Refractive":"OD Four Maps Refractive","OS Four Maps Refractive":"OS Four Maps Refractive",
     "OD Belin/Ambrosio Display":"OD Belin/Ambrosio Ekranı","OS Belin/Ambrosio Display":"OS Belin/Ambrosio Ekranı",
     "Show 2 Exams Topometric":"Show 2 Exams Topometric",
     "Upload each missing required image before assessment.":"Değerlendirmeden önce eksik olan her zorunlu görüntüyü yükleyin.",
     "No treatment card was provided. Enter complete manifest and intended refraction values for both eyes before assessment.":"Tedavi kartı sağlanmadı. Değerlendirmeden önce her iki göz için manifest ve hedeflenen refraksiyon değerlerini eksiksiz girin.",
+    "The optional treatment card was unreadable. Enter complete manifest and intended refraction values for both eyes before assessment.":"İsteğe bağlı tedavi kartı okunamadı. Değerlendirmeden önce her iki göz için manifest ve hedeflenen refraksiyon değerlerini eksiksiz girin.",
     "Patient-level clinical modifiers":"Hasta düzeyinde klinik değiştiriciler","Select all that apply":"Uygun olanların tümünü seçin",
     "Select modifiers":"Değiştiricileri seçin","Chronic eye rubbing / repetitive ocular trauma":"Kronik göz ovalama / tekrarlayan oküler travma",
     "Family history of keratoconus":"Ailede keratokonus öyküsü",
@@ -77,7 +79,7 @@
     "Thinnest pachymetry":"En ince pakimetri","Intended MRSE":"Hedef MRSE","Preoperative Kmean":"Preoperatif Kort",
     "Manifest / intended pattern":"Manifest / hedef patern","Intended principal meridians":"Hedef ana meridyenler","Estimated final Kmean":"Tahmini final Kort",
     "Corneal effect factor":"Korneal etki katsayısı","Maximum ablation":"Maksimum ablasyon","PRK epithelium":"PRK epiteli",
-    "Selected LASIK plan":"Seçilen LASIK planı","Optical / transition zone":"Optik / geçiş zonu","Tomography review":"Tomografi değerlendirmesi","Morphology category":"Morfoloji kategorisi",
+    "Selected LASIK plan":"Seçilen LASIK planı","Selected plan parameters":"Seçilen plan parametreleri","Plan-selection priority":"Plan seçim önceliği","Optical / transition zone":"Optik / geçiş zonu","Tomography review":"Tomografi değerlendirmesi","Morphology category":"Morfoloji kategorisi",
     "Randleman I-S / source":"Randleman I-S / kaynak","Validated Randleman topography":"Doğrulanmış Randleman topografisi","Anterior-map read confidence":"Anterior harita okuma güveni",
     "Parameter":"Parametre","Result":"Sonuç","Value":"Değer","Clinical action:":"Klinik eylem:","Instrument/source:":"Cihaz/kaynak:",
     "NICE component audit":"NICE bileşen denetimi","NICE interpretation note":"NICE yorum notu","Reasons":"Nedenler","Hard stops":"Kesin durdurma nedenleri",
@@ -87,7 +89,7 @@
     "Global clinical / source blockers":"Genel klinik / kaynak engelleri","Post-assessment ML7 microkeratome planning":"Değerlendirme sonrası ML7 mikrokeratom planlaması",
     "PENTACAM ACQUISITION QUALITY — SURGEON ATTENTION":"PENTACAM ÇEKİM KALİTESİ — CERRAHIN DİKKATİNE",
     "Planning warnings":"Planlama uyarıları","Planning notes":"Planlama notları","Assessment gate":"Değerlendirme geçidi","Vacuum ring":"Vakum halkası",
-    "Vacuum pressure":"Vakum basıncı","Blade recommendation(s)":"Bıçak önerisi/önerileri","Primary hinge":"Birincil menteşe","Conditional alternative":"Koşullu alternatif","Horizontal white-to-white (HWTW)":"Horizontal white-to-white (HWTW)",
+    "Vacuum pressure":"Vakum basıncı","Blade recommendation(s)":"Bıçak önerisi/önerileri","Primary hinge":"Birincil menteşe","Conditional alternative":"Koşullu alternatif","Steep meridian axis":"Dik meridyen aksı","Preferred hinge location":"Tercih edilen menteşe konumu","Secondary hinge location":"İkincil menteşe konumu","Horizontal white-to-white (HWTW)":"Horizontal white-to-white (HWTW)",
     "Alternative projected RSB / PTA":"Alternatif tahmini RSB / PTA","Alternative safety":"Alternatif güvenliği","Ring-zone clearance":"Halka-zon açıklığı","Source":"Kaynak",
     "Recommendation":"Öneri","Surgeon-review recommendation only; this module does not alter the ectasia disposition.":"Yalnızca cerrah değerlendirme önerisidir; bu modül ektazi kararını değiştirmez.",
     "PASS":"UYGUN","PASS WITH CAUTION":"DİKKATLE UYGUN","CAUTION":"DİKKAT","STOP-DEFER":"DURDUR-ERTELE",
@@ -145,6 +147,10 @@
     "Systemic disease reported; disease-specific refractive-surgery eligibility review required.":"Sistemik hastalık bildirildi; hastalığa özgü refraktif cerrahi uygunluk değerlendirmesi gerekir.",
     "Override gate negative; procedure-specific score and required tomography/clinical review are reassuring.":"Öncelikli dışlama ölçütü yoktur; prosedüre özgü puan ile zorunlu tomografi/klinik değerlendirme rahatlatıcıdır.",
     "Inter-eye tomography concern: NO MAJOR INTER-EYE DISCORDANCE DETECTED. No major categorical inter-eye tomography discordance detected. This is not a clearance criterion and does not change the CER-AI score or final disposition.":"Gözler arası tomografi değerlendirmesi: BELİRGİN GÖZLER ARASI UYUMSUZLUK SAPTANMADI. Belirgin kategorik gözler arası tomografi uyumsuzluğu saptanmadı. Bu bir cerrahi onay ölçütü değildir ve CER-AI puanını veya nihai kararı değiştirmez.",
+    "Plan A — flap 100 µm; optical zone 6.5 mm; transition zone 9.0 mm":"Plan A — flep 100 µm; optik zon 6,5 mm; geçiş zonu 9,0 mm",
+    "Plan B — flap 100 µm; optical zone 6.0 mm; transition zone 8.5 mm":"Plan B — flep 100 µm; optik zon 6,0 mm; geçiş zonu 8,5 mm",
+    "Plan C — flap 90 µm; optical zone 6.0 mm; transition zone 8.5 mm":"Plan C — flep 90 µm; optik zon 6,0 mm; geçiş zonu 8,5 mm",
+    "Select the first safe plan only: Plan A → Plan B → Plan C":"Yalnızca ilk güvenli planı seçin: Plan A → Plan B → Plan C",
     "NICE interpretation: no NICE escalation. NICE is an independent screening pathway and is not added to the CER-AI numeric score.":"NICE yorumu: NICE artırımı yoktur. NICE bağımsız bir tarama yoludur ve CER-AI sayısal puanına eklenmez.",
     "CER-AI SCORE — SOURCE & BREAKDOWN: PRK-EWSS v1.0 provisional evidence-weighted triage score (not validated); CER-AI-modified age bands. morphology: +0 (morphology NORMAL_SYMMETRIC); pachymetry: +0 (thinnest pachymetry 560 µm); age: +0 (age 35 years). TOTAL: 0 (LOWER_FLAGGED_BURDEN). Hard stops are independent of this numeric score and are not counted as score points.":"CER-AI PUANI — KAYNAK VE DÖKÜM: PRK-EWSS v1.0 geçici kanıt ağırlıklı triyaj puanı (doğrulanmamıştır); CER-AI'ye uyarlanmış yaş aralıkları. morfoloji: +0 (NORMAL_SİMETRİK); pakimetri: +0 (en ince pakimetri 560 µm); yaş: +0 (35 yaş). TOPLAM: 0 (DÜŞÜK UYARI YÜKÜ). Kesin durdurma kuralları bu sayısal puandan bağımsızdır ve puana eklenmez.",
     "ECTASIA RISK INTERPRETATION: In the cited post-PRK ectasia series with complete ERSS data, 77% of ectasia eyes had cumulative ERSS >=4, 9% had score 3, and 14% had score <=2. The surgical cohort incidence reported in that study was 9/31,045 eyes (0.029%). ABSOLUTE PROBABILITY: Not established for an individual PRK score. LIMITATION: These are distributions among ectasia cases and an overall cohort incidence, not score-specific patient probabilities. The LASIK ERSS is not validated as an absolute-risk calculator for PRK; the 0.029% cohort incidence must not be assigned to an individual score. SOURCE: Risk Assessment for Corneal Ectasia following Photorefractive Keratectomy.":"EKTAZİ RİSK YORUMU: Tam ERSS verisi bulunan atıf yapılan PRK sonrası ektazi serisinde ektazili gözlerin %77'sinde toplam ERSS ≥4, %9'unda puan 3 ve %14'ünde puan ≤2 idi. Çalışmadaki cerrahi kohort insidansı 9/31.045 göz (%0,029) olarak bildirildi. MUTLAK OLASILIK: Tek bir PRK puanı için belirlenmemiştir. SINIRLAMA: Bunlar ektazi vakaları arasındaki dağılımlar ve genel kohort insidansıdır; puana özgü hasta olasılıkları değildir. LASIK ERSS, PRK için mutlak risk hesaplayıcısı olarak doğrulanmamıştır; %0,029 kohort insidansı bireysel bir puana atanamaz. KAYNAK: Fotorefraktif keratektomi sonrası korneal ektazi risk değerlendirmesi."
@@ -170,6 +176,12 @@
       .replace(/The assessment was generated from the readable data, but acquisition quality is not confirmed as OK\. The surgeon must review the source images and interpret all findings with caution\./g,"Değerlendirme okunabilen verilerden oluşturuldu; ancak çekim kalitesinin uygun olduğu doğrulanmadı. Cerrah kaynak görüntüleri incelemeli ve tüm bulguları dikkatle yorumlamalıdır.")
       .replace(/Hard stops are independent of this numeric score and are not counted as score points\./g,"Kesin durdurma kuralları bu sayısal puandan bağımsızdır ve puana eklenmez.")
       .replace(/NICE is an independent screening pathway and is not added to the CER-AI numeric score\./g,"NICE bağımsız bir tarama yoludur ve CER-AI sayısal puanına eklenmez.")
+      .replace(/Superior hinge at the vertical steep meridian/g,"Dikey dik meridyende superior menteşe")
+      .replace(/Temporal hinge preferred at the horizontal steep meridian/g,"Yatay dik meridyende temporal menteşe tercih edilir")
+      .replace(/surgeon determines the anatomical hinge location/g,"cerrah anatomik menteşe konumunu belirler")
+      .replace(/^Superior$/,"Superior")
+      .replace(/^Temporal$/,"Temporal")
+      .replace(/^Nasal$/,"Nazal")
       .replace(/\bNot documented\b/gi,"Belgelenmedi")
       .replace(/\bNot applicable\b/gi,"Uygulanamaz")
       .replace(/\baxis unavailable\b/gi,"aks mevcut değil")

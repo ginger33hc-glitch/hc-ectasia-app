@@ -27,6 +27,7 @@ SHOW_2_CORNEA_BACK = "SHOW_2_EXAMS_TOPOMETRIC_CORNEA_BACK"
 SHOW_2_INDICES = "SHOW_2_EXAMS_TOPOMETRIC_CENTER_INDICES_8MM"
 FOUR_MAPS_LOWER_LEFT = "FOUR_MAPS_REFRACTIVE_LOWER_LEFT_LABELED_BOX"
 BAD_CENTER = "BELIN_AMBROSIO_CENTER_NUMERIC_BOX"
+BAD_ELEVATION_ROW = "BELIN_AMBROSIO_LOWER_ELEVATION_LABEL_VALUE_ROW"
 BAD_PPI = "BELIN_AMBROSIO_PROGRESSION_INDEX_BOX"
 BAD_STRIP = "BELIN_AMBROSIO_BOTTOM_BAD_D_STRIP"
 
@@ -36,6 +37,10 @@ CANONICAL_SOURCE_REGIONS = {
     SHOW_2_INDICES: ("Show 2 Exams – Topometric", "center — Indices (in 8 mm zone)"),
     FOUR_MAPS_LOWER_LEFT: ("4 Maps Refractive", "lower-left labeled numerical box"),
     BAD_CENTER: ("Belin/Ambrósio Display", "central numeric box"),
+    BAD_ELEVATION_ROW: (
+        "Belin/Ambrósio Display",
+        "central results table — elevation label/value row immediately above Progression Index",
+    ),
     BAD_PPI: ("Belin/Ambrósio Display", "Progression Index section"),
     BAD_STRIP: ("Belin/Ambrósio Display", "bottom BAD-D strip"),
 }
@@ -78,9 +83,9 @@ CANONICAL_FIELD_SOURCES = {
     "Kmax_D": (FOUR_MAPS_LOWER_LEFT, "K Max (Front)"),
     "corneal_diameter_mm": (FOUR_MAPS_LOWER_LEFT, "HWTW"),
 
-    # Belin/Ambrosio BAD -> central labeled box.
-    "F_Ele_Th_um": (BAD_CENTER, "F.Ele.Th"),
-    "B_Ele_Th_um": (BAD_CENTER, "B.Ele.Th"),
+    # Belin/Ambrosio BAD -> elevation row immediately above Progression Index.
+    "F_Ele_Th_um": (BAD_ELEVATION_ROW, "F.Ele.Th — adjacent signed µm value"),
+    "B_Ele_Th_um": (BAD_ELEVATION_ROW, "B.Ele.Th — adjacent signed µm value"),
 
     # Belin/Ambrosio BAD -> Progression Index box.
     "PPI_min": (BAD_PPI, "Min"),
@@ -131,7 +136,7 @@ def source_family(field: str):
         return SHOW2
     if source == FOUR_MAPS_LOWER_LEFT:
         return FOURMAPS
-    if source in {BAD_CENTER, BAD_PPI, BAD_STRIP}:
+    if source in {BAD_CENTER, BAD_ELEVATION_ROW, BAD_PPI, BAD_STRIP}:
         return BAD
     return None
 

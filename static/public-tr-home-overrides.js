@@ -38,7 +38,7 @@
     if (!document.querySelector('link[rel="manifest"]')) {
       const manifest = document.createElement("link");
       manifest.rel = "manifest";
-      manifest.href = "/static/manifest.webmanifest?v=11";
+      manifest.href = "/static/manifest.webmanifest?v=12";
       document.head.appendChild(manifest);
     }
     if (!document.querySelector('link[rel="apple-touch-icon"]')) {

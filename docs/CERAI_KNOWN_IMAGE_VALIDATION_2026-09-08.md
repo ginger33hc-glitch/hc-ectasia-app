@@ -97,13 +97,13 @@ Myopic ablation was the canonical estimate because no actual maximum ablation va
 | ERSS | 1 | 3 |
 | NICE | 4 | 5 |
 | PS3 complete | Yes | Yes |
-| PS3 Moderate / High | 1 / 0 | 0 / 0 |
-| Canonical runtime status | STOP-DEFER for selected LASIK | CAUTION |
-| Plan | None; PS3 defers LASIK | Plan A |
+| PS3 Moderate / High | 0 / 0 | 0 / 0 |
+| Canonical runtime status | PASS | CAUTION |
+| Plan | Plan A | Plan A |
 
-OD PS3's Moderate factor is the manifest/topographic astigmatic-axis discrepancy. OS spherical
-manifest refraction has no meaningful axis; the scorer now correctly omits axis comparison rather
-than inventing a 0° discrepancy.
+OD manifest/topographic astigmatic-axis disparity is retained as a separate measurement-validation
+warning; it is not a PS3 factor and does not independently restrict LASIK. OS spherical manifest
+refraction has no meaningful axis, so no axis comparison is made.
 
 For both eyes, PTA is below 40%; the binding `PTA >=40%` failure rule is not activated. Plan A/B/C
 fallback therefore is not triggered by tissue percentage in this case.

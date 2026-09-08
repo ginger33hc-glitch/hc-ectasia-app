@@ -20,6 +20,8 @@ from the actual GitHub staging commit, not replace staging with the local histor
 
 Application label: `0.7.71`. Checkpoint policy: `CER-AI-2026-09-08-PRK-ERSS-SHARED-ABLATION`.
 Amended review policy: `CER-AI-2026-09-08-SHARED-PTA-LT40-ELIGIBILITY-V2-SURGEON-FIRST`.
+
+Subsequent staging-only policy: `CER-AI-2026-09-08-PS3-DISPARITY-SEPARATED-ML7-HINGE-V3` separates astigmatic disparity from PS3 scoring and expresses ML7 planning as physical hinge location.
 The label alone is insufficient to identify a deployment; retain commit and policy identifiers.
 
 ## Evidence already accepted

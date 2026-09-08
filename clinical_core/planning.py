@@ -18,6 +18,8 @@ LASIK_PLANS = (
     {"name": "Plan C", "flap_um": 90.0, "optical_zone_mm": 6.0, "transition_zone_mm": 8.5},
 )
 
+LASIK_PLAN_SELECTION_RULE = "Select the first safe plan only: Plan A → Plan B → Plan C"
+
 MYOPIC_ABLATION_UM_PER_D = {6.0: 12.0, 6.5: 15.0, 7.0: 16.33}
 
 
@@ -60,6 +62,18 @@ class PlanEvaluation:
 class PlanningResult:
     selected_plan: Optional[str]
     sequence: tuple[PlanEvaluation, ...]
+
+
+def lasik_plan_definition(plan_name: str) -> Optional[str]:
+    """Return a display label derived from the one canonical plan registry."""
+    spec = next((item for item in LASIK_PLANS if item["name"] == plan_name), None)
+    if spec is None:
+        return None
+    return (
+        f'{spec["name"]} — flap {spec["flap_um"]:g} µm; '
+        f'optical zone {spec["optical_zone_mm"]:.1f} mm; '
+        f'transition zone {spec["transition_zone_mm"]:.1f} mm'
+    )
 
 
 def select_first_safe_lasik_plan(
