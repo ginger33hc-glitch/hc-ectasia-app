@@ -43,8 +43,8 @@ def _authenticated_root_html(display_name: str) -> str:
     # Make the visual CER-AI logo itself a native link back to the public website.
     # A real anchor is used instead of JavaScript so the navigation works reliably
     # across browsers, touch devices, cached pages, and CSP/security wrappers.
-    logo_frame = '<div class="brand-logo-frame" aria-label="CER-AI"><span class="brand-wordmark">CER-AI</span></div>'
-    linked_logo_frame = '<a href="/" class="brand-logo-frame" aria-label="Return to CER-AI website" title="Return to CER-AI website"><span class="brand-wordmark">CER-AI</span></a>'
+    logo_frame = '<div class="brand-logo-frame" aria-label="CER-AI"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=5" alt="CER-AI"></div>'
+    linked_logo_frame = '<a href="/" class="brand-logo-frame" aria-label="Return to CER-AI website" title="Return to CER-AI website"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=5" alt="CER-AI"></a>'
     html = html.replace(logo_frame, linked_logo_frame, 1)
 
     label = escape(display_name or "CER-AI user")
