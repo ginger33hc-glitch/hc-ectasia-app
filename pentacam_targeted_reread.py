@@ -175,6 +175,52 @@ REREAD_SCHEMA = {
     ],
 }
 
+BAD_ELEVATION_CONFIRMATION_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "readings": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "eye": {"type": "string", "enum": ["OD", "OS"]},
+                    "field": {"type": "string", "enum": list(BAD_ELEVATION_FIELDS)},
+                    "observed_value_text": {"type": ["string", "null"]},
+                    "value": {"type": ["integer", "null"]},
+                    "status": {
+                        "type": "string",
+                        "enum": ["CONFIDENT", "UNCERTAIN", "UNREADABLE", "NOT_SHOWN"],
+                    },
+                },
+                "required": ["eye", "field", "observed_value_text", "value", "status"],
+            },
+        },
+        "warnings": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["readings", "warnings"],
+}
+
+BAD_ELEVATION_CONFIRMATION_PROMPT = """You are a digit-only verification reader for two
+Pentacam BAD Display fields. Each requested field is supplied as a tight crop containing its own
+printed label and attached white numeric cell, followed by an enlarged grayscale copy.
+
+Read only the integer printed inside that field's value cell:
+- F_Ele_Th_um: the integer immediately attached to the printed F.Ele.Th label.
+- B_Ele_Th_um: the integer immediately attached to the printed B.Ele.Th label.
+
+Ignore all prior OCR values. Do not read a neighboring row, map number, label character, unit, box
+edge, or separator. In particular, the thin vertical edge of the white value cell is a BORDER, not
+the digit 1; never prepend it to the printed number. Preserve a visible minus or plus sign. Put the
+exact characters you can see in observed_value_text, then return the same integer in value. Use
+CONFIDENT only when the label, sign, and every digit are unambiguous in both crop versions. Do not
+calculate, infer, or clinically interpret the value.
+
+REQUESTED CROPS:
+{targets}
+"""
+
 REREAD_PROMPT = """You are ONLY a targeted Pentacam labeled-numeric-field transcriber.
 The first image is the complete original screen. The remaining images are overlapping crops from
 that exact same screen, supplied only to make small printed text easier to read.
@@ -382,38 +428,214 @@ def _prepare_bad_elevation_verification(
     return originals
 
 
-def _finalize_bad_elevation_verification(
+def _enhance_numeric_crop(raw: bytes) -> bytes:
+    """Enlarge a localized value cell without inventing or removing digit strokes."""
+    with Image.open(BytesIO(raw)) as opened:
+        image = ImageOps.exif_transpose(opened).convert("L")
+        scale = max(2, min(6, 1200 // max(1, image.width)))
+        image = image.resize(
+            (image.width * scale, image.height * scale), Image.Resampling.LANCZOS,
+        )
+        image = ImageOps.autocontrast(image, cutoff=1)
+    output = BytesIO()
+    image.save(output, format="PNG", optimize=True)
+    return output.getvalue()
+
+
+def confirm_bad_elevation_crops(
+    core: Any,
+    crops: dict[tuple[str, str], bytes],
+) -> dict[tuple[str, str], int]:
+    """Transcribe only already-localized F/B value cells in one independent pass."""
+    target_text = "\n".join(f"{eye}: {field}" for eye, field in sorted(crops))
+    content: list[dict[str, Any]] = [{
+        "type": "input_text",
+        "text": BAD_ELEVATION_CONFIRMATION_PROMPT.format(targets=target_text),
+    }]
+    for (eye_id, field), crop in sorted(crops.items()):
+        content.extend((
+            {"type": "input_text", "text": f"{eye_id} {field} tight original crop:"},
+            {
+                "type": "input_image",
+                "image_url": core.data_url(crop, f"{eye_id}-{field}.png"),
+                "detail": "original",
+            },
+            {"type": "input_text", "text": f"{eye_id} {field} enlarged grayscale crop:"},
+            {
+                "type": "input_image",
+                "image_url": core.data_url(
+                    _enhance_numeric_crop(crop), f"{eye_id}-{field}-enlarged.png",
+                ),
+                "detail": "original",
+            },
+        ))
+    response = core.openai_client().responses.create(
+        model=core.MODEL,
+        store=False,
+        reasoning={"effort": "medium"},
+        input=[{"role": "user", "content": content}],
+        text={
+            "verbosity": "low",
+            "format": {
+                "type": "json_schema",
+                "name": "cerai_bad_elevation_digit_confirmation",
+                "strict": True,
+                "schema": BAD_ELEVATION_CONFIRMATION_SCHEMA,
+            },
+        },
+    )
+    if not response.output_text or not response.output_text.strip():
+        raise RuntimeError("BAD elevation digit confirmation returned empty output")
+    payload = json.loads(response.output_text)
+    candidates: dict[tuple[str, str], list[int]] = defaultdict(list)
+    for reading in payload.get("readings") or []:
+        key = (reading.get("eye"), reading.get("field"))
+        value = reading.get("value")
+        observed = str(reading.get("observed_value_text") or "").strip()
+        if (
+            key in crops
+            and reading.get("status") == "CONFIDENT"
+            and isinstance(value, int) and not isinstance(value, bool)
+            and re.fullmatch(r"[+-]?\d+", observed)
+            and int(observed) == value
+        ):
+            candidates[key].append(value)
+    return {
+        key: values[0] for key, values in candidates.items()
+        if values and all(value == values[0] for value in values)
+    }
+
+
+def _finish_bad_elevation_verification(
     core: Any,
     result: dict[str, Any],
     requested: dict[str, list[str]],
     originals: dict[tuple[str, str], Any],
     filename: str,
+    localized: dict[tuple[str, str], dict[str, Any]],
+    confirmation_runs: list[dict[tuple[str, str], int]],
 ) -> None:
     eyes = {
         eye.get("eye"): eye for eye in result.get("eyes") or []
         if eye.get("eye") in requested
     }
-    for (eye_id, field), primary_value in originals.items():
+    for key, primary_value in originals.items():
+        eye_id, field = key
         eye = eyes[eye_id]
-        verified_value = eye.get(field)
-        status = "VERIFIED" if core.is_number(verified_value) else "UNRESOLVED"
+        localized_reading = localized.get(key) or {}
+        localized_value = localized_reading.get("value")
+        votes = [localized_value] + [run.get(key) for run in confirmation_runs]
+        numeric_votes = [int(value) for value in votes if core.is_number(value) and int(value) == value]
+        accepted = next(
+            (value for value in numeric_votes if numeric_votes.count(value) >= 2), None,
+        )
+        verified = set(eye.get("table_verified_numeric_fields") or [])
+        source_ids = eye.setdefault("canonical_source_ids", {})
+        missing = list(eye.get("missing_or_unreadable") or [])
+        eye[field] = accepted
+        if accepted is not None:
+            verified.add(field)
+            source_ids[field] = canonical_source_id(field)
+            missing = [item for item in missing if item != field]
+            eye.get("unreadable_source_regions", {}).pop(field, None)
+            eye.setdefault("targeted_reread_evidence", {})[field] = [{
+                "file": filename,
+                "source": "DEDICATED_BAD_ELEVATION_DIGIT_CONSENSUS",
+                "tile": localized_reading.get("source_tile"),
+                "printed_label": localized_reading.get("printed_label"),
+                "group_label": localized_reading.get("group_label"),
+                "value": accepted,
+                "confirmation_values": [run.get(key) for run in confirmation_runs],
+            }]
+            if (
+                core.is_number(primary_value)
+                and abs(float(primary_value) - float(accepted)) > 1e-9
+            ):
+                result.setdefault("global_warnings", []).append(
+                    f"{eye_id} {field} corrected by dedicated BAD value-cell consensus "
+                    f"from {float(primary_value):g} to {accepted:g} µm."
+                )
+        else:
+            verified.discard(field)
+            source_ids.pop(field, None)
+            if field not in missing:
+                missing.append(field)
+            if localized_reading.get("source_box") is not None:
+                record_unreadable_region(
+                    eye, field, filename=filename,
+                    tile=localized_reading.get("source_tile"),
+                    source_box=localized_reading.get("source_box"),
+                    printed_label=localized_reading.get("printed_label"),
+                )
+            result.setdefault("global_warnings", []).append(
+                f"{eye_id} {field} dedicated BAD value-cell reads did not reach consensus; "
+                "surgeon entry is required."
+            )
+        eye["table_verified_numeric_fields"] = sorted(verified)
+        eye["missing_or_unreadable"] = missing
         eye.setdefault("bad_elevation_verification_evidence", {})[field] = {
             "file": filename,
             "primary_value": primary_value,
-            "verified_value": verified_value,
-            "status": status,
+            "localized_value": localized_value,
+            "confirmation_values": [run.get(key) for run in confirmation_runs],
+            "verified_value": accepted,
+            "status": "VERIFIED" if accepted is not None else "UNRESOLVED",
         }
-        if status == "VERIFIED":
-            if core.is_number(primary_value) and abs(float(primary_value) - float(verified_value)) > 1e-9:
-                result.setdefault("global_warnings", []).append(
-                    f"{eye_id} {field} corrected by focused BAD labeled-cell reread "
-                    f"from {float(primary_value):g} to {float(verified_value):g} µm."
-                )
-        else:
-            result.setdefault("global_warnings", []).append(
-                f"{eye_id} {field} could not be verified in its labeled BAD central-box cell; "
-                "surgeon entry is required."
+
+
+def verify_bad_elevation_fields(
+    core: Any,
+    result: dict[str, Any],
+    raw: bytes,
+    filename: str,
+    requested: dict[str, list[str]],
+    originals: dict[tuple[str, str], Any],
+) -> None:
+    """Localize F/B cells, enlarge them, and require two independent agreeing reads."""
+    reread = targeted_reread(core, raw, filename, requested)
+    localization_candidates: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for reading in reread.get("readings") or []:
+        key = (reading.get("eye"), reading.get("field"))
+        if (
+            key[0] in requested and key[1] in requested.get(key[0], [])
+            and reading.get("status") == "CONFIDENT"
+            and core.is_number(reading.get("value"))
+            and source_supports_field(
+                reread.get("screen_family"), key[1], reading.get("group_label")
             )
+            and label_supports_field(
+                key[1], reading.get("printed_label"), reading.get("group_label")
+            )
+            and reading.get("source_box") is not None
+        ):
+            localization_candidates[key].append(reading)
+    localized = {
+        key: readings[0]
+        for key, readings in localization_candidates.items()
+        if all(
+            abs(float(reading["value"]) - float(readings[0]["value"])) <= 1e-9
+            for reading in readings
+        )
+    }
+    crops = {
+        key: render_source_region(
+            raw, reading.get("source_tile"), reading.get("source_box"),
+        )
+        for key, reading in localized.items()
+    }
+    confirmation_runs: list[dict[tuple[str, str], int]] = []
+    if crops:
+        first = confirm_bad_elevation_crops(core, crops)
+        confirmation_runs.append(first)
+        unresolved = {
+            key: crop for key, crop in crops.items()
+            if first.get(key) != int(localized[key]["value"])
+        }
+        if unresolved:
+            confirmation_runs.append(confirm_bad_elevation_crops(core, unresolved))
+    _finish_bad_elevation_verification(
+        core, result, requested, originals, filename, localized, confirmation_runs,
+    )
 
 
 def build_overlapping_tiles(raw: bytes, *, include_top_header: bool = False) -> list[tuple[str, bytes]]:
@@ -659,14 +881,17 @@ def apply_targeted_readings(
         eye.get("unreadable_source_regions", {}).pop(field, None)
         evidence = eye.setdefault("targeted_reread_evidence", {}).setdefault(field, [])
         best = readings[0]
-        evidence.append({
+        evidence_record = {
             "file": filename,
             "source": "TARGETED_LABELED_TILE_REREAD",
             "tile": best.get("source_tile"),
             "printed_label": best.get("printed_label"),
             "group_label": best.get("group_label"),
             "value": retained,
-        })
+        }
+        if best.get("source_box") is not None:
+            evidence_record["source_box"] = best.get("source_box")
+        evidence.append(evidence_record)
 
     if patient_age_requested:
         context = result.setdefault("document_context", {})
@@ -857,40 +1082,47 @@ def enrich_extraction(
         result, elevation_requested, filename,
     )
     requested = missing_targets_by_eye(result)
+    for eye_id, fields in list(requested.items()):
+        elevation_fields = set(elevation_requested.get(eye_id, []))
+        requested[eye_id] = [field for field in fields if field not in elevation_fields]
+        if not requested[eye_id]:
+            requested.pop(eye_id)
     patient_age_requested = patient_age_is_missing(result)
     pentacam_qs_requested = pentacam_qs_is_missing(result)
     if not _enabled():
-        _finalize_bad_elevation_verification(
-            core, result, elevation_requested, elevation_originals, filename,
+        _finish_bad_elevation_verification(
+            core, result, elevation_requested, elevation_originals, filename, {}, [],
         )
         return result
-    if (
-        not requested and not patient_age_requested and not pentacam_qs_requested
-        and not exam_date_requested
-    ):
-        return result
-    try:
-        reread = targeted_reread(
-            core, raw, filename, requested, patient_age_requested, pentacam_qs_requested,
-            exam_date_requested,
-        )
-        apply_targeted_readings(
-            core, result, reread, requested, filename, patient_age_requested,
-            pentacam_qs_requested, exam_date_requested,
-        )
-        _finalize_bad_elevation_verification(
-            core, result, elevation_requested, elevation_originals, filename,
-        )
-        return result
-    except Exception as exc:
-        result.setdefault("global_warnings", []).append(
-            f"Targeted Pentacam numeric reread failed for {filename}: "
-            f"{type(exc).__name__}; unresolved fields require surgeon entry."
-        )
-        _finalize_bad_elevation_verification(
-            core, result, elevation_requested, elevation_originals, filename,
-        )
-        return result
+    if requested or patient_age_requested or pentacam_qs_requested or exam_date_requested:
+        try:
+            reread = targeted_reread(
+                core, raw, filename, requested, patient_age_requested, pentacam_qs_requested,
+                exam_date_requested,
+            )
+            apply_targeted_readings(
+                core, result, reread, requested, filename, patient_age_requested,
+                pentacam_qs_requested, exam_date_requested,
+            )
+        except Exception as exc:
+            result.setdefault("global_warnings", []).append(
+                f"Targeted Pentacam numeric reread failed for {filename}: "
+                f"{type(exc).__name__}; unresolved fields require surgeon entry."
+            )
+    if elevation_requested:
+        try:
+            verify_bad_elevation_fields(
+                core, result, raw, filename, elevation_requested, elevation_originals,
+            )
+        except Exception as exc:
+            result.setdefault("global_warnings", []).append(
+                f"Dedicated BAD elevation verification failed for {filename}: "
+                f"{type(exc).__name__}; surgeon entry is required."
+            )
+            _finish_bad_elevation_verification(
+                core, result, elevation_requested, elevation_originals, filename, {}, [],
+            )
+    return result
 
 
 def verify_astigmatic_disparity_bad_flat_axes(

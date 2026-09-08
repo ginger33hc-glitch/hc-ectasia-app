@@ -7,8 +7,10 @@ retired and replaced with direct canonical enrichment assertions below.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import canonical_engine
 from pentacam_canonical_source_lock import BAD_CENTER, BAD_PPI, FOUR_MAPS_LOWER_LEFT
@@ -47,6 +49,7 @@ reading = _legacy.reading
 targeted = _legacy.targeted
 Core = _legacy.Core
 assessment_workflow = _legacy.assessment_workflow
+image_bytes = _legacy.image_bytes
 
 
 def _axis_result(value):
@@ -169,7 +172,7 @@ def test_bad_display_b_ele_th_reread_writes_direct_canonical_eye_field():
     assert not result.get("nice_readings")
 
 
-def test_bad_elevations_are_always_reverified_and_primary_values_are_audit_only(monkeypatch):
+def test_dedicated_bad_cell_consensus_corrects_primary_and_localizer_errors(monkeypatch):
     result = pentacam_result(F_Ele_Th_um=41, B_Ele_Th_um=93)
     eye = result["eyes"][0]
     eye["table_verified_numeric_fields"] = ["F_Ele_Th_um", "B_Ele_Th_um"]
@@ -180,33 +183,51 @@ def test_bad_elevations_are_always_reverified_and_primary_values_are_audit_only(
     payload = {
         "screen_family": "BAD_DISPLAY",
         "readings": [
-            reading("F_Ele_Th_um", 4, "F. Ele.Th", tile="LOWER_LEFT"),
-            reading("B_Ele_Th_um", 9, "B. Ele.Th", tile="LOWER_RIGHT"),
+            reading(
+                "F_Ele_Th_um", 13, "F. Ele.Th", tile="UPPER_RIGHT",
+                source_box=[100, 100, 400, 250],
+            ),
+            reading(
+                "B_Ele_Th_um", 9, "B. Ele.Th", tile="UPPER_RIGHT",
+                source_box=[500, 100, 800, 250],
+            ),
         ],
         "warnings": [],
     }
     monkeypatch.setattr(targeted, "targeted_reread", lambda *args, **kwargs: payload)
+    monkeypatch.setattr(targeted, "render_source_region", lambda *args, **kwargs: b"crop")
+    runs = iter([
+        {("OD", "F_Ele_Th_um"): 3, ("OD", "B_Ele_Th_um"): 9},
+        {("OD", "F_Ele_Th_um"): 3},
+    ])
+    monkeypatch.setattr(
+        targeted, "confirm_bad_elevation_crops", lambda *args, **kwargs: next(runs),
+    )
 
     targeted.enrich_extraction(Core, result, b"image", "od-bad.png")
 
-    assert eye["F_Ele_Th_um"] == 4
+    assert eye["F_Ele_Th_um"] == 3
     assert eye["B_Ele_Th_um"] == 9
     assert eye["bad_elevation_verification_evidence"] == {
         "F_Ele_Th_um": {
             "file": "od-bad.png", "primary_value": 41,
-            "verified_value": 4.0, "status": "VERIFIED",
+            "localized_value": 13,
+            "confirmation_values": [3, 3],
+            "verified_value": 3, "status": "VERIFIED",
         },
         "B_Ele_Th_um": {
             "file": "od-bad.png", "primary_value": 93,
-            "verified_value": 9.0, "status": "VERIFIED",
+            "localized_value": 9,
+            "confirmation_values": [9, None],
+            "verified_value": 9, "status": "VERIFIED",
         },
     }
     assert all(
         eye["targeted_reread_evidence"][field][0]["source"]
-        == "TARGETED_LABELED_TILE_REREAD"
+        == "DEDICATED_BAD_ELEVATION_DIGIT_CONSENSUS"
         for field in targeted.BAD_ELEVATION_FIELDS
     )
-    assert any("from 41 to 4" in warning for warning in result["global_warnings"])
+    assert any("from 41 to 3" in warning for warning in result["global_warnings"])
     assert any("from 93 to 9" in warning for warning in result["global_warnings"])
 
 
@@ -245,7 +266,70 @@ def test_unresolved_bad_elevation_does_not_retain_primary_ocr_value(monkeypatch)
         eye["bad_elevation_verification_evidence"][field]["status"] == "UNRESOLVED"
         for field in targeted.BAD_ELEVATION_FIELDS
     )
-    assert all(field in eye["unreadable_source_regions"] for field in targeted.BAD_ELEVATION_FIELDS)
+
+
+def test_bad_cell_consensus_uses_one_confirmation_when_localizer_agrees(monkeypatch):
+    result = pentacam_result(F_Ele_Th_um=3, B_Ele_Th_um=9)
+    eye = result["eyes"][0]
+    eye["table_verified_numeric_fields"] = ["F_Ele_Th_um", "B_Ele_Th_um"]
+    eye["canonical_source_ids"] = {
+        "F_Ele_Th_um": BAD_CENTER,
+        "B_Ele_Th_um": BAD_CENTER,
+    }
+    payload = {
+        "screen_family": "BAD_DISPLAY",
+        "readings": [
+            reading(
+                "F_Ele_Th_um", 3, "F. Ele.Th", tile="UPPER_RIGHT",
+                source_box=[100, 100, 400, 250],
+            ),
+            reading(
+                "B_Ele_Th_um", 9, "B. Ele.Th", tile="UPPER_RIGHT",
+                source_box=[500, 100, 800, 250],
+            ),
+        ],
+        "warnings": [],
+    }
+    monkeypatch.setattr(targeted, "targeted_reread", lambda *args, **kwargs: payload)
+    monkeypatch.setattr(targeted, "render_source_region", lambda *args, **kwargs: b"crop")
+    calls = []
+
+    def confirm(*args, **kwargs):
+        calls.append(True)
+        return {("OD", "F_Ele_Th_um"): 3, ("OD", "B_Ele_Th_um"): 9}
+
+    monkeypatch.setattr(targeted, "confirm_bad_elevation_crops", confirm)
+    targeted.enrich_extraction(Core, result, b"image", "od-bad.png")
+
+    assert eye["F_Ele_Th_um"] == 3
+    assert eye["B_Ele_Th_um"] == 9
+    assert len(calls) == 1
+
+
+def test_bad_cell_confirmation_reads_only_literal_integer_and_warns_about_cell_border():
+    captured = {}
+    response_payload = {
+        "readings": [{
+            "eye": "OS", "field": "F_Ele_Th_um",
+            "observed_value_text": "3", "value": 3, "status": "CONFIDENT",
+        }],
+        "warnings": [],
+    }
+
+    def create(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(output_text=json.dumps(response_payload))
+
+    core = Core()
+    core.openai_client = lambda: SimpleNamespace(responses=SimpleNamespace(create=create))
+    confirmed = targeted.confirm_bad_elevation_crops(
+        core, {("OS", "F_Ele_Th_um"): image_bytes(180, 80)},
+    )
+
+    assert confirmed == {("OS", "F_Ele_Th_um"): 3}
+    prompt = captured["input"][0]["content"][0]["text"]
+    assert "thin vertical edge of the white value cell is a border, not" in prompt.casefold()
+    assert "do not" in prompt.casefold() and "infer" in prompt.casefold()
 
 
 def test_unreadable_b_ele_th_uses_canonical_numeric_prompt_with_source_region():
