@@ -7,6 +7,7 @@ from clinical_core.planning import (
     MMC_RECOMMENDED,
     MMC_REVIEW_REQUIRED,
     PlanEvaluation,
+    lasik_plan_definition,
     mmc_guidance,
     select_first_safe_lasik_plan,
 )
@@ -19,6 +20,19 @@ def test_lasik_plan_sequence_is_exactly_a_b_c():
         {"name": "Plan B", "flap_um": 100.0, "optical_zone_mm": 6.0, "transition_zone_mm": 8.5},
         {"name": "Plan C", "flap_um": 90.0, "optical_zone_mm": 6.0, "transition_zone_mm": 8.5},
     )
+
+
+def test_plan_display_definitions_are_derived_from_the_canonical_registry():
+    assert lasik_plan_definition("Plan A") == (
+        "Plan A — flap 100 µm; optical zone 6.5 mm; transition zone 9.0 mm"
+    )
+    assert lasik_plan_definition("Plan B") == (
+        "Plan B — flap 100 µm; optical zone 6.0 mm; transition zone 8.5 mm"
+    )
+    assert lasik_plan_definition("Plan C") == (
+        "Plan C — flap 90 µm; optical zone 6.0 mm; transition zone 8.5 mm"
+    )
+    assert lasik_plan_definition("Plan D") is None
 
 
 def test_first_safe_plan_is_selected_and_rejected_plans_remain_visible():

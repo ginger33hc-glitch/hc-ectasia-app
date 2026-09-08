@@ -81,6 +81,16 @@ def test_model_contains_every_canonical_clinical_report_section_without_recalcul
     assert ["Total", "0"] in _section(model, "OD", "Randleman / ERSS")
     assert any(row[0] == "Final BAD-D" and row[1] == "1" for row in _section(model, "OD", "Belin/Ambrósio BAD-D"))
     assert any(row[0] == "selected_plan" and row[1] == "Plan A" for row in _section(model, "OD", "Procedure planning"))
+    assert any(
+        row[0] == "Selected plan parameters"
+        and row[1] == "Plan A — flap 100 µm; optical zone 6.5 mm; transition zone 9.0 mm"
+        for row in _section(model, "OD", "Procedure planning")
+    )
+    assert any(
+        row[0] == "Plan-selection priority"
+        and row[1] == "Select the first safe plan only: Plan A → Plan B → Plan C"
+        for row in _section(model, "OD", "Procedure planning")
+    )
 
 
 def test_locked_source_values_and_provenance_remain_distinct_in_report():

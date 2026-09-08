@@ -131,7 +131,7 @@
 </main>
 <footer class="app-legal-footer">Developed by Hüseyin Cengiz, MD. All rights reserved. Final responsibility rests with the surgeon at all times and under all circumstances.</footer>
 
-<script src="/static/i18n.js?v=8"></script>
+<script src="/static/i18n.js?v=9"></script>
 <script src="/static/assessment-readiness.js?v=5"></script>
 <script>
 const i18n=window.CERAI_I18N;
@@ -576,7 +576,7 @@ function provenanceText(entries){
   return (entries||[]).map(item=>[item.source,item.region,item.file].filter(Boolean).join(" / ")||displayValue(item)).join("; ")||"—";
 }
 function statusHeadline(r){
-  const selected=r.report_payload?.planning?.selected_plan;
+  const selected=r.report_payload?.planning?.selected_plan_definition||r.report_payload?.planning?.selected_plan;
   return selected?`${i18n.clinical(r.status)} — ${selected}`:i18n.clinical(r.status);
 }
 function renderEye(r){
@@ -587,7 +587,9 @@ function renderEye(r){
   const ps3Rows=(ps3.findings||[]).map(item=>[item.key,item.status,item.detail]).concat([["Moderate / High",ps3.moderate_count,ps3.high_count],["Procedure disposition",ps3.status,ps3.disposition]]);
   const badRows=[["Final BAD-D",bad.final_d,`${displayValue(bad.classification)} / ${displayValue(bad.status)}`],...["df","db","dp","dt","da"].map(key=>[key.toUpperCase(),badContext[key],"Displayed component; not recalculated"]),...["ppi_min","ppi_avg","ppi_max","artmax_um"].map(key=>[key,badContext[key],"Information / QC only"])];
   const safetyRows=Object.entries(p.tissue_safety||{}).map(([key,value])=>[key,value]);
-  const planningRows=[["Procedure",p.procedure],...Object.entries(p.planning||{}),...Object.entries(p.microkeratome_planning||{}).map(([key,value])=>[`ML7 ${key}`,value])];
+  const ml7Labels={hinge_axis_deg:"Hinge axis",hinge_location_preference:"Preferred hinge location",hinge_location_alternative:"Secondary hinge location"};
+  const planningLabels={selected_plan:"Selected LASIK plan",selected_plan_definition:"Selected plan parameters",selection_rule:"Plan-selection priority"};
+  const planningRows=[["Procedure",p.procedure],...Object.entries(p.planning||{}).map(([key,value])=>[planningLabels[key]||key,i18n.clinical(value)]),...Object.entries(p.microkeratome_planning||{}).map(([key,value])=>[`ML7 ${ml7Labels[key]||key}`,i18n.clinical(value)])];
   const driverRows=["stop","caution","incomplete"].flatMap(level=>(p.decision_drivers?.[level]||[]).map(item=>[level.toUpperCase(),item]));
   const sourceRows=Object.entries(p.source_values||{}).map(([key,value])=>[key,value,provenanceText(p.source_provenance?.[key])]);
   const correctionRows=(p.manual_corrections||[]).map(item=>[item.field,item.original,item.value,item.label]);

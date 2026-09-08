@@ -66,6 +66,12 @@ def test_plan_a_safe_is_selected_first_and_later_plans_are_not_evaluated():
     result, by_eye = _evaluate()
     planning = by_eye["OD"]["planning"]
     assert planning["selected_plan"] == "Plan A"
+    assert planning["selected_plan_definition"] == (
+        "Plan A — flap 100 µm; optical zone 6.5 mm; transition zone 9.0 mm"
+    )
+    assert planning["selection_rule"] == (
+        "Select the first safe plan only: Plan A → Plan B → Plan C"
+    )
     assert [item["plan"] for item in planning["sequence"]] == ["Plan A"]
     assert planning["sequence"][0]["safe"] is True
     assert result["effective_eye_plans"]["OD"]["plan_name"] == "Plan A"
@@ -82,6 +88,9 @@ def test_plan_a_unsafe_plan_b_safe_selects_b_and_keeps_a_rejection_reason():
     _, by_eye = _evaluate(od_eye=eye, od_plan=plan)
     planning = by_eye["OD"]["planning"]
     assert planning["selected_plan"] == "Plan B"
+    assert planning["selected_plan_definition"] == (
+        "Plan B — flap 100 µm; optical zone 6.0 mm; transition zone 8.5 mm"
+    )
     assert [item["plan"] for item in planning["sequence"]] == ["Plan A", "Plan B"]
     assert planning["sequence"][0]["safe"] is False
     assert "lasik_pta" in planning["sequence"][0]["rejection_reasons"]
@@ -102,6 +111,9 @@ def test_plan_c_is_selected_only_after_a_and_b_fail():
     _, by_eye = _evaluate(od_eye=eye, od_plan=plan)
     planning = by_eye["OD"]["planning"]
     assert planning["selected_plan"] == "Plan C"
+    assert planning["selected_plan_definition"] == (
+        "Plan C — flap 90 µm; optical zone 6.0 mm; transition zone 8.5 mm"
+    )
     assert [item["plan"] for item in planning["sequence"]] == ["Plan A", "Plan B", "Plan C"]
     assert [item["safe"] for item in planning["sequence"]] == [False, False, True]
     assert "lasik_pta" in planning["sequence"][1]["rejection_reasons"]

@@ -47,6 +47,9 @@ class MicrokeratomePlan:
     vacuum_pressure_mmhg: Optional[str] = None
     blade_recommendations: Tuple[str, ...] = field(default_factory=tuple)
     primary_hinge: Optional[str] = None
+    hinge_axis_deg: Optional[float] = None
+    hinge_location_preference: Optional[str] = None
+    hinge_location_alternative: Optional[str] = None
     alternative_hinge: Optional[str] = None
     delta_k_d: Optional[float] = None
     ring_tzone_clearance_mm: Optional[float] = None
@@ -120,6 +123,22 @@ def _alternative_tissue_safety(
     return round(rsb, 2), round(pta, 3), "ALLOWED" if allowed else "NOT_ALLOWED"
 
 
+def _perpendicular_hinge_plan(steep_axis_deg: float) -> tuple[float, Optional[str], Optional[str]]:
+    """Map the steep meridian to its perpendicular ML7 hinge axis and physical site.
+
+    Vertical steep meridians from 60 to 120 degrees use a superior hinge.
+    Horizontal steep meridians from 0 to 30 or 150 to 180 degrees use a
+    temporal hinge, with nasal secondary. Intervening oblique meridians retain
+    only the numeric perpendicular axis.
+    """
+    hinge_axis = (steep_axis_deg + 90.0) % 180.0
+    if 60.0 <= steep_axis_deg <= 120.0:
+        return hinge_axis, "Superior", None
+    if steep_axis_deg <= 30.0 or steep_axis_deg >= 150.0:
+        return hinge_axis, "Temporal", "Nasal"
+    return hinge_axis, None, None
+
+
 def plan_microkeratome(inp: MicrokeratomePlanningInput) -> MicrokeratomePlan:
     """Return a non-eligibility-changing surgeon-review recommendation."""
     status = (inp.assessment_status or "").upper()
@@ -170,6 +189,9 @@ def plan_microkeratome(inp: MicrokeratomePlanningInput) -> MicrokeratomePlan:
 
     delta = round(steep - flat, 2) if steep is not None and flat is not None else None
     primary_hinge = None
+    hinge_axis = None
+    hinge_location = None
+    hinge_location_alternative = None
     alternative_hinge = None
     alternative_rsb = alternative_pta = None
     alternative_safety = "NOT_APPLICABLE"
@@ -178,7 +200,16 @@ def plan_microkeratome(inp: MicrokeratomePlanningInput) -> MicrokeratomePlan:
     if delta is not None and delta > 4.00:
         primary_hinge = "Perpendicular to steep axis"
         if steep_axis is not None and 0 <= steep_axis <= 180:
-            primary_hinge += f" ({(steep_axis + 90.0) % 180.0:.0f}° hinge axis)"
+            hinge_axis, hinge_location, hinge_location_alternative = _perpendicular_hinge_plan(
+                steep_axis
+            )
+            primary_hinge += f" ({hinge_axis:.0f}° hinge axis)"
+            if hinge_location == "Superior":
+                primary_hinge += "; superior hinge preferred"
+            elif hinge_location == "Temporal":
+                primary_hinge += "; temporal hinge preferred (nasal secondary)"
+            else:
+                primary_hinge += "; oblique meridian — follow the numeric perpendicular hinge axis"
         elif steep_axis is None:
             warnings.append("K spread is >4.00 D, but the steep K axis is unavailable; the numeric hinge axis cannot be calculated.")
         else:
@@ -221,6 +252,9 @@ def plan_microkeratome(inp: MicrokeratomePlanningInput) -> MicrokeratomePlan:
         vacuum_pressure_mmhg=pressure,
         blade_recommendations=tuple(dict.fromkeys(blades)),
         primary_hinge=primary_hinge,
+        hinge_axis_deg=round(hinge_axis, 1) if hinge_axis is not None else None,
+        hinge_location_preference=hinge_location,
+        hinge_location_alternative=hinge_location_alternative,
         alternative_hinge=alternative_hinge,
         delta_k_d=delta,
         ring_tzone_clearance_mm=clearance,

@@ -28,9 +28,11 @@ from clinical_core.disposition import (
 from clinical_core.pipeline import evaluate_normalized_case
 from clinical_core.planning import (
     LASIK_PLANS,
+    LASIK_PLAN_SELECTION_RULE,
     PlanEvaluation,
     estimate_myopic_ablation_um,
     mmc_guidance,
+    lasik_plan_definition,
     select_first_safe_lasik_plan,
 )
 from clinical_core.refraction import (
@@ -382,12 +384,19 @@ def _evaluate_lasik_planning(source_eye, resolved_plan, *, age_years, extracted,
         return PlanEvaluation(spec["name"], safe, reasons, core_result)
 
     selected = select_first_safe_lasik_plan(evaluator)
+    first_safe = next((item.plan for item in selected.sequence if item.safe), None)
+    if selected.selected_plan != first_safe:
+        raise RuntimeError(
+            "Canonical LASIK planning priority violated: the selected plan must be "
+            "the first safe candidate in Plan A → Plan B → Plan C order."
+        )
     sequence = []
     for evaluation in selected.sequence:
         spec = next(item for item in LASIK_PLANS if item["name"] == evaluation.plan)
         meta = candidate_meta[evaluation.plan]
         sequence.append({
             "plan": evaluation.plan,
+            "definition": lasik_plan_definition(evaluation.plan),
             "safe": evaluation.safe,
             "rejection_reasons": list(evaluation.rejection_reasons),
             "status": meta["status"],
@@ -399,6 +408,8 @@ def _evaluate_lasik_planning(source_eye, resolved_plan, *, age_years, extracted,
         })
     planning = {
         "selected_plan": selected.selected_plan,
+        "selected_plan_definition": lasik_plan_definition(selected.selected_plan),
+        "selection_rule": LASIK_PLAN_SELECTION_RULE,
         "sequence": sequence,
         "rejection_reasons": [],
         "mmc_guidance": "NOT_APPLICABLE",

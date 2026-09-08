@@ -51,12 +51,44 @@ def test_delta_k_strictly_over_four_uses_perpendicular_hinge():
     assert p.delta_k_d == 4.1
     assert "Perpendicular" in p.primary_hinge
     assert "110" in p.primary_hinge
+    assert p.hinge_axis_deg == 110
+    assert p.hinge_location_preference == "Temporal"
+    assert p.hinge_location_alternative == "Nasal"
+
+
+@pytest.mark.parametrize("steep_axis, hinge_axis", [(60, 150), (90, 0), (120, 30)])
+def test_vertical_steep_meridian_prefers_superior_hinge(steep_axis, hinge_axis):
+    p = plan_microkeratome(base(steepest_k_d=46.1, flattest_k_d=42.0, steep_axis_deg=steep_axis))
+    assert p.hinge_axis_deg == pytest.approx(hinge_axis, abs=0.1)
+    assert p.hinge_location_preference == "Superior"
+    assert p.hinge_location_alternative is None
+    assert "superior hinge preferred" in p.primary_hinge
+
+
+@pytest.mark.parametrize("steep_axis, hinge_axis", [(0, 90), (30, 120), (150, 60), (180, 90)])
+def test_horizontal_steep_meridian_prefers_temporal_hinge(steep_axis, hinge_axis):
+    p = plan_microkeratome(base(steepest_k_d=46.1, flattest_k_d=42.0, steep_axis_deg=steep_axis))
+    assert p.hinge_axis_deg == pytest.approx(hinge_axis, abs=0.1)
+    assert p.hinge_location_preference == "Temporal"
+    assert p.hinge_location_alternative == "Nasal"
+    assert "temporal hinge preferred (nasal secondary)" in p.primary_hinge
+
+
+@pytest.mark.parametrize("steep_axis", [30.01, 45, 59.99, 120.01, 135, 149.99])
+def test_oblique_steep_meridian_retains_numeric_perpendicular_axis_only(steep_axis):
+    p = plan_microkeratome(base(steepest_k_d=46.1, flattest_k_d=42.0, steep_axis_deg=steep_axis))
+    assert p.hinge_axis_deg == pytest.approx((steep_axis + 90) % 180, abs=0.1)
+    assert p.hinge_location_preference is None
+    assert p.hinge_location_alternative is None
+    assert "oblique meridian" in p.primary_hinge
 
 
 def test_delta_k_exact_four_does_not_trigger_hc_rule():
     p = plan_microkeratome(base(steepest_k_d=46.0, flattest_k_d=42.0))
     assert p.delta_k_d == 4.0
     assert p.primary_hinge is None
+    assert p.hinge_axis_deg is None
+    assert p.hinge_location_preference is None
 
 
 def test_anatomic_exception_requires_rsb_pta_clearance():

@@ -248,7 +248,13 @@ def _report_sections(report: Mapping[str, Any]) -> list[tuple[str, list[list[str
     safety = report.get("tissue_safety") or {}
     sections.append(("Procedural safety", [["Parameter", "Canonical result"]] + [[key, _text(value)] for key, value in safety.items()]))
     planning = report.get("planning") or {}
-    planning_rows = [["Planning item", "Canonical result"], ["Procedure", procedure]] + [[key, _text(value)] for key, value in planning.items()]
+    planning_labels = {
+        "selected_plan_definition": "Selected plan parameters",
+        "selection_rule": "Plan-selection priority",
+    }
+    planning_rows = [["Planning item", "Canonical result"], ["Procedure", procedure]] + [
+        [planning_labels.get(key, key), _text(value)] for key, value in planning.items()
+    ]
     planning_rows.extend([[f"ML7 {key}", _text(value)] for key, value in (report.get("microkeratome_planning") or {}).items()])
     sections.append(("Procedure planning", planning_rows))
 

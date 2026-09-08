@@ -14,7 +14,7 @@ The active ML7 reference for this project is the user-supplied Turkish document 
 - CER-AI eligibility/risk assessment remains separate from ML7 surgical-planning reference material.
 - ML7 material is presented as a post-assessment surgeon-review recommendation, never as an autonomous operative instruction and never as an ectasia-clearance rule.
 - The module runs only after a favorable LASIK result (`PASS` or `CAUTION`) and cannot alter score, status, hard stops, or missing-data gates.
-- Binding CER-AI amendment: when `steepest K - flattest K >4.00 D`, the primary hinge recommendation is perpendicular to the steep axis. If that orientation is anatomically impractical, a `+10` temporal or nasal hinge may be shown only as a conditional alternative when projected RSB is `>=300 µm` and projected PTA is `<40%`.
+- Binding CER-AI amendment: when `steepest K - flattest K >4.00 D`, the primary hinge axis is perpendicular to the steep meridian. A vertical steep meridian (`60°–120°`, inclusive) prefers a superior hinge. A horizontal steep meridian (`0°–30°` or `150°–180°`, inclusive) prefers a temporal hinge, with nasal as the secondary location. Intervening oblique meridians retain only the numeric perpendicular hinge axis. If the primary orientation is anatomically impractical, the existing `+10` temporal or nasal contingency may be shown only when projected RSB is `>=300 µm` and projected PTA is `<40%`.
 - Final surgical planning, device selection, and verification remain with the surgeon.
 
 ## Source-derived notes retained from the Turkish reference
