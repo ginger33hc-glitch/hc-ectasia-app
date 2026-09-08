@@ -111,6 +111,22 @@ def test_plus_cylinder_is_normalized_once_before_core_input():
     assert inp.intended_axis_deg == pytest.approx(100.0)
 
 
+def test_only_a_bad_axis_that_would_trigger_ps3_is_selected_for_verification():
+    from canonical_input_adapter import ps3_axis_verification_eyes, resolve_case_plans
+
+    eye = _eye("OS")
+    eye.update(topographic_astig_D=3.1, bad_flat_axis_deg=13.1)
+    extracted = {"eyes": [eye]}
+    plan = _plan()
+    plan.update(manifest_cylinder_signed_D=-3.1, manifest_axis_deg=2.0)
+    plans = {"OS": plan}
+    resolved = resolve_case_plans(extracted, plans)
+    assert ps3_axis_verification_eyes(extracted, resolved) == {"OS"}
+
+    eye["bad_flat_axis_deg"] = 1.1
+    assert ps3_axis_verification_eyes(extracted, resolved) == set()
+
+
 def test_confident_treatment_card_defaults_both_roles_when_surrounding_plan_is_blank():
     plan = {"procedure": "LASIK", "prior": "no", "flap_um": 100.0, "ablation_um": 80.0}
     extracted = {"eyes": [_eye("OD")], "treatment_corrections": [_card()]}

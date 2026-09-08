@@ -98,13 +98,39 @@ def _num(value):
     return value if isfinite(value) else None
 
 
-def _axis_difference_deg(a, b):
+def axis_difference_deg(a, b):
+    """Return the smallest meridional difference on the 0-180 degree circle."""
     a = _num(a)
     b = _num(b)
     if a is None or b is None:
         return None
     difference = abs((a % 180) - (b % 180))
     return min(difference, 180 - difference)
+
+
+def astigmatic_axis_trigger_requires_verification(eye) -> bool:
+    """Identify an extracted axis value that would independently trigger PS3 Moderate.
+
+    This is deliberately owned by the PS3 policy so the extraction workflow does
+    not duplicate the activation or >10-degree clinical threshold.
+    """
+    topo_astig = _num(eye.topographic_astig_d)
+    manifest_astig = _num(eye.manifest_astig_d)
+    comparison_inactive = (
+        topo_astig is not None
+        and manifest_astig is not None
+        and max(abs(topo_astig), abs(manifest_astig)) <= ASTIGMATIC_COMPARISON_ACTIVATION_D
+    )
+    if (
+        comparison_inactive
+        or topo_astig is None
+        or manifest_astig is None
+        or abs(topo_astig) <= 1e-12
+        or abs(manifest_astig) <= 1e-12
+    ):
+        return False
+    difference = axis_difference_deg(eye.bad_flat_axis_deg, eye.manifest_axis_deg)
+    return difference is not None and difference > 10
 
 
 def _inter_eye_score(inp):
@@ -220,7 +246,7 @@ def evaluate_ps3(eye, inter_eye=None):
         and abs(manifest_astig) > 1e-12
     )
     axis_difference = (
-        _axis_difference_deg(eye.bad_flat_axis_deg, eye.manifest_axis_deg)
+        axis_difference_deg(eye.bad_flat_axis_deg, eye.manifest_axis_deg)
         if axis_is_meaningful
         else None
     )

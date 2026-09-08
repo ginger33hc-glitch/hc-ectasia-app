@@ -1,12 +1,13 @@
 """Targeted second-pass transcription for Pentacam labeled fields.
 
-This module is an extraction-only adapter.  It never changes clinical policy,
-calculates a missing Pentacam index, or overwrites a value from the general
-extractor.  When a Pentacam image contains still-missing labeled values, the
+This module is an extraction-only adapter. It never changes clinical policy or
+calculates a missing Pentacam index. When a Pentacam image contains still-missing labeled values, the
 adapter submits the original plus four overlapping crops and, when needed, one
 focused header crop to a structured reread. It accepts only high-confidence
 label/value pairs. Conflicting authoritative Four Maps examination dates are
 reread here but promoted only by the case-level date policy after both eyes agree.
+An existing BAD flat-axis value may be replaced only during the explicit PS3
+threshold-verification pass; its primary value remains in audit evidence.
 """
 
 from __future__ import annotations
@@ -772,3 +773,71 @@ def enrich_extraction(
             f"{type(exc).__name__}; original extraction retained."
         )
         return result
+
+
+def verify_ps3_bad_flat_axes(
+    core: Any,
+    result: dict[str, Any],
+    raw: bytes,
+    filename: str,
+    eye_ids: set[str],
+) -> dict[str, Any]:
+    """Focused-reread risk-triggering BAD axes before they enter PS3 scoring.
+
+    Only the canonical BAD flat-axis field is eligible. If the focused reading
+    is not confident and source-valid, the value is left unresolved for surgeon
+    completion instead of retaining an unverified Moderate trigger.
+    """
+    requested: dict[str, list[str]] = {}
+    originals: dict[str, float] = {}
+    source_id = canonical_source_id("bad_flat_axis_deg")
+    for eye in result.get("eyes") or []:
+        eye_id = eye.get("eye")
+        if eye_id not in eye_ids or not core.is_number(eye.get("bad_flat_axis_deg")):
+            continue
+        if (eye.get("canonical_source_ids") or {}).get("bad_flat_axis_deg") != source_id:
+            continue
+        originals[eye_id] = float(eye["bad_flat_axis_deg"])
+        eye["bad_flat_axis_deg"] = None
+        missing = list(eye.get("missing_or_unreadable") or [])
+        if "bad_flat_axis_deg" not in missing:
+            missing.append("bad_flat_axis_deg")
+        eye["missing_or_unreadable"] = missing
+        requested[eye_id] = ["bad_flat_axis_deg"]
+    if not requested:
+        return result
+
+    try:
+        reread = targeted_reread(core, raw, filename, requested)
+        apply_targeted_readings(core, result, reread, requested, filename)
+    except Exception as exc:
+        result.setdefault("global_warnings", []).append(
+            f"PS3-trigger BAD flat-axis verification failed for {filename}: "
+            f"{type(exc).__name__}; surgeon confirmation is required."
+        )
+
+    eyes = {
+        eye.get("eye"): eye for eye in result.get("eyes") or []
+        if eye.get("eye") in requested
+    }
+    for eye_id, primary_value in originals.items():
+        eye = eyes[eye_id]
+        verified_value = eye.get("bad_flat_axis_deg")
+        eye.setdefault("ps3_axis_verification_evidence", {})["bad_flat_axis_deg"] = {
+            "file": filename,
+            "primary_value": primary_value,
+            "verified_value": verified_value,
+            "status": "VERIFIED" if core.is_number(verified_value) else "UNRESOLVED",
+        }
+        if core.is_number(verified_value):
+            if abs(float(verified_value) - primary_value) > 1e-9:
+                result.setdefault("global_warnings", []).append(
+                    f"{eye_id} BAD flat axis corrected by focused canonical-box reread "
+                    f"from {primary_value:g}° to {float(verified_value):g}°."
+                )
+        else:
+            result.setdefault("global_warnings", []).append(
+                f"{eye_id} BAD flat axis that would trigger PS3 Moderate could not be "
+                "verified; surgeon confirmation is required before scoring."
+            )
+    return result

@@ -22,7 +22,11 @@ from copy import deepcopy
 from typing import Any, Mapping, Optional
 
 from clinical_core.pipeline import ClinicalCoreInput
-from clinical_core.ps3 import PS3EyeInput, PS3InterEyeInput
+from clinical_core.ps3 import (
+    PS3EyeInput,
+    PS3InterEyeInput,
+    astigmatic_axis_trigger_requires_verification,
+)
 from clinical_core.refraction import normalize_minus_cylinder
 
 
@@ -322,6 +326,25 @@ def _ps3_eye(eye, manifest):
         srax=None if srax_deg is not None else _surgeon_confirmed_srax(eye),
         srax_deg=srax_deg,
     )
+
+
+def ps3_axis_verification_eyes(
+    extracted: Mapping[str, Any],
+    resolved_plans: Mapping[str, Mapping[str, Any]],
+) -> set[str]:
+    """Return eyes whose extracted BAD flat axis would trigger PS3 Moderate."""
+    eyes = {
+        item.get("eye"): item
+        for item in extracted.get("eyes", [])
+        if isinstance(item, Mapping) and item.get("eye") in {"OD", "OS"}
+    }
+    required: set[str] = set()
+    for eye_name, eye in eyes.items():
+        plan = resolved_plans.get(eye_name) or {}
+        manifest = _refraction(plan, "manifest")
+        if astigmatic_axis_trigger_requires_verification(_ps3_eye(eye, manifest)):
+            required.add(eye_name)
+    return required
 
 
 def build_inter_eye_ps3(extracted):

@@ -69,6 +69,23 @@ def test_axis_difference_wraps_at_180_degrees():
     assert finding(evaluate_ps3(normal_eye(topographic_astig_d=3.1, manifest_astig_d=3.1, bad_flat_axis_deg=175, manifest_axis_deg=5), normal_inter_eye()), "astigmatic_study").status == NORMAL
 
 
+def test_bad_flat_axis_1_point_1_vs_manifest_axis_2_is_0_point_9_and_allows_lasik():
+    result = evaluate_ps3(
+        normal_eye(
+            topographic_astig_d=3.1,
+            manifest_astig_d=3.1,
+            bad_flat_axis_deg=1.1,
+            manifest_axis_deg=2.0,
+        ),
+        normal_inter_eye(),
+    )
+    item = finding(result, "astigmatic_study")
+    assert item.status == NORMAL
+    assert "difference 0.9°" in item.detail
+    assert result.moderate_count == 0
+    assert result.disposition.lasik == ALLOWED
+
+
 def test_astigmatic_study_moderate_if_magnitude_difference_exceeds_one_diopter():
     assert finding(evaluate_ps3(normal_eye(manifest_astig_d=3.01), normal_inter_eye()), "astigmatic_study").status == MODERATE
 

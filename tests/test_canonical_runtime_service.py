@@ -275,6 +275,25 @@ def test_ps3_compares_bad_flat_axis_only_and_never_substitutes_steep_axis():
     assert not eye['ps3']['complete']
 
 
+def test_ps3_correct_axis_difference_does_not_redirect_safe_lasik_to_prk():
+    od = _eye(
+        'OD', topographic_astig_D=3.1, bad_flat_axis_deg=1.1,
+        topographic_steep_axis_deg=91.1,
+    )
+    plans = {
+        name: _plan(manifest_cylinder_signed_D=-3.1, manifest_axis_deg=2.0)
+        for name in ('OD', 'OS')
+    }
+    result = _evaluate(extracted=_case(od), plans=plans)
+    eye = result['eyes'][0]
+    factor = next(f for f in eye['ps3']['findings'] if f['key'] == 'astigmatic_study')
+    assert factor['status'] == 'NORMAL'
+    assert 'difference 0.9°' in factor['detail']
+    assert eye['ps3']['disposition']['lasik'] == 'ALLOWED'
+    assert eye['report_payload']['procedure'] == 'LASIK'
+    assert 'lasik_assessment' not in eye
+
+
 def test_failed_lasik_automatically_evaluates_prk_and_retains_failed_assessment():
     result = _evaluate(extracted=_case(_eye('OD', PPI_avg=1.3)))
     od, os = result['eyes']

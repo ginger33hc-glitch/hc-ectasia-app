@@ -49,6 +49,51 @@ Core = _legacy.Core
 assessment_workflow = _legacy.assessment_workflow
 
 
+def _axis_result(value):
+    result = pentacam_result(bad_flat_axis_deg=value)
+    eye = result["eyes"][0]
+    eye["canonical_source_ids"] = {"bad_flat_axis_deg": BAD_CENTER}
+    eye["table_verified_numeric_fields"] = ["bad_flat_axis_deg"]
+    eye["missing_or_unreadable"] = []
+    return result
+
+
+def test_ps3_trigger_verification_replaces_bad_axis_from_same_canonical_box(monkeypatch):
+    result = _axis_result(13.1)
+    response = {
+        "screen_family": "BAD_DISPLAY",
+        "readings": [reading("bad_flat_axis_deg", 1.1, "Axis", tile="UPPER_RIGHT")],
+        "warnings": [],
+    }
+    monkeypatch.setattr(targeted, "targeted_reread", lambda *args, **kwargs: response)
+
+    targeted.verify_ps3_bad_flat_axes(Core, result, b"image", "os-bad.png", {"OD"})
+
+    eye = result["eyes"][0]
+    assert eye["bad_flat_axis_deg"] == 1.1
+    assert eye["ps3_axis_verification_evidence"]["bad_flat_axis_deg"] == {
+        "file": "os-bad.png",
+        "primary_value": 13.1,
+        "verified_value": 1.1,
+        "status": "VERIFIED",
+    }
+    assert any("from 13.1° to 1.1°" in warning for warning in result["global_warnings"])
+
+
+def test_unresolved_ps3_trigger_axis_cannot_retain_false_moderate_value(monkeypatch):
+    result = _axis_result(13.1)
+    monkeypatch.setattr(targeted, "targeted_reread", lambda *args, **kwargs: {
+        "screen_family": "BAD_DISPLAY", "readings": [], "warnings": [],
+    })
+
+    targeted.verify_ps3_bad_flat_axes(Core, result, b"image", "os-bad.png", {"OD"})
+
+    eye = result["eyes"][0]
+    assert eye["bad_flat_axis_deg"] is None
+    assert eye["ps3_axis_verification_evidence"]["bad_flat_axis_deg"]["status"] == "UNRESOLVED"
+    assert any("surgeon confirmation is required" in warning for warning in result["global_warnings"])
+
+
 def test_canonical_eye_fields_suppress_duplicate_targeted_reread_requests():
     result = pentacam_result()
     eye = result["eyes"][0]

@@ -16,6 +16,8 @@ from ps3_policy import (
     PS3InterEyeInput,
     PS3ProcedureDisposition,
     PS3Result,
+    astigmatic_axis_trigger_requires_verification,
+    axis_difference_deg,
     evaluate_ps3,
 )
 
@@ -31,5 +33,7 @@ __all__ = [
     "PS3InterEyeInput",
     "PS3ProcedureDisposition",
     "PS3Result",
+    "astigmatic_axis_trigger_requires_verification",
+    "axis_difference_deg",
     "evaluate_ps3",
 ]
