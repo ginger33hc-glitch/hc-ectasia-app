@@ -69,6 +69,10 @@ def test_disparity_verification_replaces_bad_axis_from_same_canonical_box(monkey
         "warnings": [],
     }
     monkeypatch.setattr(targeted, "targeted_reread", lambda *args, **kwargs: response)
+    monkeypatch.setattr(
+        targeted, "confirm_labeled_reading_crops",
+        lambda _core, _raw, _filename, _family, readings: readings,
+    )
 
     targeted.verify_astigmatic_disparity_bad_flat_axes(Core, result, b"image", "os-bad.png", {"OD"})
 
@@ -311,6 +315,9 @@ def test_bad_cell_confirmation_reads_only_literal_integer_and_warns_about_cell_b
     response_payload = {
         "readings": [{
             "eye": "OS", "field": "F_Ele_Th_um",
+            "visible_field_label": "F.Ele.Th",
+            "visible_companion_label": "B.Ele.Th",
+            "row_identity": "CONFIRMED_ELEVATION_ROW",
             "observed_value_text": "3", "value": 3, "status": "CONFIDENT",
         }],
         "warnings": [],
