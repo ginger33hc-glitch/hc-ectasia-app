@@ -431,24 +431,27 @@ def _resolve_patient_metadata(metadata, extracted, age):
         return patient, None
     contexts = [c for c in extracted.get("document_contexts", [])
                 if c.get("document_type") == "PENTACAM_TOPOGRAPHY"]
-    names = {}
-    for context in contexts:
+    # One source block, selected independently of readability: first OD Four Maps
+    # header, or first OS Four Maps header only when no OD page was supplied.
+    selected = next((c for side in ("OD", "OS") for c in contexts
+                     if side in c.get("four_maps_eyes", [])), None)
+    if selected is not None:
+        context = selected
         first = " ".join(str(context.get("patient_first_name") or "").split())
         last = " ".join(str(context.get("patient_last_name") or "").split())
         if first and last:
             name = f"{first} {last}"
-            names.setdefault(name.casefold(), name)
-    if len(names) == 1:
-        patient["name"] = next(iter(names.values()))
-        patient["name_source"] = "PENTACAM_FIRST_LAST_NAME_FIELDS"
-        return patient, None
+            patient["name"] = name
+            patient["name_source"] = "FOUR_MAPS_PATIENT_HEADER"
+            patient["name_source_file"] = context.get("source_filename")
+            return patient, None
     if contexts:
         return patient, {
             "eye": "PATIENT", "key": "patient_name", "kind": "form",
             "destination": "source", "form_id": "patient_name",
-            "label": "Confirm patient name — conflicting or unreadable Pentacam name fields",
-            "required_for": ["Patient identity"], "source_screen": "Pentacam patient header",
-            "source_box": "First Name / Last Name", "help": "Enter the verified patient name.",
+            "label": "Patient name — authoritative header missing or unreadable",
+            "required_for": ["Patient identity"], "source_screen": "4 Maps Refractive — OD (OS only if OD absent)",
+            "source_box": "upper-left patient header → First Name / Last Name", "help": "Enter the name from this header.",
         }
     return patient, None
 

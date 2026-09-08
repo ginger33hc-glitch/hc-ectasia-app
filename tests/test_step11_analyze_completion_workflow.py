@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_patient_name_resolution_preserves_source_and_manual_entry():
     extracted = {"document_contexts": [
         {"document_type": "PENTACAM_TOPOGRAPHY", "patient_first_name": "AYŞE",
-         "patient_last_name": "KOŞTUR"},
+         "patient_last_name": "KOŞTUR", "four_maps_eyes": ["OD"]},
         {"document_type": "PENTACAM_TOPOGRAPHY", "patient_first_name": "AYŞE",
          "patient_last_name": "KOŞTUR"},
     ]}
@@ -24,8 +24,10 @@ def test_patient_name_resolution_preserves_source_and_manual_entry():
     assert request is None
     extracted["document_contexts"][1]["patient_last_name"] = "OTHER"
     patient, request = workflow._resolve_patient_metadata({}, extracted, 37)
-    assert not patient.get("name")
-    assert request["kind"] == "form" and request["form_id"] == "patient_name"
+    assert patient["name"] == "AYŞE KOŞTUR" and request is None
+    extracted["document_contexts"][0]["patient_first_name"] = None
+    patient, request = workflow._resolve_patient_metadata({}, extracted, 37)
+    assert not patient.get("name") and request["form_id"] == "patient_name"
     patient, request = workflow._resolve_patient_metadata({"name": "Confirmed name"}, extracted, 37)
     assert patient["name"] == "Confirmed name" and request is None
 
@@ -33,13 +35,23 @@ def test_patient_name_resolution_preserves_source_and_manual_entry():
 def test_extracted_name_reaches_ready_report_metadata():
     session = {"extracted": {"eyes": [_eye("OD"), _eye("OS")],
                "document_contexts": [{"document_type": "PENTACAM_TOPOGRAPHY",
-               "patient_first_name": "AYŞE", "patient_last_name": "KOŞTUR"}]},
+               "patient_first_name": "AYŞE", "patient_last_name": "KOŞTUR", "four_maps_eyes": ["OD"]}]},
                "ready": None, "source_images": []}
     response = workflow._respond(SimpleNamespace(APP_VERSION="test"), "token", session,
                                  37, {"OD": _plan(), "OS": _plan()}, _modifiers(), {}, {})
     assert response["workflow_status"] == "READY"
     assert session["ready"]["patient"]["name"] == "AYŞE KOŞTUR"
     assert response["patient_metadata"]["name"] == "AYŞE KOŞTUR"
+
+
+def test_name_source_prefers_od_and_uses_os_only_if_od_absent():
+    os = {"document_type": "PENTACAM_TOPOGRAPHY", "four_maps_eyes": ["OS"],
+          "patient_first_name": "LEFT", "patient_last_name": "NAME"}
+    od = dict(os, four_maps_eyes=["OD"], patient_first_name="RIGHT")
+    patient, request = workflow._resolve_patient_metadata({}, {"document_contexts": [os, od]}, 37)
+    assert patient["name"] == "RIGHT NAME" and request is None
+    patient, request = workflow._resolve_patient_metadata({}, {"document_contexts": [os]}, 37)
+    assert patient["name"] == "LEFT NAME" and request is None
 
 
 def _eye(name="OD", **overrides):

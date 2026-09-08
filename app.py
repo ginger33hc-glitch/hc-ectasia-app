@@ -505,6 +505,11 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 eye.get("eye") for eye in result.get("eyes", [])
                 if isinstance(eye, dict) and eye.get("eye") in EYES
             })
+            context["four_maps_eyes"] = sorted({
+                eye.get("eye") for eye in result.get("eyes", [])
+                if isinstance(eye, dict) and eye.get("eye") in EYES
+                and geometric_srax_policy._is_four_maps_eye(eye)
+            })
             merged["document_contexts"].append(context)
             if context.get("document_type") == "PENTACAM_TOPOGRAPHY" and not (
                 context.get("patient_first_name") and context.get("patient_last_name")

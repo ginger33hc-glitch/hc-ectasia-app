@@ -9,6 +9,7 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 ## Case and source integrity gate
 
 - Age is calculated in `patient_age_policy.py` as completed years at the Four Maps Refractive examination date from its labeled Date of Birth. Raw dates and calculation provenance are retained. Surgeon-entered age takes precedence; conflicting or age-ambiguous dates require confirmation. The image model transcribes dates without performing arithmetic.
+- Report patient name uses one block: First Name / Last Name in the upper-left OD 4 Maps Refractive header (first supplied OD page). Use OS only when OD Four Maps is absent. An unreadable selected header requests surgeon entry; other-page name readings do not select or veto the report name. Patient-ID safety checks remain separate.
 - Extract and compare patient ID/name, printed age, date of birth, examination date/time, laterality, filename, and
   literal Pentacam QS.
 - Conflicting patient age or Pentacam examination date prohibits PASS; identity uncertainty remains
