@@ -12,7 +12,18 @@ from pathlib import Path
 from fastapi import Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, Response
 
-from public_education import TOPIC_BY_SLUG, TOPICS, render_faq, render_hub, render_topic
+from public_education import (
+    SAMPLE_CASE_BY_SLUG,
+    SAMPLE_CASES,
+    TOPIC_BY_SLUG,
+    TOPICS,
+    TR_SAMPLE_CASE_BY_SLUG,
+    TR_TOPIC_BY_SLUG,
+    render_case,
+    render_faq,
+    render_hub,
+    render_topic,
+)
 
 
 _PUBLIC_HOME = Path("static/public-home.html")
@@ -340,6 +351,7 @@ The software keeps major risk pathways independently interpretable rather than h
 ## Primary public pages
 - [CER-AI home]({base}/): Overview of the clinical decision-support platform and its independent ectasia-risk pathways.
 - [CER-AI Learning Center]({base}/learning-center): Surgeon education on corneal ectasia, Pentacam interpretation, BAD-D, topometric indices, risk systems, map patterns, tissue safety, and clinical reasoning.
+- [CER-AI Öğrenme Merkezi — Türkçe]({base}/tr/learning-center): ERSS, BAD-D, NICE, PS3, doku güvenliği, örnek olgular ve raporlama akışı için teknik Türkçe cerrah eğitimi.
 - [Corneal ectasia risk assessment]({base}/corneal-ectasia-risk-assessment): Search-oriented clinical overview of the problem CER-AI addresses and the terminology used by the platform.
 - [Clinical evidence and references]({base}/clinical-evidence): Verified literature mapped to the CER-AI pathways and concepts it supports, with explicit evidence boundaries.
 - [Full medical reference registry]({base}/references): Searchable consolidated CER-AI bibliography grouped by clinical topic.
@@ -367,6 +379,7 @@ The software keeps major risk pathways independently interpretable rather than h
 ## Surgeon learning modules
 {chr(10).join(f'- [{topic.title}]({base}/learning/{topic.slug})' for topic in TOPICS)}
 - [FAQ and educational assistant boundary]({base}/learning/faq)
+- [Worked synthetic cases]({base}/learning/clinical-cases): Step-by-step source inputs, pathway calculations, final combination, and report interpretation.
 
 ## Interpretation guidance
 CER-AI is a clinical decision-support system, not an autonomous diagnostic system. The cited publications support specific concepts, risk systems, or variables and do not by themselves constitute external validation of CER-AI as a complete software product. Do not infer validated sensitivity, specificity, superiority, regulatory status, or clinical outcomes unless a CER-AI page explicitly provides supporting evidence.
@@ -382,6 +395,11 @@ def _sitemap_xml(base: str) -> str:
         (f"{base}/references", "0.9"),
         *((f"{base}/learning/{topic.slug}", "0.8") for topic in TOPICS),
         (f"{base}/learning/faq", "0.8"),
+        (f"{base}/tr/learning-center", "0.9"),
+        *((f"{base}/tr/learning/{topic.slug}", "0.8") for topic in TOPICS),
+        (f"{base}/tr/learning/faq", "0.8"),
+        *((f"{base}/learning/cases/{case.slug}", "0.7") for case in SAMPLE_CASES),
+        *((f"{base}/tr/learning/cases/{case.slug}", "0.7") for case in SAMPLE_CASES),
     )
     body = "".join(
         f"<url><loc>{url}</loc><lastmod>{_PUBLIC_CONTENT_LASTMOD}</lastmod>"
@@ -446,6 +464,55 @@ def install(core) -> None:
         directive = _robots_directive(request)
         return HTMLResponse(
             render_topic(_site_base(request), directive, topic),
+            headers={"X-Robots-Tag": directive},
+        )
+
+    @core.app.get("/learning/cases/{slug}", include_in_schema=False)
+    def learning_case(slug: str, request: Request) -> HTMLResponse:
+        case = SAMPLE_CASE_BY_SLUG.get(slug)
+        if case is None:
+            return HTMLResponse("Not found", status_code=404)
+        directive = _robots_directive(request)
+        return HTMLResponse(
+            render_case(_site_base(request), directive, case),
+            headers={"X-Robots-Tag": directive},
+        )
+
+    @core.app.get("/tr/learning-center", include_in_schema=False)
+    def learning_center_tr(request: Request) -> HTMLResponse:
+        directive = _robots_directive(request)
+        return HTMLResponse(
+            render_hub(_site_base(request), directive, "tr"),
+            headers={"X-Robots-Tag": directive},
+        )
+
+    @core.app.get("/tr/learning/faq", include_in_schema=False)
+    def learning_faq_tr(request: Request) -> HTMLResponse:
+        directive = _robots_directive(request)
+        return HTMLResponse(
+            render_faq(_site_base(request), directive, "tr"),
+            headers={"X-Robots-Tag": directive},
+        )
+
+    @core.app.get("/tr/learning/cases/{slug}", include_in_schema=False)
+    def learning_case_tr(slug: str, request: Request) -> HTMLResponse:
+        case = TR_SAMPLE_CASE_BY_SLUG.get(slug)
+        if case is None:
+            return HTMLResponse("Bulunamadı", status_code=404)
+        directive = _robots_directive(request)
+        return HTMLResponse(
+            render_case(_site_base(request), directive, case, "tr"),
+            headers={"X-Robots-Tag": directive},
+        )
+
+    @core.app.get("/tr/learning/{slug}", include_in_schema=False)
+    def learning_topic_tr(slug: str, request: Request) -> HTMLResponse:
+        topic = TR_TOPIC_BY_SLUG.get(slug)
+        if topic is None:
+            return HTMLResponse("Bulunamadı", status_code=404)
+        directive = _robots_directive(request)
+        return HTMLResponse(
+            render_topic(_site_base(request), directive, topic, "tr"),
             headers={"X-Robots-Tag": directive},
         )
 
