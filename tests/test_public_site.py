@@ -13,7 +13,7 @@ def test_public_homepage_is_the_root_and_home_alias():
     with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
         response = client.get("/")
         assert response.status_code == 200
-        assert "CER-AI — Cornea Ectasia Risk Assessment Intelligence" in response.text
+        assert "CER-AI — Corneal Ectasia Risk Assessment Intelligence" in response.text
         assert "HC Ectasia App" not in response.text
         assert "Risk Analysis Intelligence" not in response.text
         assert "Hüseyin Cengiz, M.D." in response.text
@@ -53,7 +53,7 @@ def test_clinical_app_has_stable_app_entry():
     with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
         response = client.get("/app")
         assert response.status_code == 200
-        assert "CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.71" in response.text
+        assert "CER-AI — Corneal Ectasia Risk Assessment Intelligence v0.7.71" in response.text
         assert "public-home" not in response.text
 
 

@@ -56,7 +56,7 @@ async def canonical_runtime_lifespan(application: FastAPI):
 
 
 app = FastAPI(
-    title="CER-AI — Cornea Ectasia Risk Assessment Intelligence v0.7.71",
+    title="CER-AI — Corneal Ectasia Risk Assessment Intelligence v0.7.71",
     lifespan=canonical_runtime_lifespan,
 )
 app.mount("/static", StaticFiles(directory="static"), name="static")

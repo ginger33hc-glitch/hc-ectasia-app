@@ -9,6 +9,8 @@ from __future__ import annotations
 from math import isfinite
 from typing import Optional
 
+from srax_policy import srax_positive
+
 NORMAL_SYMMETRIC = "NORMAL_SYMMETRIC"
 ASYMMETRIC_BOWTIE = "ASYMMETRIC_BOWTIE"
 INFERIOR_STEEPENING_SRA = "INFERIOR_STEEPENING_SRA"
@@ -72,9 +74,11 @@ def erss_topography_category(
 
     I-S is mandatory and evaluated first. If I-S already gives inferior
     steepening (3 points) or abnormal/ectatic topography (4 points), SRAX is not
-    needed and is not consulted. When I-S is <= +1.00 D, SRAX must be known
-    because a value >20.0° escalates the same single topography row to the
-    inferior-steepening/SRA category.
+    needed and is not consulted. A negative I-S represents superior rather
+    than inferior asymmetry, so SRAX cannot relabel it as inferior steepening;
+    its signed I-S category is final. For I-S from 0.00 through +1.00 D, SRAX
+    must be known because a value >20.0° escalates the same single topography
+    row to the inferior-steepening/SRA category.
 
     SRAX evidence has two non-interchangeable canonical channels:
     - a directly measured geometric degree value; or
@@ -82,19 +86,19 @@ def erss_topography_category(
 
     A binary confirmation is never converted into an invented numeric degree.
     Missing SRAX is UNCERTAIN, not silently equivalent to a negative finding.
-    Exact measured 20.0° is negative. I-S and SRAX are never added.
+    Exact measured 20.0° is negative. Above 20° requires surgeon confirmation.
+    I-S and SRAX are never added.
     """
     i_s_category = signed_i_s_category(i_s_d)
     if i_s_category == UNCERTAIN:
         return UNCERTAIN
     if i_s_category in {INFERIOR_STEEPENING_SRA, ABNORMAL_ECTATIC}:
         return i_s_category
+    if float(i_s_d) < 0.0:
+        return i_s_category
 
-    if _finite(derived_srax_deg):
-        positive = float(derived_srax_deg) > 20.0
-    elif isinstance(srax_gt20_confirmed, bool):
-        positive = srax_gt20_confirmed
-    else:
+    positive = srax_positive(derived_srax_deg, srax_gt20_confirmed)
+    if positive is None:
         return UNCERTAIN
 
     return INFERIOR_STEEPENING_SRA if positive else i_s_category

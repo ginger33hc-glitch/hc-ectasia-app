@@ -319,7 +319,8 @@ def _ps3_eye(eye):
         ppi_avg=_first_number(eye, "PPI_avg"),
         f_ele_th_um=_first_number(eye, "F_Ele_Th_um"),
         b_ele_th_um=_first_number(eye, "B_Ele_Th_um"),
-        srax=None if srax_deg is not None else _surgeon_confirmed_srax(eye),
+        i_s_d=_first_number(eye, "I_S"),
+        srax=_surgeon_confirmed_srax(eye),
         srax_deg=srax_deg,
     )
 

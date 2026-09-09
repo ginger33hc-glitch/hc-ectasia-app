@@ -246,7 +246,7 @@ def test_prk_preserves_entered_ablation_and_requires_missing_erss_input():
     assert result['status'] == 'ASSESSMENT INCOMPLETE'
 
 
-def test_surgeon_confirmed_negative_srax_completes_both_erss_and_ps3():
+def test_negative_i_s_completes_erss_and_ps3_without_srax_risk():
     od = _eye('OD', I_S=-0.92, srax_deg=None, srax='NO',
               field_provenance={'srax': [{'source': 'SURGEON_CONFIRMED'}]})
     result = _evaluate(extracted=_case(od), plans={'OD': _plan('PRK'), 'OS': _plan('PRK')})
@@ -256,8 +256,9 @@ def test_surgeon_confirmed_negative_srax_completes_both_erss_and_ps3():
     assert eye['status'] == 'PASS'
     od['field_provenance'] = {}
     eye = _evaluate(extracted=_case(od))['eyes'][0]
-    assert eye['score']['total'] is None
-    assert not eye['ps3']['complete']
+    assert eye['score']['total'] == 1
+    assert eye['ps3']['complete']
+    assert eye['status'] == 'PASS'
 
 
 def test_astigmatic_disparity_is_separate_from_ps3_and_uses_bad_flat_axis():

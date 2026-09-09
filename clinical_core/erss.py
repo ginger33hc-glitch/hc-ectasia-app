@@ -9,6 +9,8 @@ from __future__ import annotations
 from math import isfinite
 from typing import Optional
 
+from srax_policy import srax_positive
+
 from .disposition import ASSESSMENT_INCOMPLETE, CAUTION, PASS, STOP_DEFER
 from .rules import (
     ABNORMAL_ECTATIC,
@@ -72,7 +74,9 @@ def _topography_missing(i_s_d, derived_srax_deg, srax_gt20_confirmed) -> list[st
     i_s_category = signed_i_s_category(i_s_d)
     if i_s_category in {INFERIOR_STEEPENING_SRA, ABNORMAL_ECTATIC}:
         return []
-    if not _finite(derived_srax_deg) and not isinstance(srax_gt20_confirmed, bool):
+    if _finite(i_s_d) and float(i_s_d) < 0.0:
+        return []
+    if srax_positive(derived_srax_deg, srax_gt20_confirmed) is None:
         return ["SRAX"]
     return []
 
