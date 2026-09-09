@@ -747,9 +747,10 @@ f.addEventListener("submit", async (e) => {
       return fd;
     };
     const clinicalOverrides=readiness.collect();
+    const sourceConfirmations=readiness.collectSourceConfirmations();
     let r;
     if(readiness.token){
-      r=await ceraiFetch('/assessment/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assessment_token:readiness.token,age:numberOrNull('age'),eye_plans:{OD:plan('od'),OS:plan('os')},patient_modifiers:modifiers,patient_metadata:patientPayload(),clinical_overrides:clinicalOverrides})});
+      r=await ceraiFetch('/assessment/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assessment_token:readiness.token,age:numberOrNull('age'),eye_plans:{OD:plan('od'),OS:plan('os')},patient_modifiers:modifiers,patient_metadata:patientPayload(),clinical_overrides:clinicalOverrides,source_confirmations:sourceConfirmations})});
     }else{
       const sendAssessment=async()=>ceraiFetch("/analyze",{method:"POST",body:await buildAnalyzeFormData()});
       try{

@@ -21,6 +21,7 @@ import geometric_srax_policy
 
 import mandatory_source_set_policy
 from exam_date_reconciliation_policy import (
+    EXAM_DATE_CONFLICT_ISSUE,
     _is_four_maps_refractive,
     authoritative_exam_date_conflict,
     promote_consistent_targeted_exam_dates,
@@ -794,7 +795,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 "PATIENT IDENTITY NOT VERIFIED: conflicting patient IDs were read across Pentacam sources. Surgeon confirmation is required."
             )
     if authoritative_exam_date_conflict(results):
-        merged["critical_input_issues"].append("Conflicting Pentacam examination dates across uploaded sources.")
+        merged["critical_input_issues"].append(EXAM_DATE_CONFLICT_ISSUE)
 
     assessed_eyes = {
         eye for context in pentacam_contexts for eye in context.get("extracted_eyes", [])

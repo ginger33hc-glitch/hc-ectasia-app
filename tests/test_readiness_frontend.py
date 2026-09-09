@@ -38,6 +38,8 @@ const panel={hidden:false,replaceChildren(){},querySelectorAll(){return this.inp
 const readiness=new ctx.window.HCReadiness(panel);
 panel.inputs=[{value:'−0,61',tagName:'INPUT',dataset:{eye:'OD',measurement:'I_S'}}];
 assert.equal(readiness.collect().OD.I_S,-.61);
+panel.inputs=[{value:'APPROVE_CONTINUE',dataset:{sourceConfirmation:'pentacam_exam_date_conflict'}}];
+assert.equal(readiness.collectSourceConfirmations().pentacam_exam_date_conflict,'APPROVE_CONTINUE');
 panel.inputs[0].value='wrong';assert.throws(()=>readiness.collect());
 readiness.reset();assert.equal(readiness.token,null);assert.equal(panel.hidden,true);
 '''

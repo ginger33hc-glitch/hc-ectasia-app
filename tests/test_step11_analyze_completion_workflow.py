@@ -95,16 +95,50 @@ def _modifiers(**overrides):
     return values
 
 
-def _respond(*, od=None, plans=None, modifiers=None, overrides=None):
+def _respond(*, od=None, plans=None, modifiers=None, overrides=None, extracted_overrides=None,
+             source_confirmations=None):
+    extracted = {"eyes": [od or _eye("OD"), _eye("OS")], "critical_input_issues": []}
+    extracted.update(extracted_overrides or {})
     session = {
-        "extracted": {"eyes": [od or _eye("OD"), _eye("OS")], "critical_input_issues": []},
+        "extracted": extracted,
         "ready": None, "expires": 0, "source_images": [],
     }
     return workflow._respond(
         SimpleNamespace(APP_VERSION="stage11-test"), "token", session, 35,
         plans or {"OD": _plan(), "OS": _plan()}, modifiers or _modifiers(),
-        {"name": "Stage 11 Patient"}, overrides or {},
+        {"name": "Stage 11 Patient"}, overrides or {}, source_confirmations or {},
     )
+
+
+def test_exam_date_conflict_offers_surgeon_review_and_approval_is_audited():
+    conflict = "Conflicting Pentacam examination dates across uploaded sources."
+    contexts = [
+        {"document_type": "PENTACAM_TOPOGRAPHY", "four_maps_eyes": ["OD"],
+         "source_filename": "od.png", "exam_date": "23/09/2026",
+         "targeted_exam_date_reread_evidence": {"value": "03/09/2026"}},
+        {"document_type": "PENTACAM_TOPOGRAPHY", "four_maps_eyes": ["OS"],
+         "source_filename": "os.png", "exam_date": "13/09/2026",
+         "targeted_exam_date_reread_evidence": {"value": None}},
+    ]
+    first = _respond(extracted_overrides={
+        "critical_input_issues": [conflict], "document_contexts": contexts,
+    })
+    assert first["workflow_status"] == "NEEDS_INPUT"
+    request = next(item for item in first["input_requests"] if item["destination"] == "source_confirmation")
+    assert request["kind"] == "confirmation"
+    assert request["options"] == ["APPROVE_CONTINUE"]
+    assert "initial 23/09/2026; focused reread 03/09/2026" in request["help"]
+    assert "initial 13/09/2026; focused reread unreadable/not returned" in request["help"]
+
+    approved = _respond(
+        extracted_overrides={"critical_input_issues": [conflict], "document_contexts": contexts},
+        source_confirmations={"pentacam_exam_date_conflict": "APPROVE_CONTINUE"},
+    )
+    assert approved["workflow_status"] == "READY"
+    assert approved["report_token"]
+    assert not approved["extracted"]["critical_input_issues"]
+    assert approved["extracted"]["surgeon_source_confirmations"][0]["decision"] == "APPROVE_CONTINUE"
+    assert any("surgeon reviewed" in item for item in approved["decision"]["identity_warnings"])
 
 
 def test_missing_signed_i_s_request_names_all_systems_and_exact_registry_source():
