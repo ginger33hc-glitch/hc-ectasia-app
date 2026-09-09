@@ -98,9 +98,18 @@ fields.od_manifest_cylinder.value='-2.00';fields.od_manifest_cylinder.dispatchEv
 assert.equal(fields.od_cylinder.value,'-2.00');
 fields.os_manifest_sphere.value='-2.00';fields.os_manifest_sphere.dispatchEvent(new context.Event('input'));
 fields.os_manifest_cylinder.value='0';fields.os_manifest_cylinder.dispatchEvent(new context.Event('input'));
-assert.equal(fields.os_manifest_cylinder.value,'0.00');
-assert.equal(fields.os_cylinder.value,'0.00');
+assert.equal(fields.os_manifest_cylinder.value,'0');
+assert.equal(fields.os_cylinder.value,'0');
 assert.equal(fields.os_axis.value,'0');
+// A prefilled zero must remain manually editable. Intermediate zero-like text
+// must not be rewritten while the surgeon is typing a nonzero cylinder.
+fields.os_manifest_cylinder.value='0.';fields.os_manifest_cylinder.dispatchEvent(new context.Event('input'));
+assert.equal(fields.os_manifest_cylinder.value,'0.');
+fields.os_manifest_cylinder.value='';fields.os_manifest_cylinder.dispatchEvent(new context.Event('input'));
+assert.equal(fields.os_manifest_cylinder.value,'');
+fields.os_manifest_cylinder.value='-1.25';fields.os_manifest_cylinder.dispatchEvent(new context.Event('input'));
+assert.equal(fields.os_manifest_cylinder.value,'-1.25');
+assert.equal(fields.os_cylinder.value,'-1.25');
 '''
     subprocess.run(['node', '-e', script], cwd=ROOT, check=True, capture_output=True, text=True)
 
