@@ -238,7 +238,8 @@ def test_learning_center_has_first_class_turkish_routes_and_hreflang():
         hub = client.get("/tr/learning-center")
         assert hub.status_code == 200
         assert '<html lang="tr">' in hub.text
-        assert "CER-AI Öğrenme Merkezi" in hub.text
+        assert "CER-AI Eğitim Merkezi" in hub.text
+        assert "Öğrenme Merkezi" not in hub.text
         assert "Klinik soruya göre öğrenin" in hub.text
         assert '<link rel="canonical" href="https://cer-ai.com/tr/learning-center">' in hub.text
         assert '<link rel="alternate" hreflang="en" href="https://cer-ai.com/learning-center">' in hub.text
