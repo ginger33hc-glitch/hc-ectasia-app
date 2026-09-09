@@ -404,11 +404,9 @@ def test_turkish_clinical_case_language_is_clear_and_clinically_natural():
             "Klinik örnek olgular",
             "Olgu A: birbiriyle uyumlu risk bulguları",
             "aynı şüpheli örüntüyü destekler",
-            "Bayes yaklaşımı: ön-test olasılığı önemlidir",
-            "düşük riskli rutin refraktif cerrahi adayında",
         ):
             assert phrase in response.text
-        for phrase in ("Klinik akıl yürütme olguları", "uyumlu kaygı", "Bayesçi uyarı"):
+        for phrase in ("Klinik akıl yürütme olguları", "uyumlu kaygı", "Bayesçi uyarı", "Bayes yaklaşımı"):
             assert phrase not in response.text
 
 
