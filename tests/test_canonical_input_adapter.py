@@ -141,6 +141,45 @@ def test_confident_treatment_card_defaults_both_roles_when_surrounding_plan_is_b
     assert resolved["intended_source"] == "TREATMENT_CARD_DUZELTME_MIKTARI"
 
 
+@pytest.mark.parametrize("sphere", [-3.0, -1.0, 3.0])
+def test_any_sphere_only_card_defaults_zero_cylinder_and_axis(sphere):
+    plan = {"procedure": "LASIK", "prior": "no", "flap_um": 100.0, "ablation_um": 80.0}
+    card = _card(sphere=sphere, cylinder=0.0, axis=None, axis_status="UNREADABLE")
+    extracted = {"eyes": [_eye("OD")], "treatment_corrections": [card]}
+    resolved = resolve_eye_plan(plan, extracted=extracted, eye_name="OD")
+    assert resolved["manifest_entered_sphere_D"] == sphere
+    assert resolved["manifest_cylinder_signed_D"] == 0.0
+    assert resolved["manifest_axis_deg"] == 0.0
+    assert resolved["intended_entered_sphere_D"] == sphere
+    assert resolved["intended_cylinder_signed_D"] == 0.0
+    assert resolved["intended_axis_deg"] == 0.0
+
+
+def test_explicit_zero_manifest_cylinder_defaults_blank_intended_cylinder_and_axis():
+    plan = {
+        "procedure": "LASIK", "prior": "no", "flap_um": 100.0, "ablation_um": 80.0,
+        "manifest_entered_sphere_D": -2.0, "manifest_cylinder_signed_D": 0.0,
+        "intended_entered_sphere_D": -2.0,
+    }
+    resolved = resolve_eye_plan(plan, extracted={"eyes": [_eye("OD")]}, eye_name="OD")
+    assert resolved["manifest_axis_deg"] == 0.0
+    assert resolved["intended_cylinder_signed_D"] == 0.0
+    assert resolved["intended_axis_deg"] == 0.0
+
+
+def test_explicit_zero_manifest_cylinder_overwrites_intended_cylinder_and_axis():
+    plan = {
+        "procedure": "LASIK", "prior": "no", "flap_um": 100.0, "ablation_um": 80.0,
+        "manifest_entered_sphere_D": -2.0, "manifest_cylinder_signed_D": 0.0,
+        "intended_entered_sphere_D": -2.0, "intended_cylinder_signed_D": -0.5,
+        "intended_axis_deg": 90.0,
+    }
+    resolved = resolve_eye_plan(plan, extracted={"eyes": [_eye("OD")]}, eye_name="OD")
+    assert resolved["manifest_axis_deg"] == 0.0
+    assert resolved["intended_cylinder_signed_D"] == 0.0
+    assert resolved["intended_axis_deg"] == 0.0
+
+
 def test_explicit_intended_role_outranks_treatment_card_for_that_role_only():
     plan = {"procedure": "LASIK", "prior": "no", "flap_um": 100.0, "ablation_um": 80.0,
             "intended_entered_sphere_D": -2.0, "intended_cylinder_signed_D": -0.5,

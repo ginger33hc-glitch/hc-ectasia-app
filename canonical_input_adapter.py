@@ -130,11 +130,13 @@ def _card_correction(extracted: Mapping[str, Any] | None, eye_name: str | None):
         if not _finite(sphere) or not _finite(cylinder):
             continue
         axis = item.get("axis_deg")
+        if abs(float(cylinder)) <= 1e-12:
+            axis = 0.0
         axis_confident = str(item.get("axis_status") or "").upper() == "CONFIDENT"
         candidates.append((
             float(sphere),
             float(cylinder),
-            float(axis) if axis_confident and _finite(axis) else None,
+            float(axis) if (axis_confident or abs(float(cylinder)) <= 1e-12) and _finite(axis) else None,
         ))
     unique = list(dict.fromkeys(candidates))
     return unique[0] if len(unique) == 1 else None
@@ -204,6 +206,17 @@ def _set_raw_role(plan: dict[str, Any], prefix: str, correction) -> None:
         plan[f"{prefix}_axis_deg"] = axis
 
 
+def _normalize_explicit_zero_manifest(plan: dict[str, Any]) -> None:
+    """Propagate an explicit zero manifest cylinder to intended cylinder and axis."""
+    cylinder = _first_number(plan, "manifest_cylinder_signed_D")
+    if cylinder is None or abs(cylinder) > 1e-12:
+        return
+    plan["manifest_cylinder_signed_D"] = 0.0
+    plan["manifest_axis_deg"] = 0.0
+    plan["intended_cylinder_signed_D"] = 0.0
+    plan["intended_axis_deg"] = 0.0
+
+
 def _copy_manifest_to_intended(plan: dict[str, Any]) -> None:
     """Copy one complete notation family; never synthesize a partial role."""
     manifest_raw = (
@@ -252,6 +265,8 @@ def resolve_eye_plan(
     if not manifest_supplied and correction is not None:
         _set_raw_role(resolved, "manifest", correction)
         resolved["manifest_source"] = "TREATMENT_CARD_DUZELTME_MIKTARI"
+
+    _normalize_explicit_zero_manifest(resolved)
 
     if not intended_supplied:
         if correction is not None:

@@ -249,6 +249,19 @@ for(const eye of ["od","os"]){
       refractionDefaultWrite.delete(key);
     });
   }
+  const manifestCylinder=document.getElementById(`${eye}_manifest_cylinder`);
+  const intendedCylinder=document.getElementById(`${eye}_cylinder`);
+  const axis=document.getElementById(`${eye}_axis`);
+  manifestCylinder.addEventListener("input",()=>{
+    const cylinder=numberOrNull(`${eye}_manifest_cylinder`);
+    if(cylinder!==0)return;
+    manifestCylinder.value="0.00";
+    refractionDefaultWrite.add(`${eye}:cylinder`);
+    intendedCylinder.value="0.00";
+    intendedCylinder.dispatchEvent(new Event("input",{bubbles:true}));
+    refractionDefaultWrite.delete(`${eye}:cylinder`);
+    axis.value="0";
+  });
 }
 
 const clinicalReviewState={od:false,os:false};
@@ -540,23 +553,29 @@ function statusClass(s){
 const fmt = (x, digits=1) => x === null || x === undefined ? "—" : Number(x).toFixed(digits);
 const safe = (x) => String(x ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
 function correctionText(values){
-  if(values.intended_sphere_D===null||values.intended_sphere_D===undefined||values.intended_cylinder_magnitude_D===null||values.intended_cylinder_magnitude_D===undefined)return "—";
-  const axis=values.correction_axis_deg===null||values.correction_axis_deg===undefined?"axis unavailable":`${fmt(values.correction_axis_deg,0)}°`;
-  return `${fmt(values.intended_sphere_D,2)} D / -${fmt(values.intended_cylinder_magnitude_D,2)} D × ${axis}`;
+  const sphere=values.intended_entered_sphere_D??values.intended_sphere_D;
+  const cylinder=values.intended_cylinder_signed_D??(values.intended_cylinder_magnitude_D!=null?-Math.abs(values.intended_cylinder_magnitude_D):null);
+  if(sphere==null||cylinder==null)return "—";
+  const axisValue=values.intended_axis_deg??values.correction_axis_deg;
+  const axis=axisValue==null?"axis unavailable":`${fmt(axisValue,0)}°`;
+  return `${fmt(sphere,2)} D / ${fmt(cylinder,2)} D × ${axis}`;
 }
 function applyEffectivePlans(plans){
   const transferred=[];
   for(const [eye,prefix] of [["OD","od"],["OS","os"]]){
     const p=plans?.[eye]||{};
-    if(!p.correction_source)continue;
+    if(!p.correction_source&&!p.manifest_source&&!p.intended_source)continue;
     // Only fill an entirely blank role; never transpose or overwrite a manual/partial entry in the form.
     for(const [role,sphereSuffix,cylinderSuffix] of [['manifest','manifest_sphere','manifest_cylinder'],['intended','sphere','cylinder']]){
       const sphere=document.querySelector(`#${prefix}_${sphereSuffix}`),cylinder=document.querySelector(`#${prefix}_${cylinderSuffix}`);
-      if(!sphere.value.trim()&&!cylinder.value.trim()&&p[`${role}_sphere_D`]!=null&&p[`${role}_cylinder_magnitude_D`]!=null){
-        sphere.value=p[`${role}_sphere_D`];cylinder.value=-Math.abs(p[`${role}_cylinder_magnitude_D`]);
+      const effectiveSphere=p[`${role}_entered_sphere_D`]??p[`${role}_sphere_D`];
+      const effectiveCylinder=p[`${role}_cylinder_signed_D`]??(p[`${role}_cylinder_magnitude_D`]!=null?-Math.abs(p[`${role}_cylinder_magnitude_D`]):null);
+      if(!sphere.value.trim()&&!cylinder.value.trim()&&effectiveSphere!=null&&effectiveCylinder!=null){
+        sphere.value=effectiveSphere;cylinder.value=effectiveCylinder;
       }
     }
-    if(!value(`${prefix}_axis`).trim()&&p.correction_axis_deg!=null)document.querySelector(`#${prefix}_axis`).value=p.correction_axis_deg;
+    const effectiveAxis=p.intended_axis_deg??p.manifest_axis_deg??p.entered_axis_deg??p.correction_axis_deg;
+    if(!value(`${prefix}_axis`).trim()&&effectiveAxis!=null)document.querySelector(`#${prefix}_axis`).value=effectiveAxis;
     transferred.push(`${eye}: ${correctionText(p)}`);
   }
   cardTransferNote.textContent=transferred.length?`Card values transferred: ${transferred.join("; ")}`:"";

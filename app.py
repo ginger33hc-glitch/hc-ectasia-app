@@ -404,11 +404,16 @@ laterality is unreadable, return null for that field. Final BAD-D remains the pr
 For an Excimer Laser Takip Karti, extract treatment_corrections only from the row explicitly labeled
 "Duzeltme Miktari" (including Turkish characters). Do not substitute values from "Subjektif
 Refraksiyon" or any other row. Map SAG/right to OD and SOL/left to OS. Transcribe sphere, signed
-cylinder, and axis exactly as written. sphere_cylinder_status may be CONFIDENT only when the sphere
-and cylinder digits and signs are unambiguous. If either is ambiguous, set both numeric fields to
-null and use UNCERTAIN or UNREADABLE while preserving visible characters in raw_text. Axis ambiguity
-does not require discarding an otherwise confident sphere/cylinder pair; report it separately in
-axis_status and set axis_deg to null when uncertain. Never transpose cylinder notation and never
+cylinder, and axis exactly as written. When the row clearly contains any one signed refractive value
+only and no cylinder or axis notation is printed, interpret that isolated value as sphere and
+return cylinder_D=0, axis_deg=0, sphere_cylinder_status=CONFIDENT, and axis_status=CONFIDENT. This
+zero-cylinder rule applies only when absence of cylinder notation is visually clear; an obscured,
+cropped, ambiguous, or unreadable cylinder region must remain null and UNCERTAIN or UNREADABLE.
+Otherwise, sphere_cylinder_status may be CONFIDENT only when the sphere and cylinder digits and signs
+are unambiguous. If either is ambiguous, set both numeric fields to null and use UNCERTAIN or
+UNREADABLE while preserving visible characters in raw_text. Axis ambiguity does not require
+discarding an otherwise confident nonzero sphere/cylinder pair; report it separately in axis_status
+and set axis_deg to null when uncertain. Never transpose cylinder notation and never
 infer the laser platform, optical zone, procedure, or ablation depth from the card. For a card-only
 image with no corneal tomography/topography data, return an empty eyes array. For a tomography-only
 image with no treatment card, return an empty treatment_corrections array. Downstream, a confident
