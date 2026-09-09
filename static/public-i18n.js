@@ -14,8 +14,8 @@
     "Developer":"Geliştirici",
     "Access CER-AI":"CER-AI'ye Eriş",
     "Clinical decision support for refractive surgery":"Refraktif cerrahi için klinik karar desteği",
-    "Cornea Ectasia Risk Assessment Intelligence":"Kornea Ektazi Riski Değerlendirmesinde Yapay Zeka",
-    "CER-AI — Cornea Ectasia Risk Assessment Intelligence":"CER-AI — Kornea Ektazi Riski Değerlendirmesinde Yapay Zeka",
+    "Corneal Ectasia Risk Assessment Intelligence":"Kornea Ektazi Riski Değerlendirmesinde Yapay Zeka",
+    "CER-AI — Corneal Ectasia Risk Assessment Intelligence":"CER-AI — Kornea Ektazi Riski Değerlendirmesinde Yapay Zeka",
     "Structured preoperative ectasia risk assessment combining independent ectasia-risk pathways, Pentacam-derived data, tissue-safety calculations, and procedure-specific safeguards.":"Bağımsız ektazi risk yollarını, Pentacam verilerini, doku güvenliği hesaplamalarını ve prosedüre özgü güvenlik önlemlerini birleştiren yapılandırılmış preoperatif ektazi risk değerlendirmesi.",
     "Designed to make refractive-surgery screening more structured, transparent, and reproducible without replacing surgeon judgment.":"Cerrahın klinik değerlendirmesinin yerini almadan refraktif cerrahi taramasını daha yapılandırılmış, şeffaf ve tekrarlanabilir hale getirmek için tasarlanmıştır.",
     "Evaluation Framework":"Değerlendirme Çerçevesi",
@@ -86,7 +86,7 @@
     "Founder’s Note":"Kurucunun Notu",
     "After more than thirty years of surgical and administrative experience, I wanted to find a way to pass some of that accumulated knowledge on to the generations that follow.":"Otuz yılı aşkın cerrahi ve idari deneyimden sonra, biriktirdiğim bilgi ve deneyimin bir bölümünü benden sonraki kuşaklara aktarabilmenin bir yolunu bulmak istedim.",
     "As a refractive surgeon, one of the complications we fear most is corneal ectasia. My aim was to develop a system that could help identify ectasia susceptibility more reliably before surgery and, ultimately, help protect patients from an avoidable complication. With the rapid development of artificial intelligence, I decided to combine established clinical evidence, modern imaging data, and my own surgical experience into a structured clinical decision-support platform.":"Bir refraktif cerrah olarak en çok çekindiğimiz komplikasyonlardan biri korneal ektazidir. Amacım, cerrahi öncesinde ektazi yatkınlığını daha güvenilir biçimde belirlemeye yardımcı olabilecek ve sonuçta hastaları önlenebilir bir komplikasyondan korumaya katkı sağlayabilecek bir sistem geliştirmekti. Yapay zekânın hızlı gelişimiyle birlikte, yerleşik klinik kanıtları, modern görüntüleme verilerini ve kendi cerrahi deneyimimi yapılandırılmış bir klinik karar destek platformunda birleştirmeye karar verdim.",
-    "CER-AI — Cornea Ectasia Risk Assessment Intelligence — is the single current product name used throughout the platform.":"CER-AI — Cornea Ectasia Risk Assessment Intelligence, platform genelinde kullanılan tek güncel ürün adıdır.",
+    "CER-AI — Corneal Ectasia Risk Assessment Intelligence — is the single current product name used throughout the platform.":"CER-AI — Corneal Ectasia Risk Assessment Intelligence, platform genelinde kullanılan tek güncel ürün adıdır.",
     "The software developed progressively through versions 0.1, 0.2, 0.3 and subsequent iterations, reaching version":"Yazılım 0.1, 0.2, 0.3 sürümleri ve sonraki geliştirmelerle aşamalı olarak ilerledi; bu metnin yazıldığı sırada",
     "at the time of writing. It is under continuous development, so by the time you read this, a newer version may already be in use.":"sürümüne ulaştı. Geliştirme sürekli devam ettiği için siz bunu okurken daha yeni bir sürüm kullanımda olabilir.",
     "During its development, I conducted an extensive review of the medical literature related to corneal ectasia, keratoconus susceptibility, refractive-surgery screening, corneal tomography, topography, biomechanics, and tissue safety. I combined this evidence with practical surgical experience to bring several different ectasia-risk assessment systems together within a single framework.":"Geliştirme sürecinde korneal ektazi, keratokonus yatkınlığı, refraktif cerrahi taraması, kornea tomografisi, topografi, biyomekanik ve doku güvenliğiyle ilgili tıbbi literatürü kapsamlı biçimde gözden geçirdim. Bu kanıtları pratik cerrahi deneyimle birleştirerek farklı ektazi risk değerlendirme sistemlerini tek bir çerçeve içinde bir araya getirdim.",
@@ -210,7 +210,7 @@
     document.documentElement.dataset.titleEn = titleEn;
     if (locale === "tr") {
       document.title = TR[titleEn] || titleEn
-        .replace("Cornea Ectasia Risk Assessment", "Kornea Ektazi Risk Değerlendirmesi")
+        .replace("Corneal Ectasia Risk Assessment", "Kornea Ektazi Risk Değerlendirmesi")
         .replace("Clinical Evidence", "Klinik Kanıtlar")
         .replace("References", "Kaynaklar");
     } else document.title = titleEn;

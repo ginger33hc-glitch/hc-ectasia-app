@@ -90,6 +90,6 @@ def test_current_branding_uses_approved_original_logo_asset():
         source = (REPO / relative).read_text(encoding="utf-8")
         assert '/static/branding/cer-ai-logo-final.png?v=5' in source
         assert "brand-wordmark" not in source
-        assert "CER-AI — Cornea Ectasia Risk Assessment Intelligence" in source
-        assert "Corneal Ectasia Risk Assessment Intelligence" not in source
+        assert "CER-AI — Corneal Ectasia Risk Assessment Intelligence" in source
+        assert "Cornea Ectasia Risk Assessment Intelligence" not in source
         assert "Risk Analysis Intelligence" not in source

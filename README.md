@@ -35,7 +35,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
   The crop and surgeon field are displayed
   side by side on larger screens and stacked on mobile.
 
-- The visible program expansion is now exactly `Cornea Ectasia Risk Assessment Intelligence`.
+- The visible program expansion is now exactly `Corneal Ectasia Risk Assessment Intelligence`.
   The approved `CER-AI` lettermark remains unchanged; the former embedded subtitle is cropped at
   presentation time and the exact new subtitle is rendered consistently in the app, PWA metadata,
   PDF, and Word. In the on-screen subtitle only the initial `A` of Assessment and initial `I` of
