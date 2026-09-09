@@ -158,6 +158,7 @@ def test_learning_center_exposes_the_full_public_education_architecture():
         assert response.status_code == 200
         assert response.headers["x-robots-tag"].startswith("index,follow")
         assert '<link rel="canonical" href="https://cer-ai.com/learning-center">' in response.text
+        assert '<link rel="stylesheet" href="/static/technical-public.css?v=2">' in response.text
         assert "Education explains the science; the CER-AI application performs the structured assessment." in response.text
         for phrase in (
             "Corneal ectasia: clinical foundations",
@@ -237,6 +238,8 @@ def test_learning_pages_remain_noindex_outside_canonical_production_host():
             assert response.status_code == 200
             assert '<meta name="robots" content="noindex,nofollow">' in response.text
             assert response.headers["x-robots-tag"] == "noindex,nofollow"
+            assert 'href="/static/technical-public.css?v=2"' in response.text
+            assert 'href="https://cer-ai.com/static/technical-public.css?v=2"' not in response.text
 
 
 def test_unknown_learning_topic_is_not_found():
