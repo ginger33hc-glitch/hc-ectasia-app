@@ -37,16 +37,21 @@ def test_public_homepage_mobile_navigation_exposes_learning_resources():
     with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
         response = client.get("/")
         assert response.status_code == 200
-        assert '/static/public-tr-home-overrides.js?v=2' in response.text
+        assert '/static/public-i18n.js?v=3' in response.text
+        assert '/static/public-tr-home-overrides.js?v=3' in response.text
     helper = open("static/public-tr-home-overrides.js", encoding="utf-8").read()
     expected = (
         '["Learning Center", "/learning-center"]',
+        '["Eğitim Merkezi", "/tr/learning-center"]',
         '["Ectasia Assessment", "/corneal-ectasia-risk-assessment"]',
         '["Clinical Evidence", "/clinical-evidence"]',
     )
     for link in expected:
         assert link in helper
     assert 'href.startsWith("#") && !document.querySelector(href)' in helper
+    i18n = open("static/public-i18n.js", encoding="utf-8").read()
+    assert '"Learning Center":"Eğitim Merkezi"' in i18n
+    assert 'locale === "tr" ? "/tr/learning-center" : "/learning-center"' in i18n
 
 
 def test_public_homepage_identifies_software_and_clinical_author():
