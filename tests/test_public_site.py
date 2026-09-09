@@ -46,7 +46,7 @@ def test_public_homepage_identifies_software_and_clinical_author():
         by_type = {item["@type"]: item for item in graph}
         assert by_type["SoftwareApplication"]["softwareVersion"] == "0.7.71"
         assert by_type["Person"]["name"] == "Hüseyin Cengiz, M.D."
-        assert by_type["MedicalWebPage"]["dateModified"] == "2026-09-08"
+        assert by_type["MedicalWebPage"]["dateModified"] == "2026-09-09"
 
 
 def test_clinical_app_has_stable_app_entry():
@@ -82,12 +82,21 @@ def test_sitemap_contains_only_public_discovery_pages():
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("application/xml")
         text = response.text
-        for path in ("/corneal-ectasia-risk-assessment", "/clinical-evidence", "/references"):
+        for path in (
+            "/learning-center", "/learning/corneal-ectasia-basics",
+            "/learning/pentacam-education", "/learning/bad-d-component-indices",
+            "/learning/topometric-indices", "/learning/randleman-erss",
+            "/learning/nice-risk-assessment", "/learning/topography-tomography-patterns",
+            "/learning/surgical-safety-concepts", "/learning/clinical-cases",
+            "/learning/cer-ai-methodology", "/learning/surgeon-learning-modules",
+            "/learning/faq", "/corneal-ectasia-risk-assessment",
+            "/clinical-evidence", "/references",
+        ):
             assert f"<loc>https://cer-ai.com{path}</loc>" in text
         assert "<loc>https://cer-ai.com/</loc>" in text
         assert "https://cer-ai.com/home" not in text
         assert "http://cer-ai.com" not in text
-        assert "<lastmod>2026-09-08</lastmod>" in text
+        assert "<lastmod>2026-09-09</lastmod>" in text
         for private_path in ("/app", "/analyze", "/assessment/", "/archive"):
             assert f"<loc>https://cer-ai.com{private_path}" not in text
 
@@ -141,3 +150,99 @@ def test_nonproduction_hosts_are_not_indexable():
         sitemap = client.get("/sitemap.xml")
         assert "<urlset" in sitemap.text
         assert "<url>" not in sitemap.text
+
+
+def test_learning_center_exposes_the_full_public_education_architecture():
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        response = client.get("/learning-center")
+        assert response.status_code == 200
+        assert response.headers["x-robots-tag"].startswith("index,follow")
+        assert '<link rel="canonical" href="https://cer-ai.com/learning-center">' in response.text
+        assert '<link rel="stylesheet" href="/static/technical-public.css?v=2">' in response.text
+        assert "Education explains the science; the CER-AI application performs the structured assessment." in response.text
+        for phrase in (
+            "Corneal ectasia: clinical foundations",
+            "Pentacam education for ectasia screening",
+            "BAD-D and component indices",
+            "Pentacam topometric indices",
+            "Randleman Ectasia Risk Score System (ERSS)",
+            "NICE ectasia-risk assessment",
+            "Corneal topography and tomography patterns",
+            "Surgical tissue-safety concepts",
+            "Clinical reasoning cases",
+            "CER-AI methodology and evidence boundaries",
+            "Surgeon learning pathway",
+            "FAQ and educational assistant boundary",
+        ):
+            assert phrase in response.text
+        schema = re.search(
+            r'<script type="application/ld\+json">(.*?)</script>',
+            response.text,
+            flags=re.DOTALL,
+        )
+        assert schema is not None
+        assert json.loads(schema.group(1))["@type"] == "CollectionPage"
+
+
+def test_learning_topics_are_crawlable_evidence_linked_and_nonclinical():
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        paths = (
+            "corneal-ectasia-basics", "pentacam-education",
+            "bad-d-component-indices", "topometric-indices", "randleman-erss",
+            "nice-risk-assessment", "topography-tomography-patterns",
+            "surgical-safety-concepts", "clinical-cases", "cer-ai-methodology",
+            "surgeon-learning-modules",
+        )
+        for slug in paths:
+            response = client.get(f"/learning/{slug}")
+            assert response.status_code == 200
+            assert response.text.count(
+                f'<link rel="canonical" href="https://cer-ai.com/learning/{slug}">'
+            ) == 1
+            assert "This module explains concepts. It does not perform or change a CER-AI clinical assessment." in response.text
+            assert "Selected sources" in response.text
+            schema = re.search(
+                r'<script type="application/ld\+json">(.*?)</script>',
+                response.text,
+                flags=re.DOTALL,
+            )
+            assert schema is not None
+            assert json.loads(schema.group(1))["@type"] == "MedicalWebPage"
+
+
+def test_learning_faq_has_faq_schema_and_explicit_assistant_boundary():
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        response = client.get("/learning/faq")
+        assert response.status_code == 200
+        assert "No patient data" in response.text
+        assert "No clinical scoring" in response.text
+        assert "No modification of the CER-AI engine" in response.text
+        schema = re.search(
+            r'<script type="application/ld\+json">(.*?)</script>',
+            response.text,
+            flags=re.DOTALL,
+        )
+        assert schema is not None
+        payload = json.loads(schema.group(1))
+        assert payload["@type"] == "FAQPage"
+        assert len(payload["mainEntity"]) == 6
+
+
+def test_learning_pages_remain_noindex_outside_canonical_production_host():
+    with TestClient(
+        canonical_engine.app,
+        base_url="https://cer-ai-staging-staging.up.railway.app",
+    ) as client:
+        for path in ("/learning-center", "/learning/pentacam-education", "/learning/faq"):
+            response = client.get(path)
+            assert response.status_code == 200
+            assert '<meta name="robots" content="noindex,nofollow">' in response.text
+            assert response.headers["x-robots-tag"] == "noindex,nofollow"
+            assert 'href="/static/technical-public.css?v=2"' in response.text
+            assert 'href="https://cer-ai.com/static/technical-public.css?v=2"' not in response.text
+
+
+def test_unknown_learning_topic_is_not_found():
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        response = client.get("/learning/not-a-real-module")
+        assert response.status_code == 404

@@ -12,6 +12,8 @@ from pathlib import Path
 from fastapi import Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, Response
 
+from public_education import TOPIC_BY_SLUG, TOPICS, render_faq, render_hub, render_topic
+
 
 _PUBLIC_HOME = Path("static/public-home.html")
 _AI_LANDING = Path("static/corneal-ectasia-risk-assessment.html")
@@ -21,7 +23,7 @@ _TESTING_NOTICE = Path("static/testing-notice.html")
 _PUBLIC_CANONICAL_BASE = os.getenv(
     "CERAI_PUBLIC_CANONICAL_BASE", "https://cer-ai.com"
 ).rstrip("/")
-_PUBLIC_CONTENT_LASTMOD = "2026-09-08"
+_PUBLIC_CONTENT_LASTMOD = "2026-09-09"
 _MOBILE_INSTALL_SECTION = """
 <div id="mobile-install" style="margin-top:34px;padding:26px;border:1px solid var(--line);border-radius:15px;background:#fff;box-shadow:0 6px 18px rgba(23,59,87,.045)">
   <div class="section-kicker">Mobile access</div>
@@ -236,6 +238,7 @@ def _discovery_head(base: str, *, robots_directive: str) -> str:
   <link rel="canonical" href="{base}/">
   <link rel="describedby" type="text/markdown" href="{base}/llms.txt">
   <link rel="alternate" type="text/html" href="{base}/corneal-ectasia-risk-assessment">
+  <link rel="related" type="text/html" href="{base}/learning-center">
   <link rel="related" type="text/html" href="{base}/clinical-evidence">
   <link rel="related" type="text/html" href="{base}/references">
   <link rel="stylesheet" href="{base}/static/technical-public.css?v=1">
@@ -251,7 +254,7 @@ def _render_public_home(request: Request) -> HTMLResponse:
         html = html.replace("</head>", f"{discovery}</head>", 1)
     marker = '<a href="#about">About</a>'
     if marker in html and 'href="/clinical-evidence"' not in html:
-        html = html.replace(marker, '<a href="/clinical-evidence">Clinical Evidence</a>' + marker, 1)
+        html = html.replace(marker, '<a href="/learning-center">Learning Center</a><a href="/clinical-evidence">Clinical Evidence</a>' + marker, 1)
     if 'id="references"' not in html and "</main>" in html:
         references_section = """
 <section id="references" class="alt"><div class="wrap">
@@ -336,6 +339,7 @@ The software keeps major risk pathways independently interpretable rather than h
 
 ## Primary public pages
 - [CER-AI home]({base}/): Overview of the clinical decision-support platform and its independent ectasia-risk pathways.
+- [CER-AI Learning Center]({base}/learning-center): Surgeon education on corneal ectasia, Pentacam interpretation, BAD-D, topometric indices, risk systems, map patterns, tissue safety, and clinical reasoning.
 - [Corneal ectasia risk assessment]({base}/corneal-ectasia-risk-assessment): Search-oriented clinical overview of the problem CER-AI addresses and the terminology used by the platform.
 - [Clinical evidence and references]({base}/clinical-evidence): Verified literature mapped to the CER-AI pathways and concepts it supports, with explicit evidence boundaries.
 - [Full medical reference registry]({base}/references): Searchable consolidated CER-AI bibliography grouped by clinical topic.
@@ -360,6 +364,10 @@ The software keeps major risk pathways independently interpretable rather than h
 - Residual stromal bed and procedure-specific tissue-safety calculations
 - LASIK and PRK preoperative screening
 
+## Surgeon learning modules
+{chr(10).join(f'- [{topic.title}]({base}/learning/{topic.slug})' for topic in TOPICS)}
+- [FAQ and educational assistant boundary]({base}/learning/faq)
+
 ## Interpretation guidance
 CER-AI is a clinical decision-support system, not an autonomous diagnostic system. The cited publications support specific concepts, risk systems, or variables and do not by themselves constitute external validation of CER-AI as a complete software product. Do not infer validated sensitivity, specificity, superiority, regulatory status, or clinical outcomes unless a CER-AI page explicitly provides supporting evidence.
 """
@@ -368,9 +376,12 @@ CER-AI is a clinical decision-support system, not an autonomous diagnostic syste
 def _sitemap_xml(base: str) -> str:
     urls = (
         (f"{base}/", "1.0"),
+        (f"{base}/learning-center", "0.9"),
         (f"{base}/corneal-ectasia-risk-assessment", "0.9"),
         (f"{base}/clinical-evidence", "0.9"),
         (f"{base}/references", "0.9"),
+        *((f"{base}/learning/{topic.slug}", "0.8") for topic in TOPICS),
+        (f"{base}/learning/faq", "0.8"),
     )
     body = "".join(
         f"<url><loc>{url}</loc><lastmod>{_PUBLIC_CONTENT_LASTMOD}</lastmod>"
@@ -409,6 +420,33 @@ def install(core) -> None:
     def corneal_ectasia_risk_assessment(request: Request) -> HTMLResponse:
         return _render_public_page(
             _AI_LANDING, request, "/corneal-ectasia-risk-assessment"
+        )
+
+    @core.app.get("/learning-center", include_in_schema=False)
+    def learning_center(request: Request) -> HTMLResponse:
+        directive = _robots_directive(request)
+        return HTMLResponse(
+            render_hub(_site_base(request), directive),
+            headers={"X-Robots-Tag": directive},
+        )
+
+    @core.app.get("/learning/faq", include_in_schema=False)
+    def learning_faq(request: Request) -> HTMLResponse:
+        directive = _robots_directive(request)
+        return HTMLResponse(
+            render_faq(_site_base(request), directive),
+            headers={"X-Robots-Tag": directive},
+        )
+
+    @core.app.get("/learning/{slug}", include_in_schema=False)
+    def learning_topic(slug: str, request: Request) -> HTMLResponse:
+        topic = TOPIC_BY_SLUG.get(slug)
+        if topic is None:
+            return HTMLResponse("Not found", status_code=404)
+        directive = _robots_directive(request)
+        return HTMLResponse(
+            render_topic(_site_base(request), directive, topic),
+            headers={"X-Robots-Tag": directive},
         )
 
     @core.app.get("/clinical-evidence", include_in_schema=False)
