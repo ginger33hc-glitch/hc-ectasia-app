@@ -69,6 +69,8 @@ def test_report_payload_copies_calculated_rows_and_drivers_without_recalculation
     assert payload["bad"]["context"]["artmax_um"] == 350
     assert payload["ps3"]["complete"] is True
     assert payload["decision_drivers"]["caution"][0]["key"] == "bad_d"
+    assert payload["section_drivers"]["bad"] == payload["decision_drivers"]["caution"]
+    assert payload["section_drivers"]["randleman"] == []
 
 
 def test_prk_flap_is_presented_as_na_without_changing_clinical_payload():

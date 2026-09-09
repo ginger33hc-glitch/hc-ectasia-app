@@ -26,6 +26,18 @@ REPORT_EXTRACTION_FIELDS = (
 )
 
 
+# Presentation ownership only: route canonical decision drivers to the section
+# that already owns the underlying clinical result. This does not score or
+# reinterpret any finding.
+SECTION_DRIVER_KEYS = {
+    "randleman": {"randleman_erss"},
+    "nice": {"nice"},
+    "bad": {"bad_d"},
+    "ps3": {"ps3"},
+    "tissue_safety": {"procedural_safety"},
+}
+
+
 def _plain(value: Any) -> Any:
     if is_dataclass(value):
         return {key: _plain(item) for key, item in asdict(value).items()}
@@ -44,6 +56,18 @@ def _driver_payload(final_disposition: Any) -> dict[str, Any]:
         "caution": _plain(getattr(final_disposition, "caution_drivers", ())),
         "incomplete": _plain(getattr(final_disposition, "incomplete_drivers", ())),
     }
+
+
+def _section_driver_payload(decision_drivers: Mapping[str, Any]) -> dict[str, list[Any]]:
+    routed = {section: [] for section in SECTION_DRIVER_KEYS}
+    for level in ("stop", "caution", "incomplete"):
+        for finding in decision_drivers.get(level) or []:
+            key = finding.get("key") if isinstance(finding, Mapping) else None
+            for section, owned_keys in SECTION_DRIVER_KEYS.items():
+                if key in owned_keys:
+                    routed[section].append(finding)
+                    break
+    return routed
 
 
 def build_report_payload(
@@ -118,6 +142,8 @@ def build_report_payload(
         if field in REPORT_EXTRACTION_FIELDS
     }
 
+    decision_drivers = _driver_payload(assessment.get("final_disposition"))
+
     return {
         "eye": eye,
         "procedure": procedure,
@@ -143,7 +169,8 @@ def build_report_payload(
             "flap": "N/A" if procedure == "PRK" else None,
         },
         "manual_corrections": corrections,
-        "decision_drivers": _driver_payload(assessment.get("final_disposition")),
+        "decision_drivers": decision_drivers,
+        "section_drivers": _section_driver_payload(decision_drivers),
         "versions": {
             "software": software_version,
             "clinical_policy": clinical_policy_version,

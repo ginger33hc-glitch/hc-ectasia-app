@@ -102,6 +102,27 @@ def _bad_d_disposition(classification: str) -> str:
     return ASSESSMENT_INCOMPLETE
 
 
+def _erss_finding_detail(erss, i_s_d, procedure: str) -> str:
+    """Describe the already-computed ERSS result without changing its score."""
+    if procedure not in {"LASIK", "PRK"} or erss is None:
+        return "Not applicable"
+    parts = [f"ERSS total: {erss.get('total')!r}"]
+    category = erss.get("category")
+    topography_points = (erss.get("rows") or {}).get("topography")
+    if category is not None:
+        parts.append(f"topography: {category} ({topography_points!r} points)")
+    if _finite(i_s_d):
+        parts.append(f"signed I-S: {float(i_s_d):g} D")
+    scored = [
+        f"{key}: {points} points"
+        for key, points in (erss.get("rows") or {}).items()
+        if key != "topography" and isinstance(points, int) and points > 0
+    ]
+    if scored:
+        parts.append("additional scored components: " + ", ".join(scored))
+    return "; ".join(parts)
+
+
 def _intended_refraction(inp: ClinicalCoreInput):
     if not _finite(inp.intended_sphere_d) or not _finite(inp.intended_cylinder_d):
         return None
@@ -238,12 +259,17 @@ def evaluate_normalized_case(
         procedure, inp, rsb, rst, pta, final_k, intended_group
     )
 
+    active_safety_stops = [key for key, stopped in safety_stops.items() if stopped]
     safety_detail = "Independent tissue/refractive safety gates"
+    if active_safety_stops:
+        safety_detail += "; hard stop(s): " + ", ".join(active_safety_stops)
+    if safety_missing:
+        safety_detail += "; missing: " + ", ".join(safety_missing)
     if intended_group == MIXED:
         safety_detail += "; scalar MRSE/Kmean final-K model prohibited for mixed astigmatism"
 
     core_findings = (
-        DecisionFinding("randleman_erss", erss_status, "ERSS" if procedure in {"LASIK", "PRK"} else "Not applicable"),
+        DecisionFinding("randleman_erss", erss_status, _erss_finding_detail(erss, inp.i_s_d, procedure)),
         DecisionFinding("bad_d", bad_status, f"Final BAD-D: {bad.classification}"),
         DecisionFinding("nice", nice_status, f"NICE total: {nice.get('total')!r}"),
         DecisionFinding("ps3", ps3_status, ps3_decision.detail),
