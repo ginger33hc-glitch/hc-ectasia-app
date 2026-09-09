@@ -78,11 +78,22 @@
     const nav = document.createElement("nav");
     nav.id = "cerAiMobileSectionNav";
     nav.className = "cerai-mobile-section-nav";
-    nav.setAttribute("aria-label", "Section navigation");
+    const locale = (localStorage.getItem(LANGUAGE_KEY) || "en").toLowerCase();
+    const isTurkish = locale === "tr";
+    nav.setAttribute("aria-label", isTurkish ? "Bölüm menüsü" : "Section navigation");
     const scroller = document.createElement("div");
     scroller.className = "cerai-mobile-section-scroll";
 
-    [
+    const links = isTurkish ? [
+      ["Eğitim Merkezi", "/tr/learning-center"],
+      ["Ektazi Değerlendirmesi", "/corneal-ectasia-risk-assessment"],
+      ["Klinik Kanıtlar", "/clinical-evidence"],
+      ["Değerlendirme", "#evaluation"],
+      ["CER-AI Nasıl Çalışır", "#science"],
+      ["Kullanım Kılavuzu", "#guide"],
+      ["Hakkında", "#about"],
+      ["Geliştirici", "#developer"]
+    ] : [
       ["Learning Center", "/learning-center"],
       ["Ectasia Assessment", "/corneal-ectasia-risk-assessment"],
       ["Clinical Evidence", "/clinical-evidence"],
@@ -91,7 +102,8 @@
       ["User Guide", "#guide"],
       ["About", "#about"],
       ["Developer", "#developer"]
-    ].forEach(([label, href]) => {
+    ];
+    links.forEach(([label, href]) => {
       if (href.startsWith("#") && !document.querySelector(href)) return;
       const link = document.createElement("a");
       link.className = "cerai-mobile-section-link";
@@ -117,7 +129,11 @@
     document.addEventListener("click", event => {
       const button = event.target.closest?.("#cerai-public-language button[data-lang]");
       if (!button) return;
-      queueMicrotask(applyDeveloperLocale);
+      queueMicrotask(() => {
+        applyDeveloperLocale();
+        document.getElementById("cerAiMobileSectionNav")?.remove();
+        ensureMobileSectionNav();
+      });
     });
   }
 
