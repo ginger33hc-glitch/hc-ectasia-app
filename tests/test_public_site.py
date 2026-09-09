@@ -184,7 +184,7 @@ def test_learning_center_exposes_the_full_public_education_architecture():
         assert response.status_code == 200
         assert response.headers["x-robots-tag"].startswith("index,follow")
         assert '<link rel="canonical" href="https://cer-ai.com/learning-center">' in response.text
-        assert '<link rel="stylesheet" href="/static/technical-public.css?v=5">' in response.text
+        assert '<link rel="stylesheet" href="/static/technical-public.css?v=6">' in response.text
         assert "Education explains the science; the CER-AI application performs the structured assessment." in response.text
         for phrase in (
             "Corneal ectasia: clinical foundations",
@@ -328,6 +328,28 @@ def test_pentacam_module_documents_five_sources_quadrants_and_extraction_pipelin
         assert "Eksimer" not in turkish.text
 
 
+def test_pentacam_module_includes_five_clearly_labeled_synthetic_source_images():
+    filenames = (
+        "four-maps-od.svg", "four-maps-os.svg", "bad-display-od.svg",
+        "bad-display-os.svg", "show-2-exams-topometric.svg",
+    )
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        english = client.get("/learning/pentacam-education")
+        turkish = client.get("/tr/learning/pentacam-education")
+        assert english.status_code == turkish.status_code == 200
+        assert "Five-image synthetic Pentacam source example" in english.text
+        assert "not real Pentacam device exports or real patient data" in english.text
+        assert "Beş görüntülü sentetik Pentacam kaynak örneği" in turkish.text
+        assert "gerçek Pentacam cihaz çıktısı veya gerçek hasta verisi değildir" in turkish.text
+        for filename in filenames:
+            path = f"/static/education/pentacam-synthetic/{filename}"
+            assert english.text.count(path) == 2
+            assert turkish.text.count(path) == 2
+            image = client.get(path)
+            assert image.status_code == 200
+            assert image.headers["content-type"] == "image/svg+xml"
+
+
 def test_topometric_module_explains_indices_and_their_cerai_roles():
     with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
         response = client.get("/learning/topometric-indices")
@@ -396,6 +418,31 @@ def test_worked_cases_are_bilingual_indexable_and_clearly_synthetic():
             assert "Tüm hakları saklıdır" in turkish.text
 
 
+def test_turkish_clinical_case_language_is_clear_and_clinically_natural():
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        response = client.get("/tr/learning/clinical-cases")
+        assert response.status_code == 200
+        for phrase in (
+            "Klinik örnek olgular",
+            "Yakında: gerçek klinik vaka örnekleri",
+            "Bu bölüme gerçek vakalardan seçilmiş, anonimleştirilmiş örnekler yakında eklenecektir",
+            "Olgu A: birbiriyle uyumlu risk bulguları",
+            "aynı şüpheli örüntüyü destekler",
+        ):
+            assert phrase in response.text
+        for phrase in ("Klinik akıl yürütme olguları", "uyumlu kaygı", "Bayesçi uyarı", "Bayes yaklaşımı"):
+            assert phrase not in response.text
+
+
+def test_clinical_case_module_announces_future_deidentified_real_cases():
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        response = client.get("/learning/clinical-cases")
+        assert response.status_code == 200
+        assert "Coming soon: real clinical case examples" in response.text
+        assert "De-identified examples selected from real clinical cases" in response.text
+        assert "do not contain real patient data" in response.text
+
+
 def test_every_learning_page_has_explicit_owner_and_rights_notice():
     with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
         for path in (
@@ -436,8 +483,8 @@ def test_learning_pages_remain_noindex_outside_canonical_production_host():
             assert response.status_code == 200
             assert '<meta name="robots" content="noindex,nofollow">' in response.text
             assert response.headers["x-robots-tag"] == "noindex,nofollow"
-            assert 'href="/static/technical-public.css?v=5"' in response.text
-            assert 'href="https://cer-ai.com/static/technical-public.css?v=5"' not in response.text
+            assert 'href="/static/technical-public.css?v=6"' in response.text
+            assert 'href="https://cer-ai.com/static/technical-public.css?v=6"' not in response.text
 
 
 def test_unknown_learning_topic_is_not_found():
