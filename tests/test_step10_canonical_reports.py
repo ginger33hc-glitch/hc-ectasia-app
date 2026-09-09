@@ -142,7 +142,7 @@ def test_ps3_report_uses_canonical_findings_and_exposes_exact_trigger():
     assert ppi[1] == "MODERATE"
     assert "PPI Average 1.3 > 1.20" in ppi[2]
     assert any(row[0] == "Procedure disposition" and row[1] == "PASS" for row in rows)
-    assert any(row[0] == "Procedure disposition" and "lasik: DEFER" in row[2] for row in rows)
+    assert any(row[0] == "Procedure disposition" and "Raw PS3 PRK disposition: ALLOWED" in row[2] for row in rows)
 
 
 def test_pdf_and_docx_use_same_model_and_do_not_mutate_canonical_snapshot():

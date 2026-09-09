@@ -239,9 +239,11 @@ def _report_sections(report: Mapping[str, Any]) -> list[tuple[str, list[list[str
     ps3_rows = [["Factor", "Status", "Exact finding"]]
     for finding in ps3.get("findings") or []:
         ps3_rows.append([_text(finding.get("key")), _text(finding.get("status")), _text(finding.get("detail"))])
+    ps3_decision = ps3.get("decision") or {}
+    ps3_disposition_detail = ps3_decision.get("detail") or _text(ps3.get("disposition"))
     ps3_rows.extend([
         ["Moderate / High", _text(ps3.get("moderate_count")), _text(ps3.get("high_count"))],
-        ["Procedure disposition", _text(ps3.get("status")), _text(ps3.get("disposition"))],
+        ["Procedure disposition", _text(ps3.get("status")), ps3_disposition_detail],
     ])
     sections.append(("PS3", ps3_rows))
 

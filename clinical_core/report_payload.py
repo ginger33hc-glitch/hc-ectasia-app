@@ -88,6 +88,7 @@ def build_report_payload(
             "disposition": _plain(getattr(ps3, "disposition", None)),
             "review_notes": _plain(getattr(ps3, "review_notes", ())),
             "status": assessment.get("ps3_status"),
+            "decision": _plain(assessment.get("ps3_decision")),
         }
 
     bad_payload = {
