@@ -46,11 +46,13 @@ TOPICS = (
         (
             ("A tomographic examination, not one number", "Scheimpflug tomography reconstructs anterior-segment geometry from multiple images. The resulting displays include anterior and posterior corneal surfaces, pachymetry, curvature-derived maps, and composite indices. These outputs are related, but they are not interchangeable."),
             ("Read the named display and field", "A value should be interpreted from its labeled source display, eye, examination, and surface. K1, K2, Km, Kmax, thinnest pachymetry, posterior elevation, and composite indices describe different properties. Copying a visually similar number from another panel can create a clinically important source error."),
+            ("How CER-AI reads Pentacam images", "CER-AI first identifies the complete five-image source set and laterality. Its image-extraction layer transcribes only explicitly labeled values from each field's registered display region. It does not sample map colors, estimate an unreadable number, or calculate one locked field from another. Each accepted value carries its source identifier into reconciliation, assessment, and reporting."),
+            ("What happens when a value is uncertain", "An absent, obscured, wrong-screen, or conflicting locked value remains null. CER-AI may perform a field-specific targeted reread; if the canonical box still cannot be resolved, it requests surgeon entry or confirmation when that workflow permits. It does not choose the first, average, minimum, maximum, or most concerning value to hide disagreement."),
             ("Quality precedes interpretation", "Acquisition quality, fixation, blinking, tear-film disturbance, decentration, and contact-lens effects can alter measurements. A quality warning does not automatically define the clinical result; it signals that the examination and the affected values require review or repeat acquisition when appropriate."),
             ("Compare patterns across channels", "Curvature describes optical shape, elevation describes surface position relative to a reference surface, and pachymetric progression describes spatial thickness behavior. Concordant abnormal findings are different from an isolated borderline value. Bilateral comparison and prior examinations can add context but do not replace inspection of each eye."),
         ),
         (
-            ("OCULUS Pentacam manufacturer documentation", "https://www.oculus.de/en/documents/"),
+            ("OCULUS Pentacam Interpretation Guide 2024", "https://www.pentacam.com/fileadmin/user_upload/pentacam.de/downloads/interpretations-leitfaden/Pentacam_Interpretation_Guide_Ophth_EN_0624.pdf"),
             ("Ambrósio et al., JCRS 2006", "https://doi.org/10.1016/j.jcrs.2006.06.025"),
             ("Toprak et al., Turkish Journal of Ophthalmology 2023", "https://doi.org/10.4274/tjo.galenos.2023.68188"),
         ),
@@ -257,12 +259,14 @@ TR_TOPICS = (
         (
             ("Tek sayı değil, tomografik inceleme", "Dönen Scheimpflug kamera, farklı meridyenlerden optik kesitler alarak ön segment geometrisini üç boyutlu olarak yeniden oluşturur. Elde edilen ekranlar ön ve arka korneal yüzeyleri, pakimetriyi, eğrilik haritalarını ve bileşik indeksleri içerir. Bu çıktılar ilişkili olsa da birbirinin yerine geçmez."),
             ("Adlandırılmış ekranı ve alanı okuyun", "Bir değer, etiketlenmiş kaynak ekranından; doğru göz, çekim ve yüzey ile birlikte yorumlanmalıdır. K1, K2, Km, Kmax, en ince pakimetri, arka elevasyon ve bileşik indeksler farklı özellikleri tanımlar. Görsel olarak benzer bir sayının başka panelden kopyalanması klinik açıdan önemli kaynak hatası oluşturabilir."),
+            ("CER-AI Pentacam görüntülerini nasıl okur?", "CER-AI önce beş görüntüden oluşan zorunlu kaynak kümesini ve göz tarafını tanımlar. Görüntü çıkarım katmanı, her alanın kayıtlı ekran bölgesindeki yalnız açıkça etiketlenmiş değeri yazıya aktarır. Harita renginden sayı örneklemez, okunamayan değeri tahmin etmez veya kaynağı kilitli bir alanı başka alandan hesaplamaz. Kabul edilen her değer kaynak kimliğini uzlaştırma, değerlendirme ve rapora taşır."),
+            ("Değer belirsiz olduğunda ne olur?", "Bulunmayan, kapalı, yanlış ekrandan gelen veya çelişkili kaynağı kilitli değer null olarak kalır. CER-AI alana özgü hedefli yeniden okuma yapabilir; kanonik kutu yine çözülemezse iş akışının izin verdiği durumda cerrah girişi ya da doğrulaması ister. Çelişkiyi gizlemek için ilk, ortalama, minimum, maksimum veya en kaygı verici değeri seçmez."),
             ("Elevasyonun referans yüzeye bağımlılığı", "Elevasyon mutlak bir anatomik yükseklik değildir; seçilen en uygun küre, elipsoid veya geliştirilmiş referans yüzeye göre hesaplanan farktır. Analiz çapı, merkezleme, hariç tutulan bölge ve yazılım algoritması değişirse aynı kornea için gösterilen elevasyon değeri de değişebilir."),
             ("Yorumdan önce kalite", "Fiksasyon, göz kırpma, gözyaşı filmi bozukluğu, desantralizasyon ve kontakt lens etkileri ölçümleri değiştirebilir. Kalite uyarısı klinik sonucu otomatik olarak tanımlamaz; çekimin ve etkilenen değerlerin incelenmesini, uygun olduğunda tekrar ölçüm alınmasını gerektirir."),
             ("Kanallar arasında örüntü karşılaştırması", "Eğrilik optik şekli, elevasyon referans yüzeye göre konumu, pakimetrik progresyon ise kalınlığın uzaysal davranışını tanımlar. Birbiriyle uyumlu anormal bulgular, izole sınırda bir değerden farklıdır. İki göz ve önceki çekimler ek bağlam sağlar; her gözün ayrı incelenmesinin yerini tutmaz."),
         ),
         (
-            ("OCULUS Pentacam üretici dokümantasyonu", "https://www.oculus.de/en/documents/"),
+            ("OCULUS Pentacam Yorumlama Rehberi 2024", "https://www.pentacam.com/fileadmin/user_upload/pentacam.de/downloads/interpretations-leitfaden/Pentacam_Interpretation_Guide_Ophth_EN_0624.pdf"),
             ("Ambrósio ve ark., JCRS 2006", "https://doi.org/10.1016/j.jcrs.2006.06.025"),
             ("Toprak ve ark., Turkish Journal of Ophthalmology 2023", "https://doi.org/10.4274/tjo.galenos.2023.68188"),
         ),
@@ -474,6 +478,58 @@ TR_FAQS = (
 # are presentation data only; the clinical engine remains the sole rule owner.
 TECHNICAL_TABLES = {
     "en": {
+        "pentacam-education": (
+            ("Surgeon upload and source confirmation", ("Required image", "Surgeon must define/confirm", "Image acquisition requirement"), (
+                ("1. 4 Maps Refractive — OD", "Right eye; 4 Maps Refractive", "Full display, captured directly from the front"),
+                ("2. 4 Maps Refractive — OS", "Left eye; 4 Maps Refractive", "Full display, captured directly from the front"),
+                ("3. Belin/Ambrósio BAD Display — OD", "Right eye; BAD Display", "Full display with bottom D strip and labeled boxes visible"),
+                ("4. Belin/Ambrósio BAD Display — OS", "Left eye; BAD Display", "Full display with bottom D strip and labeled boxes visible"),
+                ("5. Show 2 Exams Topometric", "Bilateral comparison; OD and OS panels identified", "Full display with Cornea Front, Cornea Back, and center indices readable"),
+            ), "The surgeon must upload and confirm all five Pentacam source images. Use a clear screenshot or a photograph taken perpendicular to the screen—not from an angle. Avoid blur, glare, perspective distortion, compression, cropping, shadows, and covered labels. Poor image quality can make a field unreadable or inconsistent; CER-AI must request a clearer source rather than infer a value. Clear acquisition supports consistency but does not guarantee clinical correctness."),
+            ("Standard 4 Maps Refractive quadrant localization", ("Screen location", "Required printed map type", "CER-AI use and conflict rule"), (
+                ("Upper left", "Axial/Sagittal Curvature (Front)", "Only this anterior/front curvature map is used by the deterministic SRAX geometry layer."),
+                ("Upper right", "Elevation (Front)", "Anterior elevation pattern review; it does not substitute for the BAD Display F.Ele.Th labeled value."),
+                ("Lower left", "Corneal Thickness / Pachymetry", "Spatial thickness-pattern review; decision fields still come from their explicitly labeled Pupil Center and Thinnest Location values."),
+                ("Lower right", "Elevation (Back)", "Posterior elevation pattern review; it does not substitute for BAD Display B.Ele.Th or Show 2 Cornea Back values."),
+            ), "CER-AI requires the standard full 4 Maps Refractive layout and verifies the printed map label as well as its quadrant. Do not upload a custom/rearranged four-map layout or place an anterior sagittal-curvature map in a right-hand quadrant. A label–position mismatch, front/back substitution, rotation, or crop is a source conflict and must be corrected with a standard export or clear front-on image."),
+            ("Required Pentacam source set", ("Source image", "Required set", "CER-AI extraction role"), (
+                ("4 Maps Refractive", "One OD and one OS", "Pupil Center pachymetry, circle-marked Thinnest Location, K Max (Front), HWTW, acquisition/identity evidence; the Axial/Sagittal Curvature (Front) map supplies deterministic SRAX geometry."),
+                ("Belin/Ambrósio BAD Display", "One OD and one OS", "Signed F.Ele.Th and B.Ele.Th; PPI Min/Avg/Max and ARTmax; Df/Db/Dp/Dt/Da and Final D; specific upper-middle K1/K2/Axis fields for their limited planning or validation roles."),
+                ("Show 2 Exams Topometric", "One bilateral comparison page", "For each eye: Cornea Front K1/K2/axes/Km/Astig; Cornea Back Km and Rmin; center 8-mm indices including ISV, IVA, KI, CKI, IHA, IHD, RMin, TKC, KISA, and signed I-S."),
+                ("Excimer treatment card", "Optional sixth image", "Only the labeled Düzeltme Miktarı row may supply treatment correction. If absent, the surgeon provides complete manifest and intended refraction for both eyes."),
+            ), "All five Pentacam pages must be identified before targeted rereading, geometric SRAX analysis, clinical scoring, or report generation. A duplicate page never substitutes for a missing source family."),
+            ("Source-locked field map", ("Registered region", "Accepted fields", "Prohibited substitution"), (
+                ("Show 2 → Cornea Front", "K1, K1 axis, K2, K2 axis, printed Km, Astig and steep axis", "No Cornea Back, Kmax, True Net Power, map spot, or calculated mean"),
+                ("Show 2 → Cornea Back", "Printed posterior Km and posterior Rmin", "No Cornea Front Rmin or center topometric RMin"),
+                ("Show 2 → center Indices (8 mm)", "ISV, IVA, KI, CKI, IHA, IHD, topometric RMin, TKC, KISA, signed I-S", "No index may substitute for I-S; preserve the printed sign"),
+                ("4 Maps → lower-left labeled box", "Pupil Center pachymetry, Thinnest Location pachymetry, K Max (Front), HWTW", "No Pachy Vertex, map color/spot, or neighboring number"),
+                ("BAD → elevation row", "Signed F.Ele.Th and B.Ele.Th in µm", "No elevation-map spot, K field, or unlabeled value"),
+                ("BAD → Progression Index", "PPI Min/Avg/Max and ARTmax", "No back-calculation of Dp or Da"),
+                ("BAD → bottom D strip", "Df, Db, Dp, Dt, Da, Final D", "No reconstruction of any component or Final D"),
+            ), "The registry distinguishes fields that look similar. In particular, posterior Rmin and center topometric RMin are separate measurements, and BAD upper-middle K1/K2 are reserved for the ML7 planning role rather than general scoring keratometry."),
+            ("From image to auditable report", ("Stage", "What CER-AI does", "Safety behavior"), (
+                ("1. Page identity", "Confirms screen family, OD/OS laterality, patient/exam identity, and the five-source set", "Assessment does not start when a mandatory source is missing or unidentified"),
+                ("2. Primary transcription", "Reads labeled numeric boxes and records exact canonical source IDs", "Wrong-screen or inferred values are rejected"),
+                ("3. Reconciliation", "Merges readings only when field, eye, and source agree", "Same-source disagreement clears the field; it is never averaged"),
+                ("4. Targeted reread", "Re-examines the exact missing or unreadable box", "The prompt remains field- and source-specific"),
+                ("5. Surgeon completion", "Accepts an explicit surgeon-entered or confirmed value where permitted", "Surgeon input is authoritative and labeled SURGEON_CONFIRMED"),
+                ("6. Clinical adapter/report", "Maps resolved values into ERSS, BAD-D, NICE, PS3, safety, then copies computed results and provenance into the report", "The PDF/Word renderer does not rescore the case"),
+            ), "The image model transcribes dates and printed values; deterministic code calculates age, refraction normalization, SRAX geometry, scores, safety formulas, and final disposition."),
+        ),
+        "topometric-indices": (
+            ("What each 8-mm topometric index describes", ("Index", "Technical meaning", "CER-AI role"), (
+                ("ISV", "Standard deviation of individual sagittal radii from mean curvature; a global surface-irregularity descriptor", "Reported context; not an independent CER-AI disposition gate"),
+                ("IVA", "Mean superior–inferior curvature difference relative to the horizontal meridian", "Reported context; not substituted for signed I-S"),
+                ("KI", "Ratio of mean radius values in the superior and inferior corneal halves", "Reported context"),
+                ("CKI", "Ratio of peripheral-ring to central-ring mean radius; emphasizes central steepening", "Reported context"),
+                ("IHA", "Mean superior–inferior difference in corneal elevation along the horizontal meridian", "Reported context"),
+                ("IHD", "Vertical decentration of elevation data derived by Fourier analysis on a 3-mm-radius ring", "Reported context"),
+                ("RMin", "Smallest axial/sagittal curvature radius across the measurement area", "Center topometric index; distinct from posterior Cornea Back Rmin"),
+                ("TKC", "Pentacam anterior-surface topographic keratoconus classification", "Reported device classification; not an autonomous CER-AI diagnosis"),
+                ("KISA%", "Composite of central K, I-S, corneal astigmatism, and SRAX", "Reported device index; CER-AI does not reverse-engineer its inputs from KISA"),
+                ("Signed I-S", "Printed inferior–superior dioptric asymmetry with sign preserved", "Direct numeric input to CER-AI ERSS topography and NICE; never replaced by ISV/IVA/IHD/IHA/KISA"),
+            ), "Definitions follow the OCULUS Pentacam Interpretation Guide. Device colors and thresholds describe the Pentacam reference framework; CER-AI preserves these indices as source-linked context unless a separate canonical pathway explicitly names the field."),
+        ),
         "randleman-erss": (
             ("CER-AI ERSS component scoring", ("Component", "Current operational rule", "Points"), (
                 ("Topography", "Normal/symmetric; asymmetric bow-tie; inferior steepening/SRAX; abnormal/ectatic", "0; 1; 3; 4"),
@@ -550,6 +606,58 @@ TECHNICAL_TABLES = {
         ),
     },
     "tr": {
+        "pentacam-education": (
+            ("Cerrah yüklemesi ve kaynak doğrulaması", ("Zorunlu görüntü", "Cerrahın tanımlaması/doğrulaması", "Görüntü alma gerekliliği"), (
+                ("1. 4 Maps Refractive — OD", "Sağ göz; 4 Maps Refractive", "Tam ekran, doğrudan karşıdan alınmış"),
+                ("2. 4 Maps Refractive — OS", "Sol göz; 4 Maps Refractive", "Tam ekran, doğrudan karşıdan alınmış"),
+                ("3. Belin/Ambrósio BAD Display — OD", "Sağ göz; BAD Display", "Alt D şeridi ve etiketli kutular görünür tam ekran"),
+                ("4. Belin/Ambrósio BAD Display — OS", "Sol göz; BAD Display", "Alt D şeridi ve etiketli kutular görünür tam ekran"),
+                ("5. Show 2 Exams Topometric", "Bilateral karşılaştırma; OD ve OS panelleri tanımlı", "Cornea Front, Cornea Back ve orta indeksler okunur tam ekran"),
+            ), "Cerrah beş Pentacam kaynak görüntüsünün tamamını yüklemeli ve doğrulamalıdır. Net ekran görüntüsü veya ekrana dik, doğrudan karşıdan çekilmiş fotoğraf kullanın; açılı çekim kullanmayın. Bulanıklık, parlama, perspektif bozulması, sıkıştırma, kırpma, gölge ve kapalı etiketlerden kaçının. Düşük görüntü kalitesi alanı okunamaz veya tutarsız yapabilir; CER-AI değer tahmin etmek yerine daha net kaynak istemelidir. Net görüntü alma tutarlılığı destekler ancak klinik doğruluğu garanti etmez."),
+            ("Standart 4 Maps Refractive kadran yerleşimi", ("Ekran konumu", "Zorunlu yazılı harita tipi", "CER-AI kullanımı ve çelişki kuralı"), (
+                ("Sol üst", "Axial/Sagittal Curvature (Front)", "Deterministik SRAX geometri katmanı yalnız bu anterior/ön eğrilik haritasını kullanır."),
+                ("Sağ üst", "Elevation (Front)", "Ön elevasyon örüntüsü incelemesi; BAD Display'deki etiketli F.Ele.Th değerinin yerine geçmez."),
+                ("Sol alt", "Corneal Thickness / Pachymetry", "Uzaysal kalınlık örüntüsü incelemesi; karar alanları yine etiketli Pupil Center ve Thinnest Location değerlerinden gelir."),
+                ("Sağ alt", "Elevation (Back)", "Arka elevasyon örüntüsü incelemesi; BAD Display B.Ele.Th veya Show 2 Cornea Back değerlerinin yerine geçmez."),
+            ), "CER-AI standart ve tam 4 Maps Refractive yerleşimini ister; yazılı harita etiketini ve kadran konumunu birlikte doğrular. Özel/yeniden düzenlenmiş dört-harita yerleşimi yüklemeyin ve anterior sagittal eğrilik haritasını sağ taraftaki bir kadrana yerleştirmeyin. Etiket–konum uyumsuzluğu, ön/arka ikamesi, döndürme veya kırpma kaynak çelişkisidir; standart dışa aktarım ya da net karşıdan çekimle düzeltilmelidir."),
+            ("Zorunlu Pentacam kaynak kümesi", ("Kaynak görüntü", "Zorunlu küme", "CER-AI çıkarım rolü"), (
+                ("4 Maps Refractive", "Bir OD ve bir OS", "Pupil Center pakimetrisi, daireyle işaretli Thinnest Location, K Max (Front), HWTW ve çekim/kimlik kanıtı; Axial/Sagittal Curvature (Front) haritası deterministik SRAX geometrisini sağlar."),
+                ("Belin/Ambrósio BAD Display", "Bir OD ve bir OS", "İşaretli F.Ele.Th ve B.Ele.Th; PPI Min/Avg/Max ve ARTmax; Df/Db/Dp/Dt/Da ve Final D; sınırlı planlama veya doğrulama rolleri için belirli üst-orta K1/K2/Axis alanları."),
+                ("Show 2 Exams Topometric", "Bir bilateral karşılaştırma sayfası", "Her göz için: Cornea Front K1/K2/eksenler/Km/Astig; Cornea Back Km ve Rmin; ISV, IVA, KI, CKI, IHA, IHD, RMin, TKC, KISA ve işaretli I-S dahil orta 8 mm indeksleri."),
+                ("Eksimer tedavi kartı", "İsteğe bağlı altıncı görüntü", "Yalnız etiketli Düzeltme Miktarı satırı tedavi düzeltmesini sağlayabilir. Kart yoksa cerrah iki göz için tam manifest ve hedeflenen refraksiyonu girer."),
+            ), "Hedefli yeniden okuma, geometrik SRAX analizi, klinik skorlama veya rapor üretiminden önce beş Pentacam sayfasının tamamı tanımlanmalıdır. Yinelenen sayfa eksik kaynak ailesinin yerine geçmez."),
+            ("Kaynağı kilitli alan haritası", ("Kayıtlı bölge", "Kabul edilen alanlar", "Yasak ikame"), (
+                ("Show 2 → Cornea Front", "K1, K1 ekseni, K2, K2 ekseni, yazılı Km, Astig ve dik eksen", "Cornea Back, Kmax, True Net Power, harita noktası veya hesaplanmış ortalama yok"),
+                ("Show 2 → Cornea Back", "Yazılı posterior Km ve posterior Rmin", "Cornea Front Rmin veya orta topometrik RMin yok"),
+                ("Show 2 → orta Indices (8 mm)", "ISV, IVA, KI, CKI, IHA, IHD, topometrik RMin, TKC, KISA, işaretli I-S", "Hiçbir indeks I-S yerine geçmez; yazılı işaret korunur"),
+                ("4 Maps → sol-alt etiketli kutu", "Pupil Center pakimetrisi, Thinnest Location pakimetrisi, K Max (Front), HWTW", "Pachy Vertex, harita rengi/noktası veya komşu sayı yok"),
+                ("BAD → elevasyon satırı", "µm cinsinden işaretli F.Ele.Th ve B.Ele.Th", "Elevasyon haritası noktası, K alanı veya etiketsiz değer yok"),
+                ("BAD → Progression Index", "PPI Min/Avg/Max ve ARTmax", "Dp veya Da geriye doğru hesaplanmaz"),
+                ("BAD → alt D şeridi", "Df, Db, Dp, Dt, Da, Final D", "Hiçbir bileşen veya Final D yeniden oluşturulmaz"),
+            ), "Kayıt sistemi benzer görünen alanları ayırır. Posterior Rmin ile orta topometrik RMin ayrı ölçümlerdir; BAD üst-orta K1/K2 ise genel skorlama keratometrisi değil, ML7 planlama rolüne ayrılmıştır."),
+            ("Görüntüden denetlenebilir rapora", ("Aşama", "CER-AI ne yapar?", "Güvenlik davranışı"), (
+                ("1. Sayfa kimliği", "Ekran ailesi, OD/OS tarafı, hasta/inceleme kimliği ve beş kaynaklı kümeyi doğrular", "Zorunlu kaynak eksik veya tanımsızsa değerlendirme başlamaz"),
+                ("2. Birincil yazıya aktarma", "Etiketli sayısal kutuları okur ve kesin kanonik kaynak kimliklerini kaydeder", "Yanlış ekran veya çıkarıma dayalı değer reddedilir"),
+                ("3. Uzlaştırma", "Okumaları yalnız alan, göz ve kaynak uyuştuğunda birleştirir", "Aynı kaynak çelişkisi alanı temizler; ortalama alınmaz"),
+                ("4. Hedefli yeniden okuma", "Tam eksik veya okunamayan kutuyu yeniden inceler", "İstem alan ve kaynağa özgü kalır"),
+                ("5. Cerrah tamamlaması", "İzin verilen durumda açık cerrah girişi veya doğrulamasını kabul eder", "Cerrah girdisi yetkilidir ve SURGEON_CONFIRMED olarak etiketlenir"),
+                ("6. Klinik adaptör/rapor", "Çözülmüş değerleri ERSS, BAD-D, NICE, PS3 ve güvenliğe eşler; hesaplanmış sonuçlar ile kökeni rapora kopyalar", "PDF/Word oluşturucu olguyu yeniden skorlamaz"),
+            ), "Görüntü modeli tarihleri ve yazılı değerleri aktarır; deterministik kod yaş, refraksiyon normalizasyonu, SRAX geometrisi, skorlar, güvenlik formülleri ve nihai kararı hesaplar."),
+        ),
+        "topometric-indices": (
+            ("Her 8 mm topometrik indeks neyi tanımlar?", ("İndeks", "Teknik anlam", "CER-AI rolü"), (
+                ("ISV", "Tek tek sagittal yarıçapların ortalama eğrilikten standart sapması; global yüzey düzensizliği tanımlayıcısı", "Raporlanan bağlam; bağımsız CER-AI karar kapısı değildir"),
+                ("IVA", "Horizontal meridyene göre ortalama superior–inferior eğrilik farkı", "Raporlanan bağlam; işaretli I-S yerine kullanılmaz"),
+                ("KI", "Korneanın üst ve alt yarısındaki ortalama yarıçap değerlerinin oranı", "Raporlanan bağlam"),
+                ("CKI", "Periferik halka ile santral halka ortalama yarıçap oranı; santral dikleşmeyi vurgular", "Raporlanan bağlam"),
+                ("IHA", "Horizontal meridyen boyunca superior–inferior korneal elevasyonun ortalama farkı", "Raporlanan bağlam"),
+                ("IHD", "3 mm yarıçaplı halkada Fourier analiziyle hesaplanan elevasyon verisinin vertikal desantralizasyonu", "Raporlanan bağlam"),
+                ("RMin", "Tüm ölçüm alanındaki en küçük aksiyel/sagittal eğrilik yarıçapı", "Orta topometrik indeks; posterior Cornea Back Rmin'den farklıdır"),
+                ("TKC", "Pentacam ön yüz topografik keratokonus sınıflaması", "Raporlanan cihaz sınıflaması; otonom CER-AI tanısı değildir"),
+                ("KISA%", "Santral K, I-S, korneal astigmatizma ve SRAX'ın bileşik indeksi", "Raporlanan cihaz indeksi; CER-AI girdileri KISA'dan geriye doğru üretmez"),
+                ("İşaretli I-S", "İşareti korunmuş yazılı inferior–superior diyoptrik asimetri", "CER-AI ERSS topografisi ve NICE için doğrudan sayısal girdi; ISV/IVA/IHD/IHA/KISA ile değiştirilmez"),
+            ), "Tanımlar OCULUS Pentacam Yorumlama Rehberi'ni izler. Cihaz renkleri ve eşikleri Pentacam referans çerçevesini tanımlar; ayrı bir kanonik yol alanı açıkça adlandırmadıkça CER-AI bu indeksleri kaynağa bağlı bağlam olarak korur."),
+        ),
         "randleman-erss": (
             ("CER-AI ERSS bileşen puanlaması", ("Bileşen", "Güncel operasyonel kural", "Puan"), (
                 ("Topografi", "Normal/simetrik; asimetrik papyon; inferior dikleşme/SRAX; anormal/ektatik", "0; 1; 3; 4"),
@@ -671,7 +779,7 @@ def _head(base: str, canonical_path: str, title: str, description: str, robots: 
 <link rel="alternate" hreflang="tr" href="{base}{turkish_path}">
 <link rel="alternate" hreflang="x-default" href="{base}{english_path}">
 <link rel="describedby" type="text/markdown" href="{base}/llms.txt">
-<link rel="stylesheet" href="/static/technical-public.css?v=3">
+<link rel="stylesheet" href="/static/technical-public.css?v=4">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=8">
 <meta name="theme-color" content="#05090d">
 <script type="application/ld+json">{json.dumps(schema, ensure_ascii=False, separators=(",", ":"))}</script>"""
