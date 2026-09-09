@@ -79,7 +79,7 @@ def test_model_contains_every_canonical_clinical_report_section_without_recalcul
         "Procedural safety", "Procedure planning", "Decision basis",
         "Canonical Pentacam values and provenance", "Version provenance",
     ]
-    assert ["Total", "0"] in _section(model, "OD", "Randleman / ERSS")
+    assert ["Total", "0", ""] in _section(model, "OD", "Randleman / ERSS")
     assert any(row[0] == "Final BAD-D" and row[1] == "1" for row in _section(model, "OD", "Belin/Ambrósio BAD-D"))
     assert any(
         row[0] == "Selected LASIK plan"
@@ -96,7 +96,7 @@ def test_model_contains_every_canonical_clinical_report_section_without_recalcul
 
 def test_safe_plan_and_ml7_hinge_vacuum_ring_are_green_without_highlighting_blade():
     rows = _section(
-        reports.canonical_report_model(_payload(ml7_bad_k1_d=40, ml7_bad_k2_d=45)),
+        reports.canonical_report_model(_payload(ml7_k1_d=40, ml7_k2_d=45)),
         "OD",
         "Procedure planning",
     )
@@ -142,7 +142,23 @@ def test_ps3_report_uses_canonical_findings_and_exposes_exact_trigger():
     assert ppi[1] == "MODERATE"
     assert "PPI Average 1.3 > 1.20" in ppi[2]
     assert any(row[0] == "Procedure disposition" and row[1] == "PASS" for row in rows)
-    assert any(row[0] == "Procedure disposition" and "lasik: DEFER" in row[2] for row in rows)
+    assert any(row[0] == "Procedure disposition" and "Raw PS3 PRK disposition: ALLOWED" in row[2] for row in rows)
+
+
+def test_erss_ectatic_stop_is_explained_and_highlighted_in_owning_section():
+    model = reports.canonical_report_model(_payload(I_S=1.4))
+    rows = _section(model, "OD", "Randleman / ERSS")
+    trigger = next(row for row in rows if row[0] == "Decision trigger")
+    assert trigger[1] == "STOP-DEFER"
+    assert "topography: ABNORMAL_ECTATIC (4 points)" in trigger[2]
+    assert "signed I-S: 1.4 D" in trigger[2]
+    assert reports._cell_palette(trigger, 0) == (reports.RED, reports.RED_FILL)
+    assert reports._cell_palette(trigger, 2) == (reports.RED, reports.RED_FILL)
+
+
+def test_decision_basis_stop_and_caution_rows_use_risk_colors():
+    assert reports._cell_palette(["STOP", "canonical driver"], 1) == (reports.RED, reports.RED_FILL)
+    assert reports._cell_palette(["CAUTION", "canonical driver"], 1) == (reports.AMBER, reports.AMBER_FILL)
 
 
 def test_pdf_and_docx_use_same_model_and_do_not_mutate_canonical_snapshot():

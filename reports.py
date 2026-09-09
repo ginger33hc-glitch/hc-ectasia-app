@@ -63,8 +63,8 @@ FIELD_LABELS = {
     "K1_D": "K1", "K1_axis_deg": "K1 axis", "K2_D": "K2",
     "K2_axis_deg": "K2 axis", "Kmean_D": "Km",
     "topographic_astig_D": "Astigmatism",
-    "ml7_bad_k1_d": "ML7 K1 (BAD Display)",
-    "ml7_bad_k2_d": "ML7 K2 (BAD Display)",
+    "ml7_k1_d": "ML7 K1 (Four Maps Anterior Sagittal Curvature)",
+    "ml7_k2_d": "ML7 K2 (Four Maps Anterior Sagittal Curvature)",
     "bad_flat_axis_deg": "PS3 BAD Axis (flat meridian, beside K1)",
     "topographic_steep_axis_deg": "Displayed steep/astigmatic axis",
     "Rmin_mm": "Posterior Rmin", "topometric_RMin": "Topometric RMin",
@@ -112,6 +112,19 @@ def _status_palette(value):
 
 def _cell_palette(row, index, selected_plan_status=None):
     label = str(row[0]).strip().lower()
+    # Highlight the whole row when it carries a canonical caution/stop. The
+    # renderer recognizes disposition labels only; it never derives risk.
+    row_status = {
+        "stop": "STOP-DEFER",
+        "caution": "CAUTION",
+    }.get(label)
+    if row_status is None:
+        for value in row:
+            row_status = _status_palette(value)
+            if row_status in {(RED, RED_FILL), (AMBER, AMBER_FILL)}:
+                return row_status
+    else:
+        return _status_palette(row_status)
     safe_plan_rows = {
         "selected lasik plan",
         "ml7 preferred hinge location",
@@ -208,23 +221,34 @@ def assert_complete_report_payload(payload: Mapping[str, Any]) -> list[dict[str,
 
 def _report_sections(report: Mapping[str, Any]) -> list[tuple[str, list[list[str]]]]:
     sections: list[tuple[str, list[list[str]]]] = []
+    section_drivers = report.get("section_drivers") or {}
+
+    def add_triggers(rows, section):
+        for finding in section_drivers.get(section) or []:
+            rows.append([
+                "Decision trigger",
+                _text(finding.get("status")),
+                _text(finding.get("detail")),
+            ])
+
     procedure = str(report.get("procedure") or "")
     randleman = report.get("randleman")
     if isinstance(randleman, Mapping):
-        rows = [["Component", "Points"]]
+        rows = [["Component", "Points / disposition", "Exact finding"]]
         for key in ("topography", "RSB", "age", "pachymetry", "MRSE"):
-            rows.append([ERSS_LABELS[key], _text((randleman.get("rows") or {}).get(key))])
+            rows.append([ERSS_LABELS[key], _text((randleman.get("rows") or {}).get(key)), ""])
         rows.extend([
-            ["Total", _text(randleman.get("total"))],
-            ["Topography category", _text(randleman.get("category"))],
-            ["Disposition", _text(randleman.get("status"))],
+            ["Total", _text(randleman.get("total")), ""],
+            ["Topography category", _text(randleman.get("category")), ""],
+            ["Disposition", _text(randleman.get("status")), ""],
         ])
     else:
-        rows = [["Component", "Points"]] + [
-            [ERSS_LABELS[key], "Not applicable to selected procedure"]
+        rows = [["Component", "Points / disposition", "Exact finding"]] + [
+            [ERSS_LABELS[key], "Not applicable to selected procedure", ""]
             for key in ("topography", "RSB", "age", "pachymetry", "MRSE")
         ]
-        rows.append(["Disposition", "NOT APPLICABLE"])
+        rows.append(["Disposition", "NOT APPLICABLE", ""])
+    add_triggers(rows, "randleman")
     sections.append(("Randleman / ERSS", rows))
 
     nice = report.get("nice") or {}
@@ -233,16 +257,20 @@ def _report_sections(report: Mapping[str, Any]) -> list[tuple[str, list[list[str
     for key in ("K2", "central_pachymetry", "B_Ele_Th", "I_S"):
         nice_rows.append([key, _text((nice.get("values") or {}).get(value_keys[key])), _text((nice.get("rows") or {}).get(key))])
     nice_rows.extend([["Total", "", _text(nice.get("total"))], ["Classification", _text(nice.get("category")), _text(nice.get("status"))]])
+    add_triggers(nice_rows, "nice")
     sections.append(("NICE", nice_rows))
 
     ps3 = report.get("ps3") or {}
     ps3_rows = [["Factor", "Status", "Exact finding"]]
     for finding in ps3.get("findings") or []:
         ps3_rows.append([_text(finding.get("key")), _text(finding.get("status")), _text(finding.get("detail"))])
+    ps3_decision = ps3.get("decision") or {}
+    ps3_disposition_detail = ps3_decision.get("detail") or _text(ps3.get("disposition"))
     ps3_rows.extend([
         ["Moderate / High", _text(ps3.get("moderate_count")), _text(ps3.get("high_count"))],
-        ["Procedure disposition", _text(ps3.get("status")), _text(ps3.get("disposition"))],
+        ["Procedure disposition", _text(ps3.get("status")), ps3_disposition_detail],
     ])
+    add_triggers(ps3_rows, "ps3")
     sections.append(("PS3", ps3_rows))
 
     disparity = report.get("astigmatic_disparity") or {}
@@ -266,10 +294,13 @@ def _report_sections(report: Mapping[str, Any]) -> list[tuple[str, list[list[str
         interpretation = (bad.get("component_interpretations") or {}).get(key) or {}
         bad_rows.append([label, _text(context.get(key)),
                          f"{interpretation.get('classification', 'UNAVAILABLE')} / {interpretation.get('range', 'Not documented')}; information only"])
+    add_triggers(bad_rows, "bad")
     sections.append(("Belin/Ambrósio BAD-D", bad_rows))
 
     safety = report.get("tissue_safety") or {}
-    sections.append(("Procedural safety", [["Parameter", "Canonical result"]] + [[key, _text(value)] for key, value in safety.items()]))
+    safety_rows = [["Parameter", "Canonical result", "Exact finding"]] + [[key, _text(value), ""] for key, value in safety.items()]
+    add_triggers(safety_rows, "tissue_safety")
+    sections.append(("Procedural safety", safety_rows))
     planning = report.get("planning") or {}
     planning_rows = [["Planning item", "Canonical result"], ["Procedure", procedure]]
     for key, value in planning.items():
@@ -379,7 +410,7 @@ def build_pdf(payload: Mapping[str, Any]) -> bytes:
     styles.add(ParagraphStyle(name="Warning", parent=styles["Notice"], textColor=_rl(AMBER), backColor=_rl(AMBER_FILL)))
     output = BytesIO()
     doc = SimpleDocTemplate(output, pagesize=letter, leftMargin=.65 * inch, rightMargin=.65 * inch, topMargin=.65 * inch, bottomMargin=.75 * inch)
-    story = [Paragraph(tr("CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT"), styles["CERTitle"]), Paragraph(escape(PROGRAM_NAME), styles["Cell"]), Spacer(1, 6), Paragraph(escape(liability_notice(locale)), styles["Notice"])]
+    story = [Paragraph(tr("CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT"), styles["CERTitle"]), Paragraph(escape(tr(PROGRAM_NAME)), styles["Cell"]), Spacer(1, 6), Paragraph(escape(liability_notice(locale)), styles["Notice"])]
     story.append(Spacer(1, REPORT_BLANK_LINE_PT))
     patient = model["patient"]
     story.append(_pdf_table([
@@ -506,7 +537,7 @@ def build_docx(payload: Mapping[str, Any]) -> bytes:
     title = document.add_paragraph(); title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     title.paragraph_format.line_spacing = Pt(20); title.paragraph_format.space_after = Pt(4)
     run = title.add_run(tr("CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT")); run.bold = True; run.font.size = Pt(17); run.font.color.rgb = RGBColor.from_string(NAVY)
-    subtitle = document.add_paragraph(PROGRAM_NAME); subtitle.paragraph_format.space_after = Pt(6)
+    subtitle = document.add_paragraph(tr(PROGRAM_NAME)); subtitle.paragraph_format.space_after = Pt(6)
     notice = _docx_notice(document, liability_notice(locale), GRAY, GRAY_FILL)
     notice.paragraph_format.space_after = Pt(8 + REPORT_BLANK_LINE_PT)
     patient = model["patient"]

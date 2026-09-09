@@ -83,8 +83,6 @@ def _refraction(mapping: Mapping[str, Any], prefix: str):
         if entered_sphere is None or signed_cylinder is None:
             return None
         axis = _raw_axis(mapping, prefix)
-        if abs(signed_cylinder) <= 1e-12 and axis is None:
-            axis = 0.0
         if axis is None:
             return None
         return normalize_minus_cylinder(entered_sphere, signed_cylinder, axis)
@@ -99,8 +97,6 @@ def _refraction(mapping: Mapping[str, Any], prefix: str):
         if sphere is None or magnitude is None:
             return None
         axis = _normalized_axis(mapping, prefix)
-        if abs(magnitude) <= 1e-12 and axis is None:
-            axis = 0.0
         if axis is None:
             return None
         return normalize_minus_cylinder(sphere, -abs(magnitude), axis)
@@ -211,6 +207,8 @@ def _copy_manifest_to_intended(plan: dict[str, Any]) -> None:
         plan.get("manifest_cylinder_signed_D"),
     )
     if all(value is not None for value in manifest_raw):
+        if any(abs(float(value)) <= 1e-12 for value in manifest_raw):
+            return
         plan["intended_entered_sphere_D"] = manifest_raw[0]
         plan["intended_cylinder_signed_D"] = manifest_raw[1]
         axis = _raw_axis(plan, "manifest")
@@ -223,6 +221,8 @@ def _copy_manifest_to_intended(plan: dict[str, Any]) -> None:
         plan.get("manifest_cylinder_magnitude_D"),
     )
     if all(value is not None for value in manifest_normalized):
+        if any(abs(float(value)) <= 1e-12 for value in manifest_normalized):
+            return
         plan["intended_sphere_D"] = manifest_normalized[0]
         plan["intended_cylinder_magnitude_D"] = manifest_normalized[1]
         axis = _normalized_axis(plan, "manifest")

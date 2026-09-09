@@ -118,7 +118,7 @@ window.HCReadiness = class {
   constructor(panel) { this.panel=panel; this.regionUrls=[]; this.reset(); }
   reset() {
     for(const url of this.regionUrls||[])URL.revokeObjectURL(url);
-    this.regionUrls=[];this.token=null;this.overrides={};this.hasCompletableInputs=false;this.requiresSourceReplacement=false;this.panel.hidden=true;this.panel.replaceChildren();
+    this.regionUrls=[];this.token=null;this.overrides={};this.sourceConfirmations={};this.hasCompletableInputs=false;this.requiresSourceReplacement=false;this.panel.hidden=true;this.panel.replaceChildren();
   }
   async loadSourceRegion(container,item,index=0) {
     const tr=value=>window.CERAI_I18N?.translate(value)??value;
@@ -148,6 +148,12 @@ window.HCReadiness = class {
       (this.overrides[input.dataset.eye]??={})[input.dataset.measurement]=value;
     }
     return this.overrides;
+  }
+  collectSourceConfirmations() {
+    for(const input of this.panel.querySelectorAll('[data-source-confirmation]')) {
+      if(input.value)this.sourceConfirmations[input.dataset.sourceConfirmation]=input.value;
+    }
+    return this.sourceConfirmations;
   }
   show(response) {
     for(const url of this.regionUrls||[])URL.revokeObjectURL(url);
@@ -191,12 +197,17 @@ window.HCReadiness = class {
           input.addEventListener('input',()=>{original.value=input.value;original.setCustomValidity('');original.dispatchEvent(new Event('input',{bubbles:true}));});
           input.addEventListener('change',()=>{original.value=input.value;original.dispatchEvent(new Event('change',{bubbles:true}));});
         }
-      }else if(item.kind==='number'||item.kind==='select') {
-        input=document.createElement(item.kind==='select'?'select':'input');
-        if(item.kind==='select')for(const value of ['',...(item.options||[])]){const option=document.createElement('option');option.value=value;option.textContent=tr(value||'Select');input.append(option);}
+      }else if(item.kind==='number'||item.kind==='select'||item.kind==='confirmation') {
+        input=document.createElement(item.kind==='number'?'input':'select');
+        if(item.kind!=='number')for(const value of ['',...(item.options||[])]){const option=document.createElement('option');option.value=value;option.textContent=tr(value||'Select');input.append(option);}
         else {input.type='text';input.inputMode='decimal';input.autocomplete='off';}
-        input.dataset.measurement=item.key;input.dataset.eye=item.eye;
-        input.value=this.overrides[item.eye]?.[item.key]??'';
+        if(item.destination==='source_confirmation'){
+          input.dataset.sourceConfirmation=item.key;
+          input.value=this.sourceConfirmations[item.key]??'';
+        }else{
+          input.dataset.measurement=item.key;input.dataset.eye=item.eye;
+          input.value=this.overrides[item.eye]?.[item.key]??'';
+        }
       }
       if(input){this.hasCompletableInputs=true;input.id=`completion_${seen.size}`;label.htmlFor=input.id;row.append(input);}
       else {
@@ -209,6 +220,14 @@ window.HCReadiness = class {
           replace.addEventListener('click',()=>window.CER_AI_SourceImageRetention?.openPicker());
           row.append(replace);
         }
+      }
+      if(item.destination==='source_confirmation'){
+        this.requiresSourceReplacement=true;
+        const replace=document.createElement('button');replace.type='button';replace.className='secondary';
+        replace.textContent=window.CERAI_I18N?.locale==='tr'?'Görüntüleri kontrol et / ekle':'Check/add images';
+        replace.addEventListener('click',()=>window.CER_AI_SourceImageRetention?.openPicker());
+        row.append(replace);
+        const help=document.createElement('span');help.textContent=tr(item.help);row.append(help);
       }
       this.panel.append(row);
     }

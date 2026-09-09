@@ -9,7 +9,17 @@ exam date. Dates printed on BAD Display, Show 2 Exams Topometric, or any other
 uploaded Pentacam source are excluded entirely from exam-date reconciliation.
 """
 from datetime import date
+from copy import deepcopy
 import re
+
+
+EXAM_DATE_CONFLICT_ISSUE = "Conflicting Pentacam examination dates across uploaded sources."
+EXAM_DATE_CONFIRMATION_KEY = "pentacam_exam_date_conflict"
+EXAM_DATE_APPROVAL = "APPROVE_CONTINUE"
+EXAM_DATE_APPROVAL_WARNING = (
+    "PENTACAM EXAMINATION DATE CONFLICT: automated readings could not be reconciled; "
+    "the surgeon reviewed the uploaded Four Maps headers and approved continuation."
+)
 
 
 def _valid_iso(year, month, day):
@@ -141,3 +151,69 @@ def promote_consistent_targeted_exam_dates(extractions) -> bool:
         context["exam_date"] = evidence["value"]
         evidence["promoted"] = True
     return True
+
+
+def merged_exam_date_evidence(extracted):
+    """Return display-only evidence from authoritative merged Four Maps contexts."""
+    evidence = []
+    for context in (extracted or {}).get("document_contexts") or []:
+        if context.get("document_type") != "PENTACAM_TOPOGRAPHY":
+            continue
+        eyes = [eye for eye in context.get("four_maps_eyes") or [] if eye in {"OD", "OS"}]
+        if not eyes:
+            continue
+        targeted = context.get("targeted_exam_date_reread_evidence") or {}
+        primary = context.get("primary_exam_date_reading", context.get("exam_date"))
+        evidence.append({
+            "source_filename": context.get("source_filename"),
+            "eyes": eyes,
+            "primary_reading": primary,
+            "targeted_reread": targeted.get("value"),
+            "effective_reading": context.get("exam_date"),
+        })
+    return evidence
+
+
+def apply_surgeon_exam_date_approval(extracted, source_confirmations):
+    """Resolve only this policy's blocker after explicit surgeon approval.
+
+    The source date readings are preserved. This records an approval rather than
+    rewriting either source date or declaring the automated readings consistent.
+    """
+    working = deepcopy(extracted)
+    if not isinstance(source_confirmations, dict):
+        raise ValueError("Source confirmations must be an object.")
+    if set(source_confirmations) - {EXAM_DATE_CONFIRMATION_KEY}:
+        raise ValueError("Unsupported source confirmation.")
+    decision = source_confirmations.get(EXAM_DATE_CONFIRMATION_KEY)
+    if decision is None:
+        return working
+    if decision != EXAM_DATE_APPROVAL:
+        raise ValueError("Invalid Pentacam examination-date confirmation.")
+    issues = list(working.get("critical_input_issues") or [])
+    if EXAM_DATE_CONFLICT_ISSUE not in issues:
+        already_approved = any(
+            item.get("key") == EXAM_DATE_CONFIRMATION_KEY
+            and item.get("decision") == EXAM_DATE_APPROVAL
+            for item in working.get("surgeon_source_confirmations") or []
+        )
+        if already_approved:
+            return working
+        raise ValueError("No unresolved Pentacam examination-date conflict is available for approval.")
+    working["critical_input_issues"] = [
+        issue for issue in issues if issue != EXAM_DATE_CONFLICT_ISSUE
+    ]
+    confirmation = {
+        "key": EXAM_DATE_CONFIRMATION_KEY,
+        "decision": EXAM_DATE_APPROVAL,
+        "evidence": merged_exam_date_evidence(working),
+    }
+    existing = [
+        item for item in working.get("surgeon_source_confirmations") or []
+        if item.get("key") != EXAM_DATE_CONFIRMATION_KEY
+    ]
+    working["surgeon_source_confirmations"] = existing + [confirmation]
+    working["identity_warnings"] = list(dict.fromkeys(
+        list(working.get("identity_warnings") or []) + [EXAM_DATE_APPROVAL_WARNING]
+    ))
+    return working

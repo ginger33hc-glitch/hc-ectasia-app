@@ -73,7 +73,7 @@ been validated here. Do not copy production patient storage or keys into staging
 
 - Replace reverse-KISA, inclusive-20 and PS3-22 SRAX instructions with shared geometric >20 evidence.
 - Replace anterior Rmin and tolerance/minimum/maximum reconciliation instructions with canonical source/conflict ownership.
-- Include PRK ERSS/shared ablation, automatic per-eye LASIK→PRK evaluation, PS3 >3 D activation/BAD flat axis, and ML7 dedicated BAD K fields.
+- Include PRK ERSS/shared ablation, automatic per-eye LASIK→PRK evaluation, PS3 >3 D activation/BAD flat axis, and ML7 dedicated 4 Maps Anterior Sagittal Curvature K fields.
 - Replace obsolete soft-lens 14-day operational text with the existing canonical 10-day readiness gate.
 - Correct matrix item 45 and distinguish earlier local audit evidence from later staging deployment and accepted report QA.
 

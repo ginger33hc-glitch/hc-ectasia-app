@@ -78,7 +78,7 @@ def test_actual_runtime_one_vs_two_scoring_cautions_and_report():
     assert presentation_class(eye["status"]) == "pass"
     assert reports._status_palette(eye["status"])[0] == reports.GREEN
     model = reports.canonical_report_model(one)
-    assert ["Disposition", "PASS"] in _section(model, "OD", "Randleman / ERSS")
+    assert ["Disposition", "PASS", ""] in _section(model, "OD", "Randleman / ERSS")
     assert ["Classification", "CAUTION", "CAUTION"] in _section(model, "OD", "NICE")
     two = _payload(I_S=1.03)
     assert two["decision"]["eyes"][0]["status"] == PASS_WITH_CAUTION

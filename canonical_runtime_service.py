@@ -243,8 +243,6 @@ def _intended_refraction_from_input(inp):
         return None
     cylinder = float(inp.intended_cylinder_d)
     axis = inp.intended_axis_deg
-    if abs(cylinder) <= 1e-12 and not _finite_number(axis):
-        axis = 0.0
     if not _finite_number(axis):
         return None
     return normalize_minus_cylinder(inp.intended_sphere_d, cylinder, axis)
@@ -460,8 +458,8 @@ def _non_lasik_planning(procedure, normalized, core_result):
 
 
 def _keratometry(source_eye: Mapping[str, Any]):
-    k1 = _plan_number(source_eye, "ml7_bad_k1_d")
-    k2 = _plan_number(source_eye, "ml7_bad_k2_d")
+    k1 = _plan_number(source_eye, "ml7_k1_d")
+    k2 = _plan_number(source_eye, "ml7_k2_d")
     if k1 is None or k2 is None:
         return None, None, None
     if k2 > k1:
@@ -472,11 +470,12 @@ def _keratometry(source_eye: Mapping[str, Any]):
 
 
 def _horizontal_wtw(source_eye: Mapping[str, Any]):
-    verified = source_eye.get("table_verified_numeric_fields")
-    if (
-        not isinstance(verified, (list, tuple, set))
-        or "corneal_diameter_mm" not in verified
-    ):
+    # HWTW may arrive either from the source-locked labeled Pentacam box or
+    # from the explicit surgeon-completion path.  Both paths retain distinct
+    # provenance; an unverified extraction remains prohibited.
+    verified = set(source_eye.get("table_verified_numeric_fields") or ())
+    surgeon_verified = set(source_eye.get("surgeon_verified_numeric_fields") or ())
+    if "corneal_diameter_mm" not in verified | surgeon_verified:
         return None
     return _plan_number(source_eye, "corneal_diameter_mm")
 

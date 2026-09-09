@@ -22,7 +22,7 @@ from typing import Any
 from PIL import Image, ImageOps
 from exam_date_reconciliation_policy import possible_calendar_dates
 from pentacam_canonical_source_lock import (
-    BAD, FOURMAPS, SHOW2, CANONICAL_FIELD_SOURCES, SHOW_2_CORNEA_BACK,
+    BAD, FOURMAPS, SHOW2, CANONICAL_FIELD_SOURCES, FOUR_MAPS_ANTERIOR_SAGITTAL, SHOW_2_CORNEA_BACK,
     SHOW_2_CORNEA_FRONT, SHOW_2_INDICES, canonical_source_id, source_family,
 )
 from pentacam_field_registry import (
@@ -422,6 +422,10 @@ def source_supports_field(screen_family: Any, field: str, group_label: Any = Non
         return group == "corneaback"
     if source_id == SHOW_2_INDICES:
         return any(token in group for token in ("indicesin8mmzone", "indices8mm", "indices"))
+    if source_id == FOUR_MAPS_ANTERIOR_SAGITTAL:
+        return "sagittalcurvature" in group and any(
+            token in group for token in ("anterior", "front")
+        )
     return True
 
 
@@ -463,8 +467,8 @@ def label_supports_field(field: str, printed_label: Any, group_label: Any = None
         "TKC": {"tkc"}, "F_Ele_Th_um": {"feleth", "felethum", "fronteleth"},
         "posterior_Kmean_D": {"km", "kmean", "kmeand"},
         "topographic_astig_D": {"astig", "astigd"},
-        "ml7_bad_k1_d": {"k1", "k1d"},
-        "ml7_bad_k2_d": {"k2", "k2d"},
+        "ml7_k1_d": {"k1", "k1d"},
+        "ml7_k2_d": {"k2", "k2d"},
         "bad_flat_axis_deg": {"axis"},
         "topographic_steep_axis_deg": {"axis", "axissteep", "steepaxis"},
         "B_Ele_Th_um": {"beleth", "belethum", "backeleth"},

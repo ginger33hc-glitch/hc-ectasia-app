@@ -19,6 +19,14 @@ def normalize_locale(value: Any) -> str:
 
 
 TR = {
+    "Corneal Ectasia Risk Assessment Intelligence": "Kornea Ektazi Risk Değerlendirme Zekâsı",
+    "definition": "Tanım",
+    "Applicability": "Uygulanabilirlik",
+    "Not applicable to selected non-LASIK procedure": "Seçilen LASIK dışı işlem için uygulanamaz",
+    "Points / disposition": "Puan / karar",
+    "Displayed component; not recalculated": "Gösterilen bileşen; yeniden hesaplanmadı",
+    "Information / QC only": "Yalnızca bilgi / kalite kontrolü",
+    "HWTW (mm; 4 Maps Refractive lower-left labeled box)": "HWTW (mm; 4 Maps Refractive sol alt etiketli kutu)",
     "Astigmatic disparity validation": "Astigmatik uyumsuzluk doğrulaması",
     "Magnitude difference": "Büyüklük farkı",
     "Axis difference": "Aks farkı",
@@ -39,8 +47,8 @@ TR = {
     "Posterior Rmin": "Arka yüz Rmin",
     "Displayed steep/astigmatic axis": "Ekrandaki dik / astigmatik aks",
     "PS3 BAD Axis (flat meridian, beside K1)": "PS3 BAD aksı (düz meridyen, K1 yanında)",
-    "ML7 K2 (BAD Display)": "ML7 K2 (BAD ekranı)",
-    "ML7 K1 (BAD Display)": "ML7 K1 (BAD ekranı)",
+    "ML7 K2 (Four Maps Anterior Sagittal Curvature)": "ML7 K2 (Four Maps Anterior Sagittal Curvature)",
+    "ML7 K1 (Four Maps Anterior Sagittal Curvature)": "ML7 K1 (Four Maps Anterior Sagittal Curvature)",
     "srax_algorithm": "SRAX algoritması",
     "source_registry": "Kaynak kaydı",
     "clinical_policy": "Klinik politika",
@@ -378,6 +386,7 @@ TR = {
 
 
 TR_CLINICAL = {
+    "Temporal hinge (default)": "Temporal menteşe (varsayılan)",
     "Plan A — flap 100 µm; optical zone 6.5 mm; transition zone 9.0 mm": "Plan A — flep 100 µm; optik zon 6,5 mm; geçiş zonu 9,0 mm",
     "Plan B — flap 100 µm; optical zone 6.0 mm; transition zone 8.5 mm": "Plan B — flep 100 µm; optik zon 6,0 mm; geçiş zonu 8,5 mm",
     "Plan C — flap 90 µm; optical zone 6.0 mm; transition zone 8.5 mm": "Plan C — flep 90 µm; optik zon 6,0 mm; geçiş zonu 8,5 mm",
@@ -401,7 +410,7 @@ TR_CLINICAL = {
     "Pachymetry <=500 µm: active ML7 reference recommends -10 blade when seeking a thinner flap/more residual stroma.": "Pakimetri <=500 µm: güncel ML7 referansı daha ince flep / daha fazla rezidüel stroma hedefleniyorsa -10 bıçak önerir.",
     "Active ML7 reference advises 580-590 mmHg when pachymetry is <530 µm, with corneal K taking priority.": "Güncel ML7 referansı, pakimetri <530 µm olduğunda korneal K öncelikli olmak üzere 580-590 mmHg önerir.",
     "Verified horizontal white-to-white (HWTW) unavailable: enter HWTW from the 4 Maps Refractive lower-left labeled box; no vacuum-ring recommendation was generated.": "Doğrulanmış yatay beyazdan beyaza mesafe (HWTW) mevcut değil: HWTW değerini 4 Maps Refractive ekranının sol alt etiketli kutusundan girin; vakum halkası önerisi oluşturulmadı.",
-    "ML7 K1/K2 unavailable: enter both from the BAD Display upper-middle numeric boxes; no vacuum-ring recommendation was generated.": "ML7 K1/K2 mevcut değil: her iki değeri BAD ekranının üst-orta sayısal kutularından girin; vakum halkası önerisi oluşturulmadı.",
+    "ML7 K1/K2 unavailable: enter both from the 4 Maps Refractive Anterior Sagittal Curvature (Front) labeled values; no vacuum-ring recommendation was generated.": "ML7 K1/K2 mevcut değil: her iki değeri 4 Maps Refractive Anterior Sagittal Curvature (Front) bölümündeki etiketli değerlerden girin; vakum halkası önerisi oluşturulmadı.",
     "Steepest K is outside the supplied nomogram range; no ring is inferred.": "En dik K, sağlanan nomogram aralığının dışındadır; halka seçimi yapılmamıştır.",
     "Recommendation only; surgeon must verify anatomy, device setup, and the active ML7 manual before use.": "Yalnızca öneridir; cerrah kullanımdan önce anatomiyi, cihaz ayarlarını ve güncel ML7 kılavuzunu doğrulamalıdır.",
     "Planning module runs only after a favorable LASIK assessment.": "Planlama modülü yalnızca uygun bir LASIK değerlendirmesinden sonra çalışır.",
@@ -477,6 +486,10 @@ TR_CLINICAL = {
 
 
 REPLACEMENTS = (
+    (
+        r"Astigmatic disparity within validation thresholds: magnitude difference ([\d.]+) D; axis difference ([\d.]+)°; no PS3 consequence\.",
+        r"Astigmatik uyumsuzluk doğrulama sınırları içindedir: büyüklük farkı \1 D; aks farkı \2°; PS3 sonucu etkilenmez.",
+    ),
     (r"(?<=\d) to (?=[<>])", " ile "),
     ('Manifest astigmatism ([\\d.]+) D and topographic astigmatism ([\\d.]+) D are both (<=?[\\d.]+) D; comparison inactive, no PS3 risk factor\\.', 'Manifest astigmatizma \\1 D ve topografik astigmatizma \\2 D; her ikisi de \\3 D. Karşılaştırma etkin değil; PS3 risk faktörü eklenmedi.'),
     ('Front-map SRAX ([\\d.]+)° (<=|>) ([\\d.]+)°\\. Source: Axial/Sagittal Curvature \\(Front\\)\\.', 'Ön yüz haritası SRAX \\1° \\2 \\3°. Kaynak: Axial/Sagittal Curvature (Front).'),

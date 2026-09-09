@@ -20,6 +20,13 @@ from pentacam_canonical_source_lock import canonical_source_region
 from pentacam_quality_policy import is_quality_only_issue
 from pentacam_source_regions import region_hints
 from patient_age_policy import apply_surgeon_age_precedence
+from exam_date_reconciliation_policy import (
+    EXAM_DATE_APPROVAL,
+    EXAM_DATE_CONFIRMATION_KEY,
+    EXAM_DATE_CONFLICT_ISSUE,
+    apply_surgeon_exam_date_approval,
+    merged_exam_date_evidence,
+)
 
 _lock = RLock()
 _sessions = {}
@@ -109,6 +116,38 @@ def missing_items(decision, extracted=None):
     return list(dict.fromkeys(items))
 
 
+def planning_missing_items(decision, extracted):
+    """Require source-complete ring planning after a favorable LASIK result.
+
+    This is a report-completion gate only.  It does not alter the clinical
+    assessment, plan selection, thresholds, or disposition.
+    """
+    source_eyes = {
+        eye.get("eye"): eye
+        for eye in (extracted or {}).get("eyes") or []
+        if eye.get("eye") in {"OD", "OS"}
+    }
+    items = []
+    for eye in decision.get("eyes") or []:
+        eye_id = eye.get("eye")
+        report = eye.get("report_payload") or {}
+        planning = report.get("planning") or {}
+        ml7 = report.get("microkeratome_planning") or {}
+        if (
+            eye_id not in source_eyes
+            or str(report.get("procedure") or "").upper() != "LASIK"
+            or not planning.get("selected_plan")
+            or not ml7.get("applicable")
+            or (ml7.get("vacuum_ring_mm") is not None and ml7.get("vacuum_pressure_mmhg") is not None)
+        ):
+            continue
+        source_eye = source_eyes[eye_id]
+        for field in ("ml7_k1_d", "ml7_k2_d", "corneal_diameter_mm"):
+            if not _finite(source_eye.get(field)):
+                items.append((eye_id, f"ML7 planning: {field}"))
+    return list(dict.fromkeys(items))
+
+
 def _with_region(item, extracted):
     hints = region_hints(extracted, item.get("eye"), item.get("key"))
     if hints:
@@ -165,6 +204,32 @@ def _request(eye, message, extracted):
     prefix = str(eye).lower()
     text = str(message)
     lower = text.lower()
+
+    if eye == "GLOBAL" and text == EXAM_DATE_CONFLICT_ISSUE:
+        readings = []
+        for item in merged_exam_date_evidence(extracted):
+            eye_text = "/".join(item.get("eyes") or []) or "unknown eye"
+            primary = item.get("primary_reading") or "unreadable"
+            targeted = item.get("targeted_reread") or "unreadable/not returned"
+            readings.append(f"{eye_text}: initial {primary}; focused reread {targeted}")
+        detail = "; ".join(readings)
+        return {
+            "eye": "GLOBAL",
+            "label": "Pentacam examination-date conflict — surgeon review required",
+            "kind": "confirmation",
+            "key": EXAM_DATE_CONFIRMATION_KEY,
+            "destination": "source_confirmation",
+            "options": [EXAM_DATE_APPROVAL],
+            "required_for": ["Source-date consistency"],
+            "source_screen": "4 Maps Refractive — OD and OS headers",
+            "source_box": "Examination date",
+            "help": (
+                "Inspect the examination date on both uploaded Four Maps headers. "
+                "Approve continuation only if both images belong to the same examination; "
+                "otherwise add or replace the incorrect image."
+                + (f" Automated readings: {detail}." if detail else "")
+            ),
+        }
 
     if text == "POST-REFRACTIVE PATHWAY REQUIRED":
         return {
@@ -448,7 +513,7 @@ def _resolve_patient_metadata(metadata, extracted, age):
     return patient, None
 
 
-def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
+def _respond(core, token, session, age, plans, modifiers, metadata, overrides, source_confirmations=None):
     if age is None:
         age = session["extracted"].get("derived_age_years")
     else:
@@ -482,6 +547,10 @@ def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
             overrides.setdefault(eye_id, {})["I_S"] = plan["surgeon_I_S_D"]
 
     extracted = _overrides(session["extracted"], overrides)
+    try:
+        extracted = apply_surgeon_exam_date_approval(extracted, source_confirmations or {})
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     decision = evaluate_case(
         deepcopy(extracted),
         age,
@@ -489,8 +558,12 @@ def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
         deepcopy(modifiers),
         software_version=getattr(core, "APP_VERSION", None),
     )
+    if extracted.get("surgeon_source_confirmations"):
+        decision["identity_warnings"] = list(extracted.get("identity_warnings") or [])
     effective = deepcopy(decision.get("effective_eye_plans") or {})
     missing = missing_items(decision, extracted)
+    missing.extend(planning_missing_items(decision, extracted))
+    missing = list(dict.fromkeys(missing))
     requests = _dedupe_requests([
         _request(eye, message, extracted) for eye, message in missing
     ])
@@ -617,6 +690,7 @@ def complete(core, payload):
             payload.get("patient_modifiers", {}),
             metadata,
             payload.get("clinical_overrides", {}),
+            payload.get("source_confirmations", {}),
         )
     return _finalize_archive(core, response, session)
 

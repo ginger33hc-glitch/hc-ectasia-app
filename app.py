@@ -21,6 +21,7 @@ import geometric_srax_policy
 
 import mandatory_source_set_policy
 from exam_date_reconciliation_policy import (
+    EXAM_DATE_CONFLICT_ISSUE,
     _is_four_maps_refractive,
     authoritative_exam_date_conflict,
     promote_consistent_targeted_exam_dates,
@@ -131,8 +132,8 @@ SCHEMA = {
                         "type": "string",
                         "enum": list(KERATOMETRY_SOURCE_VALUES),
                     },
-                    "ml7_bad_k1_d": {"type": ["number", "null"]},
-                    "ml7_bad_k2_d": {"type": ["number", "null"]},
+                    "ml7_k1_d": {"type": ["number", "null"]},
+                    "ml7_k2_d": {"type": ["number", "null"]},
                     "K1_D": {"type": ["number", "null"]},
                     "K1_axis_deg": {"type": ["number", "null"]},
                     "K2_D": {"type": ["number", "null"]},
@@ -182,7 +183,7 @@ SCHEMA = {
                 "required": [
                     "eye", "screen_types", "quality", "missing_or_unreadable",
                     "table_verified_numeric_fields", "keratometry_source",
-                    "ml7_bad_k1_d", "ml7_bad_k2_d", "K1_D", "K1_axis_deg",
+                    "ml7_k1_d", "ml7_k2_d", "K1_D", "K1_axis_deg",
                     "K2_D", "K2_axis_deg", "Kmax_D", "corneal_diameter_mm", "pachy_thinnest_um",
                     "BAD_D", "Df", "Db", "Dp", "Dt", "Da",
                     "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI", "CKI", "IHD",
@@ -359,7 +360,7 @@ EXCLUSIVE LABELED-BOX SOURCE LOCK:
   unlabeled number.
 - posterior_Kmean_D: use only Show 2 Exams Topometric -> Cornea Back -> printed Km.
 - topographic_astig_D and topographic_steep_axis_deg: use only Show 2 Exams Topometric -> Cornea Front.
-- ml7_bad_k1_d and ml7_bad_k2_d: ML7 planning ONLY. Read K1 and K2 directly from the BAD Display upper-middle numeric boxes. Do not substitute Show 2 Exams K1/K2 or Kmax. HWTW remains in the 4 Maps Refractive lower-left HWTW box.
+- ml7_k1_d and ml7_k2_d: ML7 planning ONLY. Read the explicitly labeled K1 and K2 values associated with Anterior Sagittal Curvature (Front) on the 4 Maps Refractive page. Do not use BAD Display K1/K2, Show 2 Exams K1/K2, Kmax, a color-map spot, or a calculated value. HWTW remains in the 4 Maps Refractive lower-left HWTW box.
 - bad_flat_axis_deg: for PS3 prescription-axis comparison ONLY, read the Axis box beside K1 in the BAD Display upper-middle numeric area. Never substitute the steep axis or derive a rotated value. Preserve all other axis sources and SRAX geometry.
 - topometric_RMin and TKC: use only Show 2 Exams Topometric center Indices (in 8 mm zone).
 - Kmax_D: use only the numeric value in the explicitly printed "KMax"/"Kmax" row.
@@ -404,11 +405,15 @@ laterality is unreadable, return null for that field. Final BAD-D remains the pr
 For an Excimer Laser Takip Karti, extract treatment_corrections only from the row explicitly labeled
 "Duzeltme Miktari" (including Turkish characters). Do not substitute values from "Subjektif
 Refraksiyon" or any other row. Map SAG/right to OD and SOL/left to OS. Transcribe sphere, signed
-cylinder, and axis exactly as written. sphere_cylinder_status may be CONFIDENT only when the sphere
-and cylinder digits and signs are unambiguous. If either is ambiguous, set both numeric fields to
-null and use UNCERTAIN or UNREADABLE while preserving visible characters in raw_text. Axis ambiguity
-does not require discarding an otherwise confident sphere/cylinder pair; report it separately in
-axis_status and set axis_deg to null when uncertain. Never transpose cylinder notation and never
+cylinder, and axis exactly as written. Never convert absent cylinder or axis notation into zero.
+When the row contains only one signed refractive value, return that value as sphere and keep
+cylinder_D and axis_deg null. Any absent, obscured, cropped, ambiguous, or unreadable cylinder region
+must remain null and UNCERTAIN or UNREADABLE. Otherwise, sphere_cylinder_status may be CONFIDENT only
+when the sphere and cylinder digits and signs
+are unambiguous. If either is ambiguous, set both numeric fields to null and use UNCERTAIN or
+UNREADABLE while preserving visible characters in raw_text. Axis ambiguity does not require
+discarding an otherwise confident nonzero sphere/cylinder pair; report it separately in axis_status
+and set axis_deg to null when uncertain. Never transpose cylinder notation and never
 infer the laser platform, optical zone, procedure, or ablation depth from the card. For a card-only
 image with no corneal tomography/topography data, return an empty eyes array. For a tomography-only
 image with no treatment card, return an empty treatment_corrections array. Downstream, a confident
@@ -790,7 +795,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 "PATIENT IDENTITY NOT VERIFIED: conflicting patient IDs were read across Pentacam sources. Surgeon confirmation is required."
             )
     if authoritative_exam_date_conflict(results):
-        merged["critical_input_issues"].append("Conflicting Pentacam examination dates across uploaded sources.")
+        merged["critical_input_issues"].append(EXAM_DATE_CONFLICT_ISSUE)
 
     assessed_eyes = {
         eye for context in pentacam_contexts for eye in context.get("extracted_eyes", [])

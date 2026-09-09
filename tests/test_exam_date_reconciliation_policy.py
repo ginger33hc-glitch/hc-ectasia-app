@@ -146,3 +146,58 @@ def test_exam_date_module_exposes_no_install_time_merge_wrapper():
     assert not hasattr(policy, "install")
     assert not hasattr(policy, "merge_extractions_with_exam_date_reconciliation")
     assert not hasattr(policy, "reconcile_merged_exam_date_conflict")
+
+
+def merged_conflict():
+    return {
+        "critical_input_issues": [CONFLICT, "Another source blocker."],
+        "identity_warnings": [],
+        "document_contexts": [
+            {
+                "document_type": "PENTACAM_TOPOGRAPHY", "source_filename": "od.png",
+                "four_maps_eyes": ["OD"], "exam_date": "23/09/2026",
+                "targeted_exam_date_reread_evidence": {"value": "03/09/2026"},
+            },
+            {
+                "document_type": "PENTACAM_TOPOGRAPHY", "source_filename": "os.png",
+                "four_maps_eyes": ["OS"], "exam_date": "13/09/2026",
+                "targeted_exam_date_reread_evidence": {"value": None},
+            },
+        ],
+    }
+
+
+def test_surgeon_date_approval_removes_only_date_blocker_and_preserves_readings():
+    original = merged_conflict()
+    approved = policy.apply_surgeon_exam_date_approval(original, {
+        policy.EXAM_DATE_CONFIRMATION_KEY: policy.EXAM_DATE_APPROVAL,
+    })
+    assert original["critical_input_issues"] == [CONFLICT, "Another source blocker."]
+    assert approved["critical_input_issues"] == ["Another source blocker."]
+    assert approved["surgeon_source_confirmations"] == [{
+        "key": policy.EXAM_DATE_CONFIRMATION_KEY,
+        "decision": policy.EXAM_DATE_APPROVAL,
+        "evidence": [
+            {"source_filename": "od.png", "eyes": ["OD"], "primary_reading": "23/09/2026",
+             "targeted_reread": "03/09/2026", "effective_reading": "23/09/2026"},
+            {"source_filename": "os.png", "eyes": ["OS"], "primary_reading": "13/09/2026",
+             "targeted_reread": None, "effective_reading": "13/09/2026"},
+        ],
+    }]
+    assert policy.EXAM_DATE_APPROVAL_WARNING in approved["identity_warnings"]
+
+
+def test_date_approval_is_strict_and_idempotent():
+    with __import__("pytest").raises(ValueError):
+        policy.apply_surgeon_exam_date_approval({}, {
+            policy.EXAM_DATE_CONFIRMATION_KEY: policy.EXAM_DATE_APPROVAL,
+        })
+    with __import__("pytest").raises(ValueError):
+        policy.apply_surgeon_exam_date_approval(merged_conflict(), {"another_rule": "YES"})
+    first = policy.apply_surgeon_exam_date_approval(merged_conflict(), {
+        policy.EXAM_DATE_CONFIRMATION_KEY: policy.EXAM_DATE_APPROVAL,
+    })
+    second = policy.apply_surgeon_exam_date_approval(first, {
+        policy.EXAM_DATE_CONFIRMATION_KEY: policy.EXAM_DATE_APPROVAL,
+    })
+    assert second == first

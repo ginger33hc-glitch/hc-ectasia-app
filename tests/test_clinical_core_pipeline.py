@@ -113,6 +113,23 @@ def test_tissue_hard_stop_outranks_incomplete_randleman_row():
     assert result["procedural_safety"]["hard_stops"]["preop_thickness"] is True
     assert result["procedural_safety"]["status"] == STOP_DEFER
     assert result["status"] == STOP_DEFER
+    safety_driver = next(
+        driver for driver in result["final_disposition"].stop_drivers
+        if driver.key == "procedural_safety"
+    )
+    assert "hard stop(s): preop_thickness" in safety_driver.detail
+
+
+def test_erss_stop_driver_names_exact_ectatic_topography_trigger():
+    result = evaluate_normalized_case(normal_lasik(i_s_d=1.4))
+    driver = next(
+        driver for driver in result["final_disposition"].stop_drivers
+        if driver.key == "randleman_erss"
+    )
+    assert driver.status == STOP_DEFER
+    assert "ERSS total: 4" in driver.detail
+    assert "topography: ABNORMAL_ECTATIC (4 points)" in driver.detail
+    assert "signed I-S: 1.4 D" in driver.detail
 
 
 def test_missing_decision_critical_data_is_assessment_incomplete_not_pass():
@@ -120,6 +137,13 @@ def test_missing_decision_critical_data_is_assessment_incomplete_not_pass():
     assert result["nice_status"] == ASSESSMENT_INCOMPLETE
     assert result["status"] == ASSESSMENT_INCOMPLETE
     assert {driver.key for driver in result["final_disposition"].incomplete_drivers} == {"nice"}
+
+
+def test_zero_cylinder_never_synthesizes_a_missing_axis():
+    result = evaluate_normalized_case(normal_lasik(intended_axis_deg=None))
+    assert "intended_axis_deg" in result["procedural_safety"]["missing"]
+    assert result["procedural_safety"]["status"] == ASSESSMENT_INCOMPLETE
+    assert result["status"] == ASSESSMENT_INCOMPLETE
 
 
 def test_multiple_cautions_do_not_auto_escalate_to_stop():

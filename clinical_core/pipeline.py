@@ -27,6 +27,7 @@ from .disposition import (
 )
 from .erss import erss_disposition, erss_total
 from .nice import nice_disposition, score_nice
+from .lasik_thinness_exception import resolve_ps3_procedure_decision
 from .ps3 import PS3EyeInput, PS3InterEyeInput, evaluate_ps3
 from .refraction import MIXED, normalize_minus_cylinder, refractive_group, scalar_final_k_is_valid
 from .safety import (
@@ -101,28 +102,32 @@ def _bad_d_disposition(classification: str) -> str:
     return ASSESSMENT_INCOMPLETE
 
 
-def _ps3_procedure_disposition(ps3_result, procedure: str) -> str:
-    if ps3_result is None:
-        return ASSESSMENT_INCOMPLETE
-    selected = {
-        "LASIK": ps3_result.disposition.lasik,
-        "PRK": ps3_result.disposition.prk,
-        "SMILE": ps3_result.disposition.smile,
-    }.get((procedure or "").strip().upper())
-    if selected == "DEFER":
-        return STOP_DEFER
-    if selected == "ALLOWED" and ps3_result.complete:
-        return PASS
-    return ASSESSMENT_INCOMPLETE
+def _erss_finding_detail(erss, i_s_d, procedure: str) -> str:
+    """Describe the already-computed ERSS result without changing its score."""
+    if procedure not in {"LASIK", "PRK"} or erss is None:
+        return "Not applicable"
+    parts = [f"ERSS total: {erss.get('total')!r}"]
+    category = erss.get("category")
+    topography_points = (erss.get("rows") or {}).get("topography")
+    if category is not None:
+        parts.append(f"topography: {category} ({topography_points!r} points)")
+    if _finite(i_s_d):
+        parts.append(f"signed I-S: {float(i_s_d):g} D")
+    scored = [
+        f"{key}: {points} points"
+        for key, points in (erss.get("rows") or {}).items()
+        if key != "topography" and isinstance(points, int) and points > 0
+    ]
+    if scored:
+        parts.append("additional scored components: " + ", ".join(scored))
+    return "; ".join(parts)
 
 
 def _intended_refraction(inp: ClinicalCoreInput):
     if not _finite(inp.intended_sphere_d) or not _finite(inp.intended_cylinder_d):
         return None
     cylinder = float(inp.intended_cylinder_d)
-    if abs(cylinder) <= 1e-12:
-        axis = float(inp.intended_axis_deg) if _finite(inp.intended_axis_deg) else 0.0
-    elif _finite(inp.intended_axis_deg):
+    if _finite(inp.intended_axis_deg):
         axis = float(inp.intended_axis_deg)
     else:
         return None
@@ -158,7 +163,7 @@ def _safety_status(
         ("intended_mrse_d", inp.intended_mrse_d),
     )
     missing.extend(name for name, value in required if not _finite(value))
-    if _finite(inp.intended_cylinder_d) and abs(float(inp.intended_cylinder_d)) > 1e-12 and not _finite(inp.intended_axis_deg):
+    if _finite(inp.intended_cylinder_d) and not _finite(inp.intended_axis_deg):
         missing.append("intended_axis_deg")
     if procedure == "LASIK" and not _finite(inp.flap_um):
         missing.append("flap_um")
@@ -238,21 +243,34 @@ def evaluate_normalized_case(
     nice_status = nice_disposition(nice["total"])
 
     ps3_result = evaluate_ps3(inp.ps3_eye, inp.ps3_inter_eye) if inp.ps3_eye is not None else None
-    ps3_status = _ps3_procedure_disposition(ps3_result, procedure)
+    ps3_decision = resolve_ps3_procedure_decision(
+        ps3_result,
+        procedure,
+        thinnest_um=inp.thinnest_um,
+        erss_status=erss_status,
+        nice_status=nice_status,
+        bad_d_status=bad_status,
+    )
+    ps3_status = ps3_decision.status
 
     safety_status, safety_stops, safety_missing = _safety_status(
         procedure, inp, rsb, rst, pta, final_k, intended_group
     )
 
+    active_safety_stops = [key for key, stopped in safety_stops.items() if stopped]
     safety_detail = "Independent tissue/refractive safety gates"
+    if active_safety_stops:
+        safety_detail += "; hard stop(s): " + ", ".join(active_safety_stops)
+    if safety_missing:
+        safety_detail += "; missing: " + ", ".join(safety_missing)
     if intended_group == MIXED:
         safety_detail += "; scalar MRSE/Kmean final-K model prohibited for mixed astigmatism"
 
     core_findings = (
-        DecisionFinding("randleman_erss", erss_status, "ERSS" if procedure in {"LASIK", "PRK"} else "Not applicable"),
+        DecisionFinding("randleman_erss", erss_status, _erss_finding_detail(erss, inp.i_s_d, procedure)),
         DecisionFinding("bad_d", bad_status, f"Final BAD-D: {bad.classification}"),
         DecisionFinding("nice", nice_status, f"NICE total: {nice.get('total')!r}"),
-        DecisionFinding("ps3", ps3_status, "PS3 procedure disposition"),
+        DecisionFinding("ps3", ps3_status, ps3_decision.detail),
         DecisionFinding("procedural_safety", safety_status, safety_detail),
     )
     supplied_findings = tuple(external_findings)
@@ -272,6 +290,7 @@ def evaluate_normalized_case(
         "nice_status": nice_status,
         "ps3": ps3_result,
         "ps3_status": ps3_status,
+        "ps3_decision": ps3_decision,
         "procedural_safety": {
             "LASIK_RSB_um": rsb,
             "PRK_RST_um": rst,

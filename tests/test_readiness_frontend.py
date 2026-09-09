@@ -29,11 +29,17 @@ context.applyEffectivePlans({OD:{correction_source:'card',manifest_sphere_D:-6,m
 assert.equal(fields['#od_manifest_sphere'].value,'−7,50');assert.equal(fields['#od_manifest_cylinder'].value,'-1.50');assert.equal(fields['#od_axis'].value,'8');
 assert.equal(fields['#od_sphere'].value,-6);assert.equal(fields['#od_cylinder'].value,-2);
 assert.equal(fields['#os_manifest_cylinder'].value,'');
+fields['#os_manifest_sphere'].value='';
+context.applyEffectivePlans({OS:{manifest_source:'TREATMENT_CARD_DUZELTME_MIKTARI',intended_source:'TREATMENT_CARD_DUZELTME_MIKTARI',manifest_entered_sphere_D:3,manifest_cylinder_signed_D:0,manifest_axis_deg:0,intended_entered_sphere_D:3,intended_cylinder_signed_D:0,intended_axis_deg:0}});
+assert.equal(fields['#os_manifest_sphere'].value,3);assert.equal(fields['#os_manifest_cylinder'].value,0);
+assert.equal(fields['#os_sphere'].value,3);assert.equal(fields['#os_cylinder'].value,0);assert.equal(fields['#os_axis'].value,0);
 const ctx={window:{}};vm.createContext(ctx);vm.runInContext(fs.readFileSync('static/assessment-readiness.js','utf8'),ctx);
 const panel={hidden:false,replaceChildren(){},querySelectorAll(){return this.inputs||[];}};
 const readiness=new ctx.window.HCReadiness(panel);
 panel.inputs=[{value:'−0,61',tagName:'INPUT',dataset:{eye:'OD',measurement:'I_S'}}];
 assert.equal(readiness.collect().OD.I_S,-.61);
+panel.inputs=[{value:'APPROVE_CONTINUE',dataset:{sourceConfirmation:'pentacam_exam_date_conflict'}}];
+assert.equal(readiness.collectSourceConfirmations().pentacam_exam_date_conflict,'APPROVE_CONTINUE');
 panel.inputs[0].value='wrong';assert.throws(()=>readiness.collect());
 readiness.reset();assert.equal(readiness.token,null);assert.equal(panel.hidden,true);
 '''
@@ -77,8 +83,8 @@ class Field{
   dispatchEvent(event){for(const fn of this.listeners[event.type]||[])fn(event);}
 }
 const fields={};
-for(const eye of ['od','os'])for(const suffix of ['manifest_sphere','manifest_cylinder','sphere','cylinder'])fields[`${eye}_${suffix}`]=new Field();
-const context={document:{getElementById:id=>fields[id]},Event:class{constructor(type){this.type=type;}}};
+for(const eye of ['od','os'])for(const suffix of ['manifest_sphere','manifest_cylinder','sphere','cylinder','axis'])fields[`${eye}_${suffix}`]=new Field();
+const context={document:{getElementById:id=>fields[id]},Event:class{constructor(type){this.type=type;}},numberOrNull:id=>{const raw=fields[id].value.trim();return raw===''?null:Number(raw);}};
 vm.createContext(context);
 const start=html.indexOf('// Manifest is the surgeon');
 const end=html.indexOf('const clinicalReviewState',start);
@@ -92,6 +98,25 @@ fields.od_manifest_sphere.value='-4.00';fields.od_manifest_sphere.dispatchEvent(
 assert.equal(fields.od_sphere.value,'-2.75');
 fields.od_manifest_cylinder.value='-2.00';fields.od_manifest_cylinder.dispatchEvent(new context.Event('input'));
 assert.equal(fields.od_cylinder.value,'-2.00');
+fields.os_manifest_sphere.value='-2.00';fields.os_manifest_sphere.dispatchEvent(new context.Event('input'));
+fields.os_manifest_cylinder.value='0';fields.os_manifest_cylinder.dispatchEvent(new context.Event('input'));
+assert.equal(fields.os_manifest_cylinder.value,'0');
+assert.equal(fields.os_cylinder.value,'');
+assert.equal(fields.os_axis.value,'');
+fields.os_manifest_sphere.value='0';fields.os_manifest_sphere.dispatchEvent(new context.Event('input'));
+assert.equal(fields.os_sphere.value,'-2.00');
+// Zero and intermediate zero-like text remain surgeon-entered and never
+// alter either the intended cylinder or the axis.
+fields.os_manifest_cylinder.value='0.';fields.os_manifest_cylinder.dispatchEvent(new context.Event('input'));
+assert.equal(fields.os_manifest_cylinder.value,'0.');
+assert.equal(fields.os_cylinder.value,'');
+assert.equal(fields.os_axis.value,'');
+fields.os_manifest_cylinder.value='';fields.os_manifest_cylinder.dispatchEvent(new context.Event('input'));
+assert.equal(fields.os_manifest_cylinder.value,'');
+fields.os_manifest_cylinder.value='-1.25';fields.os_manifest_cylinder.dispatchEvent(new context.Event('input'));
+assert.equal(fields.os_manifest_cylinder.value,'-1.25');
+assert.equal(fields.os_cylinder.value,'-1.25');
+assert.equal(fields.os_axis.value,'');
 '''
     subprocess.run(['node', '-e', script], cwd=ROOT, check=True, capture_output=True, text=True)
 
