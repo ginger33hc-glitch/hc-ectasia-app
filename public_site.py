@@ -351,7 +351,7 @@ The software keeps major risk pathways independently interpretable rather than h
 ## Primary public pages
 - [CER-AI home]({base}/): Overview of the clinical decision-support platform and its independent ectasia-risk pathways.
 - [CER-AI Learning Center]({base}/learning-center): Surgeon education on corneal ectasia, Pentacam interpretation, BAD-D, topometric indices, risk systems, map patterns, tissue safety, and clinical reasoning.
-- [CER-AI Öğrenme Merkezi — Türkçe]({base}/tr/learning-center): ERSS, BAD-D, NICE, PS3, doku güvenliği, örnek olgular ve raporlama akışı için teknik Türkçe cerrah eğitimi.
+- [CER-AI Eğitim Merkezi — Türkçe]({base}/tr/learning-center): ERSS, BAD-D, NICE, PS3, doku güvenliği, örnek olgular ve raporlama akışı için teknik Türkçe cerrah eğitimi.
 - [Corneal ectasia risk assessment]({base}/corneal-ectasia-risk-assessment): Search-oriented clinical overview of the problem CER-AI addresses and the terminology used by the platform.
 - [Clinical evidence and references]({base}/clinical-evidence): Verified literature mapped to the CER-AI pathways and concepts it supports, with explicit evidence boundaries.
 - [Full medical reference registry]({base}/references): Searchable consolidated CER-AI bibliography grouped by clinical topic.
