@@ -231,8 +231,8 @@ def _head(base: str, canonical_path: str, title: str, description: str, robots: 
 <meta name="robots" content="{escape(robots, quote=True)}">
 <link rel="canonical" href="{canonical}">
 <link rel="describedby" type="text/markdown" href="{base}/llms.txt">
-<link rel="stylesheet" href="{base}/static/technical-public.css?v=2">
-<link rel="icon" type="image/png" sizes="32x32" href="{base}/static/icons/favicon-32.png?v=8">
+<link rel="stylesheet" href="/static/technical-public.css?v=2">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=8">
 <meta name="theme-color" content="#05090d">
 <script type="application/ld+json">{json.dumps(schema, ensure_ascii=False, separators=(",", ":"))}</script>"""
 
