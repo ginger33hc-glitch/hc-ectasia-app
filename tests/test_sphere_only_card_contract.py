@@ -1,13 +1,14 @@
-"""Locks the explicit sphere-only treatment-card extraction rule."""
+"""Locks absence-preserving treatment-card extraction."""
 from pathlib import Path
 import re
 
 
-def test_prompt_maps_clear_sphere_only_card_row_to_zero_cylinder_and_axis():
+def test_prompt_never_converts_absent_cylinder_or_axis_to_zero():
     source = (Path(__file__).resolve().parents[1] / "app.py").read_text()
-    assert "any one signed refractive value" in source
-    assert "return cylinder_D=0, axis_deg=0" in source
+    assert "only one signed refractive value" in source
+    assert "Never convert absent cylinder or axis notation into zero" in source
+    assert "return cylinder_D=0, axis_deg=0" not in source
     assert re.search(
-        r"obscured,\s*cropped, ambiguous, or unreadable cylinder region must remain null",
+        r"absent, obscured, cropped, ambiguous, or unreadable cylinder region\s*must remain null",
         source,
     )

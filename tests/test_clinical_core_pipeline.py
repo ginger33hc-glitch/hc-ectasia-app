@@ -139,6 +139,13 @@ def test_missing_decision_critical_data_is_assessment_incomplete_not_pass():
     assert {driver.key for driver in result["final_disposition"].incomplete_drivers} == {"nice"}
 
 
+def test_zero_cylinder_never_synthesizes_a_missing_axis():
+    result = evaluate_normalized_case(normal_lasik(intended_axis_deg=None))
+    assert "intended_axis_deg" in result["procedural_safety"]["missing"]
+    assert result["procedural_safety"]["status"] == ASSESSMENT_INCOMPLETE
+    assert result["status"] == ASSESSMENT_INCOMPLETE
+
+
 def test_multiple_cautions_do_not_auto_escalate_to_stop():
     result = evaluate_normalized_case(normal_lasik(
         final_bad_d=2.0,

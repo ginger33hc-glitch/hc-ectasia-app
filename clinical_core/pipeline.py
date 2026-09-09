@@ -127,9 +127,7 @@ def _intended_refraction(inp: ClinicalCoreInput):
     if not _finite(inp.intended_sphere_d) or not _finite(inp.intended_cylinder_d):
         return None
     cylinder = float(inp.intended_cylinder_d)
-    if abs(cylinder) <= 1e-12:
-        axis = float(inp.intended_axis_deg) if _finite(inp.intended_axis_deg) else 0.0
-    elif _finite(inp.intended_axis_deg):
+    if _finite(inp.intended_axis_deg):
         axis = float(inp.intended_axis_deg)
     else:
         return None
@@ -165,7 +163,7 @@ def _safety_status(
         ("intended_mrse_d", inp.intended_mrse_d),
     )
     missing.extend(name for name, value in required if not _finite(value))
-    if _finite(inp.intended_cylinder_d) and abs(float(inp.intended_cylinder_d)) > 1e-12 and not _finite(inp.intended_axis_deg):
+    if _finite(inp.intended_cylinder_d) and not _finite(inp.intended_axis_deg):
         missing.append("intended_axis_deg")
     if procedure == "LASIK" and not _finite(inp.flap_um):
         missing.append("flap_um")

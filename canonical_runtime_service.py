@@ -243,8 +243,6 @@ def _intended_refraction_from_input(inp):
         return None
     cylinder = float(inp.intended_cylinder_d)
     axis = inp.intended_axis_deg
-    if abs(cylinder) <= 1e-12 and not _finite_number(axis):
-        axis = 0.0
     if not _finite_number(axis):
         return None
     return normalize_minus_cylinder(inp.intended_sphere_d, cylinder, axis)

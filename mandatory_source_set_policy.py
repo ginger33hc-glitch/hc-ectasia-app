@@ -285,7 +285,7 @@ def missing_manual_refraction(plans: dict[str, Any]) -> list[dict[str, str]]:
             ("intended", "intended_entered_sphere_D", "intended_cylinder_signed_D"),
         )
         axis_required = False
-        axis_available_for_every_nonzero_role = True
+        axis_available_for_every_role = True
         for role, sphere_key, cylinder_key in roles:
             if not _finite(plan.get(sphere_key)):
                 missing.append({
@@ -302,14 +302,12 @@ def missing_manual_refraction(plans: dict[str, Any]) -> list[dict[str, str]]:
                     "label": f"{eye} {role} cylinder",
                 })
             else:
-                cylinder = float(plan[cylinder_key])
-                if abs(cylinder) > 1e-9:
-                    axis_required = True
-                    role_axis = any(_finite(plan.get(key)) for key in (
-                        "entered_axis_deg", f"{role}_axis_deg", f"{role}_entered_axis_deg",
-                    ))
-                    axis_available_for_every_nonzero_role &= role_axis
-        if axis_required and not axis_available_for_every_nonzero_role:
+                axis_required = True
+                role_axis = any(_finite(plan.get(key)) for key in (
+                    "entered_axis_deg", f"{role}_axis_deg", f"{role}_entered_axis_deg",
+                ))
+                axis_available_for_every_role &= role_axis
+        if axis_required and not axis_available_for_every_role:
             missing.append({
                 "eye": eye,
                 "field": "entered_axis_deg",

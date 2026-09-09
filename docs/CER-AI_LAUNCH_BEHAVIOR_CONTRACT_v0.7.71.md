@@ -46,7 +46,7 @@ Optional:
 
 The primary image read identifies each uploaded page. The application must then show the status of all five mandatory sources and whether the optional treatment card is present. This confirmation occurs before targeted numeric rereading, geometric SRAX derivation, multi-image merging, clinical scoring, or report generation.
 
-If a mandatory source is absent or cannot be identified, clinical assessment must not start. The doctor must be told which source is missing. A duplicate mandatory page cannot substitute for a different missing page. If the optional treatment card is absent, complete surgeon-entered manifest and intended refraction for OD and OS is required at this same pre-assessment gate. A cylinder axis is required when either entered cylinder is nonzero.
+If a mandatory source is absent or cannot be identified, clinical assessment must not start. The doctor must be told which source is missing. A duplicate mandatory page cannot substitute for a different missing page. If the optional treatment card is absent, complete surgeon-entered manifest and intended refraction for OD and OS is required at this same pre-assessment gate. A surgeon-entered cylinder axis is required for each complete refraction, including an explicit zero cylinder; blank cylinder or axis values are never converted to zero.
 
 Any value explicitly entered or confirmed by the surgeon is authoritative for that field. An image-derived or calculated value may fill only a blank field; it must not overwrite the surgeon value or create a conflict against it. This includes surgeon-entered age: printed or date-derived Pentacam age remains audit evidence only when the surgeon supplies age.
 
