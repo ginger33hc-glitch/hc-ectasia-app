@@ -179,7 +179,7 @@ def test_learning_center_exposes_the_full_public_education_architecture():
         assert response.status_code == 200
         assert response.headers["x-robots-tag"].startswith("index,follow")
         assert '<link rel="canonical" href="https://cer-ai.com/learning-center">' in response.text
-        assert '<link rel="stylesheet" href="/static/technical-public.css?v=3">' in response.text
+        assert '<link rel="stylesheet" href="/static/technical-public.css?v=4">' in response.text
         assert "Education explains the science; the CER-AI application performs the structured assessment." in response.text
         for phrase in (
             "Corneal ectasia: clinical foundations",
@@ -291,6 +291,58 @@ def test_learning_center_documents_current_scoring_and_report_pipeline():
                 assert phrase in response.text
 
 
+def test_pentacam_module_documents_five_sources_quadrants_and_extraction_pipeline():
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        english = client.get("/learning/pentacam-education")
+        turkish = client.get("/tr/learning/pentacam-education")
+        assert english.status_code == turkish.status_code == 200
+        for phrase in (
+            "Surgeon upload and source confirmation",
+            "The surgeon must upload and confirm all five Pentacam source images",
+            "Standard 4 Maps Refractive quadrant localization",
+            "Upper left", "Axial/Sagittal Curvature (Front)",
+            "Upper right", "Elevation (Front)",
+            "Lower left", "Corneal Thickness / Pachymetry",
+            "Lower right", "Elevation (Back)",
+            "From image to auditable report",
+            "Same-source disagreement clears the field; it is never averaged",
+            "SURGEON_CONFIRMED",
+        ):
+            assert phrase in english.text
+        for phrase in (
+            "Cerrah yüklemesi ve kaynak doğrulaması",
+            "Cerrah beş Pentacam kaynak görüntüsünün tamamını yüklemeli",
+            "Standart 4 Maps Refractive kadran yerleşimi",
+            "Sol üst", "Sağ üst", "Sol alt", "Sağ alt",
+            "Görüntüden denetlenebilir rapora",
+            "Aynı kaynak çelişkisi alanı temizler; ortalama alınmaz",
+        ):
+            assert phrase in turkish.text
+
+
+def test_topometric_module_explains_indices_and_their_cerai_roles():
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        response = client.get("/learning/topometric-indices")
+        assert response.status_code == 200
+        for phrase in (
+            "What each 8-mm topometric index describes",
+            "Standard deviation of individual sagittal radii",
+            "superior–inferior curvature difference",
+            "Fourier analysis on a 3-mm-radius ring",
+            "distinct from posterior Cornea Back Rmin",
+            "Direct numeric input to CER-AI ERSS topography and NICE",
+        ):
+            assert phrase in response.text
+
+
+def test_learning_center_styles_use_high_contrast_system_typography():
+    css = open("static/technical-public.css", encoding="utf-8").read()
+    assert 'font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI"' in css
+    assert "color:#243b49" in css
+    assert "color:#263e4d" in css
+    assert "font-weight:500" in css
+
+
 def test_worked_cases_are_bilingual_indexable_and_clearly_synthetic():
     slugs = (
         "concordant-low-risk-lasik", "two-caution-pathways",
@@ -351,8 +403,8 @@ def test_learning_pages_remain_noindex_outside_canonical_production_host():
             assert response.status_code == 200
             assert '<meta name="robots" content="noindex,nofollow">' in response.text
             assert response.headers["x-robots-tag"] == "noindex,nofollow"
-            assert 'href="/static/technical-public.css?v=3"' in response.text
-            assert 'href="https://cer-ai.com/static/technical-public.css?v=3"' not in response.text
+            assert 'href="/static/technical-public.css?v=4"' in response.text
+            assert 'href="https://cer-ai.com/static/technical-public.css?v=4"' not in response.text
 
 
 def test_unknown_learning_topic_is_not_found():
