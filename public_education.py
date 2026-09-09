@@ -406,7 +406,6 @@ TR_TOPICS = (
             ("Olgu B: izole bileşik uyarı", "Final BAD-D cihaz referans bandının dışındayken ön eğrilik haritası düzenli görünür. Öğrenme görevi; bileşen sapmalarını, ham elevasyon ve pakimetri ekranlarını, kalite durumunu ve diğer gözü inceleyerek bileşik sinyalin tutarlı mı izole mi olduğunu belirlemektir."),
             ("Olgu C: güven verici şekil, elverişsiz plan", "Topografi ve tomografi güven verici görünür, ancak planlanan flep ve ablasyon geometrisi sınırlı stromal rezerv bırakır. Öğrenme görevi; doku güvenliğini ektazi örüntü taramasından bağımsız tutmak ve normal haritaların planı geçersiz biçimde onaylamasına izin vermemektir."),
             ("Olgu D: karar için kritik kaynak eksik", "Gerekli bir ekran yoktur veya okunamıyordur. Öğrenme görevi eksikliği olumlu sonuç olarak varsaymamak; gerekli alanı ve kaynağı açıkça tanımlamak, uygun olduğunda tekrar inceleme veya cerrahça doğrulanmış değer almak ve belirsizliği kayıtta korumaktır."),
-            ("Bayes yaklaşımı: ön-test olasılığı önemlidir", "Bir testin son-test olasılığı yalnızca duyarlılık ve özgüllüğe değil, değerlendirilen kişideki ön-test olasılığına da bağlıdır. Bu nedenle aynı indeks sonucu, düşük riskli rutin refraktif cerrahi adayında ve keratokonus şüphesiyle yönlendirilmiş yüksek riskli hastada aynı klinik anlamı taşımaz. Test sonucu her zaman hasta öyküsü, muayene ve diğer bağımsız bulgularla birlikte yorumlanmalıdır."),
         ),
         (
             ("Randleman ve ark., Ophthalmology 2008", "https://pubmed.ncbi.nlm.nih.gov/17624434/"),
