@@ -552,11 +552,20 @@ TECHNICAL_TABLES = {
                 (">=2.60", "Abnormal", "STOP-DEFER"),
                 ("Unavailable", "Unavailable", "ASSESSMENT INCOMPLETE"),
             ), "Final D is read from the BAD Display bottom strip. CER-AI never reconstructs it from Df, Db, Dp, Dt, or Da."),
-            ("Context carried into the report", ("Field", "Meaning", "Decision role"), (
-                ("Df / Db", "Anterior / posterior elevation deviation", "Context only"),
-                ("Dp / Dt / Da", "Pachymetric progression, thinnest thickness, and ARTmax-related deviations", "Context only"),
-                ("PPI min/avg/max; ARTmax", "Pachymetric progression and relational thickness", "Display/QC context; PPI Average has a separate PS3 rule"),
-            ), "Component colors and contextual bands never add a second BAD-D caution or stop."),
+            ("What each BAD-D component means", ("Field", "Technical meaning", "Do not confuse with"), (
+                ("Df", "Standardized deviation of the anterior elevation difference map: the change from the standard best-fit sphere to the enhanced reference surface", "F.Ele.Th, which is the signed anterior elevation at the thinnest point in µm"),
+                ("Db", "Standardized deviation of the posterior elevation difference map: the change from the standard best-fit sphere to the enhanced reference surface", "B.Ele.Th, which is the signed posterior elevation at the thinnest point in µm"),
+                ("Dp", "Standardized deviation of the average pachymetric progression pattern from the reference population", "PPI Average, the displayed underlying progression index"),
+                ("Dt", "Standardized deviation associated with the measured minimum/thinnest corneal thickness", "The raw Thinnest Location pachymetry in µm"),
+                ("Da", "Standardized deviation of ARTmax (Ambrósio Relational Thickness maximum)", "Raw ARTmax, calculated by Pentacam as thinnest-point thickness divided by PPI Maximum"),
+                ("Final D", "Pentacam multivariable regression output integrating the BAD display parameters against its reference database", "A sum, average, percentage risk, or patient-specific lifetime probability"),
+            ), "Df, Db, Dp, Dt, Da, and Final D are reported as normalized deviations from the device reference framework. They are dimensionless standardized values, not micrometers or diopters. A larger deviation means farther from the reference mean; it does not by itself establish a diagnosis."),
+            ("How CER-AI carries BAD information into the report", ("BAD Display value", "CER-AI handling", "Independent use elsewhere"), (
+                ("Final D", "The source-locked printed value alone determines the BAD-D pathway result shown above", "Remains independent from ERSS, NICE, and PS3"),
+                ("Df, Db, Dp, Dt, Da", "Transcribed from the bottom D strip and displayed as component context; they are not independently rescored", "No component creates a second BAD-D caution or stop"),
+                ("F.Ele.Th / B.Ele.Th", "Transcribed separately from the labeled elevation row as signed µm measurements", "These raw elevation values may enter explicitly named NICE or PS3 pathways; they are not replaced by Df or Db"),
+                ("PPI min/avg/max; ARTmax", "Transcribed separately from the Progression Index box as raw device outputs", "PPI Average has a separately defined PS3 role; Dp and Da do not substitute for it"),
+            ), "CER-AI preserves both the printed value and its exact source region. An isolated abnormal component can coexist with a normal Final D, while several smaller deviations can contribute to an abnormal Final D; therefore the report shows the component pattern without reverse-engineering or overriding the printed composite."),
         ),
         "nice-risk-assessment": (
             ("CER-AI-adapted NICE component scoring", ("Input", "1 point", "2 points", "3 points"), (
@@ -624,7 +633,7 @@ TECHNICAL_TABLES = {
                 ("4 Maps Refractive", "Bir OD ve bir OS", "Pupil Center pakimetrisi, daireyle işaretli Thinnest Location, K Max (Front), HWTW ve çekim/kimlik kanıtı; Axial/Sagittal Curvature (Front) haritası deterministik SRAX geometrisini sağlar."),
                 ("Belin/Ambrósio BAD Display", "Bir OD ve bir OS", "İşaretli F.Ele.Th ve B.Ele.Th; PPI Min/Avg/Max ve ARTmax; Df/Db/Dp/Dt/Da ve Final D; sınırlı planlama veya doğrulama rolleri için belirli üst-orta K1/K2/Axis alanları."),
                 ("Show 2 Exams Topometric", "Bir bilateral karşılaştırma sayfası", "Her göz için: Cornea Front K1/K2/eksenler/Km/Astig; Cornea Back Km ve Rmin; ISV, IVA, KI, CKI, IHA, IHD, RMin, TKC, KISA ve işaretli I-S dahil orta 8 mm indeksleri."),
-                ("Eksimer tedavi kartı", "İsteğe bağlı altıncı görüntü", "Yalnız etiketli Düzeltme Miktarı satırı tedavi düzeltmesini sağlayabilir. Kart yoksa cerrah iki göz için tam manifest ve hedeflenen refraksiyonu girer."),
+                ("Excimer tedavi kartı", "İsteğe bağlı altıncı görüntü", "Yalnız etiketli Düzeltme Miktarı satırı tedavi düzeltmesini sağlayabilir. Kart yoksa cerrah iki göz için tam manifest ve hedeflenen refraksiyonu girer."),
             ), "Hedefli yeniden okuma, geometrik SRAX analizi, klinik skorlama veya rapor üretiminden önce beş Pentacam sayfasının tamamı tanımlanmalıdır. Yinelenen sayfa eksik kaynak ailesinin yerine geçmez."),
             ("Kaynağı kilitli alan haritası", ("Kayıtlı bölge", "Kabul edilen alanlar", "Yasak ikame"), (
                 ("Show 2 → Cornea Front", "K1, K1 ekseni, K2, K2 ekseni, yazılı Km, Astig ve dik eksen", "Cornea Back, Kmax, True Net Power, harita noktası veya hesaplanmış ortalama yok"),
@@ -680,11 +689,20 @@ TECHNICAL_TABLES = {
                 (">=2.60", "Anormal", "STOP-DEFER"),
                 ("Yok", "Kullanılamıyor", "ASSESSMENT INCOMPLETE"),
             ), "Final D, BAD Display alt şeridinden okunur. CER-AI bunu Df, Db, Dp, Dt veya Da'dan yeniden hesaplamaz."),
-            ("Rapora taşınan bağlam", ("Alan", "Anlam", "Karar rolü"), (
-                ("Df / Db", "Ön / arka elevasyon sapması", "Yalnız bağlam"),
-                ("Dp / Dt / Da", "Pakimetrik progresyon, en ince kalınlık ve ARTmax ilişkili sapmalar", "Yalnız bağlam"),
-                ("PPI min/avg/max; ARTmax", "Pakimetrik progresyon ve göreli kalınlık", "Ekran/KG bağlamı; PPI Average için ayrı PS3 kuralı vardır"),
-            ), "Bileşen renkleri ve bağlamsal bantlar ikinci bir BAD-D uyarısı veya durdurması eklemez."),
+            ("Her BAD-D bileşeni ne anlama gelir?", ("Alan", "Teknik anlam", "Şununla karıştırılmamalıdır"), (
+                ("Df", "Standart en uygun küreden geliştirilmiş referans yüzeye geçişte ön elevasyon fark haritasının standardize sapması", "µm cinsinden en ince noktadaki işaretli ön elevasyon olan F.Ele.Th"),
+                ("Db", "Standart en uygun küreden geliştirilmiş referans yüzeye geçişte arka elevasyon fark haritasının standardize sapması", "µm cinsinden en ince noktadaki işaretli arka elevasyon olan B.Ele.Th"),
+                ("Dp", "Ortalama pakimetrik progresyon örüntüsünün referans popülasyondan standardize sapması", "Ekranda verilen temel progresyon indeksi PPI Average"),
+                ("Dt", "Ölçülen minimum/en ince kornea kalınlığıyla ilişkili standardize sapma", "µm cinsinden ham Thinnest Location pakimetrisi"),
+                ("Da", "ARTmax'ın (Ambrósio Relational Thickness maximum) standardize sapması", "Pentacam'ın en ince nokta kalınlığını PPI Maximum'a bölerek hesapladığı ham ARTmax"),
+                ("Final D", "BAD ekranı parametrelerini cihazın referans veri tabanına göre birleştiren Pentacam çok değişkenli regresyon çıktısı", "Basit toplam, ortalama, yüzde risk veya hastaya özgü yaşam boyu olasılık"),
+            ), "Df, Db, Dp, Dt, Da ve Final D cihaz referans çerçevesinden normalize sapmalar olarak raporlanır. Bunlar mikrometre veya diyoptri değil, boyutsuz standardize değerlerdir. Daha büyük sapma referans ortalamasından daha fazla uzaklaşmayı gösterir; tek başına tanı koydurmaz."),
+            ("CER-AI BAD bilgisini rapora nasıl taşır?", ("BAD Display değeri", "CER-AI işlemi", "Başka yerde bağımsız kullanım"), (
+                ("Final D", "Yukarıdaki BAD-D yol sonucunu yalnız kaynağı kilitli yazılı değer belirler", "ERSS, NICE ve PS3'ten bağımsız kalır"),
+                ("Df, Db, Dp, Dt, Da", "Alt D şeridinden aktarılır ve bileşen bağlamı olarak gösterilir; bağımsız yeniden skorlanmaz", "Hiçbir bileşen ikinci bir BAD-D uyarısı veya durdurması oluşturmaz"),
+                ("F.Ele.Th / B.Ele.Th", "Etiketli elevasyon satırından işaretli µm ölçümleri olarak ayrı aktarılır", "Bu ham elevasyon değerleri açıkça tanımlanmış NICE veya PS3 yollarına girebilir; Df veya Db bunların yerine geçmez"),
+                ("PPI min/avg/max; ARTmax", "Progression Index kutusundan ham cihaz çıktıları olarak ayrı aktarılır", "PPI Average'ın ayrı tanımlı PS3 rolü vardır; Dp ve Da onun yerine geçmez"),
+            ), "CER-AI hem yazılı değeri hem kesin kaynak bölgesini korur. İzole anormal bir bileşen normal Final D ile birlikte bulunabilir; birden fazla daha küçük sapma ise anormal Final D'ye katkıda bulunabilir. Bu nedenle rapor bileşen örüntüsünü gösterir ancak yazılı bileşiği geriye doğru üretmez veya geçersiz kılmaz."),
         ),
         "nice-risk-assessment": (
             ("CER-AI-uyarlanmış NICE bileşen puanlaması", ("Girdi", "1 puan", "2 puan", "3 puan"), (
@@ -779,7 +797,7 @@ def _head(base: str, canonical_path: str, title: str, description: str, robots: 
 <link rel="alternate" hreflang="tr" href="{base}{turkish_path}">
 <link rel="alternate" hreflang="x-default" href="{base}{english_path}">
 <link rel="describedby" type="text/markdown" href="{base}/llms.txt">
-<link rel="stylesheet" href="/static/technical-public.css?v=4">
+<link rel="stylesheet" href="/static/technical-public.css?v=5">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=8">
 <meta name="theme-color" content="#05090d">
 <script type="application/ld+json">{json.dumps(schema, ensure_ascii=False, separators=(",", ":"))}</script>"""
