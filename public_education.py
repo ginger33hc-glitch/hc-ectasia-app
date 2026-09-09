@@ -182,6 +182,7 @@ TOPICS = (
         "De-identified teaching archetypes showing how surgeons can reconcile concordant, discordant, incomplete, and procedure-dependent ectasia-risk evidence.",
         "Case-learning module",
         (
+            ("Coming soon: real clinical case examples", "De-identified examples selected from real clinical cases will be added to this section soon. Until then, the worked cases below remain clearly labeled synthetic teaching cases and do not contain real patient data."),
             ("Case A: concordant concern", "Anterior curvature asymmetry, corresponding posterior-elevation deviation, and abnormal pachymetric progression point toward the same region. The learning task is to verify acquisition quality and source identity, then explain why multiple independent channels are concordant rather than merely counting abnormal labels."),
             ("Case B: isolated composite alert", "Final BAD-D is outside the device reference band while the anterior curvature map appears regular. The learning task is to inspect the component deviations, raw elevation and pachymetry displays, quality status, and fellow eye before deciding whether the composite is coherent or isolated."),
             ("Case C: reassuring shape, unfavorable plan", "Topography and tomography appear reassuring, but planned flap and ablation geometry leave limited predicted stromal reserve. The learning task is to keep tissue safety independent from ectasia-pattern screening and reconsider the proposed procedure rather than allowing normal maps to override the plan."),
@@ -398,15 +399,15 @@ TR_TOPICS = (
     ),
     Topic(
         "clinical-cases",
-        "Klinik akıl yürütme olguları",
+        "Klinik örnek olgular",
         "Uyumlu, uyumsuz, eksik ve işleme bağımlı ektazi risk kanıtlarının uzlaştırılmasını gösteren kimliksiz eğitim arketipleri.",
         "Olgu öğrenme modülü",
         (
-            ("Olgu A: uyumlu kaygı", "Ön eğrilik asimetrisi, aynı bölgeye karşılık gelen arka elevasyon sapması ve anormal pakimetrik progresyon aynı yöne işaret eder. Öğrenme görevi; çekim kalitesini ve kaynak kimliğini doğrulamak, ardından yalnızca anormal etiketleri saymak yerine bağımsız kanalların neden uyumlu olduğunu açıklamaktır."),
+            ("Yakında: gerçek klinik vaka örnekleri", "Bu bölüme gerçek vakalardan seçilmiş, anonimleştirilmiş örnekler yakında eklenecektir. Bu örnekler eklenene kadar aşağıdaki işlenmiş olgular, gerçek hasta verisi içermeyen sentetik eğitim olguları olarak açıkça etiketli kalacaktır."),
+            ("Olgu A: birbiriyle uyumlu risk bulguları", "Ön eğrilik asimetrisi, aynı bölgeye karşılık gelen arka elevasyon sapması ve anormal pakimetrik progresyon aynı şüpheli örüntüyü destekler. Öğrenme görevi; çekim kalitesini ve kaynak kimliğini doğrulamak, ardından yalnızca anormal etiketleri saymak yerine birbirinden bağımsız kanalların anatomik olarak neden uyumlu olduğunu açıklamaktır."),
             ("Olgu B: izole bileşik uyarı", "Final BAD-D cihaz referans bandının dışındayken ön eğrilik haritası düzenli görünür. Öğrenme görevi; bileşen sapmalarını, ham elevasyon ve pakimetri ekranlarını, kalite durumunu ve diğer gözü inceleyerek bileşik sinyalin tutarlı mı izole mi olduğunu belirlemektir."),
             ("Olgu C: güven verici şekil, elverişsiz plan", "Topografi ve tomografi güven verici görünür, ancak planlanan flep ve ablasyon geometrisi sınırlı stromal rezerv bırakır. Öğrenme görevi; doku güvenliğini ektazi örüntü taramasından bağımsız tutmak ve normal haritaların planı geçersiz biçimde onaylamasına izin vermemektir."),
             ("Olgu D: karar için kritik kaynak eksik", "Gerekli bir ekran yoktur veya okunamıyordur. Öğrenme görevi eksikliği olumlu sonuç olarak varsaymamak; gerekli alanı ve kaynağı açıkça tanımlamak, uygun olduğunda tekrar inceleme veya cerrahça doğrulanmış değer almak ve belirsizliği kayıtta korumaktır."),
-            ("Bayesçi uyarı", "Bir testin son-test olasılığı yalnızca duyarlılık ve özgüllüğe değil, değerlendirilen popülasyondaki ön-test olasılığına da bağlıdır. Bu nedenle doğrulanmış olsa bile tek bir indeksin sonuçları, seçilmiş cerrahi adaylar ile hastalık kliniğine başvuranlarda aynı anlamı taşımaz."),
         ),
         (
             ("Randleman ve ark., Ophthalmology 2008", "https://pubmed.ncbi.nlm.nih.gov/17624434/"),
@@ -447,7 +448,7 @@ TR_TOPICS = (
         (
             ("Başlangıç: korneal ektazi temelleri", "/tr/learning/corneal-ectasia-basics"),
             ("Devam: Pentacam eğitimi", "/tr/learning/pentacam-education"),
-            ("Uygulama: klinik akıl yürütme olguları", "/tr/learning/clinical-cases"),
+            ("Uygulama: klinik örnek olgular", "/tr/learning/clinical-cases"),
         ),
     ),
 )
@@ -797,7 +798,7 @@ def _head(base: str, canonical_path: str, title: str, description: str, robots: 
 <link rel="alternate" hreflang="tr" href="{base}{turkish_path}">
 <link rel="alternate" hreflang="x-default" href="{base}{english_path}">
 <link rel="describedby" type="text/markdown" href="{base}/llms.txt">
-<link rel="stylesheet" href="/static/technical-public.css?v=5">
+<link rel="stylesheet" href="/static/technical-public.css?v=6">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=8">
 <meta name="theme-color" content="#05090d">
 <script type="application/ld+json">{json.dumps(schema, ensure_ascii=False, separators=(",", ":"))}</script>"""
@@ -846,6 +847,44 @@ def _technical_tables(locale: str, slug: str) -> str:
         body = "".join("<tr>" + "".join(f"<td>{escape(cell)}</td>" for cell in row) + "</tr>" for row in rows)
         blocks.append(f'<section class="technical-table-section"><h2>{escape(title)}</h2><div class="table-scroll"><table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></div><p class="table-note">{escape(note)}</p></section>')
     return "".join(blocks)
+
+
+def _synthetic_pentacam_gallery(locale: str) -> str:
+    if locale == "tr":
+        heading = "Beş görüntülü sentetik Pentacam kaynak örneği"
+        introduction = "Bu set, bir şüpheli öğretim gözü (OD) ile bir normal öğretim gözünün (OS) beş zorunlu kaynak ekranında nasıl karşılaştırıldığını gösterir. Görseli tam boy açmak için üzerine tıklayın."
+        warning = "Bu görseller gerçek Pentacam cihaz çıktısı veya gerçek hasta verisi değildir. Yalnız ekran ailesini, göz tarafını, kaynak alanlarını ve standart yerleşimi öğretmek için hazırlanmıştır; tanı, tedavi kararı veya CER-AI hasta girdisi olarak kullanılamaz."
+        captions = (
+            ("1. OD — 4 Maps Refractive", "Şüpheli öğretim gözü; standart dört kadran yerleşimi"),
+            ("2. OS — 4 Maps Refractive", "Normal öğretim gözü; standart dört kadran yerleşimi"),
+            ("3. OD — Belin/Ambrósio BAD Display", "Şüpheli Final D ve ilişkili bileşen örüntüsü"),
+            ("4. OS — Belin/Ambrósio BAD Display", "Normal Final D ve karşılaştırma örüntüsü"),
+            ("5. Show 2 Exams Topometric — OD/OS", "Cornea Front, Cornea Back ve Center Indices (8 mm) için bilateral karşılaştırma"),
+        )
+    else:
+        heading = "Five-image synthetic Pentacam source example"
+        introduction = "This set demonstrates how one suspicious teaching eye (OD) and one normal teaching eye (OS) align across the five mandatory source screens. Select an image to open it at full size."
+        warning = "These figures are not real Pentacam device exports or real patient data. They teach screen family, laterality, source fields, and standard layout only; they must not be used for diagnosis, treatment decisions, or as CER-AI patient inputs."
+        captions = (
+            ("1. OD — 4 Maps Refractive", "Suspicious teaching eye; standard four-quadrant layout"),
+            ("2. OS — 4 Maps Refractive", "Normal teaching eye; standard four-quadrant layout"),
+            ("3. OD — Belin/Ambrósio BAD Display", "Suspicious Final D and related component pattern"),
+            ("4. OS — Belin/Ambrósio BAD Display", "Normal Final D comparison pattern"),
+            ("5. Show 2 Exams Topometric — OD/OS", "Bilateral Cornea Front, Cornea Back, and Center Indices (8 mm) comparison"),
+        )
+    images = (
+        ("four-maps-od.svg", 1956, 1500),
+        ("four-maps-os.svg", 1956, 1500),
+        ("bad-display-od.svg", 2067, 1435),
+        ("bad-display-os.svg", 2067, 1435),
+        ("show-2-exams-topometric.svg", 2223, 1468),
+    )
+    cards = "".join(
+        f'''<figure class="synthetic-source-card{' synthetic-source-wide' if index == 4 else ''}"><a href="/static/education/pentacam-synthetic/{filename}" target="_blank" rel="noopener"><img src="/static/education/pentacam-synthetic/{filename}" width="{width}" height="{height}" loading="lazy" alt="{escape(title)} — {escape(detail)}"></a><figcaption><strong>{escape(title)}</strong><span>{escape(detail)}</span></figcaption></figure>'''
+        for index, ((title, detail), (filename, width, height)) in enumerate(zip(captions, images, strict=True))
+    )
+    emphasis = "Önemli:" if locale == "tr" else "Important:"
+    return f'''<section class="synthetic-source-section"><h2>{escape(heading)}</h2><p>{escape(introduction)}</p><div class="synthetic-source-grid">{cards}</div><p class="synthetic-source-warning"><strong>{emphasis}</strong> {escape(warning)}</p></section>'''
 
 
 def _case_cards(locale: str) -> str:
@@ -940,9 +979,10 @@ def render_topic(base: str, robots: str, topic: Topic, locale: str = "en") -> st
     cases = ""
     if topic.slug == "clinical-cases":
         cases = f'<section><h2>{"Çalışılmış sentetik olgular" if locale == "tr" else "Worked synthetic cases"}</h2><div class="learning-grid case-grid">{_case_cards(locale)}</div></section>'
+    synthetic_gallery = _synthetic_pentacam_gallery(locale) if topic.slug == "pentacam-education" else ""
     return f"""<!doctype html><html lang="{locale}"><head>{_head(base, path, topic.title, topic.description, robots, schema, locale)}</head><body>{_nav(locale, path)}<main>
 <article><header class="learning-hero article-hero"><div class="learning-wrap">{_breadcrumb(crumbs)}<p class="learning-kicker">{escape(topic.eyebrow)}</p><h1>{escape(topic.title)}</h1><p class="learning-lead">{escape(topic.description)}</p><div class="learning-principle"><strong>{scope[0]}</strong><span>{scope[1]}</span></div></div></header>
-<div class="learning-wrap article-layout"><div class="article-body">{sections}{_technical_tables(locale, topic.slug)}{cases}<section class="article-references"><h2>{sources[0]}</h2><ol>{references}</ol><p>{sources[1]}</p></section></div><aside class="article-aside"><p class="learning-kicker">{continue_label}</p>{related_cards}<a class="related-card evidence" href="/clinical-evidence"><span>{evidence[0]}</span><strong>{evidence[1]}</strong></a></aside></div></article>
+<div class="learning-wrap article-layout"><div class="article-body">{sections}{synthetic_gallery}{_technical_tables(locale, topic.slug)}{cases}<section class="article-references"><h2>{sources[0]}</h2><ol>{references}</ol><p>{sources[1]}</p></section></div><aside class="article-aside"><p class="learning-kicker">{continue_label}</p>{related_cards}<a class="related-card evidence" href="/clinical-evidence"><span>{evidence[0]}</span><strong>{evidence[1]}</strong></a></aside></div></article>
 </main>{_footer(locale)}</body></html>"""
 
 
