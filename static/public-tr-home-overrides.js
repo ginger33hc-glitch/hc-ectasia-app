@@ -83,13 +83,16 @@
     scroller.className = "cerai-mobile-section-scroll";
 
     [
+      ["Learning Center", "/learning-center"],
+      ["Ectasia Assessment", "/corneal-ectasia-risk-assessment"],
+      ["Clinical Evidence", "/clinical-evidence"],
       ["Evaluation", "#evaluation"],
       ["How CER-AI Works", "#science"],
       ["User Guide", "#guide"],
       ["About", "#about"],
       ["Developer", "#developer"]
     ].forEach(([label, href]) => {
-      if (!document.querySelector(href)) return;
+      if (href.startsWith("#") && !document.querySelector(href)) return;
       const link = document.createElement("a");
       link.className = "cerai-mobile-section-link";
       link.href = href;
