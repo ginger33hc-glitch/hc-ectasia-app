@@ -420,7 +420,7 @@ TR_TOPICS = (
         "CER-AI'ın eğitim içeriğini, yapılandırılmış değerlendirmeyi, kaynak kökenini, bağımsız risk yollarını ve işlem güvenliğini nasıl ayırdığı.",
         "Metodoloji modülü",
         (
-            ("Eğitim ve değerlendirme ayrıdır", "Öğrenme Merkezi yayımlanmış kavramları ve klinik akıl yürütmeyi açıklar. Korunan CER-AI uygulaması yapılandırılmış, hastaya özgü değerlendirmeyi gerçekleştirir. Bir eğitim sayfasını okumak klinik sonucu hesaplamaz, değiştirmez veya onun yerine geçmez."),
+            ("Eğitim ve değerlendirme ayrıdır", "Eğitim Merkezi yayımlanmış kavramları ve klinik akıl yürütmeyi açıklar. Korunan CER-AI uygulaması yapılandırılmış, hastaya özgü değerlendirmeyi gerçekleştirir. Bir eğitim sayfasını okumak klinik sonucu hesaplamaz, değiştirmez veya onun yerine geçmez."),
             ("Bağımsız yollar", "CER-AI; ERSS, Final BAD-D, CER-AI-uyarlanmış NICE ve PS3'ü ayrı değerlendirme kanalları olarak görünür tutar. Bunları dışarıdan doğrulanmış tek bir özel olasılık olarak sunmaz. Uyum ve uyumsuzluk cerrah incelemesine açık kalır."),
             ("Kaynak kökeni ve belirsizlik", "Karar için kritik çıkarılmış değerler tanımlı kaynak alanlarına bağlı kalır. Eksik, okunamayan, çelişkili ve cerrah tarafından tamamlanan verilerin nihai etiket içinde kaybolmaması amaçlanır. Bu yaklaşım denetlenebilirliği destekler ve sessiz kaynak değişimini azaltır."),
             ("Doğrulama dili", "CER-AI'ın atıf yaptığı yayınlar belirli değişkenleri, sistemleri veya arka plan kavramlarını destekler. CER-AI'ı eksiksiz ürün olarak otomatik biçimde doğrulamaz. CER-AI'a özgü tanısal performans, klinik sonuç, üstünlük veya düzenleyici iddialar kendi destekleyici kanıtını gerektirir."),
@@ -465,7 +465,7 @@ FAQS = (
 )
 
 TR_FAQS = (
-    ("Öğrenme Merkezi CER-AI değerlendirmesi yapar mı?", "Hayır. Kamusal eğitim sayfaları bilimi ve terminolojiyi açıklar. Hastaya özgü yapılandırılmış değerlendirme yalnızca korunan klinik uygulamada yapılır."),
+    ("Eğitim Merkezi CER-AI değerlendirmesi yapar mı?", "Hayır. Kamusal eğitim sayfaları bilimi ve terminolojiyi açıklar. Hastaya özgü yapılandırılmış değerlendirme yalnızca korunan klinik uygulamada yapılır."),
     ("Final BAD-D ektazi tanısıyla aynı mıdır?", "Hayır. Final BAD-D bileşik bir tomografik sapma indeksidir. Bileşenleri, ham haritalar, çekim kalitesi ve klinik bağlamla birlikte yorumlanmalıdır."),
     ("Normal ERSS ektazi yatkınlığını dışlar mı?", "Hayır. Hiçbir tarama sistemi yatkınlığa giden bütün yolları dışlamaz. ERSS özgün kanıt tabanı içinde, güncel tomografi ve klinik bulgularla birlikte yorumlanmalıdır."),
     ("Topografi ve tomografi birbirinin yerine kullanılabilir mi?", "Hayır. Eğrilik, elevasyon ve uzaysal pakimetri ilişkili fakat farklı korneal özellikleri tanımlar. Kaynak ekranları ve birimleri açık kalmalıdır."),
@@ -810,8 +810,8 @@ def _path(locale: str, path: str) -> str:
 def _nav(locale: str, current_path: str) -> str:
     if locale == "tr":
         switch_path = current_path[3:] if current_path.startswith("/tr/") else "/learning-center"
-        labels = ("Öğrenme Merkezi", "Kanıt", "Kaynaklar", "Klinik Uygulama", "English")
-        aria = "Öğrenme Merkezi menüsü"
+        labels = ("Eğitim Merkezi", "Kanıt", "Kaynaklar", "Klinik Uygulama", "English")
+        aria = "Eğitim Merkezi menüsü"
     else:
         switch_path = f"/tr{current_path}"
         labels = ("Learning Center", "Evidence", "References", "Clinical Application", "Türkçe")
@@ -860,8 +860,8 @@ def render_hub(base: str, robots: str, locale: str = "en") -> str:
     if locale == "tr":
         description = "Korneal ektazi, Pentacam, BAD-D, topometrik indeksler, ERSS, NICE, PS3, doku güvenliği, olgular ve CER-AI metodolojisi için cerrah eğitimi."
         title = "Cerrah Eğitimi"
-        breadcrumb = (("Ana Sayfa", "/"), ("Öğrenme Merkezi", ""))
-        hero = ("Cerrah eğitimi", "CER-AI Öğrenme Merkezi", "Oftalmologlar ve refraktif cerrahlar için korneal ektazi taramasına yönelik yapılandırılmış, kanıt bağlantılı ve teknik rehber.")
+        breadcrumb = (("Ana Sayfa", "/"), ("Eğitim Merkezi", ""))
+        hero = ("Cerrah eğitimi", "CER-AI Eğitim Merkezi", "Oftalmologlar ve refraktif cerrahlar için korneal ektazi taramasına yönelik yapılandırılmış, kanıt bağlantılı ve teknik rehber.")
         curriculum = ("Müfredat", "Klinik soruya göre öğrenin", "Her modül kanıt sınırlarını belirtir; birincil literatüre veya üretici dokümantasyonuna bağlanır. Hiçbir eğitim sayfası hastaya özgü sonuç hesaplamaz.", "Modülü aç")
     else:
         description = "CER-AI surgeon education on corneal ectasia, Pentacam, BAD-D, topometric indices, ERSS, NICE, PS3, map patterns, tissue safety, cases, and methodology."
@@ -926,7 +926,7 @@ def render_topic(base: str, robots: str, topic: Topic, locale: str = "en") -> st
     related = [candidate for candidate in topics if candidate.slug != topic.slug][:3]
     related_cards = "".join(f'<a class="related-card" href="{_path(locale, f"/learning/{t.slug}")}"><span>{escape(t.eyebrow)}</span><strong>{escape(t.title)}</strong></a>' for t in related)
     if locale == "tr":
-        crumbs = (("Ana Sayfa", "/"), ("Öğrenme Merkezi", "/tr/learning-center"), (topic.title, ""))
+        crumbs = (("Ana Sayfa", "/"), ("Eğitim Merkezi", "/tr/learning-center"), (topic.title, ""))
         scope = ("Eğitim kapsamı", "Bu modül güncel CER-AI uygulamasını açıklar. CER-AI klinik değerlendirmesi yapmaz veya klinik motoru değiştirmez.")
         sources = ("Seçilmiş kaynaklar", 'Daha geniş bağlam için <a href="/references">eksiksiz CER-AI tıbbi kaynak kayıt sistemine</a> bakın.')
         continue_label = "Öğrenmeye devam"
@@ -950,7 +950,7 @@ def render_faq(base: str, robots: str, locale: str = "en") -> str:
     path = _path(locale, "/learning/faq")
     faqs = TR_FAQS if locale == "tr" else FAQS
     description = "CER-AI eğitimi, ektazi taraması, kanıt sınırları ve planlanan eğitim asistanı hakkında cerrah soruları." if locale == "tr" else "Frequently asked surgeon questions about CER-AI education, ectasia screening concepts, evidence boundaries, and the planned educational assistant."
-    name = "CER-AI Öğrenme Merkezi SSS" if locale == "tr" else "CER-AI Learning Center FAQ"
+    name = "CER-AI Eğitim Merkezi SSS" if locale == "tr" else "CER-AI Learning Center FAQ"
     schema = {
         "@context": "https://schema.org",
         "@type": "FAQPage",
@@ -965,7 +965,7 @@ def render_faq(base: str, robots: str, locale: str = "en") -> str:
     }
     items = "".join(f"<details><summary>{escape(q)}</summary><p>{escape(a)}</p></details>" for q, a in faqs)
     if locale == "tr":
-        crumbs = (("Ana Sayfa", "/"), ("Öğrenme Merkezi", "/tr/learning-center"), ("SSS", ""))
+        crumbs = (("Ana Sayfa", "/"), ("Eğitim Merkezi", "/tr/learning-center"), ("SSS", ""))
         hero = ("Eğitim soruları", "SSS ve eğitim asistanı sınırı", "Kamusal öğrenme kaynaklarını kullanan cerrahlar için kısa ve kanıt sınırları belirlenmiş yanıtlar.")
         assistant = '<p class="learning-kicker">Planlanan asistan</p><h2>Yalnız kamusal eğitim</h2><p>Gelecekteki eğitim asistanı, atıf yapılmış kamusal bilgi tabanından yanıt verecek ve cerrahları ilgili modüllere yönlendirecektir.</p><ul><li>Hasta verisi yok</li><li>Klinik puanlama yok</li><li>Cerrahi karar yok</li><li>CER-AI motorunda değişiklik yok</li></ul><p>Kanıta bağlı erişim katmanı uygulanıp test edilene kadar CER-AI kamusal bir sohbet botunu klinik otorite olarak sunmaz.</p>'
         page_title = "SSS ve Eğitim Asistanı"
@@ -988,7 +988,7 @@ def render_case(base: str, robots: str, case: SampleCase, locale: str = "en") ->
     pathway_rows = "".join(f"<tr><th scope=\"row\">{escape(name)}</th><td>{escape(calculation)}</td><td><strong>{escape(status)}</strong></td></tr>" for name, calculation, status in case.pathways)
     points = "".join(f"<li>{escape(point)}</li>" for point in case.learning_points)
     if locale == "tr":
-        crumbs = (("Ana Sayfa", "/"), ("Öğrenme Merkezi", "/tr/learning-center"), ("Klinik olgular", "/tr/learning/clinical-cases"), (case.title, ""))
+        crumbs = (("Ana Sayfa", "/"), ("Eğitim Merkezi", "/tr/learning-center"), ("Klinik olgular", "/tr/learning/clinical-cases"), (case.title, ""))
         labels = ("Sentetik eğitim olgusu", "Gerçek hasta verisi değildir", "Bu çalışılmış örnek, güncel CER-AI v0.7.71 kurallarını öğretmek için oluşturulmuştur. Klinik karar değildir.", "Kaynak girdiler", "Alan", "Değer", "Yol değerlendirmesi", "Sistem", "Hesaplama / bulgu", "Sonuç", "Nihai CER-AI sonucu", "Rapor özeti", "Öğrenme noktaları")
         page_title = f"{case.title} — CER-AI eğitim olgusu"
     else:
