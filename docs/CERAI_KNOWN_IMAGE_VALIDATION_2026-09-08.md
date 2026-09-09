@@ -4,7 +4,7 @@
 
 The transcription and simulation below are retained as historical evidence for this supplied image set. They are not a complete acceptance of the later staging release. The original absence of a local model credential does not describe Railway staging, where model extraction was subsequently observed.
 
-The later PS3 axis amendment uses the BAD upper-middle flat Axis beside K1; it does not redefine the independent Show 2 `K1_axis_deg` field. ML7 also has dedicated BAD K1/K2 fields. Missing Show 2 K1 axis in this historical table must not be used to claim that the PS3 BAD flat axis is absent. See the updated master matrix and production review for current validation gaps.
+The later PS3 axis amendment uses the BAD upper-middle flat Axis beside K1; it does not redefine the independent Show 2 `K1_axis_deg` field. ML7 uses dedicated 4 Maps Refractive Anterior Sagittal Curvature K1/K2 fields. Missing Show 2 K1 axis in this historical table must not be used to claim that the PS3 BAD flat axis is absent. See the updated master matrix and production review for current validation gaps.
 
 ## Subsequent accepted PS3 amendment
 

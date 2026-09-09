@@ -7,6 +7,7 @@ import assessment_workflow as workflow
 _DECISION_FIELDS = (
     "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp", "Dt", "Da", "ARTmax_um", "PPI_max"
 )
+_PLANNING_FIELDS = ("ml7_k1_d", "ml7_k2_d", "corneal_diameter_mm")
 
 
 def _eye(name="OD", **overrides):
@@ -14,6 +15,9 @@ def _eye(name="OD", **overrides):
         "eye": name,
         "Kmean_D": 43.0,
         "K2_D": 44.0,
+        "ml7_k1_d": 42.0,
+        "ml7_k2_d": 44.0,
+        "corneal_diameter_mm": 11.8,
         "central_pachy_um": 550.0,
         "pachy_thinnest_um": 545.0,
         "BAD_D": 1.0,
@@ -34,7 +38,7 @@ def _eye(name="OD", **overrides):
         "B_Ele_Th_um": 10.0,
         "srax": "NO",
         "srax_deg": 10.0,
-        "table_verified_numeric_fields": list(_DECISION_FIELDS),
+        "table_verified_numeric_fields": list(_DECISION_FIELDS + _PLANNING_FIELDS),
         "field_provenance": {key: [{"source": "TEST_CANONICAL_SOURCE", "file": f"{name}.png"}] for key in _DECISION_FIELDS},
         "data_conflicts": [],
         "missing_or_unreadable": [],

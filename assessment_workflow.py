@@ -109,6 +109,38 @@ def missing_items(decision, extracted=None):
     return list(dict.fromkeys(items))
 
 
+def planning_missing_items(decision, extracted):
+    """Require source-complete ring planning after a favorable LASIK result.
+
+    This is a report-completion gate only.  It does not alter the clinical
+    assessment, plan selection, thresholds, or disposition.
+    """
+    source_eyes = {
+        eye.get("eye"): eye
+        for eye in (extracted or {}).get("eyes") or []
+        if eye.get("eye") in {"OD", "OS"}
+    }
+    items = []
+    for eye in decision.get("eyes") or []:
+        eye_id = eye.get("eye")
+        report = eye.get("report_payload") or {}
+        planning = report.get("planning") or {}
+        ml7 = report.get("microkeratome_planning") or {}
+        if (
+            eye_id not in source_eyes
+            or str(report.get("procedure") or "").upper() != "LASIK"
+            or not planning.get("selected_plan")
+            or not ml7.get("applicable")
+            or (ml7.get("vacuum_ring_mm") is not None and ml7.get("vacuum_pressure_mmhg") is not None)
+        ):
+            continue
+        source_eye = source_eyes[eye_id]
+        for field in ("ml7_k1_d", "ml7_k2_d", "corneal_diameter_mm"):
+            if not _finite(source_eye.get(field)):
+                items.append((eye_id, f"ML7 planning: {field}"))
+    return list(dict.fromkeys(items))
+
+
 def _with_region(item, extracted):
     hints = region_hints(extracted, item.get("eye"), item.get("key"))
     if hints:
@@ -491,6 +523,8 @@ def _respond(core, token, session, age, plans, modifiers, metadata, overrides):
     )
     effective = deepcopy(decision.get("effective_eye_plans") or {})
     missing = missing_items(decision, extracted)
+    missing.extend(planning_missing_items(decision, extracted))
+    missing = list(dict.fromkeys(missing))
     requests = _dedupe_requests([
         _request(eye, message, extracted) for eye, message in missing
     ])

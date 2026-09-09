@@ -63,8 +63,8 @@ FIELD_LABELS = {
     "K1_D": "K1", "K1_axis_deg": "K1 axis", "K2_D": "K2",
     "K2_axis_deg": "K2 axis", "Kmean_D": "Km",
     "topographic_astig_D": "Astigmatism",
-    "ml7_bad_k1_d": "ML7 K1 (BAD Display)",
-    "ml7_bad_k2_d": "ML7 K2 (BAD Display)",
+    "ml7_k1_d": "ML7 K1 (Four Maps Anterior Sagittal Curvature)",
+    "ml7_k2_d": "ML7 K2 (Four Maps Anterior Sagittal Curvature)",
     "bad_flat_axis_deg": "PS3 BAD Axis (flat meridian, beside K1)",
     "topographic_steep_axis_deg": "Displayed steep/astigmatic axis",
     "Rmin_mm": "Posterior Rmin", "topometric_RMin": "Topometric RMin",
@@ -381,7 +381,7 @@ def build_pdf(payload: Mapping[str, Any]) -> bytes:
     styles.add(ParagraphStyle(name="Warning", parent=styles["Notice"], textColor=_rl(AMBER), backColor=_rl(AMBER_FILL)))
     output = BytesIO()
     doc = SimpleDocTemplate(output, pagesize=letter, leftMargin=.65 * inch, rightMargin=.65 * inch, topMargin=.65 * inch, bottomMargin=.75 * inch)
-    story = [Paragraph(tr("CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT"), styles["CERTitle"]), Paragraph(escape(PROGRAM_NAME), styles["Cell"]), Spacer(1, 6), Paragraph(escape(liability_notice(locale)), styles["Notice"])]
+    story = [Paragraph(tr("CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT"), styles["CERTitle"]), Paragraph(escape(tr(PROGRAM_NAME)), styles["Cell"]), Spacer(1, 6), Paragraph(escape(liability_notice(locale)), styles["Notice"])]
     story.append(Spacer(1, REPORT_BLANK_LINE_PT))
     patient = model["patient"]
     story.append(_pdf_table([
@@ -508,7 +508,7 @@ def build_docx(payload: Mapping[str, Any]) -> bytes:
     title = document.add_paragraph(); title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     title.paragraph_format.line_spacing = Pt(20); title.paragraph_format.space_after = Pt(4)
     run = title.add_run(tr("CER-AI PREOPERATIVE ECTASIA RISK ASSESSMENT")); run.bold = True; run.font.size = Pt(17); run.font.color.rgb = RGBColor.from_string(NAVY)
-    subtitle = document.add_paragraph(PROGRAM_NAME); subtitle.paragraph_format.space_after = Pt(6)
+    subtitle = document.add_paragraph(tr(PROGRAM_NAME)); subtitle.paragraph_format.space_after = Pt(6)
     notice = _docx_notice(document, liability_notice(locale), GRAY, GRAY_FILL)
     notice.paragraph_format.space_after = Pt(8 + REPORT_BLANK_LINE_PT)
     patient = model["patient"]

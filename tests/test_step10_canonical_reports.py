@@ -96,7 +96,7 @@ def test_model_contains_every_canonical_clinical_report_section_without_recalcul
 
 def test_safe_plan_and_ml7_hinge_vacuum_ring_are_green_without_highlighting_blade():
     rows = _section(
-        reports.canonical_report_model(_payload(ml7_bad_k1_d=40, ml7_bad_k2_d=45)),
+        reports.canonical_report_model(_payload(ml7_k1_d=40, ml7_k2_d=45)),
         "OD",
         "Procedure planning",
     )

@@ -3,6 +3,21 @@
   const stored = (localStorage.getItem("cerai-language") || "en").toLowerCase();
   const locale = stored === "tr" ? "tr" : "en";
   const TR = {
+    "Corneal Ectasia Risk Assessment Intelligence":"Kornea Ektazi Risk Değerlendirme Zekâsı",
+    "ASSESSMENT":"DEĞERLENDİRMESİ","definition":"Tanım","Applicability":"Uygulanabilirlik",
+    "Not applicable to selected non-LASIK procedure":"Seçilen LASIK dışı işlem için uygulanamaz",
+    "Points / disposition":"Puan / karar","Displayed component; not recalculated":"Gösterilen bileşen; yeniden hesaplanmadı",
+    "Information / QC only":"Yalnızca bilgi / kalite kontrolü",
+    "HWTW (mm; 4 Maps Refractive lower-left labeled box)":"HWTW (mm; 4 Maps Refractive sol alt etiketli kutu)",
+    "applicable":"Uygulanabilir","assessment_gate":"Değerlendirme sonucu",
+    "blade_recommendations":"Bıçak önerileri","primary_hinge":"Birincil menteşe",
+    "steep_meridian_axis_deg":"Dik meridyen aksı (°)","hinge_location_preference":"Tercih edilen menteşe konumu",
+    "hinge_location_alternative":"İkincil menteşe konumu","alternative_hinge":"Alternatif menteşe",
+    "delta_k_d":"Dik-düz K farkı (D)","ring_tzone_clearance_mm":"Halka-geçiş zonu farkı (mm)",
+    "alternative_rsb_um":"Alternatif RSB (µm)","alternative_pta_percent":"Alternatif PTA (%)",
+    "alternative_safety":"Alternatifin güvenliği","warnings":"Uyarılar","notes":"Notlar",
+    "status_independent":"Nihai karardan bağımsız","source":"Kaynak",
+    "NOT_APPLICABLE":"Uygulanamaz","ALLOWED":"UYGULANABİLİR","NOT_ALLOWED":"UYGULANAMAZ",
     "English":"English","Turkish":"Türkçe","Language":"Dil",
     "Case inputs":"Vaka girdileri","Report identification":"Rapor kimlik bilgileri",
     "Patient name":"Hasta adı","Patient ID / record number":"Hasta kimliği / dosya numarası",
@@ -124,6 +139,19 @@
     "NORMAL_SYMMETRIC":"NORMAL_SİMETRİK","LOWER_FLAGGED_BURDEN":"DÜŞÜK UYARI YÜKÜ","MYOPIC":"MİYOPİK","HYPEROPIC":"HİPERMETROPİK","MIXED":"KARMA",
   };
   const CLINICAL = {
+    "Temporal hinge (default)":"Temporal menteşe (varsayılan)",
+    "Plano/standard blade unless another rule or clinical factor applies":"Başka bir kural veya klinik faktör yoksa plano/standart bıçak",
+    "Recommendation only; surgeon must verify anatomy, device setup, and the active ML7 manual before use.":"Yalnızca öneridir; cerrah kullanımdan önce anatomiyi, cihaz ayarlarını ve güncel ML7 kılavuzunu doğrulamalıdır.",
+    "If the selected ring leaks, does not hold vacuum, or is too large, the active ML7 reference directs selection of one smaller ring.":"Seçilen halka kaçırıyor, vakumu tutmuyor veya fazla büyükse güncel ML7 referansı bir küçük halka seçilmesini belirtir.",
+    "Hyperopic W2W xx.60+ rounded upward under the active ML7 reference.":"Hipermetropik W2W xx.60+ güncel ML7 referansına göre yukarı yuvarlandı.",
+    "Steepest K is outside the supplied nomogram range; no ring is inferred.":"En dik K, sağlanan nomogram aralığının dışındadır; halka seçimi yapılmamıştır.",
+    "ML7 K1/K2 unavailable: enter both from the 4 Maps Refractive Anterior Sagittal Curvature (Front) labeled values; no vacuum-ring recommendation was generated.":"ML7 K1/K2 mevcut değil: her iki değeri 4 Maps Refractive Anterior Sagittal Curvature (Front) bölümündeki etiketli değerlerden girin; vakum halkası önerisi oluşturulmadı.",
+    "Verified horizontal white-to-white (HWTW) unavailable: enter HWTW from the 4 Maps Refractive lower-left labeled box; no vacuum-ring recommendation was generated.":"Doğrulanmış yatay beyazdan beyaza mesafe (HWTW) mevcut değil: HWTW değerini 4 Maps Refractive ekranının sol alt etiketli kutusundan girin; vakum halkası önerisi oluşturulmadı.",
+    "Active ML7 reference advises 580-590 mmHg when pachymetry is <530 µm, with corneal K taking priority.":"Güncel ML7 referansı, pakimetri <530 µm olduğunda korneal K öncelikli olmak üzere 580-590 mmHg önerir.",
+    "Pachymetry <=500 µm: active ML7 reference recommends -10 blade when seeking a thinner flap/more residual stroma.":"Pakimetri <=500 µm: güncel ML7 referansı daha ince flep / daha fazla rezidüel stroma hedefleniyorsa -10 bıçak önerir.",
+    "K <=39 D: active ML7 reference recommends +10 or +20 blade.":"K <=39 D: güncel ML7 referansı +10 veya +20 bıçak önerir.",
+    "Ablation/transition zone is not 0.4-0.5 mm smaller than the selected ring (active ML7 reference optimum).":"Ablasyon / geçiş zonu seçilen halkadan 0,4-0,5 mm daha küçük değildir (güncel ML7 referansının ideal farkı).",
+    "MED-LOGICS ML7 Rev. 22 active Turkish reference + CER-AI hinge amendment":"MED-LOGICS ML7 Rev. 22 güncel Türkçe referans + CER-AI menteşe değişikliği",
     "STOP-DEFER; do not proceed with elective corneal refractive surgery.":"DURDUR-ERTELE; elektif korneal refraktif cerrahiye devam etmeyin.",
     "STOP/DEFER; repeat relevant ectasia screening and reassess after at least 6 months.":"DURDURUN/ERTELEYİN; ilgili ektazi taramasını tekrarlayın ve en az 6 ay sonra yeniden değerlendirin.",
     "CER-AI assessment PASS; this is not a guarantee of zero ectasia risk.":"CER-AI değerlendirmesi UYGUN; bu sonuç ektazi riskinin sıfır olduğunu garanti etmez.",
@@ -160,6 +188,7 @@
     if (locale !== "tr" || !text) return text;
     if (CLINICAL[text]) return CLINICAL[text];
     if (TR[text]) return TR[text];
+    if (text.startsWith("ML7 ") && TR[text.slice(4)]) return `ML7 ${TR[text.slice(4)]}`;
     return text
       .replace(/^CER-AI SCORE — SOURCE & BREAKDOWN:/,"CER-AI PUANI — KAYNAK VE DÖKÜM:")
       .replace(/^ECTASIA RISK INTERPRETATION:/,"EKTAZİ RİSK YORUMU:")
@@ -179,6 +208,9 @@
       .replace(/Superior hinge at the vertical steep meridian/g,"Dikey dik meridyende superior menteşe")
       .replace(/Temporal hinge preferred at the horizontal steep meridian/g,"Yatay dik meridyende temporal menteşe tercih edilir")
       .replace(/surgeon determines the anatomical hinge location/g,"cerrah anatomik menteşe konumunu belirler")
+      .replace(/Astigmatic disparity within validation thresholds: magnitude difference ([\d.]+) D; axis difference ([\d.]+)°; no PS3 consequence\./g,"Astigmatik uyumsuzluk doğrulama sınırları içindedir: büyüklük farkı $1 D; aks farkı $2°; PS3 sonucu etkilenmez.")
+      .replace(/\bdefinition:/g,"Tanım:")
+      .replace(/Temporal hinge \(default\)/g,"Temporal menteşe (varsayılan)")
       .replace(/^Superior$/,"Superior")
       .replace(/^Temporal$/,"Temporal")
       .replace(/^Nasal$/,"Nazal")

@@ -131,7 +131,7 @@
 </main>
 <footer class="app-legal-footer">Developed by Hüseyin Cengiz, MD. All rights reserved. Final responsibility rests with the surgeon at all times and under all circumstances.</footer>
 
-<script src="/static/i18n.js?v=9"></script>
+<script src="/static/i18n.js?v=10"></script>
 <script src="/static/assessment-readiness.js?v=5"></script>
 <script>
 const i18n=window.CERAI_I18N;
@@ -587,10 +587,16 @@ function displayValue(value){
   if(typeof value==="object")return Object.entries(value).map(([key,item])=>`${key}: ${displayValue(item)}`).join("; ");
   return String(value);
 }
+function reportDisplayValue(value){
+  if(value===null||value===undefined||value==="")return "—";
+  if(Array.isArray(value))return value.map(reportDisplayValue).join("; ");
+  if(typeof value==="object")return Object.entries(value).map(([key,item])=>`${i18n.translate(key)}: ${reportDisplayValue(item)}`).join("; ");
+  return i18n.clinical(String(value));
+}
 function canonicalTable(title,headers,rows,greenLabels=[]){
   if(!rows.length)return "";
   const green=new Set(greenLabels);
-  return `<div class="finding-group"><h4>${safe(i18n.translate(title))}</h4><table class="clinical-table"><thead><tr>${headers.map(value=>`<th>${safe(i18n.translate(value))}</th>`).join("")}</tr></thead><tbody>${rows.map(row=>`<tr class="${green.has(row[0])?"safe-plan-row":""}">${row.map(value=>`<td>${safe(displayValue(value))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+  return `<div class="finding-group"><h4>${safe(i18n.translate(title))}</h4><table class="clinical-table"><thead><tr>${headers.map(value=>`<th>${safe(i18n.translate(value))}</th>`).join("")}</tr></thead><tbody>${rows.map(row=>`<tr class="${green.has(row[0])?"safe-plan-row":""}">${row.map(value=>`<td>${safe(reportDisplayValue(value))}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
 }
 function provenanceText(entries){
   return (entries||[]).map(item=>[item.source,item.region,item.file].filter(Boolean).join(" / ")||displayValue(item)).join("; ")||"—";
@@ -609,13 +615,13 @@ function renderEye(r){
   const safetyRows=Object.entries(p.tissue_safety||{}).map(([key,value])=>[key,value]);
   const ml7Labels={steep_meridian_axis_deg:"Steep meridian axis",hinge_location_preference:"Preferred hinge location",hinge_location_alternative:"Secondary hinge location",vacuum_ring_mm:"Vacuum ring",vacuum_pressure_mmhg:"Vacuum pressure"};
   const planningLabels={selected_plan:"Selected LASIK plan",selected_plan_definition:"Selected plan parameters",selection_rule:"Plan-selection priority"};
-  const planningEntries=Object.entries(p.planning||{}).filter(([key])=>key!=="selected_plan_definition").map(([key,value])=>[planningLabels[key]||key,i18n.clinical(key==="selected_plan"?(p.planning?.selected_plan_definition||value):value)]);
-  const planningRows=[["Procedure",p.procedure],...planningEntries,...Object.entries(p.microkeratome_planning||{}).map(([key,value])=>[`ML7 ${ml7Labels[key]||key}`,i18n.clinical(value)])];
+  const planningEntries=Object.entries(p.planning||{}).filter(([key])=>key!=="selected_plan_definition").map(([key,value])=>[planningLabels[key]||key,key==="selected_plan"?(p.planning?.selected_plan_definition||value):value]);
+  const planningRows=[["Procedure",p.procedure],...planningEntries,...Object.entries(p.microkeratome_planning||{}).map(([key,value])=>[`ML7 ${ml7Labels[key]||key}`,value])];
   const greenPlanningRows=p.planning?.selected_plan?["Selected LASIK plan","ML7 Preferred hinge location","ML7 Vacuum ring","ML7 Vacuum pressure"]:[];
   const driverRows=["stop","caution","incomplete"].flatMap(level=>(p.decision_drivers?.[level]||[]).map(item=>[level.toUpperCase(),item]));
   const sourceRows=Object.entries(p.source_values||{}).map(([key,value])=>[key,value,provenanceText(p.source_provenance?.[key])]);
   const correctionRows=(p.manual_corrections||[]).map(item=>[item.field,item.original,item.value,item.label]);
-  return `<section class="eye-result"><div class="eye-head"><strong>${safe(r.eye)} ASSESSMENT</strong><span class="status ${statusClass(r.status)}">${safe(statusHeadline(r))}</span></div><div class="eye-body">
+  return `<section class="eye-result"><div class="eye-head"><strong>${safe(r.eye)} ${safe(i18n.translate("ASSESSMENT"))}</strong><span class="status ${statusClass(r.status)}">${safe(statusHeadline(r))}</span></div><div class="eye-body">
     <p class="eye-action"><strong>Clinical action:</strong> ${safe(i18n.clinical(r.action))}</p>
     ${canonicalTable("Randleman / ERSS",["Component","Points"],erssRows)}
     ${canonicalTable("NICE",["Component","Input","Points / disposition"],niceRows)}
