@@ -255,9 +255,11 @@ for(const eye of ["od","os"]){
   manifestCylinder.addEventListener("input",()=>{
     const cylinder=numberOrNull(`${eye}_manifest_cylinder`);
     if(cylinder!==0)return;
-    manifestCylinder.value="0.00";
+    // Preserve the surgeon's in-progress text. Reformatting values such as
+    // "0." or "0.0" on every keystroke traps a prefilled zero and prevents
+    // it from being cleared or replaced, particularly on mobile keyboards.
     refractionDefaultWrite.add(`${eye}:cylinder`);
-    intendedCylinder.value="0.00";
+    intendedCylinder.value="0";
     intendedCylinder.dispatchEvent(new Event("input",{bubbles:true}));
     refractionDefaultWrite.delete(`${eye}:cylinder`);
     axis.value="0";
