@@ -5,6 +5,7 @@ exports, patient records, or clinical inputs.
 """
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 import matplotlib
@@ -146,7 +147,10 @@ def watermark(fig: plt.Figure) -> None:
 def save(fig: plt.Figure, filename: str) -> None:
     OUTPUT.mkdir(parents=True, exist_ok=True)
     destination = OUTPUT / Path(filename).with_suffix(".svg")
-    fig.savefig(destination, format="svg", facecolor="white", bbox_inches="tight")
+    buffer = io.StringIO()
+    fig.savefig(buffer, format="svg", facecolor="white", bbox_inches="tight")
+    ascii_svg = buffer.getvalue().encode("ascii", "xmlcharrefreplace").decode("ascii")
+    destination.write_text(ascii_svg, encoding="ascii")
     plt.close(fig)
 
 
