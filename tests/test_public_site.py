@@ -396,6 +396,22 @@ def test_worked_cases_are_bilingual_indexable_and_clearly_synthetic():
             assert "Tüm hakları saklıdır" in turkish.text
 
 
+def test_turkish_clinical_case_language_is_clear_and_clinically_natural():
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        response = client.get("/tr/learning/clinical-cases")
+        assert response.status_code == 200
+        for phrase in (
+            "Klinik örnek olgular",
+            "Olgu A: birbiriyle uyumlu risk bulguları",
+            "aynı şüpheli örüntüyü destekler",
+            "Bayes yaklaşımı: ön-test olasılığı önemlidir",
+            "düşük riskli rutin refraktif cerrahi adayında",
+        ):
+            assert phrase in response.text
+        for phrase in ("Klinik akıl yürütme olguları", "uyumlu kaygı", "Bayesçi uyarı"):
+            assert phrase not in response.text
+
+
 def test_every_learning_page_has_explicit_owner_and_rights_notice():
     with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
         for path in (
