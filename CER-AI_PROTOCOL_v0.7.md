@@ -191,3 +191,17 @@ Temporal is the default preferred hinge location. When `steepest K - flattest K 
 ### Automatic PRK evaluation after LASIK failure — 2026-09-08
 
 A definitive LASIK STOP-DEFER triggers one PRK evaluation per failed eye. Incomplete LASIK alone does not trigger the transition. The original LASIK assessment and candidate history remain in `lasik_assessment`. PRK uses the requested correction, requested optical zone, and shared ablation resolution; the flap is None. All PRK tissue, ERSS, NICE, PS3, BAD and eligibility rules run through the same canonical core. A successful fellow-eye LASIK plan is unchanged. The workflow exposes an eye-specific warning, “LASIK failed. Now evaluating PRK.”, including when completion inputs remain missing. The evaluated PRK result is not an automatic clearance: shared stops and missing inputs remain effective. Browser presentation contains no clinical decision logic.
+
+
+### SRAX surgeon confirmation — 2026-09-09
+
+For nonnegative signed I-S, application-measured SRAX above 20° requires an explicit
+surgeon YES/NO answer before the final report is issued. The shared decision owner
+is `srax_policy.srax_positive`; ERSS and PS3 consume this decision.
+YES confirms the existing SRAX-positive scoring; NO rejects the positive classification.
+The measured degrees remain visible and the existing correction audit records the answer.
+An unanswered question is incomplete, never silently NO. Exactly 20° does not trigger
+this confirmation. Negative signed I-S skips the question and retains the existing
+signed-I-S category and SRAX exclusion. Other clinical findings still apply.
+The existing completion workflow presents one question per applicable eye and blocks
+the final report until it is resolved; no report-side score correction is used.

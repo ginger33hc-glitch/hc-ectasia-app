@@ -63,8 +63,10 @@ def _modifiers():
     }
 
 
-def _evaluate(i_s, srax_deg):
+def _evaluate(i_s, srax_deg, confirmation=None):
     extracted = {"eyes": [_eye("OD", i_s=i_s, srax_deg=srax_deg), _eye("OS", i_s=0.0, srax_deg=10.0)]}
+    if confirmation is not None:
+        extracted["eyes"][0].update(srax=confirmation, field_provenance={"srax": [{"source": "SURGEON_CONFIRMED"}]})
     result = evaluate_case(
         extracted,
         35,
@@ -90,7 +92,7 @@ def test_i_s_1_40_sets_four_point_topography_without_requiring_srax():
 
 
 def test_srax_runtime_boundary_is_strictly_greater_than_20():
-    expected = {19.9: 1, 20.0: 1, 20.1: 3}
+    expected = {19.9: 1, 20.0: 1, 20.1: None}
     actual = {
         value: _evaluate(0.51, value)["score"]["rows"]["topography"]
         for value in expected
@@ -106,7 +108,7 @@ def test_negative_i_s_stays_non_inferior_even_with_large_srax():
 
 
 def test_i_s_and_srax_remain_one_topography_row_not_additive():
-    od = _evaluate(0.51, 20.1)
+    od = _evaluate(0.51, 20.1, "YES")
     assert od["score"]["rows"]["topography"] == 3
     assert od["score"]["total"] == 3
 

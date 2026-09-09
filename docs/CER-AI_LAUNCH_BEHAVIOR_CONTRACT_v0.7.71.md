@@ -261,3 +261,17 @@ During Phase 2 and Phase 3, a proposed architectural change is acceptable only w
 5. any intentional clinical behavior change is separately documented and explicitly approved.
 
 Implementation details such as wrapper identity are **not** part of this long-term contract. Observable clinical behavior, source ownership, disposition, and safety boundaries are.
+
+
+### SRAX surgeon confirmation — 2026-09-09
+
+For nonnegative signed I-S, application-measured SRAX above 20° requires an explicit
+surgeon YES/NO answer before the final report is issued. The shared decision owner
+is `srax_policy.srax_positive`; ERSS and PS3 consume this decision.
+YES confirms the existing SRAX-positive scoring; NO rejects the positive classification.
+The measured degrees remain visible and the existing correction audit records the answer.
+An unanswered question is incomplete, never silently NO. Exactly 20° does not trigger
+this confirmation. Negative signed I-S skips the question and retains the existing
+signed-I-S category and SRAX exclusion. Other clinical findings still apply.
+The existing completion workflow presents one question per applicable eye and blocks
+the final report until it is resolved; no report-side score correction is used.

@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from math import isfinite
 from typing import Optional, Tuple
 
+from srax_policy import srax_positive
+
 NORMAL = "NORMAL"
 MODERATE = "MODERATE"
 HIGH = "HIGH"
@@ -39,7 +41,7 @@ class PS3EyeInput:
     f_ele_th_um: Optional[float] = None
     b_ele_th_um: Optional[float] = None
     i_s_d: Optional[float] = None
-    srax: Optional[str] = None
+    srax: Optional[str] = None  # Explicit surgeon confirmation only; machine classification is not an answer.
     srax_deg: Optional[float] = None
 
 
@@ -211,28 +213,22 @@ def evaluate_ps3(eye, inter_eye=None):
             "srax", NORMAL,
             f"Front-map SRAX {measured}; signed I-S {i_s_d:g} D is negative (superior asymmetry), so SRAX does not create an inferior-steepening PS3 factor.",
         ))
-    elif srax_deg is not None:
-        status = HIGH if srax_deg > 20 else NORMAL
-        relation = ">" if srax_deg > 20 else "<="
-        findings.append(PS3Finding(
-            "srax", status,
-            f"Front-map SRAX {srax_deg:.1f}° {relation} 20°. Source: Axial/Sagittal Curvature (Front).",
-        ))
-    elif srax_state == "YES":
-        findings.append(PS3Finding(
-            "srax", HIGH,
-            "Surgeon/front-map confirmation: SRAX >20°.",
-        ))
-    elif srax_state == "NO":
-        findings.append(PS3Finding(
-            "srax", NORMAL,
-            "Surgeon/front-map confirmation: SRAX is not >20°.",
-        ))
     else:
-        findings.append(PS3Finding(
-            "srax", NOT_EVALUATED,
-            "SRAX cannot be determined from the Axial/Sagittal Curvature (Front) map; ask surgeon whether skewed axis is >20°.",
-        ))
+        confirmed = {"YES": True, "NO": False}.get(srax_state)
+        positive = srax_positive(srax_deg, confirmed)
+        measured = f"Front-map SRAX {srax_deg:.1f}°. " if srax_deg is not None else ""
+        if positive is None:
+            findings.append(PS3Finding(
+                "srax", NOT_EVALUATED,
+                measured + "Surgeon confirmation required: is SRAX >20° on the Axial/Sagittal Curvature (Front) map?",
+            ))
+        else:
+            evidence = (
+                "Surgeon confirmation: SRAX >20°." if confirmed is True else
+                "Surgeon confirmation: SRAX is not >20°." if confirmed is False else
+                f"Front-map SRAX {srax_deg:.1f}° <= 20°. Source: Axial/Sagittal Curvature (Front)."
+            )
+            findings.append(PS3Finding("srax", HIGH if positive else NORMAL, (measured + evidence) if confirmed is not None else evidence))
 
     review_notes = (
         "Corneal Thickness Map morphology: not evaluated; surgeon review required; not counted in automated PS3.",

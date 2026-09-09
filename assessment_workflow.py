@@ -151,6 +151,7 @@ def _srax_request(eye):
         "source_screen": "4 Maps Refractive",
         "source_box": "Axial/Sagittal Curvature (Front) map",
         "help": (
+            "An application measurement above 20° requires your confirmation before scoring and the final report. "
             "Inspect only the Axial/Sagittal Curvature (Front) map. Choose YES only when the skew amount is greater than 20°. "
             "Exact 20.0° is NO. Do not infer SRAX from KISA, I-S, Kmax, BAD-D, elevation, or another surrogate."
         ),

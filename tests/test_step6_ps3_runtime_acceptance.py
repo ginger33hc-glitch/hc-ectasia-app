@@ -157,7 +157,8 @@ def test_ps3_runtime_srax_exact_20_is_negative_but_20_1_is_high():
     finding_20 = next(item for item in at_20["OD"]["ps3"]["findings"] if item["key"] == "srax")
     assert finding_20["status"] == "NORMAL"
 
-    result, over_20 = _evaluate(procedure="PRK", od=_eye("OD", srax_deg=20.1))
+    result, over_20 = _evaluate(procedure="PRK", od=_eye("OD", srax_deg=20.1, srax="YES",
+        field_provenance={"srax": [{"source": "SURGEON_CONFIRMED"}]}))
     finding_20_1 = next(item for item in over_20["OD"]["ps3"]["findings"] if item["key"] == "srax")
     assert finding_20_1["status"] == "HIGH"
     assert over_20["OD"]["status"] == "STOP-DEFER"

@@ -9,6 +9,8 @@ from __future__ import annotations
 from math import isfinite
 from typing import Optional
 
+from srax_policy import srax_positive
+
 NORMAL_SYMMETRIC = "NORMAL_SYMMETRIC"
 ASYMMETRIC_BOWTIE = "ASYMMETRIC_BOWTIE"
 INFERIOR_STEEPENING_SRA = "INFERIOR_STEEPENING_SRA"
@@ -84,7 +86,8 @@ def erss_topography_category(
 
     A binary confirmation is never converted into an invented numeric degree.
     Missing SRAX is UNCERTAIN, not silently equivalent to a negative finding.
-    Exact measured 20.0° is negative. I-S and SRAX are never added.
+    Exact measured 20.0° is negative. Above 20° requires surgeon confirmation.
+    I-S and SRAX are never added.
     """
     i_s_category = signed_i_s_category(i_s_d)
     if i_s_category == UNCERTAIN:
@@ -94,11 +97,8 @@ def erss_topography_category(
     if float(i_s_d) < 0.0:
         return i_s_category
 
-    if _finite(derived_srax_deg):
-        positive = float(derived_srax_deg) > 20.0
-    elif isinstance(srax_gt20_confirmed, bool):
-        positive = srax_gt20_confirmed
-    else:
+    positive = srax_positive(derived_srax_deg, srax_gt20_confirmed)
+    if positive is None:
         return UNCERTAIN
 
     return INFERIOR_STEEPENING_SRA if positive else i_s_category

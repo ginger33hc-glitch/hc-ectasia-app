@@ -58,7 +58,7 @@ def test_i_s_at_1_40_is_abnormal_four_point_category():
 
 
 def test_front_map_srax_over_20_scores_three_when_i_s_can_be_upgraded():
-    category = erss_topography_category(0.5, 20.1)
+    category = erss_topography_category(0.5, 20.1, True)
     assert category == INFERIOR_STEEPENING_SRA
     assert erss_topography_points(category) == 3
 
@@ -68,7 +68,7 @@ def test_exact_20_does_not_trigger_srax():
 
 
 def test_higher_single_category_wins_without_addition():
-    category = erss_topography_category(0.8, 25.0)
+    category = erss_topography_category(0.8, 25.0, True)
     assert category == INFERIOR_STEEPENING_SRA
     assert erss_topography_points(category) == 3
 

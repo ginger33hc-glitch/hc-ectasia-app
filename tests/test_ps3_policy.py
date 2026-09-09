@@ -186,7 +186,7 @@ def test_srax_unavailable_is_incomplete_and_requests_surgeon_review():
     assert result.complete is False
     assert "srax" in result.missing_keys
     assert "Axial/Sagittal Curvature (Front)" in item.detail
-    assert "ask surgeon" in item.detail.lower()
+    assert "surgeon confirmation required" in item.detail.lower()
 
 
 def test_binary_front_map_or_surgeon_confirmation_is_supported_without_numeric_srax():
@@ -205,7 +205,7 @@ def test_irrevocable_defer_still_requires_srax_for_complete_ps3():
 
 
 def test_existing_high_factor_does_not_discard_shared_numeric_srax():
-    result = evaluate_ps3(normal_eye(thinnest_um=469, srax_deg=20.01), normal_inter_eye())
+    result = evaluate_ps3(normal_eye(thinnest_um=469, srax_deg=20.01, srax="YES"), normal_inter_eye())
     assert result.srax_deg == 20.01
     assert finding(result, "srax").status == HIGH
     assert result.high_count == 2
