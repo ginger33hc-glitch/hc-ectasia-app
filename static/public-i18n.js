@@ -6,6 +6,7 @@
   let locale = SUPPORTED.has(requested) ? requested : "en";
 
   const TR = {
+    "Learning Center":"Eğitim Merkezi",
     "Evaluation":"Değerlendirme",
     "Ectasia Assessment":"Ektazi Değerlendirmesi",
     "User Guide":"Kullanım Kılavuzu",
@@ -243,16 +244,27 @@
     });
   }
 
+  function routeLearningCenterLinks() {
+    document.querySelectorAll('a[href="/learning-center"],a[href="/tr/learning-center"]').forEach(link => {
+      const label = (link.textContent || "").trim();
+      if (label === "Learning Center" || label === "Eğitim Merkezi") {
+        link.setAttribute("href", locale === "tr" ? "/tr/learning-center" : "/learning-center");
+      }
+    });
+  }
+
   function setLocale(next) {
     locale = next === "tr" ? "tr" : "en";
     localStorage.setItem(STORAGE_KEY, locale);
     applyToNode(document.body);
+    routeLearningCenterLinks();
     updateSwitcher();
   }
 
   function init() {
     renderSwitcher();
     applyToNode(document.body);
+    routeLearningCenterLinks();
     const observer = new MutationObserver(mutations => {
       for (const mutation of mutations) {
         mutation.addedNodes.forEach(node => {
