@@ -24,7 +24,7 @@ def _pdf_text(data):
 
 
 def test_turkish_exports_translate_current_report_sections_and_preserve_snapshot():
-    payload = _payload(ml7_bad_k1_d=40, ml7_bad_k2_d=45)
+    payload = _payload(ml7_k1_d=40, ml7_k2_d=45)
     payload['locale'] = 'tr'
     payload['patient'].update(name='No Source Şule Işık', id='PASS-NO-035', reviewer='Dr. Çağrı Şen')
     original = deepcopy(payload)
@@ -32,7 +32,7 @@ def test_turkish_exports_translate_current_report_sections_and_preserve_snapshot
     word, pdf = _word_text(document), _pdf_text(reports.build_pdf(payload))
     for content in (word, pdf):
         for required in (
-            'Genel karar', 'OD — UYGUN', 'Cerrahi güvenlik', 'Cerrahi planlama',
+            'Kornea Ektazi Risk Değerlendirme Zekâsı', 'Genel karar', 'OD — UYGUN', 'Cerrahi güvenlik', 'Cerrahi planlama',
             'Kararın gerekçesi', 'Pentacam değerleri ve kaynak bilgileri',
                 'Topografi kategorisi', 'Astigmatik uyumsuzluk doğrulaması', 'Gözler arası puan 0/5.',
             'Kornea kalınlık haritası morfolojisi: değerlendirilmedi; cerrah değerlendirmesi gerekir;',
@@ -47,7 +47,8 @@ def test_turkish_exports_translate_current_report_sections_and_preserve_snapshot
         ):
             assert required in content
         for obsolete in ('Canonical result', 'Procedure disposition', 'selected_plan',
-                         'information only', 'Recommendation only;', 'Inter-eye score'):
+                         'information only', 'Recommendation only;', 'Inter-eye score',
+                         'Corneal Ectasia Risk Assessment Intelligence'):
             assert obsolete not in content
     assert document.core_properties.language == 'tr-TR'
     assert payload == original
@@ -133,3 +134,15 @@ def test_turkish_bad_classifications_and_selected_plan_keep_colors():
     assert selected.cells[1].text == 'Plan A — flep 100 µm; optik zon 6,5 mm; geçiş zonu 9,0 mm'
     assert selected.cells[1]._tc.get_or_add_tcPr().find(qn('w:shd')).get(qn('w:fill')) == reports.GREEN_FILL
     assert 'pachymetry' not in translate_text('Inter-eye score 1/5; exceeded: thinnest pachymetry.', 'tr')
+
+
+def test_turkish_report_translates_dynamic_disparity_sequence_and_default_hinge():
+    payload = _payload()
+    payload['locale'] = 'tr'
+    text = _word_text(Document(BytesIO(reports.build_docx(payload))))
+    assert 'Astigmatic disparity within validation thresholds' not in text
+    assert 'definition:' not in text
+    assert 'Temporal hinge (default)' not in text
+    assert 'Astigmatik uyumsuzluk doğrulama sınırları içindedir' in text
+    assert 'Tanım: Plan A' in text
+    assert 'Temporal menteşe (varsayılan)' in text

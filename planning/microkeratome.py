@@ -168,7 +168,7 @@ def plan_microkeratome(inp: MicrokeratomePlanningInput) -> MicrokeratomePlan:
             warnings.append("Steepest K is outside the supplied nomogram range; no ring is inferred.")
     else:
         if steep is None:
-            warnings.append("ML7 K1/K2 unavailable: enter both from the BAD Display upper-middle numeric boxes; no vacuum-ring recommendation was generated.")
+            warnings.append("ML7 K1/K2 unavailable: enter both from the 4 Maps Refractive Anterior Sagittal Curvature (Front) labeled values; no vacuum-ring recommendation was generated.")
         if w2w is None:
             warnings.append("Verified horizontal white-to-white (HWTW) unavailable: enter HWTW from the 4 Maps Refractive lower-left labeled box; no vacuum-ring recommendation was generated.")
 
