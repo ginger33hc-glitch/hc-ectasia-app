@@ -102,11 +102,16 @@ def test_sitemap_contains_only_public_discovery_pages():
             "/learning-center", "/learning/corneal-ectasia-basics",
             "/learning/pentacam-education", "/learning/bad-d-component-indices",
             "/learning/topometric-indices", "/learning/randleman-erss",
-            "/learning/nice-risk-assessment", "/learning/topography-tomography-patterns",
+            "/learning/nice-risk-assessment", "/learning/ps3-risk-assessment",
+            "/learning/topography-tomography-patterns",
             "/learning/surgical-safety-concepts", "/learning/clinical-cases",
             "/learning/cer-ai-methodology", "/learning/surgeon-learning-modules",
             "/learning/faq", "/corneal-ectasia-risk-assessment",
             "/clinical-evidence", "/references",
+            "/tr/learning-center", "/tr/learning/randleman-erss",
+            "/tr/learning/ps3-risk-assessment", "/tr/learning/faq",
+            "/learning/cases/two-caution-pathways",
+            "/tr/learning/cases/two-caution-pathways",
         ):
             assert f"<loc>https://cer-ai.com{path}</loc>" in text
         assert "<loc>https://cer-ai.com/</loc>" in text
@@ -174,7 +179,7 @@ def test_learning_center_exposes_the_full_public_education_architecture():
         assert response.status_code == 200
         assert response.headers["x-robots-tag"].startswith("index,follow")
         assert '<link rel="canonical" href="https://cer-ai.com/learning-center">' in response.text
-        assert '<link rel="stylesheet" href="/static/technical-public.css?v=2">' in response.text
+        assert '<link rel="stylesheet" href="/static/technical-public.css?v=3">' in response.text
         assert "Education explains the science; the CER-AI application performs the structured assessment." in response.text
         for phrase in (
             "Corneal ectasia: clinical foundations",
@@ -183,6 +188,7 @@ def test_learning_center_exposes_the_full_public_education_architecture():
             "Pentacam topometric indices",
             "Randleman Ectasia Risk Score System (ERSS)",
             "NICE ectasia-risk assessment",
+            "PS3 practical subjective scoring",
             "Corneal topography and tomography patterns",
             "Surgical tissue-safety concepts",
             "Clinical reasoning cases",
@@ -205,7 +211,8 @@ def test_learning_topics_are_crawlable_evidence_linked_and_nonclinical():
         paths = (
             "corneal-ectasia-basics", "pentacam-education",
             "bad-d-component-indices", "topometric-indices", "randleman-erss",
-            "nice-risk-assessment", "topography-tomography-patterns",
+            "nice-risk-assessment", "ps3-risk-assessment",
+            "topography-tomography-patterns",
             "surgical-safety-concepts", "clinical-cases", "cer-ai-methodology",
             "surgeon-learning-modules",
         )
@@ -224,6 +231,96 @@ def test_learning_topics_are_crawlable_evidence_linked_and_nonclinical():
             )
             assert schema is not None
             assert json.loads(schema.group(1))["@type"] == "MedicalWebPage"
+
+
+def test_learning_center_has_first_class_turkish_routes_and_hreflang():
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        hub = client.get("/tr/learning-center")
+        assert hub.status_code == 200
+        assert '<html lang="tr">' in hub.text
+        assert "CER-AI Öğrenme Merkezi" in hub.text
+        assert "Klinik soruya göre öğrenin" in hub.text
+        assert '<link rel="canonical" href="https://cer-ai.com/tr/learning-center">' in hub.text
+        assert '<link rel="alternate" hreflang="en" href="https://cer-ai.com/learning-center">' in hub.text
+        assert '<link rel="alternate" hreflang="tr" href="https://cer-ai.com/tr/learning-center">' in hub.text
+        assert 'href="/learning-center">English</a>' in hub.text
+
+        for slug in (
+            "corneal-ectasia-basics", "pentacam-education",
+            "bad-d-component-indices", "topometric-indices", "randleman-erss",
+            "nice-risk-assessment", "ps3-risk-assessment",
+            "topography-tomography-patterns", "surgical-safety-concepts",
+            "clinical-cases", "cer-ai-methodology", "surgeon-learning-modules",
+        ):
+            response = client.get(f"/tr/learning/{slug}")
+            assert response.status_code == 200
+            assert '<html lang="tr">' in response.text
+            assert f'href="/learning/{slug}">English</a>' in response.text
+            assert "Bu modül" in response.text
+
+
+def test_learning_center_documents_current_scoring_and_report_pipeline():
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        expectations = {
+            "/learning/randleman-erss": (
+                "CER-AI ERSS component scoring", "0–2", "STOP-DEFER",
+                "Manifest MRSE", "LASIK RSB or PRK RST",
+            ),
+            "/learning/bad-d-component-indices": (
+                "Final BAD-D disposition", "&lt;=1.60", "&gt;=2.60",
+                "CER-AI never reconstructs it from Df, Db, Dp, Dt, or Da",
+            ),
+            "/learning/nice-risk-assessment": (
+                "CER-AI-adapted NICE component scoring", "B.Ele.Th", "5–8",
+                "NICE remains independent",
+            ),
+            "/learning/ps3-risk-assessment": (
+                "Automated PS3 factors in CER-AI", "Anterior Km", "PPI Average",
+                "Inter-eye asymmetry", "PS3 procedure disposition",
+            ),
+            "/learning/cer-ai-methodology": (
+                "How independent pathways become the final result",
+                "Four systems complete; 2 CAUTION", "PASS WITH CAUTION",
+                "PDF and Word reports consume the same already-computed canonical report payload",
+            ),
+        }
+        for path, phrases in expectations.items():
+            response = client.get(path)
+            assert response.status_code == 200
+            for phrase in phrases:
+                assert phrase in response.text
+
+
+def test_worked_cases_are_bilingual_indexable_and_clearly_synthetic():
+    slugs = (
+        "concordant-low-risk-lasik", "two-caution-pathways",
+        "srax-ps3-stop", "incomplete-source",
+    )
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        for slug in slugs:
+            english = client.get(f"/learning/cases/{slug}")
+            turkish = client.get(f"/tr/learning/cases/{slug}")
+            assert english.status_code == turkish.status_code == 200
+            assert "Not real patient data" in english.text
+            assert "Synthetic teaching case" in english.text
+            assert "Gerçek hasta verisi değildir" in turkish.text
+            assert "Sentetik eğitim olgusu" in turkish.text
+            assert "Pathway evaluation" in english.text
+            assert "Yol değerlendirmesi" in turkish.text
+            assert "Hüseyin Cengiz, M.D." in english.text
+            assert "Tüm hakları saklıdır" in turkish.text
+
+
+def test_every_learning_page_has_explicit_owner_and_rights_notice():
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        for path in (
+            "/learning-center", "/learning/randleman-erss", "/learning/faq",
+            "/tr/learning-center", "/tr/learning/randleman-erss", "/tr/learning/faq",
+        ):
+            response = client.get(path)
+            assert response.status_code == 200
+            assert '<meta name="author" content="Hüseyin Cengiz, M.D.">' in response.text
+            assert "All rights reserved" in response.text or "Tüm hakları saklıdır" in response.text
 
 
 def test_learning_faq_has_faq_schema_and_explicit_assistant_boundary():
@@ -254,8 +351,8 @@ def test_learning_pages_remain_noindex_outside_canonical_production_host():
             assert response.status_code == 200
             assert '<meta name="robots" content="noindex,nofollow">' in response.text
             assert response.headers["x-robots-tag"] == "noindex,nofollow"
-            assert 'href="/static/technical-public.css?v=2"' in response.text
-            assert 'href="https://cer-ai.com/static/technical-public.css?v=2"' not in response.text
+            assert 'href="/static/technical-public.css?v=3"' in response.text
+            assert 'href="https://cer-ai.com/static/technical-public.css?v=3"' not in response.text
 
 
 def test_unknown_learning_topic_is_not_found():
