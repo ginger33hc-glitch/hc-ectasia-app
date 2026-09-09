@@ -179,7 +179,7 @@ def test_learning_center_exposes_the_full_public_education_architecture():
         assert response.status_code == 200
         assert response.headers["x-robots-tag"].startswith("index,follow")
         assert '<link rel="canonical" href="https://cer-ai.com/learning-center">' in response.text
-        assert '<link rel="stylesheet" href="/static/technical-public.css?v=4">' in response.text
+        assert '<link rel="stylesheet" href="/static/technical-public.css?v=5">' in response.text
         assert "Education explains the science; the CER-AI application performs the structured assessment." in response.text
         for phrase in (
             "Corneal ectasia: clinical foundations",
@@ -318,6 +318,8 @@ def test_pentacam_module_documents_five_sources_quadrants_and_extraction_pipelin
             "Aynı kaynak çelişkisi alanı temizler; ortalama alınmaz",
         ):
             assert phrase in turkish.text
+        assert "Excimer tedavi kartı" in turkish.text
+        assert "Eksimer" not in turkish.text
 
 
 def test_topometric_module_explains_indices_and_their_cerai_roles():
@@ -335,12 +337,37 @@ def test_topometric_module_explains_indices_and_their_cerai_roles():
             assert phrase in response.text
 
 
+def test_bad_d_module_defines_components_units_and_source_separation_bilingually():
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        english = client.get("/learning/bad-d-component-indices")
+        turkish = client.get("/tr/learning/bad-d-component-indices")
+        assert english.status_code == turkish.status_code == 200
+        for phrase in (
+            "What each BAD-D component means",
+            "standard best-fit sphere to the enhanced reference surface",
+            "PPI Average, the displayed underlying progression index",
+            "thinnest-point thickness divided by PPI Maximum",
+            "dimensionless standardized values, not micrometers or diopters",
+            "An isolated abnormal component can coexist with a normal Final D",
+        ):
+            assert phrase in english.text
+        for phrase in (
+            "Her BAD-D bileşeni ne anlama gelir?",
+            "Standart en uygun küreden geliştirilmiş referans yüzeye",
+            "boyutsuz standardize değerlerdir",
+            "İzole anormal bir bileşen normal Final D ile birlikte bulunabilir",
+        ):
+            assert phrase in turkish.text
+
+
 def test_learning_center_styles_use_high_contrast_system_typography():
     css = open("static/technical-public.css", encoding="utf-8").read()
     assert 'font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI"' in css
     assert "color:#243b49" in css
     assert "color:#263e4d" in css
-    assert "font-weight:500" in css
+    assert "font-weight:550" in css
+    assert "font-weight:680" in css
+    assert "font-weight:530" in css
 
 
 def test_worked_cases_are_bilingual_indexable_and_clearly_synthetic():
@@ -403,8 +430,8 @@ def test_learning_pages_remain_noindex_outside_canonical_production_host():
             assert response.status_code == 200
             assert '<meta name="robots" content="noindex,nofollow">' in response.text
             assert response.headers["x-robots-tag"] == "noindex,nofollow"
-            assert 'href="/static/technical-public.css?v=4"' in response.text
-            assert 'href="https://cer-ai.com/static/technical-public.css?v=4"' not in response.text
+            assert 'href="/static/technical-public.css?v=5"' in response.text
+            assert 'href="https://cer-ai.com/static/technical-public.css?v=5"' not in response.text
 
 
 def test_unknown_learning_topic_is_not_found():
