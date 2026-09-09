@@ -398,15 +398,14 @@ TR_TOPICS = (
     ),
     Topic(
         "clinical-cases",
-        "Klinik akıl yürütme olguları",
+        "Klinik örnek olgular",
         "Uyumlu, uyumsuz, eksik ve işleme bağımlı ektazi risk kanıtlarının uzlaştırılmasını gösteren kimliksiz eğitim arketipleri.",
         "Olgu öğrenme modülü",
         (
-            ("Olgu A: uyumlu kaygı", "Ön eğrilik asimetrisi, aynı bölgeye karşılık gelen arka elevasyon sapması ve anormal pakimetrik progresyon aynı yöne işaret eder. Öğrenme görevi; çekim kalitesini ve kaynak kimliğini doğrulamak, ardından yalnızca anormal etiketleri saymak yerine bağımsız kanalların neden uyumlu olduğunu açıklamaktır."),
+            ("Olgu A: birbiriyle uyumlu risk bulguları", "Ön eğrilik asimetrisi, aynı bölgeye karşılık gelen arka elevasyon sapması ve anormal pakimetrik progresyon aynı şüpheli örüntüyü destekler. Öğrenme görevi; çekim kalitesini ve kaynak kimliğini doğrulamak, ardından yalnızca anormal etiketleri saymak yerine birbirinden bağımsız kanalların anatomik olarak neden uyumlu olduğunu açıklamaktır."),
             ("Olgu B: izole bileşik uyarı", "Final BAD-D cihaz referans bandının dışındayken ön eğrilik haritası düzenli görünür. Öğrenme görevi; bileşen sapmalarını, ham elevasyon ve pakimetri ekranlarını, kalite durumunu ve diğer gözü inceleyerek bileşik sinyalin tutarlı mı izole mi olduğunu belirlemektir."),
             ("Olgu C: güven verici şekil, elverişsiz plan", "Topografi ve tomografi güven verici görünür, ancak planlanan flep ve ablasyon geometrisi sınırlı stromal rezerv bırakır. Öğrenme görevi; doku güvenliğini ektazi örüntü taramasından bağımsız tutmak ve normal haritaların planı geçersiz biçimde onaylamasına izin vermemektir."),
             ("Olgu D: karar için kritik kaynak eksik", "Gerekli bir ekran yoktur veya okunamıyordur. Öğrenme görevi eksikliği olumlu sonuç olarak varsaymamak; gerekli alanı ve kaynağı açıkça tanımlamak, uygun olduğunda tekrar inceleme veya cerrahça doğrulanmış değer almak ve belirsizliği kayıtta korumaktır."),
-            ("Bayesçi uyarı", "Bir testin son-test olasılığı yalnızca duyarlılık ve özgüllüğe değil, değerlendirilen popülasyondaki ön-test olasılığına da bağlıdır. Bu nedenle doğrulanmış olsa bile tek bir indeksin sonuçları, seçilmiş cerrahi adaylar ile hastalık kliniğine başvuranlarda aynı anlamı taşımaz."),
         ),
         (
             ("Randleman ve ark., Ophthalmology 2008", "https://pubmed.ncbi.nlm.nih.gov/17624434/"),
@@ -447,7 +446,7 @@ TR_TOPICS = (
         (
             ("Başlangıç: korneal ektazi temelleri", "/tr/learning/corneal-ectasia-basics"),
             ("Devam: Pentacam eğitimi", "/tr/learning/pentacam-education"),
-            ("Uygulama: klinik akıl yürütme olguları", "/tr/learning/clinical-cases"),
+            ("Uygulama: klinik örnek olgular", "/tr/learning/clinical-cases"),
         ),
     ),
 )
