@@ -27,8 +27,7 @@ from .disposition import (
 )
 from .erss import erss_disposition, erss_total
 from .nice import nice_disposition, score_nice
-from .lasik_thinness_exception import resolve_ps3_procedure_decision
-from .ps3 import PS3EyeInput, PS3InterEyeInput, evaluate_ps3
+from .ps3 import ALLOWED, DEFER, PS3EyeInput, PS3InterEyeInput, evaluate_ps3
 from .refraction import MIXED, normalize_minus_cylinder, refractive_group, scalar_final_k_is_valid
 from .safety import (
     PRK_EPITHELIUM_UM,
@@ -100,6 +99,30 @@ def _bad_d_disposition(classification: str) -> str:
     if classification == "NORMAL":
         return PASS
     return ASSESSMENT_INCOMPLETE
+
+
+def _ps3_procedure_decision(ps3_result, procedure: str) -> dict[str, object]:
+    """Translate the authoritative raw PS3 procedure disposition once."""
+    if ps3_result is None:
+        return {
+            "status": ASSESSMENT_INCOMPLETE,
+            "detail": "PS3 procedure disposition unavailable.",
+        }
+    selected = {
+        "LASIK": ps3_result.disposition.lasik,
+        "PRK": ps3_result.disposition.prk,
+        "SMILE": ps3_result.disposition.smile,
+    }.get(procedure)
+    if selected == DEFER:
+        status = STOP_DEFER
+    elif selected == ALLOWED and ps3_result.complete:
+        status = PASS
+    else:
+        status = ASSESSMENT_INCOMPLETE
+    return {
+        "status": status,
+        "detail": f"Raw PS3 {procedure or 'selected procedure'} disposition: {selected or 'INCOMPLETE'}.",
+    }
 
 
 def _erss_finding_detail(erss, i_s_d, procedure: str) -> str:
@@ -243,15 +266,8 @@ def evaluate_normalized_case(
     nice_status = nice_disposition(nice["total"])
 
     ps3_result = evaluate_ps3(inp.ps3_eye, inp.ps3_inter_eye) if inp.ps3_eye is not None else None
-    ps3_decision = resolve_ps3_procedure_decision(
-        ps3_result,
-        procedure,
-        thinnest_um=inp.thinnest_um,
-        erss_status=erss_status,
-        nice_status=nice_status,
-        bad_d_status=bad_status,
-    )
-    ps3_status = ps3_decision.status
+    ps3_decision = _ps3_procedure_decision(ps3_result, procedure)
+    ps3_status = str(ps3_decision["status"])
 
     safety_status, safety_stops, safety_missing = _safety_status(
         procedure, inp, rsb, rst, pta, final_k, intended_group
@@ -270,7 +286,7 @@ def evaluate_normalized_case(
         DecisionFinding("randleman_erss", erss_status, _erss_finding_detail(erss, inp.i_s_d, procedure)),
         DecisionFinding("bad_d", bad_status, f"Final BAD-D: {bad.classification}"),
         DecisionFinding("nice", nice_status, f"NICE total: {nice.get('total')!r}"),
-        DecisionFinding("ps3", ps3_status, ps3_decision.detail),
+        DecisionFinding("ps3", ps3_status, str(ps3_decision["detail"])),
         DecisionFinding("procedural_safety", safety_status, safety_detail),
     )
     supplied_findings = tuple(external_findings)

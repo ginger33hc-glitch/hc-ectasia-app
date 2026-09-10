@@ -179,7 +179,7 @@ Individual ERSS/NICE/PS3 scoring and procedural hard stops remain unchanged.
 
 LASIK and PRK resolve requested myopic ablation through the same canonical estimator when no entered maximum ablation is supplied. Entered ablation takes precedence. PRK includes the canonical ERSS result alongside NICE, PS3 and final BAD-D in the four-system disposition. ERSS uses the same component thresholds, with PRK residual stroma (thinnest pachymetry minus 50 µm epithelium minus ablation) supplying the tissue input. A full PRK report requires complete ERSS. Do not emit an ERSS-not-applicable warning for PRK.
 
-CER-AI-modified PS3 LASIK thinness exception: the underlying PS3 rule remains one Moderate factor = PRK and SMILE allowed / LASIK deferred; two Moderate factors or one High factor = all procedures deferred. When thinnest pachymetry is 490-500 µm inclusive and is the sole PS3 Moderate factor, LASIK may be reported as PASS WITH CAUTION only if Randleman/ERSS, NICE, and Final BAD-D are each PASS. Any CAUTION, STOP-DEFER, or incomplete result in those three systems preserves the raw PS3 LASIK defer. Independent tissue-safety and eligibility gates remain controlling. The report must show both the raw PS3 LASIK defer and the explicitly labeled CER-AI modification.
+PS3 procedure rule: exactly one Moderate factor and no High factor defers LASIK while PRK and SMILE remain allowed. Two Moderate factors or one High factor defer LASIK, PRK, and SMILE. No thickness-only or cross-system exception may convert a raw PS3 LASIK defer into PASS or PASS WITH CAUTION. Independent ERSS, NICE, Final BAD-D, tissue-safety, and eligibility gates remain controlling for the procedure that PS3 allows.
 
 ### PS3 prescription-axis source — 2026-09-08
 

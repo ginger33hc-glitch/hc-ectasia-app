@@ -94,6 +94,7 @@ TR = {
     "optical_zone_mm": "Optik zon (mm)",
     "flap_um": "Flep kalınlığı (µm)",
     "mmc_guidance": "Mitomisin-C önerisi",
+    "MMC guidance": "Mitomisin-C önerisi",
     "rejection_reasons": "Uygun bulunmama nedenleri",
     "safe": "Güvenlik koşulları sağlandı",
     "plan": "Plan",

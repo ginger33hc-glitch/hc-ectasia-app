@@ -73,6 +73,11 @@ def test_plan_a_safe_is_selected_first_and_later_plans_are_not_evaluated():
         "Select the first safe plan only: Plan A → Plan B → Plan C"
     )
     assert [item["plan"] for item in planning["sequence"]] == ["Plan A"]
+    assert planning["selected_procedure_plan"] == {
+        "eye": "OD", "status": "PASS", "procedure": "LASIK",
+        "selected_lasik_plan": "Plan A", "optical_zone_mm": 6.5,
+        "transition_zone_mm": 9.0, "flap_um": 100.0, "ablation_um": 30.0,
+    }
     assert planning["sequence"][0]["safe"] is True
     assert result["effective_eye_plans"]["OD"]["plan_name"] == "Plan A"
     assert result["effective_eye_plans"]["OD"]["flap_um"] == 100.0
@@ -216,6 +221,8 @@ def test_prk_forces_flap_none_and_mmc_boundary_is_exact():
     result, by_eye = _evaluate(
         od_plan=_plan(
             "PRK",
+            optical_zone_mm=6.5,
+            transition_zone_mm=9.0,
             intended_entered_sphere_D=-4.0,
             intended_cylinder_signed_D=0.0,
             intended_axis_deg=0.0,
@@ -223,6 +230,11 @@ def test_prk_forces_flap_none_and_mmc_boundary_is_exact():
         os_plan=_plan("PRK"),
     )
     assert by_eye["OD"]["planning"]["mmc_guidance"] == "MANDATORY"
+    assert by_eye["OD"]["planning"]["selected_procedure_plan"] == {
+        "eye": "OD", "status": "PASS", "procedure": "PRK",
+        "selected_lasik_plan": None, "optical_zone_mm": 6.5,
+        "transition_zone_mm": 9.0, "flap_um": None, "ablation_um": 50.0,
+    }
 
 
 def test_hyperopic_prk_mmc_is_mandatory_and_mixed_requires_review():
