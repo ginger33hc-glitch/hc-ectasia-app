@@ -132,7 +132,7 @@ TOPICS = (
         (
             ("What PS3 contributes", "PS3 organizes selected corneal, elevation, pachymetric, SRAX, and inter-eye findings as Normal, Moderate, or High factors. CER-AI keeps this pathway independent from ERSS, Final BAD-D, and NICE so the origin and consequence of every finding remain visible."),
             ("Automated factor set", "The current CER-AI implementation evaluates anterior Km, thinnest pachymetry, front and back elevation at the thinnest point, PPI Average, bilateral asymmetry, and SRAX. Corneal Thickness Map, Relative Thickness Map, and PTI/CTSP morphology remain explicit surgeon-review items and are not silently counted by automation."),
-            ("Procedure-specific consequence", "One Moderate factor defers LASIK while allowing PRK and SMILE when the automated set is otherwise complete. Two or more Moderate factors, or any High factor, defer all three procedures. Missing decision-critical factors make the pathway incomplete; an already established defer finding is retained."),
+            ("Procedure-specific consequence", "One Moderate factor ordinarily defers LASIK while allowing PRK and SMILE when the automated set is otherwise complete. CER-AI exception: isolated thickness Moderate at 490-499 µm permits LASIK PASS WITH CAUTION when ERSS, NICE, and Final BAD-D are each PASS or CAUTION. At exactly 500 µm there is no PS3 thickness escalation. Two or more Moderate factors, or any High factor, defer all three procedures. Missing decision-critical factors make the pathway incomplete; an already established defer finding is retained."),
             ("Do not add unlike quantities", "Moderate and High are categorical findings, not interchangeable numeric points. CER-AI counts factors only within PS3, converts the selected procedure's PS3 result to an independent pathway disposition, and does not add PS3 counts to ERSS or NICE totals."),
             ("Evidence and implementation boundary", "The public module documents the current CER-AI operational implementation and its source literature. It does not claim that every operational threshold has been prospectively validated for every device, population, or procedure."),
         ),
@@ -585,7 +585,7 @@ TECHNICAL_TABLES = {
         "ps3-risk-assessment": (
             ("Automated PS3 factors in CER-AI", ("Factor", "Moderate", "High"), (
                 ("Anterior Km", "48–50 D", ">50 D"),
-                ("Thinnest pachymetry", "470–500 µm", "<470 µm"),
+                ("Thinnest pachymetry", "470–499 µm", "<470 µm"),
                 ("Elevation at thinnest", "—", "F.Ele.Th >12 µm or B.Ele.Th >15 µm"),
                 ("PPI Average", ">1.20", "—"),
                 ("Inter-eye asymmetry", "4 of 5 differences reach threshold", "5 of 5 differences reach threshold"),
@@ -594,6 +594,7 @@ TECHNICAL_TABLES = {
             ("PS3 procedure disposition", ("Factor pattern", "LASIK", "PRK / SMILE"), (
                 ("No Moderate or High; complete", "Allowed", "Allowed"),
                 ("One Moderate; complete", "Defer", "Allowed"),
+                ("Only Moderate is thickness 490–499 µm; ERSS/NICE/Final BAD-D each PASS or CAUTION", "PASS WITH CAUTION", "Allowed"),
                 (">=2 Moderate or >=1 High", "Defer", "Defer"),
                 ("Required factor missing", "Incomplete unless already deferred", "Incomplete unless already deferred"),
             ), "Manual map-morphology review items remain visible but are not counted as automated factors."),
@@ -723,7 +724,7 @@ TECHNICAL_TABLES = {
         "ps3-risk-assessment": (
             ("CER-AI'daki otomatik PS3 faktörleri", ("Faktör", "Orta", "Yüksek"), (
                 ("Ön Km", "48–50 D", ">50 D"),
-                ("En ince pakimetri", "470–500 µm", "<470 µm"),
+                ("En ince pakimetri", "470–499 µm", "<470 µm"),
                 ("En ince noktada elevasyon", "—", "F.Ele.Th >12 µm veya B.Ele.Th >15 µm"),
                 ("PPI Average", ">1.20", "—"),
                 ("İki göz arası asimetri", "5 farktan 4'ü eşiğe ulaşır", "5 farktan 5'i eşiğe ulaşır"),
@@ -732,6 +733,7 @@ TECHNICAL_TABLES = {
             ("PS3 işlem kararı", ("Faktör örüntüsü", "LASIK", "PRK / SMILE"), (
                 ("Orta/Yüksek yok; tam", "Uygun", "Uygun"),
                 ("Bir Orta; tam", "Ertele", "Uygun"),
+                ("Tek Orta faktör 490–499 µm kalınlık; ERSS/NICE/Final BAD-D sonuçlarının her biri PASS veya CAUTION", "Dikkatle uygun", "Uygun"),
                 (">=2 Orta veya >=1 Yüksek", "Ertele", "Ertele"),
                 ("Gerekli faktör eksik", "Önceden erteleme yoksa tamamlanmamış", "Önceden erteleme yoksa tamamlanmamış"),
             ), "Manuel harita morfolojisi maddeleri görünür kalır ancak otomatik faktör olarak sayılmaz."),

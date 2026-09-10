@@ -7,10 +7,8 @@ retired and replaced with direct canonical enrichment assertions below.
 from __future__ import annotations
 
 import importlib.util
-import json
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 import canonical_engine
 from pentacam_canonical_source_lock import (
@@ -225,6 +223,111 @@ def test_bad_elevations_use_the_standard_single_targeted_reread_path(monkeypatch
         == "TARGETED_LABELED_TILE_REREAD"
         for field in ("F_Ele_Th_um", "B_Ele_Th_um")
     )
+
+
+def _threshold_elevation_result(front=13, back=44):
+    result = pentacam_result(F_Ele_Th_um=front, B_Ele_Th_um=back)
+    eye = result["eyes"][0]
+    eye["table_verified_numeric_fields"] = ["F_Ele_Th_um", "B_Ele_Th_um"]
+    eye["canonical_source_ids"] = {
+        "F_Ele_Th_um": BAD_ELEVATION_ROW,
+        "B_Ele_Th_um": BAD_ELEVATION_ROW,
+    }
+    eye["missing_or_unreadable"] = []
+    return result
+
+
+def test_threshold_level_bad_elevations_are_read_exactly_three_times(monkeypatch):
+    result = _threshold_elevation_result()
+    calls = []
+
+    def reread(_core, _raw, _filename, requested):
+        calls.append(requested)
+        return {
+            "screen_family": "BAD_DISPLAY",
+            "readings": [
+                reading("F_Ele_Th_um", 4, "F.Ele.Th", source_box=[100, 100, 400, 200]),
+                reading("B_Ele_Th_um", 4, "B.Ele.Th", source_box=[400, 100, 700, 200]),
+            ],
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(targeted, "targeted_reread", reread)
+    targeted.verify_threshold_level_bad_elevations(Core, result, b"image", "od-bad.png")
+
+    eye = result["eyes"][0]
+    assert len(calls) == targeted.BAD_ELEVATION_VERIFICATION_READS == 3
+    assert all(call == {"OD": ["F_Ele_Th_um", "B_Ele_Th_um"]} for call in calls)
+    assert eye["F_Ele_Th_um"] == eye["B_Ele_Th_um"] == 4
+    assert eye["threshold_elevation_verification_evidence"]["B_Ele_Th_um"]["primary_value"] == 44
+    assert len(eye["threshold_elevation_verification_evidence"]["B_Ele_Th_um"]["attempts"]) == 3
+
+
+def test_three_concordant_still_high_bad_elevations_require_surgeon(monkeypatch):
+    result = _threshold_elevation_result(front=13, back=16)
+    monkeypatch.setattr(targeted, "targeted_reread", lambda *_args: {
+        "screen_family": "BAD_DISPLAY",
+        "readings": [
+            reading("F_Ele_Th_um", 13, "F.Ele.Th", source_box=[100, 100, 400, 200]),
+            reading("B_Ele_Th_um", 16, "B.Ele.Th", source_box=[400, 100, 700, 200]),
+        ],
+        "warnings": [],
+    })
+
+    targeted.verify_threshold_level_bad_elevations(Core, result, b"image", "od-bad.png")
+
+    eye = result["eyes"][0]
+    assert eye["F_Ele_Th_um"] is None
+    assert eye["B_Ele_Th_um"] is None
+    assert {"F_Ele_Th_um", "B_Ele_Th_um"} <= set(eye["missing_or_unreadable"])
+    assert not {"F_Ele_Th_um", "B_Ele_Th_um"} & set(eye["table_verified_numeric_fields"])
+    assert eye["threshold_elevation_verification_evidence"]["F_Ele_Th_um"]["status"] == "SURGEON_CONFIRMATION_REQUIRED"
+    expanded = assessment_workflow._expanded_ps3_missing(
+        "OD", "PS3: elevation", {}, result,
+    )
+    assert expanded == [
+        ("OD", "PS3: F_Ele_Th_um"),
+        ("OD", "PS3: B_Ele_Th_um"),
+    ]
+    posterior_request = assessment_workflow._request("OD", "NICE: B_Ele_Th_um", result)
+    assert posterior_request["kind"] == "number"
+    assert posterior_request["key"] == "B_Ele_Th_um"
+
+
+def test_discordant_or_unreadable_bad_elevation_rereads_require_surgeon(monkeypatch):
+    result = _threshold_elevation_result(front=13, back=10)
+    values = iter((4, 5, None))
+
+    def reread(_core, _raw, _filename, _requested):
+        value = next(values)
+        return {
+            "screen_family": "BAD_DISPLAY",
+            "readings": [reading(
+                "F_Ele_Th_um", value, "F.Ele.Th",
+                status="CONFIDENT" if value is not None else "UNREADABLE",
+                source_box=[100, 100, 400, 200],
+            )],
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(targeted, "targeted_reread", reread)
+    targeted.verify_threshold_level_bad_elevations(Core, result, b"image", "od-bad.png")
+
+    eye = result["eyes"][0]
+    assert eye["F_Ele_Th_um"] is None
+    assert eye["B_Ele_Th_um"] == 10
+    assert eye["unreadable_source_regions"]["F_Ele_Th_um"]["source_box"] == [100, 100, 400, 200]
+
+
+def test_bad_elevation_verification_does_not_trigger_at_exact_boundaries(monkeypatch):
+    result = _threshold_elevation_result(front=12, back=15)
+    monkeypatch.setattr(
+        targeted, "targeted_reread",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("must not reread")),
+    )
+    targeted.verify_threshold_level_bad_elevations(Core, result, b"image", "od-bad.png")
+    assert result["eyes"][0]["F_Ele_Th_um"] == 12
+    assert result["eyes"][0]["B_Ele_Th_um"] == 15
 
 
 def test_unreadable_b_ele_th_uses_canonical_numeric_prompt_with_source_region():

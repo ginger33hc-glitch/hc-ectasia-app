@@ -49,14 +49,25 @@ def finalize_disposition(findings: Iterable[DecisionFinding]) -> FinalDispositio
     caution_drivers = tuple(f for f in findings if f.status in {CAUTION, PASS_WITH_CAUTION})
     incomplete_drivers = tuple(f for f in findings if f.status == ASSESSMENT_INCOMPLETE)
     scoring_keys = {"randleman_erss", "nice", "ps3", "bad_d"}
-    completed_scoring_keys = {f.key for f in findings if f.key in scoring_keys and f.status in {PASS, CAUTION}}
+    completed_scoring_keys = {
+        f.key for f in findings
+        if f.key in scoring_keys and f.status in {PASS, PASS_WITH_CAUTION, CAUTION}
+    }
     caution_scoring_keys = {f.key for f in findings if f.key in scoring_keys and f.status == CAUTION}
+    explicit_scoring_pass_with_caution = any(
+        f.key in scoring_keys and f.status == PASS_WITH_CAUTION for f in findings
+    )
     independent_caution = any(f.status == CAUTION and f.key not in scoring_keys for f in findings)
 
     if stop_drivers:
         status = STOP_DEFER
     elif incomplete_drivers:
         status = ASSESSMENT_INCOMPLETE
+    elif explicit_scoring_pass_with_caution and not independent_caution:
+        # A scoring system may emit an explicit, already-combined conditional
+        # clearance. Other completed scoring systems may be PASS or CAUTION,
+        # but cannot silently erase that declared PASS WITH CAUTION result.
+        status = PASS_WITH_CAUTION
     elif caution_drivers:
         if independent_caution or len(caution_scoring_keys) >= 3:
             status = CAUTION

@@ -309,34 +309,39 @@ def test_failed_lasik_automatically_evaluates_prk_and_retains_failed_assessment(
     assert 'lasik_assessment' not in os
 
 
-def test_thickness_only_ps3_exception_keeps_lasik_and_is_explicit_in_report():
+def test_490_to_499_exception_keeps_lasik_and_500_has_no_escalation():
     extracted = _case(
         _eye('OD', pachy_thinnest_um=495, central_pachy_um=525),
         _eye('OS', pachy_thinnest_um=500, central_pachy_um=525),
     )
     result = _evaluate(extracted=extracted)
-    for eye in result['eyes']:
-        assert eye['status'] == 'PASS WITH CAUTION'
-        assert eye['report_payload']['procedure'] == 'LASIK'
-        assert eye['report_payload']['ps3']['status'] == 'PASS WITH CAUTION'
-        assert eye['report_payload']['ps3']['disposition']['lasik'] == 'DEFER'
-        assert eye['report_payload']['ps3']['decision']['modification_applied'] is True
-        assert 'CER-AI modified PS3 LASIK rule' in eye['report_payload']['ps3']['decision']['detail']
-        assert eye['planning']['selected_plan'] == 'Plan A'
-        assert 'lasik_assessment' not in eye
+    od, os = result['eyes']
+    assert od['status'] == 'PASS WITH CAUTION'
+    assert od['report_payload']['procedure'] == 'LASIK'
+    assert od['report_payload']['ps3']['decision']['exception_applied'] is True
+    assert od['report_payload']['ps3']['disposition']['lasik'] == 'DEFER'
+    assert od['planning']['selected_procedure_plan']['procedure'] == 'LASIK'
+    assert od['planning']['selected_procedure_plan']['status'] == 'PASS WITH CAUTION'
+    assert os['status'] == 'PASS'
+    assert os['report_payload']['procedure'] == 'LASIK'
+    assert os['report_payload']['ps3']['decision']['exception_applied'] is False
+    assert os['report_payload']['ps3']['disposition']['lasik'] == 'ALLOWED'
+    assert result['procedure_transitions'] == []
 
 
-def test_other_system_caution_disables_thickness_exception_and_triggers_prk_fallback():
+def test_other_system_caution_is_accepted_by_490_to_499_exception():
     extracted = _case(
         _eye('OD', pachy_thinnest_um=495, central_pachy_um=525, BAD_D=2.0),
         _eye('OS', pachy_thinnest_um=500, central_pachy_um=525),
     )
     result = _evaluate(extracted=extracted)
     od = result['eyes'][0]
-    assert od['lasik_assessment']['status'] == 'STOP-DEFER'
-    assert od['lasik_assessment']['report_payload']['ps3']['decision']['modification_applied'] is False
-    assert od['report_payload']['procedure'] == 'PRK'
-    assert result['procedure_transitions'][0]['message'] == 'OD: LASIK failed. Now evaluating PRK.'
+    assert od['status'] == 'PASS WITH CAUTION'
+    assert od['report_payload']['ps3']['decision']['status'] == 'PASS WITH CAUTION'
+    assert od['report_payload']['ps3']['decision']['exception_applied'] is True
+    assert od['report_payload']['procedure'] == 'LASIK'
+    assert 'lasik_assessment' not in od
+    assert result['procedure_transitions'] == []
 
 
 def test_prk_fallback_keeps_shared_stops_and_missing_data():

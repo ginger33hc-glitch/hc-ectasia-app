@@ -112,6 +112,13 @@ def _status_palette(value):
 
 def _cell_palette(row, index, selected_plan_status=None):
     label = str(row[0]).strip().lower()
+    if label in {"mmc guidance", "mmc_guidance"} and str(row[1]).strip().upper() == "MANDATORY":
+        return RED, RED_FILL
+    summary_parts = [part.strip().upper() for part in str(row[0]).split("—")]
+    if summary_parts and summary_parts[0] in {"OD", "OS"}:
+        for status in ("STOP-DEFER", "PASS WITH CAUTION", "CAUTION", "PASS"):
+            if status in summary_parts:
+                return _status_palette(status)
     # Highlight the whole row when it carries a canonical caution/stop. The
     # renderer recognizes disposition labels only; it never derives risk.
     row_status = {
@@ -147,6 +154,26 @@ def _cell_palette(row, index, selected_plan_status=None):
     if "warning" in label and str(row[index]) not in {"", "Not documented"}:
         return AMBER, AMBER_FILL
     return _status_palette(row[index])
+
+
+def _selected_procedure_summary(planning: Mapping[str, Any]) -> tuple[str, str] | None:
+    """Format the canonical selected-procedure record without clinical inference."""
+    selected = planning.get("selected_procedure_plan") or {}
+    if not isinstance(selected, Mapping) or not selected.get("procedure"):
+        return None
+    label = " — ".join(_text(selected.get(key)) for key in ("eye", "status", "procedure"))
+    details = []
+    if selected.get("selected_lasik_plan"):
+        details.append(_text(selected.get("selected_lasik_plan")))
+    for name, key, unit in (
+        ("OZ", "optical_zone_mm", "mm"),
+        ("TZ", "transition_zone_mm", "mm"),
+        ("Flap", "flap_um", "µm"),
+        ("Ablation", "ablation_um", "µm"),
+    ):
+        if selected.get(key) is not None:
+            details.append(f"{name} {_text(selected.get(key))} {unit}")
+    return label, " — ".join(details) or "Plan parameters not documented"
 
 
 def _text(value: Any, fallback: str = "Not documented") -> str:
@@ -302,15 +329,19 @@ def _report_sections(report: Mapping[str, Any]) -> list[tuple[str, list[list[str
     add_triggers(safety_rows, "tissue_safety")
     sections.append(("Procedural safety", safety_rows))
     planning = report.get("planning") or {}
-    planning_rows = [["Planning item", "Canonical result"], ["Procedure", procedure]]
+    planning_rows = [["Planning item", "Canonical result"]]
+    summary = _selected_procedure_summary(planning)
+    planning_rows.append(list(summary) if summary else ["Procedure", procedure])
     for key, value in planning.items():
-        if key == "selected_plan_definition":
+        if key in {"selected_plan_definition", "selected_procedure_plan"}:
             continue
         if key == "selected_plan":
             value = planning.get("selected_plan_definition") or value
             key = "Selected LASIK plan"
         elif key == "selection_rule":
             key = "Plan-selection priority"
+        elif key == "mmc_guidance":
+            key = "MMC guidance"
         planning_rows.append([key, _text(value)])
     ml7_labels = {
         "hinge_location_preference": "Preferred hinge location",
@@ -435,7 +466,7 @@ def build_pdf(payload: Mapping[str, Any]) -> bytes:
         story.append(Paragraph(f"{escape(_text(eye['eye']))} — {escape(tr(_text(eye['status'])))}", eye_style))
         for title, rows in eye["sections"]:
             section_content = [Paragraph(escape(tr(title)), styles["CERSection"]),
-                               _pdf_table(rows, styles, regular, bold, eye["status"] if title == "Procedure planning" and eye.get("procedure") == "LASIK" else None,
+                               _pdf_table(rows, styles, regular, bold, eye["status"] if title == "Procedure planning" else None,
                                           locale=locale, protected_columns=PROTECTED_COLUMNS.get(title, ()))]
             if title in {"Randleman / ERSS", "NICE", "PS3"}:
                 story.append(KeepTogether(section_content))
@@ -568,7 +599,7 @@ def build_docx(payload: Mapping[str, Any]) -> bytes:
             run.font.size = Pt(15.75)
         for heading, rows in eye["sections"]:
             document.add_heading(tr(heading), level=2)
-            _docx_table(document, rows, eye["status"] if heading == "Procedure planning" and eye.get("procedure") == "LASIK" else None, keep_together=heading in {"Randleman / ERSS", "NICE", "PS3"}, locale=locale, protected_columns=PROTECTED_COLUMNS.get(heading, ()))
+            _docx_table(document, rows, eye["status"] if heading == "Procedure planning" else None, keep_together=heading in {"Randleman / ERSS", "NICE", "PS3"}, locale=locale, protected_columns=PROTECTED_COLUMNS.get(heading, ()))
     footer = section.footer.paragraphs[0]; footer.alignment = WD_ALIGN_PARAGRAPH.CENTER; footer.add_run(authorship_notice(locale))
     for run in footer.runs: run.font.size = Pt(6.2); run.font.color.rgb = RGBColor.from_string(GRAY)
     page = section.footer.add_paragraph(tr("Page") + " "); page.alignment = WD_ALIGN_PARAGRAPH.RIGHT

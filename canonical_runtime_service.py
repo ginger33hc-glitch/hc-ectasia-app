@@ -457,6 +457,29 @@ def _non_lasik_planning(procedure, normalized, core_result):
     }
 
 
+def _attach_selected_procedure_plan(planning, eye_name, effective_plan, core_result):
+    """Attach renderer-neutral parameters for the procedure actually assessed.
+
+    Eligibility and disposition remain owned by the canonical clinical systems.
+    This record only binds their final result to the already-resolved plan that
+    the report must display.
+    """
+    result = dict(planning or {})
+    procedure = str((effective_plan or {}).get("procedure") or "").strip().upper()
+    selected = {
+        "eye": eye_name,
+        "status": core_result.get("status"),
+        "procedure": procedure,
+        "selected_lasik_plan": result.get("selected_plan") if procedure == "LASIK" else None,
+        "optical_zone_mm": _plan_number(effective_plan or {}, "optical_zone_mm"),
+        "transition_zone_mm": _plan_number(effective_plan or {}, "transition_zone_mm"),
+        "flap_um": _plan_number(effective_plan or {}, "flap_um") if procedure == "LASIK" else None,
+        "ablation_um": _plan_number(effective_plan or {}, "max_ablation_um", "ablation_um"),
+    }
+    result["selected_procedure_plan"] = selected
+    return result
+
+
 def _keratometry(source_eye: Mapping[str, Any]):
     k1 = _plan_number(source_eye, "ml7_k1_d")
     k2 = _plan_number(source_eye, "ml7_k2_d")
@@ -660,6 +683,12 @@ def evaluate_case(
             planning["prior_lasik_reasons"] = list(lasik_assessment.get("reasons") or [])
             effective_plans[eye_name] = prk_plan
             procedure_transitions.append({"eye": eye_name, "from": "LASIK", "to": "PRK", "message": transition_message})
+        planning = _attach_selected_procedure_plan(
+            planning,
+            eye_name,
+            effective_plans.get(eye_name) or plan,
+            core_result,
+        )
         microkeratome_planning = _microkeratome_planning(
             eye,
             effective_plans.get(eye_name) or plan,
