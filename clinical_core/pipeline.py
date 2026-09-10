@@ -21,6 +21,7 @@ from .disposition import (
     ASSESSMENT_INCOMPLETE,
     CAUTION,
     PASS,
+    PASS_WITH_CAUTION,
     STOP_DEFER,
     DecisionFinding,
     finalize_disposition,
@@ -101,8 +102,16 @@ def _bad_d_disposition(classification: str) -> str:
     return ASSESSMENT_INCOMPLETE
 
 
-def _ps3_procedure_decision(ps3_result, procedure: str) -> dict[str, object]:
-    """Translate the authoritative raw PS3 procedure disposition once."""
+def _ps3_procedure_decision(
+    ps3_result,
+    procedure: str,
+    *,
+    thinnest_um,
+    erss_status: str,
+    nice_status: str,
+    bad_d_status: str,
+) -> dict[str, object]:
+    """Translate raw PS3 disposition and apply the one cross-system exception."""
     if ps3_result is None:
         return {
             "status": ASSESSMENT_INCOMPLETE,
@@ -113,15 +122,44 @@ def _ps3_procedure_decision(ps3_result, procedure: str) -> dict[str, object]:
         "PRK": ps3_result.disposition.prk,
         "SMILE": ps3_result.disposition.smile,
     }.get(procedure)
-    if selected == DEFER:
+    moderate_keys = {
+        finding.key for finding in ps3_result.findings if finding.status == "MODERATE"
+    }
+    isolated_borderline_thickness = (
+        procedure == "LASIK"
+        and selected == DEFER
+        and ps3_result.complete
+        and ps3_result.high_count == 0
+        and ps3_result.moderate_count == 1
+        and moderate_keys == {"thinnest"}
+        and _finite(thinnest_um)
+        and 490.0 <= float(thinnest_um) < 500.0
+        and all(
+            status in {PASS, CAUTION}
+            for status in (erss_status, nice_status, bad_d_status)
+        )
+    )
+    if isolated_borderline_thickness:
+        status = PASS_WITH_CAUTION
+        detail = (
+            "Raw PS3 LASIK disposition: DEFER. CER-AI 490-499 µm isolated-thickness "
+            "exception applied because thinnest pachymetry is the sole PS3 Moderate "
+            "factor and ERSS, NICE, and Final BAD-D are each PASS or CAUTION."
+        )
+    elif selected == DEFER:
         status = STOP_DEFER
+        detail = f"Raw PS3 {procedure or 'selected procedure'} disposition: DEFER."
     elif selected == ALLOWED and ps3_result.complete:
         status = PASS
+        detail = f"Raw PS3 {procedure or 'selected procedure'} disposition: ALLOWED."
     else:
         status = ASSESSMENT_INCOMPLETE
+        detail = f"Raw PS3 {procedure or 'selected procedure'} disposition: {selected or 'INCOMPLETE'}."
     return {
         "status": status,
-        "detail": f"Raw PS3 {procedure or 'selected procedure'} disposition: {selected or 'INCOMPLETE'}.",
+        "raw_disposition": selected,
+        "exception_applied": isolated_borderline_thickness,
+        "detail": detail,
     }
 
 
@@ -266,7 +304,14 @@ def evaluate_normalized_case(
     nice_status = nice_disposition(nice["total"])
 
     ps3_result = evaluate_ps3(inp.ps3_eye, inp.ps3_inter_eye) if inp.ps3_eye is not None else None
-    ps3_decision = _ps3_procedure_decision(ps3_result, procedure)
+    ps3_decision = _ps3_procedure_decision(
+        ps3_result,
+        procedure,
+        thinnest_um=inp.thinnest_um,
+        erss_status=erss_status,
+        nice_status=nice_status,
+        bad_d_status=bad_status,
+    )
     ps3_status = str(ps3_decision["status"])
 
     safety_status, safety_stops, safety_missing = _safety_status(

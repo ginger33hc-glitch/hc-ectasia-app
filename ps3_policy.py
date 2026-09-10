@@ -186,10 +186,10 @@ def evaluate_ps3(eye, inter_eye=None):
         findings.append(PS3Finding("thinnest", NOT_EVALUATED, "Thinnest pachymetry unavailable."))
     elif thinnest < 470:
         findings.append(PS3Finding("thinnest", HIGH, f"Thinnest {thinnest:g} µm < 470 µm."))
-    elif thinnest <= 500:
-        findings.append(PS3Finding("thinnest", MODERATE, f"Thinnest {thinnest:g} µm is 470-500 µm."))
+    elif thinnest < 500:
+        findings.append(PS3Finding("thinnest", MODERATE, f"Thinnest {thinnest:g} µm is 470-499 µm."))
     else:
-        findings.append(PS3Finding("thinnest", NORMAL, f"Thinnest {thinnest:g} µm > 500 µm."))
+        findings.append(PS3Finding("thinnest", NORMAL, f"Thinnest {thinnest:g} µm >=500 µm."))
 
     findings.append(_elevation_finding(eye))
 
