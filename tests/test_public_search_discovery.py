@@ -154,3 +154,71 @@ def test_production_canonical_and_real_software_identity_remain_intact(public_ap
     software = next(item for item in graph if item["@type"] == "SoftwareApplication")
     assert software["name"] == "CER-AI"
     assert software["url"] == "https://cer-ai.com/"
+    home_structure = PageStructure(home.text)
+    assert [
+        meta["content"]
+        for meta in home_structure.attributes("meta")
+        if meta.get("property") == "og:url"
+    ] == ["https://cer-ai.com/"]
+    assert [
+        meta["content"]
+        for meta in home_structure.attributes("meta")
+        if meta.get("name") == "twitter:card"
+    ] == ["summary"]
+
+
+@pytest.mark.parametrize(
+    ("path", "schema_type", "title"),
+    (
+        (
+            "/corneal-ectasia-risk-assessment",
+            "MedicalWebPage",
+            "Corneal Ectasia Risk Assessment Software for Refractive Surgeons | CER-AI",
+        ),
+        (
+            "/clinical-evidence",
+            "MedicalWebPage",
+            "Clinical Evidence for Corneal Ectasia Risk Assessment | CER-AI",
+        ),
+        (
+            "/references",
+            "CollectionPage",
+            "Corneal Ectasia and Refractive Surgery References | CER-AI",
+        ),
+    ),
+)
+def test_static_public_pages_have_page_specific_discovery_identity(
+    public_app, path, schema_type, title
+):
+    with TestClient(public_app, base_url="https://cer-ai.com") as client:
+        response = client.get(path)
+    assert response.status_code == 200
+    structure = PageStructure(response.text)
+    assert [m["content"] for m in structure.attributes("meta") if m.get("property") == "og:title"] == [title]
+    assert [m["content"] for m in structure.attributes("meta") if m.get("property") == "og:url"] == [f"https://cer-ai.com{path}"]
+    assert [m["content"] for m in structure.attributes("meta") if m.get("name") == "twitter:card"] == ["summary"]
+    schema_match = re.search(
+        r'<script id="cerai-page-discovery" type="application/ld\+json">(.*?)</script>',
+        response.text,
+        re.S,
+    )
+    assert schema_match is not None
+    schema = json.loads(schema_match.group(1))
+    assert schema["@type"] == schema_type
+    assert schema["url"] == f"https://cer-ai.com{path}"
+    assert schema["name"] == title
+    assert schema["dateModified"] == "2026-09-10"
+    assert schema["author"] == {"@id": "https://cer-ai.com/#clinical-author"}
+
+
+def test_product_page_discovery_schema_points_to_canonical_software(public_app):
+    with TestClient(public_app, base_url="https://cer-ai.com") as client:
+        response = client.get("/corneal-ectasia-risk-assessment")
+    schema_match = re.search(
+        r'<script id="cerai-page-discovery" type="application/ld\+json">(.*?)</script>',
+        response.text,
+        re.S,
+    )
+    assert schema_match is not None
+    schema = json.loads(schema_match.group(1))
+    assert schema["mainEntity"] == {"@id": "https://cer-ai.com/#software"}
