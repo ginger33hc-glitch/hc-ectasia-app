@@ -41,6 +41,11 @@ PENTACAM_SCREEN_FAMILIES = {
     "SHOW_2_EXAMS_TOPOMETRIC",
 }
 TARGETED_REREAD_MAX_ATTEMPTS = 5
+BAD_ELEVATION_VERIFICATION_READS = 3
+BAD_ELEVATION_VERIFICATION_THRESHOLDS = {
+    "F_Ele_Th_um": 12.0,
+    "B_Ele_Th_um": 15.0,
+}
 
 SOURCE_TILES = (
     "ORIGINAL", "TOP_HEADER", "UPPER_LEFT", "UPPER_RIGHT", "LOWER_LEFT", "LOWER_RIGHT"
@@ -877,4 +882,151 @@ def verify_astigmatic_disparity_bad_flat_axes(
                 f"{eye_id} BAD flat axis associated with an astigmatic-disparity warning "
                 "could not be verified; surgeon confirmation is recommended."
             )
+    return result
+
+
+def verify_threshold_level_bad_elevations(
+    core: Any,
+    result: dict[str, Any],
+    raw: bytes,
+    filename: str,
+) -> dict[str, Any]:
+    """Triple-read threshold-level BAD elevations before any clinical scoring.
+
+    A primary F.Ele.Th >12 µm or B.Ele.Th >15 µm is never passed directly to
+    NICE, PS3, or the report.  Three independent, canonical-label rereads are
+    required.  Only three identical, confident readings at or below the field's
+    threshold replace the primary value automatically.  Every other outcome is
+    left unresolved for explicit surgeon numeric confirmation.
+    """
+    source_id = canonical_source_id("F_Ele_Th_um")
+    requested: dict[str, list[str]] = {}
+    originals: dict[tuple[str, str], float] = {}
+    eyes = {
+        eye.get("eye"): eye for eye in result.get("eyes") or []
+        if eye.get("eye") in {"OD", "OS"}
+    }
+    for eye_id, eye in eyes.items():
+        for field, threshold in BAD_ELEVATION_VERIFICATION_THRESHOLDS.items():
+            value = eye.get(field)
+            if not core.is_number(value) or float(value) <= threshold:
+                continue
+            if (eye.get("canonical_source_ids") or {}).get(field) != source_id:
+                continue
+            requested.setdefault(eye_id, []).append(field)
+            originals[(eye_id, field)] = float(value)
+    if not requested:
+        return result
+
+    accepted: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    attempts: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for attempt_number in range(1, BAD_ELEVATION_VERIFICATION_READS + 1):
+        try:
+            reread = targeted_reread(core, raw, filename, requested)
+        except Exception as exc:
+            for eye_id, fields in requested.items():
+                for field in fields:
+                    attempts[(eye_id, field)].append({
+                        "attempt": attempt_number,
+                        "status": "ERROR",
+                        "error_type": type(exc).__name__,
+                    })
+            continue
+
+        # Reuse the standard canonical source/label validator on an isolated
+        # result so no attempt can influence a later independent attempt.
+        temporary = {
+            "eyes": [{
+                "eye": eye_id,
+                **{field: None for field in fields},
+                "missing_or_unreadable": list(fields),
+            } for eye_id, fields in requested.items()],
+            "global_warnings": [],
+        }
+        apply_targeted_readings(core, temporary, reread, requested, filename)
+        temp_eyes = {eye["eye"]: eye for eye in temporary["eyes"]}
+        for eye_id, fields in requested.items():
+            temp_eye = temp_eyes[eye_id]
+            for field in fields:
+                value = temp_eye.get(field)
+                evidence = list(
+                    (temp_eye.get("targeted_reread_evidence") or {}).get(field) or []
+                )
+                record: dict[str, Any] = {
+                    "attempt": attempt_number,
+                    "status": "ACCEPTED" if core.is_number(value) else "UNRESOLVED",
+                    "value": float(value) if core.is_number(value) else None,
+                }
+                if evidence:
+                    record.update(evidence[0])
+                    record["attempt"] = attempt_number
+                    record["status"] = "ACCEPTED"
+                    accepted[(eye_id, field)].append(record)
+                else:
+                    matching = [
+                        item for item in reread.get("readings") or []
+                        if isinstance(item, dict)
+                        and item.get("eye") == eye_id and item.get("field") == field
+                    ]
+                    if matching:
+                        item = matching[0]
+                        record.update({
+                            "reported_status": item.get("status"),
+                            "tile": item.get("source_tile"),
+                            "source_box": item.get("source_box"),
+                            "printed_label": item.get("printed_label"),
+                        })
+                attempts[(eye_id, field)].append(record)
+
+    for (eye_id, field), primary_value in originals.items():
+        eye = eyes[eye_id]
+        threshold = BAD_ELEVATION_VERIFICATION_THRESHOLDS[field]
+        records = attempts[(eye_id, field)]
+        readings = accepted[(eye_id, field)]
+        values = [float(item["value"]) for item in readings]
+        resolved = (
+            len(readings) == BAD_ELEVATION_VERIFICATION_READS
+            and _same_number(values)
+            and values[0] <= threshold
+        )
+        eye.setdefault("threshold_elevation_verification_evidence", {})[field] = {
+            "file": filename,
+            "primary_value": primary_value,
+            "threshold_um": threshold,
+            "attempts": records,
+            "status": "VERIFIED_BELOW_THRESHOLD" if resolved else "SURGEON_CONFIRMATION_REQUIRED",
+        }
+        if resolved:
+            verified_value = values[0]
+            eye[field] = verified_value
+            evidence = eye.setdefault("targeted_reread_evidence", {}).setdefault(field, [])
+            evidence.extend(readings)
+            result.setdefault("global_warnings", []).append(
+                f"{eye_id} {field} corrected by three concordant canonical-box rereads "
+                f"from {primary_value:g} µm to {verified_value:g} µm."
+            )
+            continue
+
+        eye[field] = None
+        eye["table_verified_numeric_fields"] = [
+            item for item in eye.get("table_verified_numeric_fields") or [] if item != field
+        ]
+        missing = list(eye.get("missing_or_unreadable") or [])
+        if field not in missing:
+            missing.append(field)
+        eye["missing_or_unreadable"] = missing
+        located = next(
+            (item for item in reversed(records) if item.get("source_box") is not None), None
+        )
+        if located:
+            record_unreadable_region(
+                eye, field, filename=filename, tile=located.get("tile"),
+                source_box=located.get("source_box"),
+                printed_label=located.get("printed_label"),
+            )
+        result.setdefault("global_warnings", []).append(
+            f"{eye_id} {field} exceeded {threshold:g} µm on the primary read and did not "
+            "resolve below threshold on three concordant canonical-box rereads; "
+            "surgeon numeric confirmation is required before the report."
+        )
     return result

@@ -86,6 +86,10 @@ def test_model_contains_every_canonical_clinical_report_section_without_recalcul
         and row[1] == "Plan A — flap 100 µm; optical zone 6.5 mm; transition zone 9.0 mm"
         for row in _section(model, "OD", "Procedure planning")
     )
+    assert [
+        "OD — PASS — LASIK",
+        "Plan A — OZ 6.5 mm — TZ 9 mm — Flap 100 µm — Ablation 50 µm",
+    ] in _section(model, "OD", "Procedure planning")
     assert not any(row[0] == "Selected plan parameters" for row in _section(model, "OD", "Procedure planning"))
     assert any(
         row[0] == "Plan-selection priority"
@@ -109,6 +113,37 @@ def test_safe_plan_and_ml7_hinge_vacuum_ring_are_green_without_highlighting_blad
     ):
         assert reports._cell_palette(by_name[label], 1, "PASS") == (reports.GREEN, reports.GREEN_FILL)
     assert reports._cell_palette(by_name["ML7 blade_recommendations"], 1, "PASS") is None
+
+
+def test_prk_summary_names_the_passing_procedure_and_mandatory_mmc_is_red():
+    payload = _payload()
+    for eye in payload["decision"]["eyes"]:
+        report = eye["report_payload"]
+        report["procedure"] = "PRK"
+        report["planning"] = {
+            "selected_plan": None,
+            "sequence": [],
+            "rejection_reasons": [],
+            "mmc_guidance": "MANDATORY",
+            "selected_procedure_plan": {
+                "eye": eye["eye"], "status": "PASS", "procedure": "PRK",
+                "selected_lasik_plan": None, "optical_zone_mm": 6.5,
+                "transition_zone_mm": 9.0, "flap_um": None, "ablation_um": 60.0,
+            },
+        }
+    rows = _section(reports.canonical_report_model(payload), "OD", "Procedure planning")
+    assert ["OD — PASS — PRK", "OZ 6.5 mm — TZ 9 mm — Ablation 60 µm"] in rows
+    mmc = next(row for row in rows if row[0] == "MMC guidance")
+    assert reports._cell_palette(mmc, 1, "PASS") == (reports.RED, reports.RED_FILL)
+    document = Document(BytesIO(reports.build_docx(payload)))
+    mmc_row = next(
+        row for table in document.tables for row in table.rows
+        if row.cells[0].text == "MMC guidance"
+    )
+    assert mmc_row.cells[1].text == "MANDATORY"
+    assert mmc_row.cells[1]._tc.get_or_add_tcPr().find(
+        __import__("docx").oxml.ns.qn("w:shd")
+    ).get(__import__("docx").oxml.ns.qn("w:fill")) == reports.RED_FILL
 
 
 def test_locked_source_values_and_provenance_remain_distinct_in_report():

@@ -55,7 +55,7 @@ def test_anterior_km_boundaries(km, status):
     assert finding(evaluate_ps3(normal_eye(anterior_km_d=km), normal_inter_eye()), "anterior_km").status == status
 
 
-@pytest.mark.parametrize("thinnest,status", [(500.01, NORMAL), (500.0, MODERATE), (470.0, MODERATE), (469.99, HIGH)])
+@pytest.mark.parametrize("thinnest,status", [(500.0, NORMAL), (499.99, MODERATE), (470.0, MODERATE), (469.99, HIGH)])
 def test_thinnest_boundaries(thinnest, status):
     assert finding(evaluate_ps3(normal_eye(thinnest_um=thinnest), normal_inter_eye()), "thinnest").status == status
 

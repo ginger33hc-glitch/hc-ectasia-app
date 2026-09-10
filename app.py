@@ -656,6 +656,10 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                         json.dumps(record, sort_keys=True): record for record in combined
                     }.values()
                 ]
+            target.setdefault("threshold_elevation_verification_evidence", {})
+            target["threshold_elevation_verification_evidence"].update(
+                eye.get("threshold_elevation_verification_evidence") or {}
+            )
             target.setdefault("unreadable_source_regions", {})
             for field, region in (eye.get("unreadable_source_regions") or {}).items():
                 target["unreadable_source_regions"].setdefault(field, dict(region))
@@ -683,6 +687,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                     "source_files", "quality_by_source", "_source_filename",
                     "_pentacam_qs", "pentacam_qs", "scoring_morphology", "field_provenance",
                     "planning_data_issues", "targeted_reread_evidence",
+                    "threshold_elevation_verification_evidence",
                     "canonical_source_ids", "unreadable_source_regions", "data_conflicts",
                 ):
                     continue
@@ -1021,6 +1026,10 @@ async def _run_image_assessment(
                         exam_date_requested=(
                             exam_date_reread_required and _is_four_maps_refractive(result)
                         ),
+                    )
+                    reread = await asyncio.to_thread(
+                        pentacam_targeted_reread.verify_threshold_level_bad_elevations,
+                        sys.modules[__name__], reread, raw, filename,
                     )
                     return await asyncio.to_thread(
                         geometric_srax_policy.enrich_extraction, reread, raw, filename,

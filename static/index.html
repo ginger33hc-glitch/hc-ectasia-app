@@ -588,6 +588,7 @@ function canonicalTable(title,headers,rows,greenLabels=[]){
   const green=new Set(greenLabels);
   const rowClass=row=>{
     const values=row.flatMap(value=>value&&typeof value==="object"?Object.values(value):[value]).map(value=>String(value).trim().toUpperCase());
+    if(values.includes("MANDATORY")&&String(row[0]).toUpperCase().includes("MMC"))return "risk-stop-row";
     if(values.includes("STOP")||values.includes("STOP-DEFER"))return "risk-stop-row";
     if(values.includes("CAUTION")||values.includes("PASS WITH CAUTION"))return "risk-caution-row";
     return green.has(row[0])?"safe-plan-row":"";
@@ -611,10 +612,13 @@ function renderEye(r){
   const badRows=[["Final BAD-D",bad.final_d,`${displayValue(bad.classification)} / ${displayValue(bad.status)}`],...["df","db","dp","dt","da"].map(key=>[key.toUpperCase(),badContext[key],"Displayed component; not recalculated"]),...["ppi_min","ppi_avg","ppi_max","artmax_um"].map(key=>[key,badContext[key],"Information / QC only"]),...triggerRows("bad")];
   const safetyRows=[...Object.entries(p.tissue_safety||{}).map(([key,value])=>[key,value,""]),...triggerRows("tissue_safety")];
   const ml7Labels={steep_meridian_axis_deg:"Steep meridian axis",hinge_location_preference:"Preferred hinge location",hinge_location_alternative:"Secondary hinge location",vacuum_ring_mm:"Vacuum ring",vacuum_pressure_mmhg:"Vacuum pressure"};
-  const planningLabels={selected_plan:"Selected LASIK plan",selected_plan_definition:"Selected plan parameters",selection_rule:"Plan-selection priority"};
-  const planningEntries=Object.entries(p.planning||{}).filter(([key])=>key!=="selected_plan_definition").map(([key,value])=>[planningLabels[key]||key,key==="selected_plan"?(p.planning?.selected_plan_definition||value):value]);
-  const planningRows=[["Procedure",p.procedure],...planningEntries,...Object.entries(p.microkeratome_planning||{}).map(([key,value])=>[`ML7 ${ml7Labels[key]||key}`,value])];
-  const greenPlanningRows=p.planning?.selected_plan?["Selected LASIK plan","ML7 Preferred hinge location","ML7 Vacuum ring","ML7 Vacuum pressure"]:[];
+  const planningLabels={selected_plan:"Selected LASIK plan",selected_plan_definition:"Selected plan parameters",selection_rule:"Plan-selection priority",mmc_guidance:"MMC guidance"};
+  const selectedProcedure=p.planning?.selected_procedure_plan||{};
+  const selectedProcedureLabel=selectedProcedure.procedure?[selectedProcedure.eye,i18n.clinical(selectedProcedure.status),selectedProcedure.procedure].join(" — "):"Procedure";
+  const selectedProcedureDetails=[selectedProcedure.selected_lasik_plan,selectedProcedure.optical_zone_mm==null?null:`OZ ${reportDisplayValue(selectedProcedure.optical_zone_mm)} mm`,selectedProcedure.transition_zone_mm==null?null:`TZ ${reportDisplayValue(selectedProcedure.transition_zone_mm)} mm`,selectedProcedure.flap_um==null?null:`Flap ${reportDisplayValue(selectedProcedure.flap_um)} µm`,selectedProcedure.ablation_um==null?null:`Ablation ${reportDisplayValue(selectedProcedure.ablation_um)} µm`].filter(Boolean).join(" — ");
+  const planningEntries=Object.entries(p.planning||{}).filter(([key])=>!["selected_plan_definition","selected_procedure_plan"].includes(key)).map(([key,value])=>[planningLabels[key]||key,key==="selected_plan"?(p.planning?.selected_plan_definition||value):value]);
+  const planningRows=[[selectedProcedureLabel,selectedProcedureDetails||p.procedure],...planningEntries,...Object.entries(p.microkeratome_planning||{}).map(([key,value])=>[`ML7 ${ml7Labels[key]||key}`,value])];
+  const greenPlanningRows=[...(selectedProcedure.status==="PASS"?[selectedProcedureLabel]:[]),...(p.planning?.selected_plan?["Selected LASIK plan","ML7 Preferred hinge location","ML7 Vacuum ring","ML7 Vacuum pressure"]:[])];
   const driverRows=["stop","caution","incomplete"].flatMap(level=>(p.decision_drivers?.[level]||[]).map(item=>[level.toUpperCase(),item]));
   const sourceRows=Object.entries(p.source_values||{}).map(([key,value])=>[key,value,provenanceText(p.source_provenance?.[key])]);
   const correctionRows=(p.manual_corrections||[]).map(item=>[item.field,item.original,item.value,item.label]);

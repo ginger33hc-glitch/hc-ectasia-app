@@ -277,7 +277,7 @@ def test_browser_places_plan_definition_beside_name_and_marks_only_requested_saf
     html = (ROOT / "static" / "index.html").read_text()
     render_source = html[html.index("function renderEye("):html.index("function patientPayload(")]
     assert 'key==="selected_plan"?(p.planning?.selected_plan_definition||value):value' in render_source
-    assert '.filter(([key])=>key!=="selected_plan_definition")' in render_source
+    assert '!["selected_plan_definition","selected_procedure_plan"].includes(key)' in render_source
     for label in (
         "Selected LASIK plan",
         "ML7 Preferred hinge location",
