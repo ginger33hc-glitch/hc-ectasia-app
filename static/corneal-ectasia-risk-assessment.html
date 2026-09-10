@@ -4,14 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Corneal Ectasia Risk Assessment Software for Refractive Surgeons | CER-AI</title>
-  <meta name="description" content="CER-AI is corneal ectasia risk assessment software for refractive surgeons, combining independent ERSS, BAD-D, NICE and PS3 pathways with Pentacam data and tissue-safety checks.">
+  <meta name="description" content="CER-AI is corneal ectasia screening and risk assessment software for refractive surgeons, with AI-assisted Pentacam image reading, independent risk pathways and tissue-safety checks.">
   <meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1">
-  <meta name="keywords" content="corneal ectasia, ectasia risk assessment, post-LASIK ectasia, keratoconus screening, Pentacam, Final BAD-D, Belin Ambrosio, Randleman ERSS, NICE, PS3, LASIK screening, PRK screening, residual stromal bed">
   <link rel="describedby" type="text/markdown" href="/llms.txt">
   <link rel="home" href="/">
   <style>
     :root{--ink:#17212b;--navy:#173b57;--blue:#1f5e8c;--muted:#5d6d79;--line:#d8e2e9;--bg:#f5f8fa;--soft:#edf4f8}
-    *{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:var(--ink);line-height:1.65;background:#fff}.wrap{width:min(940px,calc(100% - 34px));margin:0 auto}header{background:#05090d;color:#fff;padding:20px 0;border-bottom:1px solid #243440}header a{color:#fff;text-decoration:none;font-weight:800}main{padding:62px 0 78px}h1{font-size:clamp(36px,6vw,58px);line-height:1.05;color:var(--navy);letter-spacing:-1.5px;margin:12px 0 22px}.kicker{text-transform:uppercase;color:var(--blue);font-size:12px;letter-spacing:1.4px;font-weight:900}.lead{font-size:20px;color:#344d60;max-width:840px}.panel{margin:32px 0;padding:24px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}h2{font-size:28px;color:var(--navy);margin:42px 0 12px}h3{color:var(--navy);margin:24px 0 8px}p,li{color:#3f4f5b}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:24px 0}.card{border:1px solid var(--line);border-radius:12px;padding:19px;background:#fff}.card h3{margin-top:0;font-size:17px}.faq{border-top:1px solid var(--line);padding:20px 0}.faq:first-of-type{margin-top:22px}.faq h3{margin:0 0 8px}.byline{margin-top:38px;padding:18px 20px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:14px}.notice{border-left:4px solid var(--blue);background:var(--soft);padding:17px 19px;margin-top:32px;border-radius:8px}footer{border-top:1px solid var(--line);padding:28px 0;background:#f8fafb;color:var(--muted);font-size:13px}@media(max-width:680px){.grid{grid-template-columns:1fr}}
+    *{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:var(--ink);line-height:1.65;background:#fff}.wrap{width:min(940px,calc(100% - 34px));margin:0 auto}header{background:#05090d;color:#fff;padding:20px 0;border-bottom:1px solid #243440}header a{color:#fff;text-decoration:none;font-weight:800}main{padding:62px 0 78px}h1{font-size:clamp(36px,6vw,58px);line-height:1.05;color:var(--navy);letter-spacing:-1.5px;margin:12px 0 22px}.kicker{text-transform:uppercase;color:var(--blue);font-size:12px;letter-spacing:1.4px;font-weight:900}.lead{font-size:20px;color:#344d60;max-width:840px}.panel{margin:32px 0;padding:24px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}h2{font-size:28px;color:var(--navy);margin:42px 0 12px}h3{color:var(--navy);margin:24px 0 8px}p,li{color:#3f4f5b}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:24px 0}.card{border:1px solid var(--line);border-radius:12px;padding:19px;background:#fff}.card h3{margin-top:0;font-size:17px}.faq{border-top:1px solid var(--line);padding:20px 0}.faq:first-of-type{margin-top:22px}.faq h3{margin:0 0 8px}.byline{margin-top:38px;padding:18px 20px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:14px}.notice{border-left:4px solid var(--blue);background:var(--soft);padding:17px 19px;margin-top:32px;border-radius:8px}footer{border-top:1px solid var(--line);padding:28px 0;background:#f8fafb;color:var(--muted);font-size:13px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin:24px 0}.actions a{display:inline-block;padding:11px 16px;border:1px solid var(--blue);border-radius:8px;text-decoration:none;font-weight:700;color:var(--navy)}.actions a:first-child{background:var(--navy);color:#fff}a:focus-visible{outline:3px solid var(--blue);outline-offset:4px}
+    /* The existing public-i18n controller owns html.lang and the EN/TR switch.
+       These paired editorial sections need no second translator or script. */
+    html:not([lang="tr"]) [data-language-variant="tr"],html[lang="tr"] [data-language-variant="en"]{display:none}
+    @media(max-width:680px){.grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -19,12 +22,36 @@
 <main><article class="wrap">
   <div class="kicker">Professional clinical decision support</div>
   <h1>Corneal ectasia risk assessment software for refractive surgeons</h1>
-  <p class="lead">CER-AI is a web-based clinical decision-support platform that structures preoperative corneal ectasia risk assessment before procedures such as LASIK and PRK.</p>
+  <div data-language-variant="en" lang="en">
+    <p class="lead">CER-AI is web-based corneal ectasia screening and risk assessment software for qualified ophthalmologists and refractive surgeons. It supports structured preoperative review before LASIK and PRK, with AI-assisted reading of Pentacam images and separately implemented assessment rules.</p>
+    <p>The full product name is Corneal Ectasia Risk Assessment Intelligence. CER-AI brings imaging measurements, independent risk pathways, tissue-safety checks and an explained assessment report into one workflow.</p>
+    <div class="actions"><a href="/learning/clinical-cases">Explore worked examples</a><a href="/clinical-evidence">Review clinical evidence</a><a href="/app">Access CER-AI</a></div>
+  </div>
+  <div data-language-variant="tr" lang="tr">
+    <p class="lead">CER-AI, yetkin göz hekimleri ve refraktif cerrahlar için web tabanlı korneal ektazi tarama ve risk değerlendirme yazılımıdır. Pentacam görüntülerinin yapay zekâ destekli okunmasını ve ayrı olarak uygulanan değerlendirme kurallarını kullanarak LASIK ve PRK öncesi yapılandırılmış incelemeyi destekler.</p>
+    <p>Ürünün tam adı Corneal Ectasia Risk Assessment Intelligence'dır. CER-AI, görüntüleme ölçümlerini, bağımsız risk yollarını, doku güvenliği kontrollerini ve gerekçeli değerlendirme raporunu tek bir iş akışında bir araya getirir.</p>
+    <div class="actions"><a href="/tr/learning/clinical-cases">Açıklamalı örnekleri inceleyin</a><a href="/clinical-evidence">Klinik kanıtları inceleyin</a><a href="/app">CER-AI'ye Eriş</a></div>
+  </div>
 
   <div class="panel"><strong>What CER-AI is:</strong> a structured, auditable assessment environment that keeps major ectasia-risk pathways independently interpretable while also checking procedure-specific tissue safety. It is not an autonomous diagnostic system and does not replace surgeon judgment.</div>
 
   <h2>Clinical problem addressed</h2>
   <p>Postoperative corneal ectasia is a major safety concern in corneal refractive surgery. Preoperative screening therefore examines multiple domains rather than relying on a single measurement. These domains can include anterior corneal topography, corneal tomography, pachymetry, refractive magnitude, age, residual stromal bed and other procedure-specific factors.</p>
+
+  <section id="ai-and-clinical-rules">
+    <div data-language-variant="en" lang="en">
+      <h2>How does CER-AI use artificial intelligence?</h2>
+      <p>AI assists with reading information from supplied Pentacam images. Extracted measurements can be incorrect, incomplete or conflicting; source review and correction remain essential parts of professional use.</p>
+      <p>Clinical risk classification and tissue-safety calculations are handled separately by the canonical rule-based assessment engine. AI-assisted image reading is not a claim that CER-AI is an externally validated autonomous diagnostic or ectasia-prediction model.</p>
+      <p>Final BAD-D is read from the Pentacam display. CER-AI does not acquire the corneal scan, replace the Pentacam device or reconstruct its proprietary indices.</p>
+    </div>
+    <div data-language-variant="tr" lang="tr">
+      <h2>CER-AI yapay zekâyı nasıl kullanır?</h2>
+      <p>Yapay zekâ, yüklenen Pentacam görüntülerindeki bilgilerin okunmasına yardımcı olur. Çıkarılan ölçümler hatalı, eksik veya çelişkili olabilir; kaynakların incelenmesi ve hataların düzeltilmesi profesyonel kullanımın temel parçalarıdır.</p>
+      <p>Klinik risk sınıflaması ve doku güvenliği hesaplamaları, kanonik ve kural tabanlı değerlendirme motoru tarafından ayrı olarak yürütülür. Yapay zekâ destekli görüntü okuma, CER-AI'nin dış doğrulaması yapılmış otonom bir tanı veya ektazi öngörü modeli olduğu anlamına gelmez.</p>
+      <p>Final BAD-D, Pentacam ekranından okunur. CER-AI kornea taraması yapmaz, Pentacam cihazının yerini almaz ve cihazın tescilli indekslerini yeniden oluşturmaz.</p>
+    </div>
+  </section>
 
   <h2>Risk pathways represented in CER-AI</h2>
   <div class="grid">
@@ -34,8 +61,18 @@
     <div class="card"><h3>PS3</h3><p>PS3 adds another independently visible risk pathway with procedure-aware interpretation of selected corneal, refractive and inter-eye findings.</p></div>
   </div>
 
-  <h2>Pentacam and corneal imaging concepts</h2>
-  <p>CER-AI is designed around structured interpretation of Pentacam-derived corneal information. Relevant search concepts include corneal topography, corneal tomography, keratoconus screening, ectasia susceptibility, Belin/Ambrosio Enhanced Ectasia Display, Final BAD-D, pachymetry, topometric indices, anterior and posterior elevation, and inter-eye asymmetry.</p>
+  <section id="assessment-workflow">
+    <div data-language-variant="en" lang="en">
+      <h2>From Pentacam images to an assessment report</h2>
+      <p>The workflow starts with the required examination images and clinical inputs. Measurements are linked to defined source fields; missing or conflicting decision-critical data are identified for completion or confirmation. ERSS, Final BAD-D, CER-AI-adapted NICE and PS3 are then presented as independent pathways alongside separate procedure-safety checks.</p>
+      <p>The report documents the assessment, reasons, warnings and applicable planning information. It supports the surgeon's review rather than declaring that surgery is risk-free. PDF and Word reporting use the already-computed canonical report payload; the public website does not calculate a separate assessment.</p>
+    </div>
+    <div data-language-variant="tr" lang="tr">
+      <h2>Pentacam görüntülerinden değerlendirme raporuna</h2>
+      <p>İş akışı, gerekli muayene görüntüleri ve klinik girdilerle başlar. Ölçümler tanımlı kaynak alanlarına bağlanır; kararı etkileyen eksik veya çelişkili veriler tamamlanmak ya da doğrulanmak üzere belirtilir. Ardından ERSS, Final BAD-D, CER-AI'ye uyarlanmış NICE ve PS3, ayrı prosedür güvenliği kontrolleriyle birlikte bağımsız değerlendirme yolları olarak sunulur.</p>
+      <p>Rapor; değerlendirmeyi, gerekçeleri, uyarıları ve uygulanabilir planlama bilgilerini belgeler. Cerrahın incelemesini destekler; ameliyatın risksiz olduğunu ilan etmez. PDF ve Word raporları önceden hesaplanmış aynı kanonik rapor verisini kullanır; kamuya açık web sitesi ayrı bir değerlendirme hesaplamaz.</p>
+    </div>
+  </section>
 
   <h2>Tissue-safety assessment remains separate</h2>
   <p>A reassuring ectasia-risk pathway does not automatically establish procedural safety. CER-AI separately evaluates treatment-related tissue constraints, including pachymetry, anticipated ablation, residual stromal bed or residual stromal tissue, planned refractive correction and postoperative keratometric safety.</p>
@@ -51,16 +88,26 @@
   <div class="faq"><h3>Does CER-AI decide whether surgery should be performed?</h3><p>No. CER-AI organizes evidence, applies predefined assessment and safety rules, and documents the reasoning. The final clinical and surgical decision remains the surgeon's responsibility.</p></div>
   <div class="faq"><h3>Has the complete CER-AI software been externally validated?</h3><p>The public evidence pages identify literature supporting individual clinical concepts and risk pathways. Those publications do not constitute external validation of CER-AI as a complete software product. CER-AI does not claim validated diagnostic sensitivity, specificity or superiority unless supporting CER-AI-specific evidence is explicitly published.</p></div>
 
+  <section id="worked-examples" class="panel">
+    <div data-language-variant="en" lang="en">
+      <h2>Can I examine an example before using the application?</h2>
+      <p>Explore the public worked examples to see how inputs, independent pathway results and explanations fit together. These are synthetic educational cases, not live analyses or actual patient reports. No patient upload is needed to read them.</p>
+      <p><a href="/learning/clinical-cases">Explore worked examples</a> · <a href="/learning/cer-ai-methodology">Read the methodology and evidence boundaries</a> · <a href="/learning/pentacam-education">Review the required Pentacam sources</a></p>
+    </div>
+    <div data-language-variant="tr" lang="tr">
+      <h2>Uygulamayı kullanmadan önce bir örneği inceleyebilir miyim?</h2>
+      <p>Girdilerin, bağımsız değerlendirme sonuçlarının ve açıklamaların nasıl bir araya geldiğini görmek için kamuya açık örnekleri inceleyin. Bunlar sentetik eğitim olgularıdır; canlı analiz veya gerçek hasta raporu değildir. Okumak için hasta görüntüsü yüklemek gerekmez.</p>
+      <p><a href="/tr/learning/clinical-cases">Açıklamalı örnekleri inceleyin</a> · <a href="/tr/learning/cer-ai-methodology">Yöntemi ve kanıt sınırlarını okuyun</a> · <a href="/tr/learning/pentacam-education">Gerekli Pentacam kaynaklarını inceleyin</a></p>
+    </div>
+  </section>
+
   <p>Continue with the <a href="/learning-center">CER-AI Learning Center</a>, review the <a href="/clinical-evidence">clinical evidence mapped to CER-AI</a>, or search the <a href="/references">complete medical reference registry</a>.</p>
 
   <div class="byline"><strong>Clinical author and reviewer:</strong> Hüseyin Cengiz, M.D., Ophthalmic Surgeon and Developer of CER-AI<br><strong>Last reviewed:</strong> September 8, 2026 · <strong>Software version:</strong> 0.7.71</div>
 
-  <h2>Search terminology associated with CER-AI</h2>
-  <p>Corneal ectasia; postoperative corneal ectasia; post-LASIK ectasia; keratoconus susceptibility; refractive surgery ectasia risk; Pentacam ectasia screening; corneal topography; corneal tomography; Belin/Ambrosio Enhanced Ectasia Display; Final BAD-D; Randleman Ectasia Risk Score System; ERSS; NICE; PS3; pachymetry; residual stromal bed; LASIK screening; PRK screening.</p>
-
   <div class="notice"><strong>Clinical-use notice:</strong> CER-AI provides decision support for qualified ophthalmic professionals. Public website content is educational and descriptive; it is not patient-specific medical advice and should not be interpreted as a claim of validated diagnostic performance unless the relevant evidence is explicitly cited.</div>
 </article></main>
 <footer><div class="wrap">CER-AI — structured corneal ectasia risk assessment and refractive-surgery decision support. <a href="/">Return to CER-AI home</a>.</div></footer>
-<script src="/static/public-i18n.js?v=2" defer></script>
+<script src="/static/public-i18n.js?v=3" defer></script>
 </body>
 </html>
