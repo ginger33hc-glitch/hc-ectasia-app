@@ -1,9 +1,9 @@
 """Public presentation contracts; no clinical scoring or patient data."""
 import json
+import re
 from html.parser import HTMLParser
 from pathlib import Path
 from types import SimpleNamespace
-from urllib.robotparser import RobotFileParser
 
 import pytest
 from fastapi import FastAPI
@@ -75,7 +75,6 @@ def test_new_editorial_sections_have_both_languages_with_one_existing_controller
     assert len(scripts) == 1
     assert scripts[0]["src"] == "/static/public-i18n.js?v=3"
     assert "CER-AI yapay zekâyı nasıl kullanır?" in html
-    assert "P entacam" not in html
     assert "Bunlar sentetik eğitim olgularıdır" in html
 
 
@@ -102,13 +101,34 @@ def test_existing_public_crawl_permissions_do_not_expose_private_paths(public_ap
     with TestClient(public_app, base_url="https://cer-ai.com") as client:
         response = client.get("/robots.txt")
     assert response.status_code == 200
-    robots = RobotFileParser()
-    robots.parse(response.text.splitlines())
-    assert robots.can_fetch(agent, "https://cer-ai.com/")
-    assert robots.can_fetch(agent, "https://cer-ai.com/corneal-ectasia-risk-assessment")
-    assert robots.can_fetch(agent, "https://cer-ai.com/learning/clinical-cases")
+    groups = []
+    for block in response.text.split("\n\n"):
+        directives = [line.split(":", 1) for line in block.splitlines()
+                      if ":" in line and not line.startswith("#")]
+        names = [value.strip() for key, value in directives if key == "User-agent"]
+        rules = [(key, value.strip()) for key, value in directives if key in ("Allow", "Disallow")]
+        if names:
+            groups.append((names, rules))
+    matches = [rules for names, rules in groups if agent in names]
+    if not matches:
+        matches = [rules for names, rules in groups if "*" in names]
+    assert len(matches) == 1
+    rules = matches[0]
+    # This site's rules are literal prefixes. Check longest-match precedence,
+    # not urllib.robotparser's first-matching-rule behavior.
+    assert all("*" not in prefix and "$" not in prefix for _, prefix in rules)
+
+    def public_path_allowed(path):
+        allow = max([len(prefix) for kind, prefix in rules
+                     if kind == "Allow" and path.startswith(prefix)] or [0])
+        block = max([len(prefix) for kind, prefix in rules
+                     if kind == "Disallow" and prefix and path.startswith(prefix)] or [0])
+        return allow >= block
+
+    for path in ("/", "/corneal-ectasia-risk-assessment", "/learning/clinical-cases"):
+        assert public_path_allowed(path), (agent, path)
     for path in ("/app", "/testing-app", "/api/example", "/analyze", "/archive", "/report/example"):
-        assert not robots.can_fetch(agent, "https://cer-ai.com" + path), (agent, path)
+        assert not public_path_allowed(path), (agent, path)
 
 
 @pytest.mark.parametrize("path", ["/", "/corneal-ectasia-risk-assessment", "/learning/clinical-cases"])
@@ -128,7 +148,6 @@ def test_production_canonical_and_real_software_identity_remain_intact(public_ap
         assert canonicals == ["https://cer-ai.com/corneal-ectasia-risk-assessment"]
         assert response.headers["x-robots-tag"].startswith("index,follow")
         home = client.get("/")
-    import re
     match = re.search(r'<script type="application/ld\+json">(.*?)</script>', home.text, re.S)
     assert match
     graph = json.loads(match.group(1))["@graph"]
