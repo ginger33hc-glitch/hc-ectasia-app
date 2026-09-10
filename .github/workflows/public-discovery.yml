@@ -1,0 +1,117 @@
+name: Public Search Discovery
+
+on:
+  pull_request:
+    branches: [main, 'staging/canonical-validation-2026-09-08']
+    paths:
+      - 'static/corneal-ectasia-risk-assessment.html'
+      - 'static/public-i18n.js'
+      - 'public_site.py'
+      - 'tests/test_public_search_discovery.py'
+      - 'scripts/check_public_discovery.py'
+      - '.github/workflows/public-discovery.yml'
+  push:
+    branches: ['staging/canonical-validation-2026-09-08']
+    paths:
+      - 'static/corneal-ectasia-risk-assessment.html'
+      - 'tests/test_public_search_discovery.py'
+      - 'scripts/check_public_discovery.py'
+      - '.github/workflows/public-discovery.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-discovery-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  public-discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      OPENAI_API_KEY: test-key-for-import-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Compile public-only additions
+        run: python -m py_compile scripts/check_public_discovery.py tests/test_public_search_discovery.py
+      - name: Public site and discovery contracts
+        run: python -m pytest -q tests/test_public_site.py tests/test_public_search_discovery.py
+      - name: Complete application regression suite
+        run: python -m pytest -q
+      - name: Install browser test dependency
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Desktop and phone EN/TR presentation
+        run: |
+          python -m http.server 8765 --bind 127.0.0.1 >/tmp/cerai-public-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID"' EXIT
+          python - <<'PY'
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright, expect
+          out = Path('public-discovery-artifacts')
+          out.mkdir(exist_ok=True)
+          with sync_playwright() as p:
+              browser = p.chromium.launch()
+              for width, height in ((1440, 1000), (390, 844)):
+                  context = browser.new_context(viewport={'width': width, 'height': height})
+                  page = context.new_page()
+                  errors = []
+                  page.on('pageerror', lambda error: errors.append(str(error)))
+                  page.goto('http://127.0.0.1:8765/static/corneal-ectasia-risk-assessment.html', wait_until='networkidle')
+                  expect(page.locator('[data-language-variant="en"]:visible')).to_have_count(4)
+                  expect(page.locator('[data-language-variant="tr"]:visible')).to_have_count(0)
+                  expect(page.get_by_role('heading', name='How does CER-AI use artificial intelligence?')).to_be_visible()
+                  assert page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), 'Horizontal overflow in EN'
+                  page.screenshot(path=str(out / f'product-{width}-en.png'), full_page=True)
+                  page.locator('#cerai-public-language button[data-lang="tr"]').click()
+                  expect(page.locator('html')).to_have_attribute('lang', 'tr')
+                  expect(page.locator('[data-language-variant="tr"]:visible')).to_have_count(4)
+                  expect(page.locator('[data-language-variant="en"]:visible')).to_have_count(0)
+                  expect(page.get_by_role('heading', name='CER-AI yapay zekâyı nasıl kullanır?')).to_be_visible()
+                  assert page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'), 'Horizontal overflow in TR'
+                  page.screenshot(path=str(out / f'product-{width}-tr.png'), full_page=True)
+                  page.reload(wait_until='networkidle')
+                  expect(page.locator('html')).to_have_attribute('lang', 'tr')
+                  expect(page.locator('[data-language-variant="tr"]:visible')).to_have_count(4)
+                  page.locator('#cerai-public-language button[data-lang="en"]').click()
+                  expect(page.locator('html')).to_have_attribute('lang', 'en')
+                  expect(page.get_by_role('heading', name='How does CER-AI use artificial intelligence?')).to_be_visible()
+                  assert not errors, errors
+                  print(f'PASS: {width}px EN -> TR -> persisted TR -> EN, no horizontal overflow or JS errors')
+                  context.close()
+              browser.close()
+          PY
+      - name: Read-only production HTTP audit (not an indexing verdict)
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p public-discovery-artifacts
+          set -o pipefail
+          python scripts/check_public_discovery.py --environment production | tee public-discovery-artifacts/production-http.json
+      - name: Read-only staging HTTP audit
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p public-discovery-artifacts
+          set -o pipefail
+          python scripts/check_public_discovery.py --environment staging | tee public-discovery-artifacts/staging-http.json
+      - name: Preserve public audit outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-discovery-${{ github.run_id }}
+          path: public-discovery-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
