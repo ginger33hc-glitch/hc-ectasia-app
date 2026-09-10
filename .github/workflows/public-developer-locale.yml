@@ -1,0 +1,82 @@
+name: Public Developer Language
+
+on:
+  pull_request:
+    branches: [main, 'staging/canonical-validation-2026-09-08']
+    paths:
+      - 'static/public-home.html'
+      - 'static/public-i18n.js'
+      - 'static/public-tr-home-overrides.js'
+      - 'tests/test_public_developer_locale.py'
+      - 'scripts/check_public_developer_locale.py'
+      - '.github/workflows/public-developer-locale.yml'
+  push:
+    branches: [main, 'staging/canonical-validation-2026-09-08']
+    paths:
+      - 'static/public-home.html'
+      - 'static/public-i18n.js'
+      - 'static/public-tr-home-overrides.js'
+      - 'tests/test_public_developer_locale.py'
+      - 'scripts/check_public_developer_locale.py'
+      - '.github/workflows/public-developer-locale.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: developer-locale-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  developer-locale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      OPENAI_API_KEY: test-key-for-import-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+      - name: JavaScript syntax and translation contracts
+        run: |
+          node --check static/public-i18n.js
+          node --check static/public-tr-home-overrides.js
+          python -m pytest -q tests/test_public_developer_locale.py tests/test_public_site.py tests/test_public_search_discovery.py
+      - name: Complete application regression suite
+        run: python -m pytest -q
+      - name: Install browser and retrieve original bug baseline
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+          git fetch --depth=1 origin cf903be1db314a7477a7132af1945374236bdb6a
+      - name: Reproduce original bug and verify desktop/phone language recovery
+        run: |
+          python -m http.server 8765 --bind 127.0.0.1 >/tmp/cerai-developer-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID"' EXIT
+          python scripts/check_public_developer_locale.py --baseline-ref cf903be1db314a7477a7132af1945374236bdb6a
+      - name: Verify deployed public scripts and live homepage after promotion
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            TARGET=production
+          else
+            TARGET=staging
+          fi
+          python scripts/check_public_developer_locale.py --environment "$TARGET"
+          set -o pipefail
+          python scripts/check_public_discovery.py --environment "$TARGET" | tee "public-developer-artifacts/$TARGET/public-http.json"
+      - name: Preserve language regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: developer-locale-${{ github.run_id }}-${{ github.run_attempt }}
+          path: public-developer-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
