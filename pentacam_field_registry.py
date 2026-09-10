@@ -38,8 +38,6 @@ COMPLETION_NUMERIC_FIELDS = {
     "I_S": "Signed I-S (D; not ISV/IVA)", "TKC": "TKC (Show 2 Exams center indices)",
     "topographic_astig_D": "Topographic Astig. (D; Cornea Front)",
     "topographic_steep_axis_deg": "Topographic Axis (steep) (degrees; Cornea Front)",
-    "ml7_k1_d": "ML7 K1 (D; Four Maps Anterior Sagittal Curvature)",
-    "ml7_k2_d": "ML7 K2 (D; Four Maps Anterior Sagittal Curvature)",
     "bad_flat_axis_deg": "PS3 BAD Axis (degrees; upper-middle box beside K1; flat meridian)",
     "posterior_Kmean_D": "Posterior Km (D; Cornea Back)",
     "F_Ele_Th_um": "F. Ele.Th (µm; BAD Display labeled box)",

@@ -152,11 +152,8 @@ def test_targeted_reread_uses_exact_subpanel_source_contract():
     assert targeted_reread.source_supports_field(
         "SHOW_2_EXAMS_TOPOMETRIC", "topometric_RMin", "Indices (in 8 mm zone)"
     )
-    assert targeted_reread.source_supports_field(
-        "FOUR_MAPS_REFRACTIVE", "ml7_k1_d", "Anterior Sagittal Curvature (Front)"
-    )
     assert not targeted_reread.source_supports_field(
-        "FOUR_MAPS_REFRACTIVE", "ml7_k1_d", "Posterior Elevation (Back)"
+        "FOUR_MAPS_REFRACTIVE", "K1_D", "Anterior Sagittal Curvature (Front)"
     )
 
 
@@ -167,14 +164,11 @@ def test_ps3_flat_axis_has_its_own_bad_source_without_changing_steep_axis_source
     assert not derivation_is_allowed('bad_flat_axis_deg')
 
 
-def test_ml7_k_values_have_dedicated_four_maps_sources_and_cannot_use_general_keratometry():
-    from pentacam_canonical_source_lock import FOUR_MAPS_ANTERIOR_SAGITTAL
-
-    for field in ('ml7_k1_d', 'ml7_k2_d'):
-        assert source_is_allowed(field, FOUR_MAPS_ANTERIOR_SAGITTAL)
-        assert not source_is_allowed(field, BAD_CENTER)
-        assert not source_is_allowed(field, SHOW_2_CORNEA_FRONT)
-        assert not source_is_allowed(field, FOUR_MAPS_LOWER_LEFT)
-        assert not derivation_is_allowed(field)
+def test_ml7_reuses_single_canonical_k_fields_without_duplicate_registry_entries():
+    assert 'ml7_k1_d' not in CANONICAL_FIELD_SOURCES
+    assert 'ml7_k2_d' not in CANONICAL_FIELD_SOURCES
     assert source_is_allowed('K1_D', SHOW_2_CORNEA_FRONT)
+    assert source_is_allowed('K2_D', SHOW_2_CORNEA_FRONT)
+    assert not derivation_is_allowed('K1_D')
+    assert not derivation_is_allowed('K2_D')
     assert source_is_allowed('corneal_diameter_mm', FOUR_MAPS_LOWER_LEFT)

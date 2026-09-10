@@ -42,7 +42,7 @@ def test_developer_english_source_is_retained():
 def test_every_developer_text_fragment_has_a_canonical_turkish_translation():
     texts = TextNodes(developer_source()).texts
     translations = translation_dictionary()
-    language_neutral = {"Hüseyin Cengiz, M.D.", "0.7.71"}
+    language_neutral = {"Hüseyin Cengiz, M.D.", "0.7.86"}
     missing = [text for text in texts if text not in language_neutral and text not in translations]
     assert not missing, missing
     assert any(text.startswith(". Rather than") for text in texts)

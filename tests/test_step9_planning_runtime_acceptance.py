@@ -292,8 +292,6 @@ def test_hyperopic_lasik_does_not_use_myopic_ablation_estimate_for_fallbacks():
 def test_ml7_planning_is_attached_directly_after_favorable_lasik():
     eye = _eye(
         "OD",
-        ml7_k1_d=42.0,
-        ml7_k2_d=44.0,
         K1_D=42.0,
         K1_axis_deg=180.0,
         K2_D=44.0,
@@ -353,12 +351,11 @@ def test_prk_never_receives_ml7_planning():
     assert "microkeratome_planning" not in by_eye["OD"]
 
 
-def test_ml7_uses_larger_four_maps_k_and_never_falls_back_to_kmax_or_scoring_k():
+def test_ml7_reuses_canonical_k_values_and_never_substitutes_kmax():
     from canonical_runtime_service import _keratometry
-    source = {'ml7_k1_d': 46, 'ml7_k2_d': 44,
-              'K1_D': 40, 'K2_D': 41, 'Kmax_D': 55}
+    source = {'K1_D': 46, 'K2_D': 44, 'Kmax_D': 55}
     assert _keratometry(source)[:2] == (46, 44)
-    source['ml7_k1_d'] = None
+    source['K1_D'] = None
     assert _keratometry(source)[:2] == (None, None)
 
 

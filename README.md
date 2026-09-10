@@ -2,7 +2,7 @@
 
 FastAPI application for source-restricted preoperative ectasia risk assessment using the **CER-AI Preoperative Ectasia Risk Assessment for Corneal Refractive Surgery**.
 
-## What v0.7.71 implements
+## What v0.7.86 implements
 
 - Clinical dispositions now use one centralized three-category contract: `PASS`, `CAUTION`, and
   `STOP-DEFER`. NICE 5–8 produces `CAUTION` without automatic defer; NICE ≥9 remains a

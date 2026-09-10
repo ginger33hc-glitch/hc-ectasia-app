@@ -8,10 +8,9 @@ import assessment_workflow as workflow
 def _eye(name="OD", **overrides):
     values = {
         "eye": name,
+        "K1_D": 42.0,
         "Kmean_D": 43.0,
         "K2_D": 44.0,
-        "ml7_k1_d": 42.0,
-        "ml7_k2_d": 44.0,
         "corneal_diameter_mm": 11.8,
         "table_verified_numeric_fields": ["corneal_diameter_mm"],
         "central_pachy_um": 550.0,

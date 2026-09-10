@@ -1,4 +1,4 @@
-# CER-AI Launch Behavior Contract — v0.7.71
+# CER-AI Launch Behavior Contract — v0.7.86
 
 Status: **Reconciled with the approved September 8, 2026 staging checkpoint**
 
@@ -62,7 +62,7 @@ Decision-critical values must retain source provenance. Source locks include:
 - NICE central pachymetry: **Pupil Center (+)** only.
 - Posterior Rmin: **Show 2 Exams Topometric → Cornea Back** only; the center 8-mm topometric RMin is a separate field.
 - PS3 prescription comparison: `bad_flat_axis_deg` from the **BAD upper-middle Axis box beside K1** only.
-- ML7 keratometry: dedicated `ml7_k1_d` / `ml7_k2_d` from the **4 Maps Refractive Anterior Sagittal Curvature (Front) labeled K1/K2 values** only; no BAD K1/K2, scoring-K, or Kmax fallback.
+- ML7 keratometry: reuse the existing canonical `K1_D` / `K2_D`; never create or request a second ML7-specific pair, and never substitute Kmax.
 - Thinnest pachymetry: circle-marked Thinnest Location source.
 - Final BAD-D and components: their own labeled boxes only.
 

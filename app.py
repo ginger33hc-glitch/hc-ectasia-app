@@ -57,7 +57,7 @@ async def canonical_runtime_lifespan(application: FastAPI):
 
 
 app = FastAPI(
-    title="CER-AI — Corneal Ectasia Risk Assessment Intelligence v0.7.71",
+    title="CER-AI — Corneal Ectasia Risk Assessment Intelligence v0.7.86",
     lifespan=canonical_runtime_lifespan,
 )
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -132,8 +132,6 @@ SCHEMA = {
                         "type": "string",
                         "enum": list(KERATOMETRY_SOURCE_VALUES),
                     },
-                    "ml7_k1_d": {"type": ["number", "null"]},
-                    "ml7_k2_d": {"type": ["number", "null"]},
                     "K1_D": {"type": ["number", "null"]},
                     "K1_axis_deg": {"type": ["number", "null"]},
                     "K2_D": {"type": ["number", "null"]},
@@ -183,7 +181,7 @@ SCHEMA = {
                 "required": [
                     "eye", "screen_types", "quality", "missing_or_unreadable",
                     "table_verified_numeric_fields", "keratometry_source",
-                    "ml7_k1_d", "ml7_k2_d", "K1_D", "K1_axis_deg",
+                    "K1_D", "K1_axis_deg",
                     "K2_D", "K2_axis_deg", "Kmax_D", "corneal_diameter_mm", "pachy_thinnest_um",
                     "BAD_D", "Df", "Db", "Dp", "Dt", "Da",
                     "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI", "CKI", "IHD",
@@ -360,7 +358,8 @@ EXCLUSIVE LABELED-BOX SOURCE LOCK:
   unlabeled number.
 - posterior_Kmean_D: use only Show 2 Exams Topometric -> Cornea Back -> printed Km.
 - topographic_astig_D and topographic_steep_axis_deg: use only Show 2 Exams Topometric -> Cornea Front.
-- ml7_k1_d and ml7_k2_d: ML7 planning ONLY. Read the explicitly labeled K1 and K2 values associated with Anterior Sagittal Curvature (Front) on the 4 Maps Refractive page. Do not use BAD Display K1/K2, Show 2 Exams K1/K2, Kmax, a color-map spot, or a calculated value. HWTW remains in the 4 Maps Refractive lower-left HWTW box.
+- ML7 planning reuses the canonical K1_D and K2_D values above. Do not create or request a second
+  ML7-specific K1/K2 pair. HWTW remains in the 4 Maps Refractive lower-left HWTW box.
 - bad_flat_axis_deg: for PS3 prescription-axis comparison ONLY, read the Axis box beside K1 in the BAD Display upper-middle numeric area. Never substitute the steep axis or derive a rotated value. Preserve all other axis sources and SRAX geometry.
 - topometric_RMin and TKC: use only Show 2 Exams Topometric center Indices (in 8 mm zone).
 - Kmax_D: use only the numeric value in the explicitly printed "KMax"/"Kmax" row.

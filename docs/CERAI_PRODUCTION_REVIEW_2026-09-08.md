@@ -64,7 +64,7 @@ been validated here. Do not copy production patient storage or keys into staging
 | Matrix item | Required evidence | Current limitation |
 |---|---|---|
 | 57 | Physical phone: install/share, first upload, completion, PDF/Word access and archive reopen | Automated tests and HTTP logs are not a physical-device run |
-| 63 | Compare every canonical target against labeled source boxes for the exact candidate; include BAD flat axis, dedicated ML7 K1/K2, bilateral geometric SRAX and unreadable/conflict behavior | Historical transcription and extracted responses do not establish complete equality/sign-off |
+| 63 | Compare every canonical target against labeled source boxes for the exact candidate; include BAD flat axis, canonical K1/K2 reused by ML7, bilateral geometric SRAX and unreadable/conflict behavior | Historical transcription and extracted responses do not establish complete equality/sign-off |
 | 64 | Surgeon-confirmed eligibility and treatment inputs; complete case through report, durable save, search, reopen, original artifact and attribution | Incomplete recovered responses; staging archive is unconfigured |
 | 65 | Required CI on the proposed promotion revision, explicit approval, production deployment/SHA verification | Staging is verified; production promotion is pending |
 | 66 | Production desktop and physical-mobile smoke test after authorized deployment | Not performed; production action is not authorized |
@@ -73,7 +73,7 @@ been validated here. Do not copy production patient storage or keys into staging
 
 - Replace reverse-KISA, inclusive-20 and PS3-22 SRAX instructions with shared geometric >20 evidence.
 - Replace anterior Rmin and tolerance/minimum/maximum reconciliation instructions with canonical source/conflict ownership.
-- Include PRK ERSS/shared ablation, automatic per-eye LASIK→PRK evaluation, PS3 >3 D activation/BAD flat axis, and ML7 dedicated 4 Maps Anterior Sagittal Curvature K fields.
+- Include PRK ERSS/shared ablation, automatic per-eye LASIK→PRK evaluation, PS3 >3 D activation/BAD flat axis, and ML7 reuse of canonical K1/K2 without duplicate fields.
 - Replace obsolete soft-lens 14-day operational text with the existing canonical 10-day readiness gate.
 - Correct matrix item 45 and distinguish earlier local audit evidence from later staging deployment and accepted report QA.
 

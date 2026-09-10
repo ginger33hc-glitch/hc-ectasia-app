@@ -34,7 +34,7 @@ from pentacam_canonical_source_lock import (
 
 core = composition.core
 app = composition.app
-CANONICAL_VERSION = "0.7.71"
+CANONICAL_VERSION = "0.7.86"
 _archive_runtime = composition.compose(CANONICAL_VERSION)
 
 

@@ -34,7 +34,7 @@ _TESTING_NOTICE = Path("static/testing-notice.html")
 _PUBLIC_CANONICAL_BASE = os.getenv(
     "CERAI_PUBLIC_CANONICAL_BASE", "https://cer-ai.com"
 ).rstrip("/")
-_PUBLIC_CONTENT_LASTMOD = "2026-09-09"
+_PUBLIC_CONTENT_LASTMOD = "2026-09-10"
 _MOBILE_INSTALL_SECTION = """
 <div id="mobile-install" style="margin-top:34px;padding:26px;border:1px solid var(--line);border-radius:15px;background:#fff;box-shadow:0 6px 18px rgba(23,59,87,.045)">
   <div class="section-kicker">Mobile access</div>
@@ -162,7 +162,7 @@ def _discovery_head(base: str, *, robots_directive: str) -> str:
                 "@id": f"{base}/#software",
                 "name": "CER-AI",
                 "url": f"{base}/",
-                "softwareVersion": "0.7.71",
+                "softwareVersion": "0.7.86",
                 "creator": {"@id": f"{base}/#clinical-author"},
                 "applicationCategory": "MedicalApplication",
                 "applicationSubCategory": (

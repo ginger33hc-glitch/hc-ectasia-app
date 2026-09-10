@@ -475,7 +475,7 @@ TR_FAQS = (
 )
 
 
-# Public documentation of the current canonical v0.7.71 behavior. These tables
+# Public documentation of the current canonical v0.7.86 behavior. These tables
 # are presentation data only; the clinical engine remains the sole rule owner.
 TECHNICAL_TABLES = {
     "en": {
@@ -494,7 +494,7 @@ TECHNICAL_TABLES = {
                 ("Lower right", "Elevation (Back)", "Posterior elevation pattern review; it does not substitute for BAD Display B.Ele.Th or Show 2 Cornea Back values."),
             ), "CER-AI requires the standard full 4 Maps Refractive layout and verifies the printed map label as well as its quadrant. Do not upload a custom/rearranged four-map layout or place an anterior sagittal-curvature map in a right-hand quadrant. A label–position mismatch, front/back substitution, rotation, or crop is a source conflict and must be corrected with a standard export or clear front-on image."),
             ("Required Pentacam source set", ("Source image", "Required set", "CER-AI extraction role"), (
-                ("4 Maps Refractive", "One OD and one OS", "Pupil Center pachymetry, circle-marked Thinnest Location, K Max (Front), HWTW, and acquisition/identity evidence; Anterior Sagittal Curvature (Front) supplies labeled ML7 K1/K2 and deterministic SRAX geometry."),
+                ("4 Maps Refractive", "One OD and one OS", "Pupil Center pachymetry, circle-marked Thinnest Location, K Max (Front), HWTW, acquisition/identity evidence, and deterministic SRAX geometry."),
                 ("Belin/Ambrósio BAD Display", "One OD and one OS", "Signed F.Ele.Th and B.Ele.Th; PPI Min/Avg/Max and ARTmax; Df/Db/Dp/Dt/Da and Final D; the specific upper-middle Axis field is retained for its validation role. BAD K1/K2 are not required for ML7."),
                 ("Show 2 Exams Topometric", "One bilateral comparison page", "For each eye: Cornea Front K1/K2/axes/Km/Astig; Cornea Back Km and Rmin; center 8-mm indices including ISV, IVA, KI, CKI, IHA, IHD, RMin, TKC, KISA, and signed I-S."),
                 ("Excimer treatment card", "Optional sixth image", "Only the labeled Düzeltme Miktarı row may supply treatment correction. If absent, the surgeon provides complete manifest and intended refraction for both eyes."),
@@ -503,12 +503,11 @@ TECHNICAL_TABLES = {
                 ("Show 2 → Cornea Front", "K1, K1 axis, K2, K2 axis, printed Km, Astig and steep axis", "No Cornea Back, Kmax, True Net Power, map spot, or calculated mean"),
                 ("Show 2 → Cornea Back", "Printed posterior Km and posterior Rmin", "No Cornea Front Rmin or center topometric RMin"),
                 ("Show 2 → center Indices (8 mm)", "ISV, IVA, KI, CKI, IHA, IHD, topometric RMin, TKC, KISA, signed I-S", "No index may substitute for I-S; preserve the printed sign"),
-                ("4 Maps → Anterior Sagittal Curvature (Front)", "Labeled K1 and K2 for ML7 planning", "No BAD K1/K2, Show 2 K1/K2, Kmax, map spot, or calculated value"),
                 ("4 Maps → lower-left labeled box", "Pupil Center pachymetry, Thinnest Location pachymetry, K Max (Front), HWTW", "No Pachy Vertex, map color/spot, or neighboring number"),
                 ("BAD → elevation row", "Signed F.Ele.Th and B.Ele.Th in µm", "No elevation-map spot, K field, or unlabeled value"),
                 ("BAD → Progression Index", "PPI Min/Avg/Max and ARTmax", "No back-calculation of Dp or Da"),
                 ("BAD → bottom D strip", "Df, Db, Dp, Dt, Da, Final D", "No reconstruction of any component or Final D"),
-            ), "The registry distinguishes fields that look similar. In particular, posterior Rmin and center topometric RMin are separate measurements. ML7 planning uses the labeled K1/K2 values associated with Anterior Sagittal Curvature (Front) on 4 Maps Refractive; BAD K1/K2 are not required."),
+            ), "The registry distinguishes fields that look similar. In particular, posterior Rmin and center topometric RMin are separate measurements. ML7 planning reuses the existing canonical Cornea Front K1/K2; it does not request a second pair."),
             ("From image to auditable report", ("Stage", "What CER-AI does", "Safety behavior"), (
                 ("1. Page identity", "Confirms screen family, OD/OS laterality, patient/exam identity, and the five-source set", "Assessment does not start when a mandatory source is missing or unidentified"),
                 ("2. Primary transcription", "Reads labeled numeric boxes and records exact canonical source IDs", "Wrong-screen or inferred values are rejected"),
@@ -633,7 +632,7 @@ TECHNICAL_TABLES = {
                 ("Sağ alt", "Elevation (Back)", "Arka elevasyon örüntüsü incelemesi; BAD Display B.Ele.Th veya Show 2 Cornea Back değerlerinin yerine geçmez."),
             ), "CER-AI standart ve tam 4 Maps Refractive yerleşimini ister; yazılı harita etiketini ve kadran konumunu birlikte doğrular. Özel/yeniden düzenlenmiş dört-harita yerleşimi yüklemeyin ve anterior sagittal eğrilik haritasını sağ taraftaki bir kadrana yerleştirmeyin. Etiket–konum uyumsuzluğu, ön/arka ikamesi, döndürme veya kırpma kaynak çelişkisidir; standart dışa aktarım ya da net karşıdan çekimle düzeltilmelidir."),
             ("Zorunlu Pentacam kaynak kümesi", ("Kaynak görüntü", "Zorunlu küme", "CER-AI çıkarım rolü"), (
-                ("4 Maps Refractive", "Bir OD ve bir OS", "Pupil Center pakimetrisi, daireyle işaretli Thinnest Location, K Max (Front), HWTW ve çekim/kimlik kanıtı; Anterior Sagittal Curvature (Front), ML7 için etiketli K1/K2 değerlerini ve deterministik SRAX geometrisini sağlar."),
+                ("4 Maps Refractive", "Bir OD ve bir OS", "Pupil Center pakimetrisi, daireyle işaretli Thinnest Location, K Max (Front), HWTW, çekim/kimlik kanıtı ve deterministik SRAX geometrisi."),
                 ("Belin/Ambrósio BAD Display", "Bir OD ve bir OS", "İşaretli F.Ele.Th ve B.Ele.Th; PPI Min/Avg/Max ve ARTmax; Df/Db/Dp/Dt/Da ve Final D; belirli üst-orta Axis alanı doğrulama rolü için korunur. ML7 için BAD K1/K2 gerekli değildir."),
                 ("Show 2 Exams Topometric", "Bir bilateral karşılaştırma sayfası", "Her göz için: Cornea Front K1/K2/eksenler/Km/Astig; Cornea Back Km ve Rmin; ISV, IVA, KI, CKI, IHA, IHD, RMin, TKC, KISA ve işaretli I-S dahil orta 8 mm indeksleri."),
                 ("Excimer tedavi kartı", "İsteğe bağlı altıncı görüntü", "Yalnız etiketli Düzeltme Miktarı satırı tedavi düzeltmesini sağlayabilir. Kart yoksa cerrah iki göz için tam manifest ve hedeflenen refraksiyonu girer."),
@@ -642,12 +641,11 @@ TECHNICAL_TABLES = {
                 ("Show 2 → Cornea Front", "K1, K1 ekseni, K2, K2 ekseni, yazılı Km, Astig ve dik eksen", "Cornea Back, Kmax, True Net Power, harita noktası veya hesaplanmış ortalama yok"),
                 ("Show 2 → Cornea Back", "Yazılı posterior Km ve posterior Rmin", "Cornea Front Rmin veya orta topometrik RMin yok"),
                 ("Show 2 → orta Indices (8 mm)", "ISV, IVA, KI, CKI, IHA, IHD, topometrik RMin, TKC, KISA, işaretli I-S", "Hiçbir indeks I-S yerine geçmez; yazılı işaret korunur"),
-                ("4 Maps → Anterior Sagittal Curvature (Front)", "ML7 planlaması için etiketli K1 ve K2", "BAD K1/K2, Show 2 K1/K2, Kmax, harita noktası veya hesaplanmış değer kullanılamaz"),
                 ("4 Maps → sol-alt etiketli kutu", "Pupil Center pakimetrisi, Thinnest Location pakimetrisi, K Max (Front), HWTW", "Pachy Vertex, harita rengi/noktası veya komşu sayı yok"),
                 ("BAD → elevasyon satırı", "µm cinsinden işaretli F.Ele.Th ve B.Ele.Th", "Elevasyon haritası noktası, K alanı veya etiketsiz değer yok"),
                 ("BAD → Progression Index", "PPI Min/Avg/Max ve ARTmax", "Dp veya Da geriye doğru hesaplanmaz"),
                 ("BAD → alt D şeridi", "Df, Db, Dp, Dt, Da, Final D", "Hiçbir bileşen veya Final D yeniden oluşturulmaz"),
-            ), "Kayıt sistemi benzer görünen alanları ayırır. Posterior Rmin ile orta topometrik RMin ayrı ölçümlerdir. ML7 planlaması, 4 Maps Refractive ekranındaki Anterior Sagittal Curvature (Front) bölümünün etiketli K1/K2 değerlerini kullanır; BAD K1/K2 gerekli değildir."),
+            ), "Kayıt sistemi benzer görünen alanları ayırır. Posterior Rmin ile orta topometrik RMin ayrı ölçümlerdir. ML7 planlaması mevcut kanonik Cornea Front K1/K2 değerlerini yeniden kullanır; ikinci bir çift istemez."),
             ("Görüntüden denetlenebilir rapora", ("Aşama", "CER-AI ne yapar?", "Güvenlik davranışı"), (
                 ("1. Sayfa kimliği", "Ekran ailesi, OD/OS tarafı, hasta/inceleme kimliği ve beş kaynaklı kümeyi doğrular", "Zorunlu kaynak eksik veya tanımsızsa değerlendirme başlamaz"),
                 ("2. Birincil yazıya aktarma", "Etiketli sayısal kutuları okur ve kesin kanonik kaynak kimliklerini kaydeder", "Yanlış ekran veya çıkarıma dayalı değer reddedilir"),
@@ -976,7 +974,7 @@ def render_topic(base: str, robots: str, topic: Topic, locale: str = "en") -> st
         evidence = ("Kanıt sınırı", "Klinik kanıt haritası")
     else:
         crumbs = (("Home", "/"), ("Learning Center", "/learning-center"), (topic.title, ""))
-        scope = ("Educational scope", "This module explains concepts. It does not perform or change a CER-AI clinical assessment. Where stated, it documents the current CER-AI v0.7.71 implementation for transparent surgeon education.")
+        scope = ("Educational scope", "This module explains concepts. It does not perform or change a CER-AI clinical assessment. Where stated, it documents the current CER-AI v0.7.86 implementation for transparent surgeon education.")
         sources = ("Selected sources", 'See the <a href="/references">complete CER-AI medical reference registry</a> for broader context.')
         continue_label = "Continue learning"
         evidence = ("Evidence boundary", "Clinical evidence map")
@@ -1033,11 +1031,11 @@ def render_case(base: str, robots: str, case: SampleCase, locale: str = "en") ->
     points = "".join(f"<li>{escape(point)}</li>" for point in case.learning_points)
     if locale == "tr":
         crumbs = (("Ana Sayfa", "/"), ("Eğitim Merkezi", "/tr/learning-center"), ("Klinik olgular", "/tr/learning/clinical-cases"), (case.title, ""))
-        labels = ("Sentetik eğitim olgusu", "Gerçek hasta verisi değildir", "Bu çalışılmış örnek, güncel CER-AI v0.7.71 kurallarını öğretmek için oluşturulmuştur. Klinik karar değildir.", "Kaynak girdiler", "Alan", "Değer", "Yol değerlendirmesi", "Sistem", "Hesaplama / bulgu", "Sonuç", "Nihai CER-AI sonucu", "Rapor özeti", "Öğrenme noktaları")
+        labels = ("Sentetik eğitim olgusu", "Gerçek hasta verisi değildir", "Bu çalışılmış örnek, güncel CER-AI v0.7.86 kurallarını öğretmek için oluşturulmuştur. Klinik karar değildir.", "Kaynak girdiler", "Alan", "Değer", "Yol değerlendirmesi", "Sistem", "Hesaplama / bulgu", "Sonuç", "Nihai CER-AI sonucu", "Rapor özeti", "Öğrenme noktaları")
         page_title = f"{case.title} — CER-AI eğitim olgusu"
     else:
         crumbs = (("Home", "/"), ("Learning Center", "/learning-center"), ("Clinical cases", "/learning/clinical-cases"), (case.title, ""))
-        labels = ("Synthetic teaching case", "Not real patient data", "This worked example was created to teach the current CER-AI v0.7.71 rules. It is not a clinical decision.", "Source inputs", "Field", "Value", "Pathway evaluation", "System", "Calculation / finding", "Result", "Final CER-AI result", "Report summary", "Learning points")
+        labels = ("Synthetic teaching case", "Not real patient data", "This worked example was created to teach the current CER-AI v0.7.86 rules. It is not a clinical decision.", "Source inputs", "Field", "Value", "Pathway evaluation", "System", "Calculation / finding", "Result", "Final CER-AI result", "Report summary", "Learning points")
         page_title = f"{case.title} — CER-AI teaching case"
     return f"""<!doctype html><html lang="{locale}"><head>{_head(base, path, page_title, description, robots, schema, locale)}</head><body>{_nav(locale, path)}<main><article><header class="learning-hero article-hero"><div class="learning-wrap">{_breadcrumb(crumbs)}<p class="learning-kicker">{labels[0]}</p><h1>{escape(case.title)}</h1><p class="learning-lead">{escape(case.summary)}</p><div class="learning-principle"><strong>{labels[1]}</strong><span>{labels[2]}</span></div></div></header><div class="learning-wrap case-detail"><section><h2>{labels[3]}</h2><div class="table-scroll"><table><thead><tr><th>{labels[4]}</th><th>{labels[5]}</th></tr></thead><tbody>{input_rows}</tbody></table></div></section><section><h2>{labels[6]}</h2><div class="table-scroll"><table><thead><tr><th>{labels[7]}</th><th>{labels[8]}</th><th>{labels[9]}</th></tr></thead><tbody>{pathway_rows}</tbody></table></div></section><section class="case-result"><p class="learning-kicker">{labels[10]}</p><h2>{escape(case.final_result)}</h2></section><section><h2>{labels[11]}</h2><p>{escape(case.report_text)}</p></section><section><h2>{labels[12]}</h2><ul>{points}</ul></section></div></article></main>{_footer(locale)}</body></html>"""
 

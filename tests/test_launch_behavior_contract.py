@@ -9,7 +9,7 @@ from clinical_core.safety import FINAL_KMEAN_MAX_D, FINAL_KMEAN_MIN_D, PRK_EPITH
 
 
 def test_launch_behavior_contract_document_exists():
-    assert Path("docs/CER-AI_LAUNCH_BEHAVIOR_CONTRACT_v0.7.71.md").exists()
+    assert Path("docs/CER-AI_LAUNCH_BEHAVIOR_CONTRACT_v0.7.86.md").exists()
 
 
 def test_direct_canonical_runtime_is_ready():
