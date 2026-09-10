@@ -56,8 +56,7 @@ def test_name_source_prefers_od_and_uses_os_only_if_od_absent():
 
 def _eye(name="OD", **overrides):
     values = {
-        "eye": name, "Kmean_D": 43.0, "K2_D": 44.0,
-        "ml7_k1_d": 42.0, "ml7_k2_d": 44.0,
+        "eye": name, "K1_D": 42.0, "Kmean_D": 43.0, "K2_D": 44.0,
         "corneal_diameter_mm": 11.8,
         "table_verified_numeric_fields": ["corneal_diameter_mm"],
         "central_pachy_um": 550.0, "pachy_thinnest_um": 545.0,
@@ -194,13 +193,13 @@ def test_missing_astigmatic_disparity_inputs_do_not_block_ps3_or_request_complet
     assert "bad_flat_axis_deg" not in od_keys
 
 
-def test_favorable_lasik_requires_missing_ml7_ring_inputs_before_report_release():
+def test_favorable_lasik_requests_only_genuinely_missing_ring_inputs():
     verified_decision_fields = [
         "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp", "Dt", "Da",
         "ARTmax_um", "PPI_max",
     ]
     od = _eye(
-        "OD", ml7_k1_d=None, ml7_k2_d=None, corneal_diameter_mm=None,
+        "OD", K1_D=None, corneal_diameter_mm=None,
         table_verified_numeric_fields=verified_decision_fields,
     )
     response = _respond(od=od)
@@ -210,21 +209,33 @@ def test_favorable_lasik_requires_missing_ml7_ring_inputs_before_report_release(
     }
     assert response["workflow_status"] == "NEEDS_INPUT"
     assert response["report_token"] is None
-    assert {"ml7_k1_d", "ml7_k2_d", "corneal_diameter_mm"} <= set(requests)
-    assert requests["ml7_k1_d"]["source_screen"] == "4 Maps Refractive"
-    assert "Anterior Sagittal Curvature (Front)" in requests["ml7_k1_d"]["source_box"]
+    assert set(requests) == {"K1_D", "corneal_diameter_mm"}
+    assert requests["K1_D"]["source_screen"] == "Show 2 Exams – Topometric"
+    assert "Cornea Front" in requests["K1_D"]["source_box"]
     assert requests["corneal_diameter_mm"]["source_screen"] == "4 Maps Refractive"
-    assert requests["ml7_k1_d"]["required_for"] == ["CER-AI"]
+    assert requests["K1_D"]["required_for"] == ["CER-AI"]
 
     completed = _respond(od=od, overrides={"OD": {
-        "ml7_k1_d": 42.0,
-        "ml7_k2_d": 44.0,
+        "K1_D": 42.0,
         "corneal_diameter_mm": 11.8,
     }})
     assert completed["workflow_status"] == "READY"
     ml7 = completed["decision"]["eyes"][0]["report_payload"]["microkeratome_planning"]
     assert ml7["vacuum_ring_mm"] == 9.0
     assert ml7["vacuum_pressure_mmhg"] == "550"
+
+
+def test_existing_canonical_k_values_do_not_generate_duplicate_ml7_requests():
+    response = _respond(od=_eye("OD", K1_D=42.0, K2_D=44.0))
+    requested_keys = {
+        item.get("key") for item in response["input_requests"]
+        if item.get("eye") == "OD"
+    }
+    assert "K1_D" not in requested_keys
+    assert "K2_D" not in requested_keys
+    assert "ml7_k1_d" not in requested_keys
+    assert "ml7_k2_d" not in requested_keys
+    assert response["workflow_status"] == "READY"
 
 
 def test_prior_surgery_cannot_receive_virgin_cornea_report_token():

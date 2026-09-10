@@ -481,8 +481,11 @@ def _attach_selected_procedure_plan(planning, eye_name, effective_plan, core_res
 
 
 def _keratometry(source_eye: Mapping[str, Any]):
-    k1 = _plan_number(source_eye, "ml7_k1_d")
-    k2 = _plan_number(source_eye, "ml7_k2_d")
+    # K1/K2 are one canonical clinical measurement. ML7 consumes the same
+    # verified values already used by the assessment; it must not maintain or
+    # request a second procedure-specific copy.
+    k1 = _plan_number(source_eye, "K1_D")
+    k2 = _plan_number(source_eye, "K2_D")
     if k1 is None or k2 is None:
         return None, None, None
     if k2 > k1:

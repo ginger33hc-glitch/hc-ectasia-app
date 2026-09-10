@@ -7,16 +7,15 @@ import assessment_workflow as workflow
 _DECISION_FIELDS = (
     "pachy_thinnest_um", "BAD_D", "Df", "Db", "Dp", "Dt", "Da", "ARTmax_um", "PPI_max"
 )
-_PLANNING_FIELDS = ("ml7_k1_d", "ml7_k2_d", "corneal_diameter_mm")
+_PLANNING_FIELDS = ("K1_D", "K2_D", "corneal_diameter_mm")
 
 
 def _eye(name="OD", **overrides):
     values = {
         "eye": name,
+        "K1_D": 42.0,
         "Kmean_D": 43.0,
         "K2_D": 44.0,
-        "ml7_k1_d": 42.0,
-        "ml7_k2_d": 44.0,
         "corneal_diameter_mm": 11.8,
         "central_pachy_um": 550.0,
         "pachy_thinnest_um": 545.0,

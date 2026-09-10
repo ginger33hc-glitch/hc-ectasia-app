@@ -142,7 +142,7 @@ def planning_missing_items(decision, extracted):
         ):
             continue
         source_eye = source_eyes[eye_id]
-        for field in ("ml7_k1_d", "ml7_k2_d", "corneal_diameter_mm"):
+        for field in ("K1_D", "K2_D", "corneal_diameter_mm"):
             if not _finite(source_eye.get(field)):
                 items.append((eye_id, f"ML7 planning: {field}"))
     return list(dict.fromkeys(items))

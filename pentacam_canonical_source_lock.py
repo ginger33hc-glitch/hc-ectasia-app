@@ -5,7 +5,7 @@ Extraction, reread, provenance, reconciliation, readiness and reporting must que
 this registry rather than maintain their own field/source lists.
 """
 
-POLICY_VERSION = "2026-09-09-ML7-FOUR-MAPS"
+POLICY_VERSION = "2026-09-10-ML7-REUSE-CANONICAL-K"
 NO_FALLBACK = True
 NO_DERIVATION = True
 
@@ -26,7 +26,6 @@ SHOW_2_CORNEA_FRONT = "SHOW_2_EXAMS_TOPOMETRIC_CORNEA_FRONT"
 SHOW_2_CORNEA_BACK = "SHOW_2_EXAMS_TOPOMETRIC_CORNEA_BACK"
 SHOW_2_INDICES = "SHOW_2_EXAMS_TOPOMETRIC_CENTER_INDICES_8MM"
 FOUR_MAPS_LOWER_LEFT = "FOUR_MAPS_REFRACTIVE_LOWER_LEFT_LABELED_BOX"
-FOUR_MAPS_ANTERIOR_SAGITTAL = "FOUR_MAPS_REFRACTIVE_ANTERIOR_SAGITTAL_CURVATURE"
 BAD_CENTER = "BELIN_AMBROSIO_CENTER_NUMERIC_BOX"
 BAD_ELEVATION_ROW = "BELIN_AMBROSIO_LOWER_ELEVATION_LABEL_VALUE_ROW"
 BAD_PPI = "BELIN_AMBROSIO_PROGRESSION_INDEX_BOX"
@@ -37,10 +36,6 @@ CANONICAL_SOURCE_REGIONS = {
     SHOW_2_CORNEA_BACK: ("Show 2 Exams – Topometric", "Cornea Back"),
     SHOW_2_INDICES: ("Show 2 Exams – Topometric", "center — Indices (in 8 mm zone)"),
     FOUR_MAPS_LOWER_LEFT: ("4 Maps Refractive", "lower-left labeled numerical box"),
-    FOUR_MAPS_ANTERIOR_SAGITTAL: (
-        "4 Maps Refractive",
-        "Anterior Sagittal Curvature (Front) — labeled K1/K2 values",
-    ),
     BAD_CENTER: ("Belin/Ambrósio Display", "central numeric box"),
     BAD_ELEVATION_ROW: (
         "Belin/Ambrósio Display",
@@ -59,9 +54,6 @@ CANONICAL_FIELD_SOURCES = {
     "Kmean_D": (SHOW_2_CORNEA_FRONT, "Km"),
     "topographic_astig_D": (SHOW_2_CORNEA_FRONT, "Astig"),
     "topographic_steep_axis_deg": (SHOW_2_CORNEA_FRONT, "Astig/steep axis"),
-
-    "ml7_k1_d": (FOUR_MAPS_ANTERIOR_SAGITTAL, "K1 (ML7 planning only)"),
-    "ml7_k2_d": (FOUR_MAPS_ANTERIOR_SAGITTAL, "K2 (ML7 planning only)"),
 
     # PS3 prescription-axis comparison only; independent of steep-axis and SRAX sources.
     "bad_flat_axis_deg": (BAD_CENTER, "Axis (upper middle, beside K1; flat meridian)"),
@@ -139,7 +131,7 @@ def source_family(field: str):
     source = canonical_source_id(field)
     if source in {SHOW_2_CORNEA_FRONT, SHOW_2_CORNEA_BACK, SHOW_2_INDICES}:
         return SHOW2
-    if source in {FOUR_MAPS_LOWER_LEFT, FOUR_MAPS_ANTERIOR_SAGITTAL}:
+    if source == FOUR_MAPS_LOWER_LEFT:
         return FOURMAPS
     if source in {BAD_CENTER, BAD_ELEVATION_ROW, BAD_PPI, BAD_STRIP}:
         return BAD

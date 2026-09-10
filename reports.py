@@ -63,8 +63,6 @@ FIELD_LABELS = {
     "K1_D": "K1", "K1_axis_deg": "K1 axis", "K2_D": "K2",
     "K2_axis_deg": "K2 axis", "Kmean_D": "Km",
     "topographic_astig_D": "Astigmatism",
-    "ml7_k1_d": "ML7 K1 (Four Maps Anterior Sagittal Curvature)",
-    "ml7_k2_d": "ML7 K2 (Four Maps Anterior Sagittal Curvature)",
     "bad_flat_axis_deg": "PS3 BAD Axis (flat meridian, beside K1)",
     "topographic_steep_axis_deg": "Displayed steep/astigmatic axis",
     "Rmin_mm": "Posterior Rmin", "topometric_RMin": "Topometric RMin",

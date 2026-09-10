@@ -15,7 +15,7 @@ from typing import Any, Iterable, Mapping
 # alternate sources or report-side calculations. Keeping the list here lets both
 # renderers consume the exact same source values and provenance.
 REPORT_EXTRACTION_FIELDS = (
-    "ml7_k1_d", "ml7_k2_d", "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmean_D",
+    "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmean_D",
     "topographic_astig_D", "topographic_steep_axis_deg", "bad_flat_axis_deg",
     "Rmin_mm", "ISV", "IVA", "KI", "CKI", "IHA", "IHD",
     "topometric_RMin", "TKC", "KISA", "I_S",

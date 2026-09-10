@@ -24,7 +24,7 @@ def _pdf_text(data):
 
 
 def test_turkish_exports_translate_current_report_sections_and_preserve_snapshot():
-    payload = _payload(ml7_k1_d=40, ml7_k2_d=45)
+    payload = _payload(K1_D=40, K2_D=45)
     payload['locale'] = 'tr'
     payload['patient'].update(name='No Source Şule Işık', id='PASS-NO-035', reviewer='Dr. Çağrı Şen')
     original = deepcopy(payload)
