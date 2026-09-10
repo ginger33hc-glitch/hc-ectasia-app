@@ -1,4 +1,4 @@
-# CER-AI Launch Behavior Contract — v0.7.71
+# CER-AI Launch Behavior Contract — v0.7.86
 
 Status: **Reconciled with the approved September 8, 2026 staging checkpoint**
 

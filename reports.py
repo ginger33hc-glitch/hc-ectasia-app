@@ -40,7 +40,7 @@ GRAY = "52616D"
 GRAY_FILL = "EEF2F5"
 LINE = "D7E0E7"
 INK = "17212B"
-APP_VERSION = "0.7.71"
+APP_VERSION = "0.7.86"
 PROGRAM_NAME = "Corneal Ectasia Risk Assessment Intelligence"
 
 PDF_UNICODE_REGULAR = "CER-AI-Vera"

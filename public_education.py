@@ -475,7 +475,7 @@ TR_FAQS = (
 )
 
 
-# Public documentation of the current canonical v0.7.71 behavior. These tables
+# Public documentation of the current canonical v0.7.86 behavior. These tables
 # are presentation data only; the clinical engine remains the sole rule owner.
 TECHNICAL_TABLES = {
     "en": {
@@ -974,7 +974,7 @@ def render_topic(base: str, robots: str, topic: Topic, locale: str = "en") -> st
         evidence = ("Kanıt sınırı", "Klinik kanıt haritası")
     else:
         crumbs = (("Home", "/"), ("Learning Center", "/learning-center"), (topic.title, ""))
-        scope = ("Educational scope", "This module explains concepts. It does not perform or change a CER-AI clinical assessment. Where stated, it documents the current CER-AI v0.7.71 implementation for transparent surgeon education.")
+        scope = ("Educational scope", "This module explains concepts. It does not perform or change a CER-AI clinical assessment. Where stated, it documents the current CER-AI v0.7.86 implementation for transparent surgeon education.")
         sources = ("Selected sources", 'See the <a href="/references">complete CER-AI medical reference registry</a> for broader context.')
         continue_label = "Continue learning"
         evidence = ("Evidence boundary", "Clinical evidence map")
@@ -1031,11 +1031,11 @@ def render_case(base: str, robots: str, case: SampleCase, locale: str = "en") ->
     points = "".join(f"<li>{escape(point)}</li>" for point in case.learning_points)
     if locale == "tr":
         crumbs = (("Ana Sayfa", "/"), ("Eğitim Merkezi", "/tr/learning-center"), ("Klinik olgular", "/tr/learning/clinical-cases"), (case.title, ""))
-        labels = ("Sentetik eğitim olgusu", "Gerçek hasta verisi değildir", "Bu çalışılmış örnek, güncel CER-AI v0.7.71 kurallarını öğretmek için oluşturulmuştur. Klinik karar değildir.", "Kaynak girdiler", "Alan", "Değer", "Yol değerlendirmesi", "Sistem", "Hesaplama / bulgu", "Sonuç", "Nihai CER-AI sonucu", "Rapor özeti", "Öğrenme noktaları")
+        labels = ("Sentetik eğitim olgusu", "Gerçek hasta verisi değildir", "Bu çalışılmış örnek, güncel CER-AI v0.7.86 kurallarını öğretmek için oluşturulmuştur. Klinik karar değildir.", "Kaynak girdiler", "Alan", "Değer", "Yol değerlendirmesi", "Sistem", "Hesaplama / bulgu", "Sonuç", "Nihai CER-AI sonucu", "Rapor özeti", "Öğrenme noktaları")
         page_title = f"{case.title} — CER-AI eğitim olgusu"
     else:
         crumbs = (("Home", "/"), ("Learning Center", "/learning-center"), ("Clinical cases", "/learning/clinical-cases"), (case.title, ""))
-        labels = ("Synthetic teaching case", "Not real patient data", "This worked example was created to teach the current CER-AI v0.7.71 rules. It is not a clinical decision.", "Source inputs", "Field", "Value", "Pathway evaluation", "System", "Calculation / finding", "Result", "Final CER-AI result", "Report summary", "Learning points")
+        labels = ("Synthetic teaching case", "Not real patient data", "This worked example was created to teach the current CER-AI v0.7.86 rules. It is not a clinical decision.", "Source inputs", "Field", "Value", "Pathway evaluation", "System", "Calculation / finding", "Result", "Final CER-AI result", "Report summary", "Learning points")
         page_title = f"{case.title} — CER-AI teaching case"
     return f"""<!doctype html><html lang="{locale}"><head>{_head(base, path, page_title, description, robots, schema, locale)}</head><body>{_nav(locale, path)}<main><article><header class="learning-hero article-hero"><div class="learning-wrap">{_breadcrumb(crumbs)}<p class="learning-kicker">{labels[0]}</p><h1>{escape(case.title)}</h1><p class="learning-lead">{escape(case.summary)}</p><div class="learning-principle"><strong>{labels[1]}</strong><span>{labels[2]}</span></div></div></header><div class="learning-wrap case-detail"><section><h2>{labels[3]}</h2><div class="table-scroll"><table><thead><tr><th>{labels[4]}</th><th>{labels[5]}</th></tr></thead><tbody>{input_rows}</tbody></table></div></section><section><h2>{labels[6]}</h2><div class="table-scroll"><table><thead><tr><th>{labels[7]}</th><th>{labels[8]}</th><th>{labels[9]}</th></tr></thead><tbody>{pathway_rows}</tbody></table></div></section><section class="case-result"><p class="learning-kicker">{labels[10]}</p><h2>{escape(case.final_result)}</h2></section><section><h2>{labels[11]}</h2><p>{escape(case.report_text)}</p></section><section><h2>{labels[12]}</h2><ul>{points}</ul></section></div></article></main>{_footer(locale)}</body></html>"""
 
