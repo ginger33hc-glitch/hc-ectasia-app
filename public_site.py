@@ -30,11 +30,13 @@ _PUBLIC_HOME = Path("static/public-home.html")
 _AI_LANDING = Path("static/corneal-ectasia-risk-assessment.html")
 _EVIDENCE_PAGE = Path("static/clinical-evidence.html")
 _REFERENCES_PAGE = Path("static/references.html")
+_CLINICAL_AUTHOR_PAGE = Path("static/huseyin-cengiz.html")
+_EDITORIAL_POLICY_PAGE = Path("static/editorial-policy.html")
 _TESTING_NOTICE = Path("static/testing-notice.html")
 _PUBLIC_CANONICAL_BASE = os.getenv(
     "CERAI_PUBLIC_CANONICAL_BASE", "https://cer-ai.com"
 ).rstrip("/")
-_PUBLIC_CONTENT_LASTMOD = "2026-09-10"
+_PUBLIC_CONTENT_LASTMOD = "2026-09-11"
 _PUBLIC_PAGE_METADATA = {
     "/corneal-ectasia-risk-assessment": {
         "schema_type": "MedicalWebPage",
@@ -64,6 +66,25 @@ _PUBLIC_PAGE_METADATA = {
             "keratoconus susceptibility and refractive-surgery screening."
         ),
         "about": "Corneal ectasia and refractive-surgery medical literature",
+    },
+    "/about/huseyin-cengiz": {
+        "schema_type": "ProfilePage",
+        "title": "Hüseyin Cengiz, M.D. — Clinical Author and CER-AI Developer",
+        "description": (
+            "Clinical author profile for Hüseyin Cengiz, M.D., ophthalmic surgeon "
+            "and developer of CER-AI corneal ectasia risk assessment software."
+        ),
+        "about": "Hüseyin Cengiz, M.D.",
+        "main_entity": {"@id": "{base}/#clinical-author"},
+    },
+    "/editorial-policy": {
+        "schema_type": "WebPage",
+        "title": "Medical Editorial and Evidence Policy | CER-AI",
+        "description": (
+            "How CER-AI authors, reviews, cites, updates and corrects its public "
+            "corneal ectasia and refractive-surgery educational content."
+        ),
+        "about": "CER-AI medical editorial and evidence policy",
     },
 }
 _MOBILE_INSTALL_SECTION = """
@@ -232,7 +253,10 @@ def _discovery_head(base: str, *, robots_directive: str) -> str:
                 "@id": f"{base}/#clinical-author",
                 "name": "Hüseyin Cengiz, M.D.",
                 "jobTitle": "Ophthalmic Surgeon and Developer of CER-AI",
-                "url": f"{base}/#developer",
+                "url": f"{base}/about/huseyin-cengiz",
+                "sameAs": [
+                    "https://www.linkedin.com/in/huseyin-cengiz-md-881b9797/"
+                ],
             },
             {
                 "@type": "MedicalWebPage",
@@ -293,6 +317,7 @@ def _discovery_head(base: str, *, robots_directive: str) -> str:
   <meta name="twitter:title" content="{home_title}">
   <meta name="twitter:description" content="{home_description}">
   <link rel="canonical" href="{base}/">
+  <link rel="author" href="{base}/about/huseyin-cengiz">
   <link rel="describedby" type="text/markdown" href="{base}/llms.txt">
   <link rel="alternate" type="text/html" href="{base}/corneal-ectasia-risk-assessment">
   <link rel="related" type="text/html" href="{base}/learning-center">
@@ -370,6 +395,7 @@ def _public_page_discovery_head(base: str, canonical_path: str) -> str:
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="{escape(title, quote=True)}">
   <meta name="twitter:description" content="{escape(description, quote=True)}">
+  <link rel="author" href="{base}/about/huseyin-cengiz">
   <script id="cerai-page-discovery" type="application/ld+json">{encoded_schema}</script>
 """
 
@@ -449,6 +475,8 @@ The software keeps major risk pathways independently interpretable rather than h
 - [Corneal ectasia risk assessment]({base}/corneal-ectasia-risk-assessment): Search-oriented clinical overview of the problem CER-AI addresses and the terminology used by the platform.
 - [Clinical evidence and references]({base}/clinical-evidence): Verified literature mapped to the CER-AI pathways and concepts it supports, with explicit evidence boundaries.
 - [Full medical reference registry]({base}/references): Searchable consolidated CER-AI bibliography grouped by clinical topic.
+- [Clinical author]({base}/about/huseyin-cengiz): Authorship, clinical background, scope, and professional profile for Hüseyin Cengiz, M.D.
+- [Medical editorial policy]({base}/editorial-policy): Public standards for source selection, authorship, review, corrections, and evidence boundaries.
 
 ## Evidence anchors
 - Randleman et al. Risk assessment for ectasia after corneal refractive surgery. Ophthalmology. 2008. DOI 10.1016/j.ophtha.2007.03.073.
@@ -487,6 +515,8 @@ def _sitemap_xml(base: str) -> str:
         (f"{base}/corneal-ectasia-risk-assessment", "0.9"),
         (f"{base}/clinical-evidence", "0.9"),
         (f"{base}/references", "0.9"),
+        (f"{base}/about/huseyin-cengiz", "0.8"),
+        (f"{base}/editorial-policy", "0.8"),
         *((f"{base}/learning/{topic.slug}", "0.8") for topic in TOPICS),
         (f"{base}/learning/faq", "0.8"),
         (f"{base}/tr/learning-center", "0.9"),
@@ -617,6 +647,18 @@ def install(core) -> None:
     @core.app.get("/references", include_in_schema=False)
     def references(request: Request) -> HTMLResponse:
         return _render_public_page(_REFERENCES_PAGE, request, "/references")
+
+    @core.app.get("/about/huseyin-cengiz", include_in_schema=False)
+    def clinical_author(request: Request) -> HTMLResponse:
+        return _render_public_page(
+            _CLINICAL_AUTHOR_PAGE, request, "/about/huseyin-cengiz"
+        )
+
+    @core.app.get("/editorial-policy", include_in_schema=False)
+    def editorial_policy(request: Request) -> HTMLResponse:
+        return _render_public_page(
+            _EDITORIAL_POLICY_PAGE, request, "/editorial-policy"
+        )
 
     @core.app.get("/robots.txt", include_in_schema=False)
     def robots(request: Request) -> PlainTextResponse:

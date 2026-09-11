@@ -67,7 +67,11 @@ def test_public_homepage_identifies_software_and_clinical_author():
         by_type = {item["@type"]: item for item in graph}
         assert by_type["SoftwareApplication"]["softwareVersion"] == "0.7.86"
         assert by_type["Person"]["name"] == "Hüseyin Cengiz, M.D."
-        assert by_type["MedicalWebPage"]["dateModified"] == "2026-09-10"
+        assert by_type["Person"]["url"] == "https://cer-ai.com/about/huseyin-cengiz"
+        assert by_type["Person"]["sameAs"] == [
+            "https://www.linkedin.com/in/huseyin-cengiz-md-881b9797/"
+        ]
+        assert by_type["MedicalWebPage"]["dateModified"] == "2026-09-11"
 
 
 def test_clinical_app_has_stable_app_entry():
@@ -112,7 +116,8 @@ def test_sitemap_contains_only_public_discovery_pages():
             "/learning/surgical-safety-concepts", "/learning/clinical-cases",
             "/learning/cer-ai-methodology", "/learning/surgeon-learning-modules",
             "/learning/faq", "/corneal-ectasia-risk-assessment",
-            "/clinical-evidence", "/references",
+            "/clinical-evidence", "/references", "/about/huseyin-cengiz",
+            "/editorial-policy",
             "/tr/learning-center", "/tr/learning/randleman-erss",
             "/tr/learning/ps3-risk-assessment", "/tr/learning/faq",
             "/learning/cases/two-caution-pathways",
@@ -122,7 +127,7 @@ def test_sitemap_contains_only_public_discovery_pages():
         assert "<loc>https://cer-ai.com/</loc>" in text
         assert "https://cer-ai.com/home" not in text
         assert "http://cer-ai.com" not in text
-        assert "<lastmod>2026-09-10</lastmod>" in text
+        assert "<lastmod>2026-09-11</lastmod>" in text
         for private_path in ("/app", "/analyze", "/assessment/", "/archive"):
             assert f"<loc>https://cer-ai.com{private_path}" not in text
 
@@ -136,6 +141,8 @@ def test_all_public_pages_have_absolute_https_canonicals():
             ),
             "/clinical-evidence": "https://cer-ai.com/clinical-evidence",
             "/references": "https://cer-ai.com/references",
+            "/about/huseyin-cengiz": "https://cer-ai.com/about/huseyin-cengiz",
+            "/editorial-policy": "https://cer-ai.com/editorial-policy",
         }
         for path, canonical in expected.items():
             response = client.get(path)
@@ -144,6 +151,31 @@ def test_all_public_pages_have_absolute_https_canonicals():
                 f'<link rel="canonical" href="{canonical}">'
             ) == 1
             assert response.headers["x-robots-tag"].startswith("index,follow")
+
+
+def test_public_author_and_editorial_pages_document_medical_accountability():
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        author = client.get("/about/huseyin-cengiz")
+        assert author.status_code == 200
+        assert "Hüseyin Cengiz, M.D." in author.text
+        assert "Ophthalmic surgeon and developer of CER-AI" in author.text
+        assert 'href="/editorial-policy"' in author.text
+        assert 'rel="author" href="https://cer-ai.com/about/huseyin-cengiz"' in author.text
+        discovery = re.search(
+            r'<script id="cerai-page-discovery" type="application/ld\+json">(.*?)</script>',
+            author.text,
+            flags=re.DOTALL,
+        )
+        assert discovery is not None
+        author_schema = json.loads(discovery.group(1))
+        assert author_schema["@type"] == "ProfilePage"
+        assert author_schema["mainEntity"]["@id"] == "https://cer-ai.com/#clinical-author"
+
+        policy = client.get("/editorial-policy")
+        assert policy.status_code == 200
+        assert "Medical editorial and evidence policy" in policy.text
+        assert "Evidence boundaries" in policy.text
+        assert "search visibility, advertising or commercial considerations" in policy.text
 
 
 def test_public_landing_page_answers_surgeon_discovery_questions():
@@ -187,7 +219,7 @@ def test_learning_center_exposes_the_full_public_education_architecture():
         assert '<link rel="stylesheet" href="/static/technical-public.css?v=6">' in response.text
         assert "Education explains the science; the CER-AI application performs the structured assessment." in response.text
         for phrase in (
-            "Corneal ectasia: clinical foundations",
+            "Corneal ectasia: screening, risk factors, and preoperative assessment",
             "Pentacam education for ectasia screening",
             "BAD-D and component indices",
             "Pentacam topometric indices",
@@ -235,7 +267,19 @@ def test_learning_topics_are_crawlable_evidence_linked_and_nonclinical():
                 flags=re.DOTALL,
             )
             assert schema is not None
-            assert json.loads(schema.group(1))["@type"] == "MedicalWebPage"
+            parsed = json.loads(schema.group(1))
+            assert parsed["@type"] == "MedicalWebPage"
+            assert parsed["author"]["@id"] == "https://cer-ai.com/#clinical-author"
+            assert parsed["dateModified"] == "2026-09-11"
+            assert 'rel="author" href="https://cer-ai.com/about/huseyin-cengiz"' in response.text
+
+        basics = client.get("/learning/corneal-ectasia-basics")
+        assert (
+            "Corneal ectasia: screening, risk factors, and preoperative assessment"
+            in basics.text
+        )
+        assert "Topography, tomography, and pachymetry answer different questions" in basics.text
+        assert "Global Consensus on Keratoconus and Ectatic Diseases" in basics.text
 
 
 def test_learning_center_has_first_class_turkish_routes_and_hreflang():

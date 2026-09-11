@@ -23,19 +23,25 @@ class Topic:
 TOPICS = (
     Topic(
         "corneal-ectasia-basics",
-        "Corneal ectasia: clinical foundations",
-        "A surgeon-focused introduction to corneal ectasia, susceptibility, postoperative ectasia, and the role of preoperative screening.",
+        "Corneal ectasia: screening, risk factors, and preoperative assessment",
+        "A surgeon-focused guide to corneal ectasia, keratoconus susceptibility, postoperative ectasia, topography, tomography, and preoperative refractive-surgery screening.",
         "Foundation module",
         (
             ("What corneal ectasia means", "Corneal ectasia describes progressive loss of corneal shape and optical regularity associated with structural weakening. Clinical findings can include localized steepening, thinning, irregular astigmatism, and reduced corrected visual quality. Keratoconus is a primary ectatic disorder; postoperative ectasia is a distinct clinical context that may become evident after corneal refractive surgery."),
+            ("The term covers more than one clinical setting", "Corneal ectatic disorders include primary conditions such as keratoconus and pellucid marginal degeneration as well as ectasia that develops after corneal refractive surgery. These entities can share thinning, steepening, irregular astigmatism, and optical degradation, but their history, distribution, stage, and management context are not interchangeable."),
             ("Susceptibility is not the same as diagnosis", "Preoperative screening asks whether available history, examination, topography, tomography, and procedure-related factors suggest vulnerability. A susceptibility signal is not automatically a diagnosis of keratoconus, and a normal-looking single metric cannot exclude all risk. The evidence must be interpreted as a pattern and in clinical context."),
             ("Why multimodal screening matters", "Published postoperative cases show that no single variable captures every pathway to ectasia. Anterior curvature patterns, pachymetric distribution, posterior-surface information, age, refractive magnitude, and planned tissue alteration answer different questions. Discordance between these channels is itself information that deserves review."),
+            ("Topography, tomography, and pachymetry answer different questions", "Anterior topography characterizes corneal curvature and optical-shape patterns. Tomography adds posterior-surface and three-dimensional thickness-distribution information. Pachymetry contributes both absolute thickness and spatial progression. A screening conclusion should preserve these distinctions instead of replacing one channel with a similarly positioned number from another display."),
+            ("Screening before LASIK or PRK", "Preoperative assessment combines the corneal phenotype with the proposed procedure. Age, refraction, planned optical and transition zones, anticipated ablation, flap thickness for LASIK, residual stromal tissue, percent tissue altered, previous surgery, examination quality, and clinical modifiers can affect the interpretation. A reassuring corneal map does not by itself establish tissue safety, and conservative tissue geometry does not neutralize suspicious morphology."),
+            ("Postoperative ectasia and preoperative risk are related but distinct", "Postoperative ectasia is a clinical outcome identified after surgery; preoperative risk assessment estimates whether available findings warrant caution, further evaluation, a different plan, or deferral. A risk system developed in one procedure or historical cohort should not be converted into a universal lifetime probability without supporting validation."),
+            ("What warrants closer review", "Progressive refractive change, increasing irregular astigmatism, localized or asymmetric steepening, abnormal posterior elevation, atypical pachymetric progression, inter-eye asymmetry, poor acquisition quality, contact-lens effects, eye rubbing, family history, or disagreement between risk channels can justify repeat acquisition or broader clinical review. None of these observations should be interpreted without the full examination context."),
             ("What this module does not do", "This page teaches terminology and reasoning. It does not diagnose an individual eye, calculate a patient-specific probability, or determine surgical eligibility. Longitudinal change, image quality, contact-lens history, ocular examination, and surgeon judgment remain essential."),
         ),
         (
             ("Randleman et al., Ophthalmology 2008", "https://pubmed.ncbi.nlm.nih.gov/17624434/"),
             ("Moshirfar et al., Ophthalmology and Therapy 2021", "https://doi.org/10.1007/s40123-021-00383-w"),
             ("Rabinowitz, Survey of Ophthalmology 1998", "https://doi.org/10.1016/S0039-6257(97)00119-7"),
+            ("Gomes et al., Global Consensus on Keratoconus and Ectatic Diseases, Cornea 2015", "https://doi.org/10.1097/ICO.0000000000000408"),
         ),
     ),
     Topic(
@@ -796,6 +802,7 @@ def _head(base: str, canonical_path: str, title: str, description: str, robots: 
 <meta name="author" content="Hüseyin Cengiz, M.D.">
 <meta name="copyright" content="© 2026 Hüseyin Cengiz, M.D. CER-AI. All rights reserved.">
 <link rel="canonical" href="{canonical}">
+<link rel="author" href="{base}/about/huseyin-cengiz">
 <link rel="alternate" hreflang="en" href="{base}{english_path}">
 <link rel="alternate" hreflang="tr" href="{base}{turkish_path}">
 <link rel="alternate" hreflang="x-default" href="{base}{english_path}">
@@ -921,6 +928,8 @@ def render_hub(base: str, robots: str, locale: str = "en") -> str:
         "hasPart": [{"@type": "MedicalWebPage", "name": t.title, "url": f"{base}{_path(locale, f'/learning/{t.slug}')}"} for t in topics],
         "isPartOf": {"@id": f"{base}/#website"},
         "inLanguage": locale,
+        "author": {"@id": f"{base}/#clinical-author"},
+        "dateModified": "2026-09-11",
         "copyrightHolder": {"@type": "Person", "name": "Hüseyin Cengiz, M.D."},
         "copyrightYear": 2026,
     }
@@ -959,6 +968,8 @@ def render_topic(base: str, robots: str, topic: Topic, locale: str = "en") -> st
         "citation": [url for _, url in topic.references if url.startswith("http")],
         "isPartOf": {"@id": f"{base}{_path(locale, '/learning-center')}#page"},
         "inLanguage": locale,
+        "author": {"@id": f"{base}/#clinical-author"},
+        "dateModified": "2026-09-11",
         "copyrightHolder": {"@type": "Person", "name": "Hüseyin Cengiz, M.D."},
         "copyrightYear": 2026,
     }
@@ -1002,6 +1013,8 @@ def render_faq(base: str, robots: str, locale: str = "en") -> str:
         "mainEntity": [{"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in faqs],
         "isPartOf": {"@id": f"{base}{_path(locale, '/learning-center')}#page"},
         "inLanguage": locale,
+        "author": {"@id": f"{base}/#clinical-author"},
+        "dateModified": "2026-09-11",
         "copyrightHolder": {"@type": "Person", "name": "Hüseyin Cengiz, M.D."},
         "copyrightYear": 2026,
     }
@@ -1025,7 +1038,7 @@ def render_faq(base: str, robots: str, locale: str = "en") -> str:
 def render_case(base: str, robots: str, case: SampleCase, locale: str = "en") -> str:
     path = _path(locale, f"/learning/cases/{case.slug}")
     description = case.summary
-    schema = {"@context": "https://schema.org", "@type": "MedicalWebPage", "@id": f"{base}{path}#page", "url": f"{base}{path}", "name": case.title, "description": description, "audience": {"@type": "MedicalAudience", "audienceType": "Ophthalmologists and refractive surgeons"}, "isPartOf": {"@id": f"{base}{_path(locale, '/learning/clinical-cases')}#page"}, "inLanguage": locale, "copyrightHolder": {"@type": "Person", "name": "Hüseyin Cengiz, M.D."}, "copyrightYear": 2026}
+    schema = {"@context": "https://schema.org", "@type": "MedicalWebPage", "@id": f"{base}{path}#page", "url": f"{base}{path}", "name": case.title, "description": description, "audience": {"@type": "MedicalAudience", "audienceType": "Ophthalmologists and refractive surgeons"}, "isPartOf": {"@id": f"{base}{_path(locale, '/learning/clinical-cases')}#page"}, "inLanguage": locale, "author": {"@id": f"{base}/#clinical-author"}, "dateModified": "2026-09-11", "copyrightHolder": {"@type": "Person", "name": "Hüseyin Cengiz, M.D."}, "copyrightYear": 2026}
     input_rows = "".join(f"<tr><th scope=\"row\">{escape(label)}</th><td>{escape(value)}</td></tr>" for label, value in case.inputs)
     pathway_rows = "".join(f"<tr><th scope=\"row\">{escape(name)}</th><td>{escape(calculation)}</td><td><strong>{escape(status)}</strong></td></tr>" for name, calculation, status in case.pathways)
     points = "".join(f"<li>{escape(point)}</li>" for point in case.learning_points)

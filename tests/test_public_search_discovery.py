@@ -185,6 +185,16 @@ def test_production_canonical_and_real_software_identity_remain_intact(public_ap
             "CollectionPage",
             "Corneal Ectasia and Refractive Surgery References | CER-AI",
         ),
+        (
+            "/about/huseyin-cengiz",
+            "ProfilePage",
+            "Hüseyin Cengiz, M.D. — Clinical Author and CER-AI Developer",
+        ),
+        (
+            "/editorial-policy",
+            "WebPage",
+            "Medical Editorial and Evidence Policy | CER-AI",
+        ),
     ),
 )
 def test_static_public_pages_have_page_specific_discovery_identity(
@@ -207,7 +217,7 @@ def test_static_public_pages_have_page_specific_discovery_identity(
     assert schema["@type"] == schema_type
     assert schema["url"] == f"https://cer-ai.com{path}"
     assert schema["name"] == title
-    assert schema["dateModified"] == "2026-09-10"
+    assert schema["dateModified"] == "2026-09-11"
     assert schema["author"] == {"@id": "https://cer-ai.com/#clinical-author"}
 
 
