@@ -156,6 +156,7 @@
     "Ophthalmic Surgeon and Developer of CER-AI":"Göz Cerrahı ve CER-AI Geliştiricisi",
     "Last reviewed:":"Son gözden geçirme:",
     "September 8, 2026":"8 Eylül 2026",
+    "September 10, 2026":"10 Eylül 2026",
     "Software version:":"Yazılım sürümü:",
     "Search terminology associated with CER-AI":"CER-AI ile ilişkili arama terimleri",
     "Clinical-use notice:":"Klinik kullanım uyarısı:",

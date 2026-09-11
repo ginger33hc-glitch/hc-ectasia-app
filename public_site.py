@@ -35,6 +35,37 @@ _PUBLIC_CANONICAL_BASE = os.getenv(
     "CERAI_PUBLIC_CANONICAL_BASE", "https://cer-ai.com"
 ).rstrip("/")
 _PUBLIC_CONTENT_LASTMOD = "2026-09-10"
+_PUBLIC_PAGE_METADATA = {
+    "/corneal-ectasia-risk-assessment": {
+        "schema_type": "MedicalWebPage",
+        "title": "Corneal Ectasia Risk Assessment Software for Refractive Surgeons | CER-AI",
+        "description": (
+            "CER-AI is corneal ectasia screening and risk assessment software for "
+            "refractive surgeons, with AI-assisted Pentacam image reading, independent "
+            "risk pathways and tissue-safety checks."
+        ),
+        "about": "Corneal ectasia risk assessment before refractive surgery",
+        "main_entity": {"@id": "{base}/#software"},
+    },
+    "/clinical-evidence": {
+        "schema_type": "MedicalWebPage",
+        "title": "Clinical Evidence for Corneal Ectasia Risk Assessment | CER-AI",
+        "description": (
+            "Clinical evidence underlying CER-AI corneal ectasia risk assessment "
+            "pathways, with access to the consolidated medical reference registry."
+        ),
+        "about": "Clinical evidence for preoperative corneal ectasia risk assessment",
+    },
+    "/references": {
+        "schema_type": "CollectionPage",
+        "title": "Corneal Ectasia and Refractive Surgery References | CER-AI",
+        "description": (
+            "CER-AI medical reference registry for corneal ectasia risk assessment, "
+            "keratoconus susceptibility and refractive-surgery screening."
+        ),
+        "about": "Corneal ectasia and refractive-surgery medical literature",
+    },
+}
 _MOBILE_INSTALL_SECTION = """
 <div id="mobile-install" style="margin-top:34px;padding:26px;border:1px solid var(--line);border-radius:15px;background:#fff;box-shadow:0 6px 18px rgba(23,59,87,.045)">
   <div class="section-kicker">Mobile access</div>
@@ -116,6 +147,12 @@ def _webmaster_verification_meta() -> str:
 
 def _discovery_head(base: str, *, robots_directive: str) -> str:
     """Machine-readable discovery metadata for public CER-AI pages."""
+    home_title = "CER-AI — Corneal Ectasia Risk Assessment Intelligence"
+    home_description = (
+        "Structured preoperative corneal ectasia risk assessment for refractive "
+        "surgeons, combining independent risk pathways, Pentacam-derived data and "
+        "procedure-specific tissue-safety checks."
+    )
     citations = [
         {
             "@type": "ScholarlyArticle",
@@ -246,6 +283,15 @@ def _discovery_head(base: str, *, robots_directive: str) -> str:
     return f"""
   <meta name="robots" content="{robots_directive}">
 {verification}  <meta name="keywords" content="corneal ectasia, ectasia risk assessment, refractive surgery screening, keratoconus screening, Pentacam, Final BAD-D, Belin Ambrosio, Randleman ERSS, NICE, PS3, LASIK ectasia, PRK ectasia, residual stromal bed">
+  <meta name="author" content="Hüseyin Cengiz, M.D.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="CER-AI">
+  <meta property="og:title" content="{home_title}">
+  <meta property="og:description" content="{home_description}">
+  <meta property="og:url" content="{base}/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="{home_title}">
+  <meta name="twitter:description" content="{home_description}">
   <link rel="canonical" href="{base}/">
   <link rel="describedby" type="text/markdown" href="{base}/llms.txt">
   <link rel="alternate" type="text/html" href="{base}/corneal-ectasia-risk-assessment">
@@ -283,6 +329,51 @@ def _render_public_home(request: Request) -> HTMLResponse:
     return HTMLResponse(html, headers={"X-Robots-Tag": directive})
 
 
+def _public_page_discovery_head(base: str, canonical_path: str) -> str:
+    """Return accurate, page-specific discovery metadata for static public pages."""
+    metadata = _PUBLIC_PAGE_METADATA.get(canonical_path)
+    if metadata is None:
+        return ""
+    canonical = f"{base}{canonical_path}"
+    title = metadata["title"]
+    description = metadata["description"]
+    schema = {
+        "@context": "https://schema.org",
+        "@type": metadata["schema_type"],
+        "@id": f"{canonical}#page",
+        "url": canonical,
+        "name": title,
+        "description": description,
+        "about": {"@type": "Thing", "name": metadata["about"]},
+        "audience": {
+            "@type": "MedicalAudience",
+            "audienceType": "Ophthalmologists and refractive surgeons",
+        },
+        "author": {"@id": f"{base}/#clinical-author"},
+        "dateModified": _PUBLIC_CONTENT_LASTMOD,
+        "isPartOf": {"@id": f"{base}/#website"},
+        "inLanguage": "en",
+    }
+    if "main_entity" in metadata:
+        schema["mainEntity"] = {
+            key: value.format(base=base) if isinstance(value, str) else value
+            for key, value in metadata["main_entity"].items()
+        }
+    encoded_schema = json.dumps(schema, ensure_ascii=False, separators=(",", ":"))
+    return f"""
+  <meta name="author" content="Hüseyin Cengiz, M.D.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="CER-AI">
+  <meta property="og:title" content="{escape(title, quote=True)}">
+  <meta property="og:description" content="{escape(description, quote=True)}">
+  <meta property="og:url" content="{canonical}">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="{escape(title, quote=True)}">
+  <meta name="twitter:description" content="{escape(description, quote=True)}">
+  <script id="cerai-page-discovery" type="application/ld+json">{encoded_schema}</script>
+"""
+
+
 def _render_public_page(path: Path, request: Request, canonical_path: str) -> HTMLResponse:
     """Serve a static public page with one environment-safe canonical contract."""
     html = path.read_text(encoding="utf-8")
@@ -306,6 +397,9 @@ def _render_public_page(path: Path, request: Request, canonical_path: str) -> HT
         html = html.replace(
             "</head>", f'  <meta name="robots" content="{directive}">\n</head>', 1,
         )
+    discovery = _public_page_discovery_head(_site_base(request), canonical_path)
+    if discovery and 'id="cerai-page-discovery"' not in html:
+        html = html.replace("</head>", f"{discovery}</head>", 1)
     return HTMLResponse(html, headers={"X-Robots-Tag": directive})
 
 
