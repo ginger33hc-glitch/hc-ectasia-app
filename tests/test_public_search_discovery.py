@@ -65,9 +65,9 @@ def test_new_editorial_sections_have_both_languages_with_one_existing_controller
     html = Path("static/corneal-ectasia-risk-assessment.html").read_text(encoding="utf-8")
     structure = PageStructure(html)
     variants = [a for _, a in structure.tags if "data-language-variant" in a]
-    assert len(variants) == 8
-    assert sum(a["data-language-variant"] == "en" for a in variants) == 4
-    assert sum(a["data-language-variant"] == "tr" for a in variants) == 4
+    assert len(variants) == 10
+    assert sum(a["data-language-variant"] == "en" for a in variants) == 5
+    assert sum(a["data-language-variant"] == "tr" for a in variants) == 5
     assert all(a["lang"] == a["data-language-variant"] for a in variants)
     assert 'html:not([lang="tr"]) [data-language-variant="tr"]' in html
     assert 'html[lang="tr"] [data-language-variant="en"]' in html
@@ -219,7 +219,12 @@ def test_static_public_pages_have_page_specific_discovery_identity(
     assert schema["name"] == title
     expected_date = (
         "2026-09-12"
-        if path in {"/clinical-evidence", "/references"}
+        if path
+        in {
+            "/corneal-ectasia-risk-assessment",
+            "/clinical-evidence",
+            "/references",
+        }
         else "2026-09-11"
     )
     assert schema["dateModified"] == expected_date
@@ -237,3 +242,38 @@ def test_product_page_discovery_schema_points_to_canonical_software(public_app):
     assert schema_match is not None
     schema = json.loads(schema_match.group(1))
     assert schema["mainEntity"] == {"@id": "https://cer-ai.com/#software"}
+    assert schema["keywords"][:3] == [
+        "corneal ectasia",
+        "corneal ectasia risk assessment",
+        "corneal ectasia screening",
+    ]
+
+
+def test_product_page_serves_physician_ectasia_intent_without_topography_repositioning(
+    public_app,
+):
+    with TestClient(public_app, base_url="https://cer-ai.com") as client:
+        response = client.get("/corneal-ectasia-risk-assessment")
+    assert response.status_code == 200
+    assert "Corneal ectasia screening before refractive surgery" in response.text
+    assert "For a refractive surgeon" in response.text
+    assert "Pentacam ectasia screening is therefore one evidence source" in response.text
+    assert 'href="/learning/corneal-ectasia-basics">corneal ectasia screening guide</a>' in response.text
+    assert "Corneal topography risk assessment software" not in response.text
+
+
+@pytest.mark.parametrize(
+    "path",
+    (
+        "/learning/corneal-ectasia-basics",
+        "/learning/pentacam-education",
+    ),
+)
+def test_relevant_learning_pages_link_to_physician_ectasia_assessment(public_app, path):
+    with TestClient(public_app, base_url="https://cer-ai.com") as client:
+        response = client.get(path)
+    assert response.status_code == 200
+    assert (
+        'href="/corneal-ectasia-risk-assessment">CER-AI corneal ectasia risk assessment</a>'
+        in response.text
+    )

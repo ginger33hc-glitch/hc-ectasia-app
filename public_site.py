@@ -38,6 +38,7 @@ _PUBLIC_CANONICAL_BASE = os.getenv(
 ).rstrip("/")
 _PUBLIC_CONTENT_LASTMOD = "2026-09-11"
 _PUBLIC_PAGE_LASTMOD = {
+    "/corneal-ectasia-risk-assessment": "2026-09-12",
     "/clinical-evidence": "2026-09-12",
     "/references": "2026-09-12",
 }
@@ -51,6 +52,16 @@ _PUBLIC_PAGE_METADATA = {
             "risk pathways and tissue-safety checks."
         ),
         "about": "Corneal ectasia risk assessment before refractive surgery",
+        "keywords": [
+            "corneal ectasia",
+            "corneal ectasia risk assessment",
+            "corneal ectasia screening",
+            "preoperative ectasia screening",
+            "LASIK ectasia risk assessment",
+            "Pentacam ectasia screening",
+            "corneal ectasia screening software",
+            "AI-assisted corneal ectasia assessment",
+        ],
         "main_entity": {"@id": "{base}/#software"},
     },
     "/clinical-evidence": {
@@ -412,6 +423,8 @@ def _public_page_discovery_head(base: str, canonical_path: str) -> str:
         schema["lastReviewed"] = date_modified
     if "citation" in metadata:
         schema["citation"] = metadata["citation"]
+    if "keywords" in metadata:
+        schema["keywords"] = metadata["keywords"]
     encoded_schema = json.dumps(schema, ensure_ascii=False, separators=(",", ":"))
     return f"""
   <meta name="author" content="Hüseyin Cengiz, M.D.">
