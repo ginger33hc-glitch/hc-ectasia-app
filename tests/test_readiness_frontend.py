@@ -54,6 +54,36 @@ def test_hidden_reports_stay_hidden_when_printing_and_after_edits():
     assert "f.addEventListener('change',()=>{reportCard.hidden=true;lastReport=null;})" in html
 
 
+def test_ablation_field_rejects_negative_typing_and_paste_but_accepts_zero():
+    if not shutil.which("node"):
+        pytest.skip("Node is not available")
+    script = r'''
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const html=fs.readFileSync('static/index.html','utf8');
+class Field{
+  constructor(){this.value='';this.validity='';this.listeners={};this.reports=0;}
+  addEventListener(type,fn){(this.listeners[type]??=[]).push(fn);}
+  setCustomValidity(message){this.validity=message;}
+  reportValidity(){this.reports++;}
+  dispatch(type,event={}){for(const fn of this.listeners[type]||[])fn(event);}
+}
+const fields={od_ablation:new Field(),os_ablation:new Field()};
+const context={document:{getElementById:id=>fields[id]},Number,String};
+vm.createContext(context);
+const start=html.indexOf('function enforceNonnegativeAblation');
+const end=html.indexOf('const f = document.querySelector',start);
+vm.runInContext(html.slice(start,end),context);
+let prevented=false;
+fields.od_ablation.dispatch('keydown',{key:'-',preventDefault(){prevented=true;}});
+assert.equal(prevented,true);assert.notEqual(fields.od_ablation.validity,'');
+fields.od_ablation.value='-12.5';fields.od_ablation.dispatch('input');
+assert.equal(fields.od_ablation.value,'');assert.notEqual(fields.od_ablation.validity,'');
+fields.od_ablation.value='0';fields.od_ablation.dispatch('input');
+assert.equal(fields.od_ablation.value,'0');assert.equal(fields.od_ablation.validity,'');
+'''
+    subprocess.run(["node", "-e", script], cwd=ROOT, check=True, capture_output=True, text=True)
+
+
 def test_preassessment_source_confirmation_and_refraction_prompt_are_visible():
     html = (ROOT / 'static/index.html').read_text()
     translations = (ROOT / 'static/i18n.js').read_text()

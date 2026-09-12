@@ -12,6 +12,7 @@ from math import isfinite
 from typing import Any, Mapping
 
 from clinical_core.readiness import contact_lens_washout
+from clinical_core.safety import ablation_um_is_valid
 
 SUPPORTED_PROCEDURES = frozenset({"LASIK", "PRK", "SMILE"})
 KNOWN_PRIOR_STATES = frozenset({"no", "prk", "lasik", "smile"})
@@ -82,6 +83,14 @@ def evaluate_precore_readiness(
                 "eye": eye,
                 "key": "procedure",
                 "message": "Select LASIK, PRK, or SMILE before canonical assessment.",
+            })
+
+        ablation = plan.get("max_ablation_um", plan.get("ablation_um"))
+        if _finite(ablation) and not ablation_um_is_valid(ablation):
+            blockers.append({
+                "eye": eye,
+                "key": "ablation_um",
+                "message": "Actual maximum ablation must be zero or greater.",
             })
 
     if not pathways and not any(item.get("key") == "plan" for item in blockers):

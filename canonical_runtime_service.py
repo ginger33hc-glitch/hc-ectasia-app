@@ -47,6 +47,7 @@ from clinical_core.refraction import (
     refractive_group,
 )
 from clinical_core.report_payload import build_report_payload
+from clinical_core.safety import ablation_um_is_valid
 from clinical_core.version import CLINICAL_POLICY_VERSION, SRAX_POLICY_VERSION
 from clinical_eligibility import evaluate_eligibility
 from pentacam_canonical_source_lock import POLICY_VERSION as SOURCE_REGISTRY_VERSION
@@ -318,6 +319,17 @@ def _evaluate_lasik_planning(source_eye, resolved_plan, *, age_years, extracted,
     preliminary_core = evaluate_normalized_case(
         preliminary, external_findings=eligibility.findings
     )
+    if (_finite_number(preliminary.ablation_um)
+            and not ablation_um_is_valid(preliminary.ablation_um)):
+        planning = {
+            "selected_plan": None,
+            "sequence": [],
+            "rejection_reasons": [
+                "Actual maximum ablation must be zero or greater before LASIK planning."
+            ],
+            "mmc_guidance": "NOT_APPLICABLE",
+        }
+        return preliminary_core, preliminary_plan, planning
     upstream = _preplanning_gate(preliminary_core)
     if upstream.status not in {PASS, PASS_WITH_CAUTION, CAUTION}:
         reasons = [

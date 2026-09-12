@@ -51,6 +51,7 @@ from .rules import (
     signed_i_s_category,
 )
 from .safety import (
+    ablation_um_is_valid,
     estimated_final_kmean_d,
     final_kmean_hard_stop,
     pta_hard_stop,
@@ -90,6 +91,7 @@ __all__ = [
     "PlanningResult",
     "Refraction",
     "STOP_DEFER",
+    "ablation_um_is_valid",
     "erss_age_points",
     "erss_disposition",
     "erss_mrse_points",

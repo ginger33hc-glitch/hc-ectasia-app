@@ -95,6 +95,24 @@ def test_case_runtime_evaluates_od_then_os_and_returns_json_safe_payload():
     json.dumps(result)
 
 
+@pytest.mark.parametrize("procedure", ("LASIK", "PRK"))
+def test_case_runtime_rejects_negative_ablation_before_tissue_calculation(procedure):
+    plans = {
+        eye: _plan(procedure, ablation_um=-0.1)
+        for eye in ("OD", "OS")
+    }
+    result = _evaluate(plans=plans)
+    assert result["status"] == "ASSESSMENT INCOMPLETE"
+    for eye in result["eyes"]:
+        assert eye["status"] == "ASSESSMENT INCOMPLETE"
+        assert "Safety: ablation_um" in eye["missing"]
+        assert eye["values"]["LASIK_RSB_um"] is None
+        assert eye["values"]["PRK_RST_um"] is None
+        assert eye["values"]["LASIK_PTA_percent"] is None
+        assert eye["values"]["PRK_PTA_percent"] is None
+        assert eye["planning"]["selected_plan"] is None
+
+
 def test_runtime_creates_one_renderer_neutral_report_payload_from_same_assessment():
     result = _evaluate(software_version="v-test")
     od = result["eyes"][0]

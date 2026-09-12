@@ -266,6 +266,34 @@ for(const eye of ["od","os"]){
   });
 }
 
+function enforceNonnegativeAblation(input){
+  const message="Actual maximum ablation must be zero or greater.";
+  const reject=(event)=>{
+    event.preventDefault();
+    input.setCustomValidity(message);
+    input.reportValidity();
+  };
+  input.addEventListener("keydown",event=>{
+    if(event.key==="-"||event.key==="Subtract")reject(event);
+  });
+  input.addEventListener("beforeinput",event=>{
+    if(String(event.data??"").includes("-"))reject(event);
+  });
+  input.addEventListener("input",()=>{
+    const raw=input.value.trim();
+    if(raw!==""&&Number.isFinite(Number(raw))&&Number(raw)<0){
+      input.value="";
+      input.setCustomValidity(message);
+      input.reportValidity();
+      return;
+    }
+    input.setCustomValidity("");
+  });
+}
+for(const eye of ["od","os"]){
+  enforceNonnegativeAblation(document.getElementById(`${eye}_ablation`));
+}
+
 const f = document.querySelector("#f");
 const statusBox = document.querySelector("#status");
 const decisionBox = document.querySelector("#decision");
