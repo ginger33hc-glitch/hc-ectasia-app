@@ -32,6 +32,7 @@ from .ps3 import ALLOWED, DEFER, PS3EyeInput, PS3InterEyeInput, evaluate_ps3
 from .refraction import MIXED, normalize_minus_cylinder, refractive_group, scalar_final_k_is_valid
 from .safety import (
     PRK_EPITHELIUM_UM,
+    ablation_um_is_valid,
     estimated_final_kmean_d,
     final_kmean_hard_stop,
     pta_hard_stop,
@@ -219,18 +220,20 @@ def _safety_status(
         ("thinnest_um", inp.thinnest_um),
         ("intended_sphere_d", inp.intended_sphere_d),
         ("intended_cylinder_d", inp.intended_cylinder_d),
-        ("ablation_um", inp.ablation_um),
         ("preop_kmean_d", inp.preop_kmean_d),
         ("intended_mrse_d", inp.intended_mrse_d),
     )
     missing.extend(name for name, value in required if not _finite(value))
+    if not ablation_um_is_valid(inp.ablation_um):
+        missing.append("ablation_um")
     if _finite(inp.intended_cylinder_d) and not _finite(inp.intended_axis_deg):
         missing.append("intended_axis_deg")
     if procedure == "LASIK" and not _finite(inp.flap_um):
         missing.append("flap_um")
-    if procedure == "LASIK" and rsb is None and "flap_um" not in missing:
+    if (procedure == "LASIK" and rsb is None
+            and "flap_um" not in missing and "ablation_um" not in missing):
         missing.append("LASIK_RSB_um")
-    if procedure == "PRK" and rst is None:
+    if procedure == "PRK" and rst is None and "ablation_um" not in missing:
         missing.append("PRK_RST_um")
     if intended_group == MIXED:
         missing.append("mixed_astigmatism_meridional_final_k_assessment")

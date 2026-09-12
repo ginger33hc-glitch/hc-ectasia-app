@@ -23,21 +23,30 @@ def _finite(value) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and isfinite(float(value))
 
 
+def ablation_um_is_valid(ablation_um) -> bool:
+    """Return whether an ablation value is finite and physically nonnegative."""
+    return _finite(ablation_um) and float(ablation_um) >= 0.0
+
+
 def lasik_rsb_um(thinnest_um, flap_um, ablation_um):
-    if not all(_finite(x) for x in (thinnest_um, flap_um, ablation_um)):
+    if not all(_finite(x) for x in (thinnest_um, flap_um)) or not ablation_um_is_valid(ablation_um):
         return None
     return float(thinnest_um) - float(flap_um) - float(ablation_um)
 
 
 def prk_rst_um(thinnest_um, ablation_um):
-    if not all(_finite(x) for x in (thinnest_um, ablation_um)):
+    if not _finite(thinnest_um) or not ablation_um_is_valid(ablation_um):
         return None
     return float(thinnest_um) - PRK_EPITHELIUM_UM - float(ablation_um)
 
 
 def pta_percent(thinnest_um, anterior_tissue_um, ablation_um):
     """PTA using LASIK flap thickness or fixed PRK epithelial thickness."""
-    if not all(_finite(x) for x in (thinnest_um, anterior_tissue_um, ablation_um)) or float(thinnest_um) <= 0:
+    if (
+        not all(_finite(x) for x in (thinnest_um, anterior_tissue_um))
+        or not ablation_um_is_valid(ablation_um)
+        or float(thinnest_um) <= 0
+    ):
         return None
     return 100.0 * (float(anterior_tissue_um) + float(ablation_um)) / float(thinnest_um)
 

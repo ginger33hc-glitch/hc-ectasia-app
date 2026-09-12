@@ -67,6 +67,26 @@ def test_age_must_be_supported_adult_whole_number():
         assert any(item["key"] == "age" for item in result["blockers"])
 
 
+def test_negative_ablation_is_blocked_before_canonical_assessment_and_zero_is_allowed():
+    negative = evaluate_precore_readiness(
+        age_years=35,
+        eye_plans={"OD": _plan(ablation_um=-0.1)},
+        patient_modifiers={"contact_lens_type": "NONE"},
+    )
+    zero = evaluate_precore_readiness(
+        age_years=35,
+        eye_plans={"OD": _plan(ablation_um=0.0)},
+        patient_modifiers={"contact_lens_type": "NONE"},
+    )
+    assert negative["ready"] is False
+    assert negative["blockers"] == [{
+        "eye": "OD",
+        "key": "ablation_um",
+        "message": "Actual maximum ablation must be zero or greater.",
+    }]
+    assert zero["ready"] is True
+
+
 def test_precore_readiness_has_no_tomography_or_scoring_dependency_table():
     import canonical_readiness as module
     source = inspect.getsource(module)

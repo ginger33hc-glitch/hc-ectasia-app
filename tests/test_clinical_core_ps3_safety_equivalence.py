@@ -9,6 +9,7 @@ from clinical_core.safety import (
     FINAL_KMEAN_MAX_D,
     FINAL_KMEAN_MIN_D,
     PRK_EPITHELIUM_UM,
+    ablation_um_is_valid,
     estimated_final_kmean_d,
     final_kmean_hard_stop,
     pta_hard_stop,
@@ -66,6 +67,17 @@ def test_structural_calculations_match_matrix_examples():
     assert pta_percent(500, 100, 100) == 40.0
     assert estimated_final_kmean_d(44.0, -10.0) == 36.0
     assert estimated_final_kmean_d(43.2, 6.0) == 48.0
+
+
+def test_negative_ablation_is_rejected_by_every_tissue_equation_but_zero_is_valid():
+    assert not ablation_um_is_valid(-0.1)
+    assert ablation_um_is_valid(0.0)
+    assert lasik_rsb_um(520, 100, -0.1) is None
+    assert prk_rst_um(520, -0.1) is None
+    assert pta_percent(520, 100, -0.1) is None
+    assert lasik_rsb_um(520, 100, 0.0) == 420.0
+    assert prk_rst_um(520, 0.0) == 470.0
+    assert pta_percent(520, 100, 0.0) == 10000 / 520
 
 
 def test_procedural_hard_stop_boundaries_are_exact():

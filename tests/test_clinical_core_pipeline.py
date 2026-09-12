@@ -1,5 +1,7 @@
 """Behavior locks for the linear clinical-core pipeline."""
 
+import pytest
+
 import canonical_engine
 from clinical_core import (
     ASSESSMENT_INCOMPLETE,
@@ -92,6 +94,23 @@ def test_reassuring_normalized_lasik_case_passes_only_when_all_decision_inputs_c
     assert result["ps3_status"] == "PASS"
     assert result["procedural_safety"]["status"] == "PASS"
     assert result["status"] == "PASS"
+
+
+@pytest.mark.parametrize("procedure,flap", (("LASIK", 100.0), ("PRK", None)))
+def test_negative_ablation_never_enters_tissue_calculations(procedure, flap):
+    result = evaluate_normalized_case(normal_lasik(
+        procedure=procedure,
+        flap_um=flap,
+        ablation_um=-0.1,
+    ))
+    safety = result["procedural_safety"]
+    assert result["status"] == ASSESSMENT_INCOMPLETE
+    assert safety["status"] == ASSESSMENT_INCOMPLETE
+    assert safety["missing"] == ["ablation_um"]
+    assert safety["LASIK_RSB_um"] is None
+    assert safety["PRK_RST_um"] is None
+    assert safety["LASIK_PTA_percent"] is None
+    assert safety["PRK_PTA_percent"] is None
 
 
 def test_independent_bad_d_abnormal_outranks_reassuring_erss():
