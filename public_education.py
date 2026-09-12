@@ -993,9 +993,15 @@ def render_topic(base: str, robots: str, topic: Topic, locale: str = "en") -> st
     if topic.slug == "clinical-cases":
         cases = f'<section><h2>{"Çalışılmış sentetik olgular" if locale == "tr" else "Worked synthetic cases"}</h2><div class="learning-grid case-grid">{_case_cards(locale)}</div></section>'
     synthetic_gallery = _synthetic_pentacam_gallery(locale) if topic.slug == "pentacam-education" else ""
+    assessment_link = ""
+    if topic.slug in {"corneal-ectasia-basics", "pentacam-education"}:
+        if locale == "tr":
+            assessment_link = '<section class="assessment-context"><h2>Kavramlardan yapılandırılmış değerlendirmeye</h2><p>Bu eğitim modülünü hekimlere yönelik <a href="/corneal-ectasia-risk-assessment">CER-AI korneal ektazi risk değerlendirmesi</a> genel bakışıyla ilişkilendirin. Topografi ve tomografi, daha geniş preoperatif ektazi tarama iş akışının farklı kanıt kanallarıdır.</p></section>'
+        else:
+            assessment_link = '<section class="assessment-context"><h2>From concepts to structured assessment</h2><p>Connect this educational module to the physician-focused <a href="/corneal-ectasia-risk-assessment">CER-AI corneal ectasia risk assessment</a> overview. Corneal topography and tomography are distinct evidence channels within the broader preoperative ectasia screening workflow.</p></section>'
     return f"""<!doctype html><html lang="{locale}"><head>{_head(base, path, topic.title, topic.description, robots, schema, locale)}</head><body>{_nav(locale, path)}<main>
 <article><header class="learning-hero article-hero"><div class="learning-wrap">{_breadcrumb(crumbs)}<p class="learning-kicker">{escape(topic.eyebrow)}</p><h1>{escape(topic.title)}</h1><p class="learning-lead">{escape(topic.description)}</p><div class="learning-principle"><strong>{scope[0]}</strong><span>{scope[1]}</span></div></div></header>
-<div class="learning-wrap article-layout"><div class="article-body">{sections}{synthetic_gallery}{_technical_tables(locale, topic.slug)}{cases}<section class="article-references"><h2>{sources[0]}</h2><ol>{references}</ol><p>{sources[1]}</p></section></div><aside class="article-aside"><p class="learning-kicker">{continue_label}</p>{related_cards}<a class="related-card evidence" href="/clinical-evidence"><span>{evidence[0]}</span><strong>{evidence[1]}</strong></a></aside></div></article>
+<div class="learning-wrap article-layout"><div class="article-body">{sections}{assessment_link}{synthetic_gallery}{_technical_tables(locale, topic.slug)}{cases}<section class="article-references"><h2>{sources[0]}</h2><ol>{references}</ol><p>{sources[1]}</p></section></div><aside class="article-aside"><p class="learning-kicker">{continue_label}</p>{related_cards}<a class="related-card evidence" href="/clinical-evidence"><span>{evidence[0]}</span><strong>{evidence[1]}</strong></a></aside></div></article>
 </main>{_footer(locale)}</body></html>"""
 
 
