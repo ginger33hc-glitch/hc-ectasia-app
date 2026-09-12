@@ -217,7 +217,12 @@ def test_static_public_pages_have_page_specific_discovery_identity(
     assert schema["@type"] == schema_type
     assert schema["url"] == f"https://cer-ai.com{path}"
     assert schema["name"] == title
-    assert schema["dateModified"] == "2026-09-11"
+    expected_date = (
+        "2026-09-12"
+        if path in {"/clinical-evidence", "/references"}
+        else "2026-09-11"
+    )
+    assert schema["dateModified"] == expected_date
     assert schema["author"] == {"@id": "https://cer-ai.com/#clinical-author"}
 
 

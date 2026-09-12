@@ -37,6 +37,10 @@ _PUBLIC_CANONICAL_BASE = os.getenv(
     "CERAI_PUBLIC_CANONICAL_BASE", "https://cer-ai.com"
 ).rstrip("/")
 _PUBLIC_CONTENT_LASTMOD = "2026-09-11"
+_PUBLIC_PAGE_LASTMOD = {
+    "/clinical-evidence": "2026-09-12",
+    "/references": "2026-09-12",
+}
 _PUBLIC_PAGE_METADATA = {
     "/corneal-ectasia-risk-assessment": {
         "schema_type": "MedicalWebPage",
@@ -57,6 +61,17 @@ _PUBLIC_PAGE_METADATA = {
             "pathways, with access to the consolidated medical reference registry."
         ),
         "about": "Clinical evidence for preoperative corneal ectasia risk assessment",
+        "citation": [
+            "https://doi.org/10.1016/j.ophtha.2007.03.073",
+            "https://doi.org/10.1016/j.ajo.2007.12.033",
+            "https://doi.org/10.1155/2017/2434830",
+            "https://doi.org/10.2147/OPTH.S464217",
+            "https://doi.org/10.21608/bmfj.2021.100688.1503",
+            "https://doi.org/10.1016/j.ajo.2018.08.005",
+            "https://doi.org/10.1111/aos.16814",
+            "https://doi.org/10.1016/j.ajo.2014.04.002",
+            "https://doi.org/10.3928/1081597X-20150319-05",
+        ],
     },
     "/references": {
         "schema_type": "CollectionPage",
@@ -66,6 +81,11 @@ _PUBLIC_PAGE_METADATA = {
             "keratoconus susceptibility and refractive-surgery screening."
         ),
         "about": "Corneal ectasia and refractive-surgery medical literature",
+        "main_entity": {
+            "@type": "ItemList",
+            "name": "CER-AI medical reference registry",
+            "numberOfItems": 61,
+        },
     },
     "/about/huseyin-cengiz": {
         "schema_type": "ProfilePage",
@@ -362,6 +382,9 @@ def _public_page_discovery_head(base: str, canonical_path: str) -> str:
     canonical = f"{base}{canonical_path}"
     title = metadata["title"]
     description = metadata["description"]
+    date_modified = _PUBLIC_PAGE_LASTMOD.get(
+        canonical_path, _PUBLIC_CONTENT_LASTMOD
+    )
     schema = {
         "@context": "https://schema.org",
         "@type": metadata["schema_type"],
@@ -375,7 +398,7 @@ def _public_page_discovery_head(base: str, canonical_path: str) -> str:
             "audienceType": "Ophthalmologists and refractive surgeons",
         },
         "author": {"@id": f"{base}/#clinical-author"},
-        "dateModified": _PUBLIC_CONTENT_LASTMOD,
+        "dateModified": date_modified,
         "isPartOf": {"@id": f"{base}/#website"},
         "inLanguage": "en",
     }
@@ -384,6 +407,11 @@ def _public_page_discovery_head(base: str, canonical_path: str) -> str:
             key: value.format(base=base) if isinstance(value, str) else value
             for key, value in metadata["main_entity"].items()
         }
+    if canonical_path in _PUBLIC_PAGE_LASTMOD:
+        schema["reviewedBy"] = {"@id": f"{base}/#clinical-author"}
+        schema["lastReviewed"] = date_modified
+    if "citation" in metadata:
+        schema["citation"] = metadata["citation"]
     encoded_schema = json.dumps(schema, ensure_ascii=False, separators=(",", ":"))
     return f"""
   <meta name="author" content="Hüseyin Cengiz, M.D.">
@@ -525,8 +553,12 @@ def _sitemap_xml(base: str) -> str:
         *((f"{base}/learning/cases/{case.slug}", "0.7") for case in SAMPLE_CASES),
         *((f"{base}/tr/learning/cases/{case.slug}", "0.7") for case in SAMPLE_CASES),
     )
+    def lastmod(url: str) -> str:
+        path = url.removeprefix(base)
+        return _PUBLIC_PAGE_LASTMOD.get(path, _PUBLIC_CONTENT_LASTMOD)
+
     body = "".join(
-        f"<url><loc>{url}</loc><lastmod>{_PUBLIC_CONTENT_LASTMOD}</lastmod>"
+        f"<url><loc>{url}</loc><lastmod>{lastmod(url)}</lastmod>"
         f"<changefreq>weekly</changefreq><priority>{priority}</priority></url>"
         for url, priority in urls
     )

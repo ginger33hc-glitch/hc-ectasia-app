@@ -127,7 +127,14 @@ def test_sitemap_contains_only_public_discovery_pages():
         assert "<loc>https://cer-ai.com/</loc>" in text
         assert "https://cer-ai.com/home" not in text
         assert "http://cer-ai.com" not in text
-        assert "<lastmod>2026-09-11</lastmod>" in text
+        assert (
+            "<loc>https://cer-ai.com/clinical-evidence</loc>"
+            "<lastmod>2026-09-12</lastmod>"
+        ) in text
+        assert (
+            "<loc>https://cer-ai.com/learning-center</loc>"
+            "<lastmod>2026-09-11</lastmod>"
+        ) in text
         for private_path in ("/app", "/analyze", "/assessment/", "/archive"):
             assert f"<loc>https://cer-ai.com{private_path}" not in text
 
@@ -176,6 +183,47 @@ def test_public_author_and_editorial_pages_document_medical_accountability():
         assert "Medical editorial and evidence policy" in policy.text
         assert "Evidence boundaries" in policy.text
         assert "search visibility, advertising or commercial considerations" in policy.text
+
+
+def test_public_evidence_pages_document_clinical_review_and_source_boundaries():
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        evidence = client.get("/clinical-evidence")
+        references = client.get("/references")
+
+        for response in (evidence, references):
+            assert response.status_code == 200
+            assert "Hüseyin Cengiz, M.D." in response.text
+            assert "Last clinical review:</strong> 12 September 2026" in response.text
+            assert 'href="/editorial-policy"' in response.text
+            assert "external validation of CER-AI" in response.text
+
+        assert "Medical-quality and evidence standards" in evidence.text
+        assert "Claim-to-source traceability" in evidence.text
+        assert "Practical subjective scoring system" in evidence.text
+        assert "Manufacturer field definitions" in evidence.text
+        assert "How this registry supports medical quality" in references.text
+        assert "Peer-reviewed publication" in references.text
+        assert "Manufacturer documentation" in references.text
+        assert references.text.count("10.2147/OPTH.S464217") == 2
+
+        evidence_schema_match = re.search(
+            r'<script id="cerai-page-discovery" type="application/ld\+json">(.*?)</script>',
+            evidence.text,
+            flags=re.DOTALL,
+        )
+        references_schema_match = re.search(
+            r'<script id="cerai-page-discovery" type="application/ld\+json">(.*?)</script>',
+            references.text,
+            flags=re.DOTALL,
+        )
+        assert evidence_schema_match is not None
+        assert references_schema_match is not None
+        evidence_schema = json.loads(evidence_schema_match.group(1))
+        references_schema = json.loads(references_schema_match.group(1))
+        assert evidence_schema["lastReviewed"] == "2026-09-12"
+        assert evidence_schema["reviewedBy"]["@id"].endswith("/#clinical-author")
+        assert len(evidence_schema["citation"]) == 9
+        assert references_schema["mainEntity"]["numberOfItems"] == 61
 
 
 def test_public_landing_page_answers_surgeon_discovery_questions():
