@@ -614,5 +614,18 @@ def test_confident_four_maps_exam_date_reread_is_evidence_until_case_reconciliat
     }
 
 
+def test_surrogate_age_reread_is_skipped_when_surgeon_age_was_supplied(monkeypatch):
+    result = pentacam_result()
+    result["document_context"].pop("patient_age_years", None)
+
+    def unexpected_reread(*_args, **_kwargs):
+        raise AssertionError("surgeon-entered age must suppress patient-age OCR")
+
+    monkeypatch.setattr(targeted, "targeted_reread", unexpected_reread)
+    assert targeted.enrich_extraction(
+        Core, result, b"image", "od-four-maps.png", seek_patient_age=False,
+    ) is result
+
+
 PENTACAM_SOURCE_LOCK_RETIRED_TARGETED_TESTS = tuple(sorted(_RETIRED))
 del _name, _value

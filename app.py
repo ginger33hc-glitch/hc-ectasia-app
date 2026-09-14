@@ -1046,6 +1046,7 @@ async def _run_image_assessment(
                         exam_date_requested=(
                             exam_date_reread_required and _is_four_maps_refractive(result)
                         ),
+                        seek_patient_age=age is None,
                     )
                     reread = await asyncio.to_thread(
                         pentacam_targeted_reread.verify_threshold_level_bad_elevations,

@@ -166,6 +166,7 @@ def test_patient_age_completion_uses_one_shared_field():
     html = (ROOT / 'static/index.html').read_text()
     translations = (ROOT / 'static/i18n.js').read_text()
     assert '<label>Patient age (years)</label>' in html
+    assert '/static/assessment-readiness.js?v=6' in html
     assert 'Pentacam age unreadable; enter years' not in html
     assert 'Pentacam yaşı okunamadı; yıl olarak girin' not in translations
     assert item == {
@@ -183,6 +184,10 @@ def test_patient_age_completion_uses_one_shared_field():
     assert 'item.form_id===\'age\'' in readiness
     assert 'originalRow.hidden=true' in readiness
     assert 'original.required=false;input.required=true' in readiness
+    assert 'input.dataset.sourceForm=item.form_id' in readiness
+    assert "this.panel.querySelectorAll('[data-source-form]')" in readiness
+    assert 'original.value=input.value' in readiness
+    assert 'seek_patient_age=age is None' in (ROOT / 'app.py').read_text()
 
 
 def test_nice_measurements_are_requested_only_after_canonical_reading_fails():

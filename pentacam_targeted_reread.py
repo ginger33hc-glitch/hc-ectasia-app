@@ -870,7 +870,7 @@ def targeted_reread(
 
 def enrich_extraction(
     core: Any, result: dict[str, Any], raw: bytes, filename: str,
-    *, exam_date_requested: bool = False,
+    *, exam_date_requested: bool = False, seek_patient_age: bool = True,
 ) -> dict[str, Any]:
     """Retry unresolved required fields through the standard targeted pathway."""
     if not _enabled():
@@ -878,7 +878,7 @@ def enrich_extraction(
     attempt_errors: list[str] = []
     for attempt in range(1, TARGETED_REREAD_MAX_ATTEMPTS + 1):
         requested = missing_targets_by_eye(result)
-        patient_age_requested = patient_age_is_missing(result)
+        patient_age_requested = seek_patient_age and patient_age_is_missing(result)
         pentacam_qs_requested = pentacam_qs_is_missing(result)
         date_requested = exam_date_requested and not result.get(
             "document_context", {}
