@@ -16,6 +16,7 @@ from pentacam_canonical_source_lock import (
     SHOW_2_CORNEA_FRONT,
     SHOW_2_INDICES,
     canonical_source_id,
+    canonical_reread_tiles,
     derivation_is_allowed,
     source_family,
     source_is_allowed,
@@ -44,6 +45,14 @@ def eye(**values):
     }
     base.update(values)
     return base
+
+
+def test_canonical_reread_tiles_are_owned_by_the_source_registry():
+    assert canonical_reread_tiles("central_pachy_um") == ("LOWER_LEFT",)
+    assert canonical_reread_tiles("B_Ele_Th_um") == ("LOWER_RIGHT",)
+    assert canonical_reread_tiles("BAD_D") == ("LOWER_LEFT", "LOWER_RIGHT")
+    assert canonical_reread_tiles("K1_D") == ("UPPER_LEFT", "UPPER_RIGHT")
+    assert canonical_reread_tiles("unknown_field") == ()
 
 
 def payload(source_eye):

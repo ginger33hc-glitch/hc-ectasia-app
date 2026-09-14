@@ -497,6 +497,56 @@ def test_focused_retry_requires_regions_for_every_outstanding_target():
     ]
 
 
+def test_region_without_exact_box_uses_canonical_tile_fallback_only():
+    result = pentacam_result()
+    result["eyes"][0]["unreadable_source_regions"] = {
+        "B_Ele_Th_um": {
+            "file": "od-bad.png",
+            "tile": "LOWER_RIGHT",
+            "source_box": None,
+        }
+    }
+    requested = {"OD": ["B_Ele_Th_um"]}
+
+    assert targeted._focused_retry_regions(result, requested, "od-bad.png") == []
+    assert targeted._canonical_retry_regions(
+        requested, pentacam_qs_requested=True,
+    ) == [
+        {"tile": "LOWER_RIGHT", "source_box": None},
+        {"tile": "TOP_HEADER", "source_box": None},
+    ]
+
+
+def test_first_reread_is_full_then_follow_up_uses_canonical_tiles(monkeypatch):
+    result = pentacam_result()
+    eye = result["eyes"][0]
+    for field in targeted.TARGET_FIELDS:
+        eye[field] = 1.0
+    eye["B_Ele_Th_um"] = None
+    result["document_context"].update({"patient_age_years": 40, "pentacam_qs": "OK"})
+    calls = []
+
+    def reread(*args):
+        calls.append(args)
+        value = 8 if len(calls) == 2 else None
+        return {
+            "screen_family": "BAD_DISPLAY",
+            "readings": [reading(
+                "B_Ele_Th_um", value, "B.Ele.Th",
+                status="CONFIDENT" if value is not None else "NOT_SHOWN",
+            )],
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(targeted, "targeted_reread", reread)
+    targeted.enrich_extraction(Core, result, b"image", "od-bad.png")
+
+    assert len(calls) == 2
+    assert len(calls[0]) == 7
+    assert calls[1][7] == [{"tile": "LOWER_RIGHT", "source_box": None}]
+    assert eye["B_Ele_Th_um"] == 8
+
+
 def test_focused_retry_sends_original_plus_only_exact_unread_region():
     captured = {}
 

@@ -24,7 +24,8 @@ from PIL import Image, ImageOps
 from exam_date_reconciliation_policy import possible_calendar_dates
 from pentacam_canonical_source_lock import (
     BAD, FOURMAPS, SHOW2, CANONICAL_FIELD_SOURCES, SHOW_2_CORNEA_BACK,
-    SHOW_2_CORNEA_FRONT, SHOW_2_INDICES, canonical_source_id, source_family,
+    SHOW_2_CORNEA_FRONT, SHOW_2_INDICES, canonical_reread_tiles,
+    canonical_source_id, source_family,
 )
 from pentacam_field_registry import (
     CORNEA_FRONT_KERATOMETRY_FIELDS,
@@ -389,6 +390,14 @@ def _focused_retry_regions(
             return False
         if region.get("tile") not in SOURCE_TILES:
             return False
+        source_box = region.get("source_box")
+        if not isinstance(source_box, (list, tuple)) or len(source_box) != 4:
+            return False
+        if not all(isinstance(value, int) and not isinstance(value, bool) for value in source_box):
+            return False
+        x1, y1, x2, y2 = source_box
+        if not (0 <= x1 < x2 <= 999 and 0 <= y1 < y2 <= 999):
+            return False
         regions.append(region)
         return True
 
@@ -418,6 +427,31 @@ def _focused_retry_regions(
     unique = {}
     for region in regions:
         key = (region.get("tile"), tuple(region.get("source_box") or ()))
+        unique[key] = region
+    return list(unique.values())
+
+
+def _canonical_retry_regions(
+    requested: dict[str, list[str]],
+    *,
+    patient_age_requested: bool = False,
+    pentacam_qs_requested: bool = False,
+    exam_date_requested: bool = False,
+) -> list[dict[str, Any]]:
+    """Use only registry-owned broad crops when exact unread boxes are unavailable."""
+    regions: list[dict[str, Any]] = []
+    for fields in requested.values():
+        for field in fields:
+            tiles = canonical_reread_tiles(field)
+            if not tiles:
+                return []
+            regions.extend({"tile": tile, "source_box": None} for tile in tiles)
+    if patient_age_requested or pentacam_qs_requested or exam_date_requested:
+        regions.append({"tile": "TOP_HEADER", "source_box": None})
+
+    unique = {}
+    for region in regions:
+        key = (region["tile"], tuple(region.get("source_box") or ()))
         unique[key] = region
     return list(unique.values())
 
@@ -861,6 +895,16 @@ def enrich_extraction(
             pentacam_qs_requested=pentacam_qs_requested,
             exam_date_requested=date_requested,
         )
+        region_mode = "exact" if focused_regions else "full"
+        if attempt > 1 and not focused_regions:
+            focused_regions = _canonical_retry_regions(
+                requested,
+                patient_age_requested=patient_age_requested,
+                pentacam_qs_requested=pentacam_qs_requested,
+                exam_date_requested=date_requested,
+            )
+            if focused_regions:
+                region_mode = "canonical"
         started = monotonic()
         outcome = "completed"
         try:
@@ -893,6 +937,7 @@ def enrich_extraction(
             f"attempt={attempt}",
             f"duration_ms={round((monotonic() - started) * 1000)}",
             f"focused_regions={len(focused_regions)}",
+            f"region_mode={region_mode}",
             f"remaining_targets={remaining}",
             f"outcome={outcome}",
             flush=True,
