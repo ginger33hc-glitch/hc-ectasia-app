@@ -15,6 +15,17 @@ def test_app_loads_analysis_job_transport_client():
         assert "/static/analysis-jobs-client.js?v=1" in response.text
 
 
+def test_transport_client_injection_is_idempotent():
+    import analysis_job_service
+
+    html = "<html><head></head><body></body></html>"
+    once = analysis_job_service.inject_client(html)
+    twice = analysis_job_service.inject_client(once)
+
+    assert once == twice
+    assert twice.count("/static/analysis-jobs-client.js?v=1") == 1
+
+
 def test_upload_returns_job_then_background_calls_canonical_analyze(monkeypatch):
     expected = {"workflow_status": "READY", "sentinel": "canonical-result"}
     calls = []

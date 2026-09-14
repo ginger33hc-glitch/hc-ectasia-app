@@ -40,6 +40,12 @@ def _authenticated_destination(request) -> str:
 
 def _authenticated_root_html(display_name: str) -> str:
     html = ROOT_HTML.read_text(encoding="utf-8")
+    # Authentication must preserve the canonical mobile transport. Without
+    # this client, the browser posts directly to /analyze and the proxy closes
+    # long-running assessments at five minutes.
+    from analysis_job_service import inject_client
+
+    html = inject_client(html)
     # Make the visual CER-AI logo itself a native link back to the public website.
     # A real anchor is used instead of JavaScript so the navigation works reliably
     # across browsers, touch devices, cached pages, and CSP/security wrappers.

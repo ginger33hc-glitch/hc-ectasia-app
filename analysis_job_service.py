@@ -138,12 +138,16 @@ async def _run(core, job_id: str) -> None:
             job["images"] = []
 
 
-def _render_app() -> HTMLResponse:
-    html = _APP_HTML.read_text(encoding="utf-8")
+def inject_client(html: str) -> str:
+    """Add the single background-job transport client to clinical app HTML."""
     tag = f'<script src="{_CLIENT_SCRIPT}"></script>'
     if tag not in html:
         html = html.replace("</head>", f"  {tag}\n</head>", 1)
-    return HTMLResponse(html)
+    return html
+
+
+def _render_app() -> HTMLResponse:
+    return HTMLResponse(inject_client(_APP_HTML.read_text(encoding="utf-8")))
 
 
 def install(core) -> None:
