@@ -161,6 +161,7 @@ TR = {
     "Assessment": "Değerlendirme",
     "Conclusion detail": "Sonuç ayrıntısı",
     "Selected procedure plan": "Seçilen işlem planı",
+    "LASIK outcome / transition": "LASIK sonucu / PRK geçişi",
     "ML7 planning": "ML7 planlaması",
     "Review notes / warnings": "Değerlendirme notları / uyarılar",
     "None documented": "Belgelenmiş bulgu yok",

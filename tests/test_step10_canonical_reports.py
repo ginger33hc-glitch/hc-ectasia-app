@@ -215,7 +215,9 @@ def test_single_page_conclusion_uses_complete_canonical_snapshot_without_mutatio
     before = deepcopy(payload)
     pdf = reports.build_conclusion_pdf(payload)
     reader = PdfReader(BytesIO(pdf))
-    text = "\n".join(page.extract_text() for page in reader.pages)
+    text = " ".join(
+        "\n".join(page.extract_text() for page in reader.pages).split()
+    )
 
     assert len(reader.pages) == 1
     for required in (
@@ -242,6 +244,24 @@ def test_single_page_conclusion_uses_the_full_report_completion_gate():
     payload = _payload(BAD_D=None)
     with pytest.raises(reports.ReportContractError, match="Final BAD-D is incomplete"):
         reports.build_conclusion_pdf(payload)
+
+
+def test_single_page_conclusion_explains_lasik_to_prk_transition_from_canonical_reasons():
+    payload = _payload(pachy_thinnest_um=486)
+    od_report = payload["decision"]["eyes"][0]["report_payload"]
+    assert od_report["procedure"] == "PRK"
+
+    pdf = reports.build_conclusion_pdf(payload)
+    reader = PdfReader(BytesIO(pdf))
+    text = " ".join(
+        "\n".join(page.extract_text() for page in reader.pages).split()
+    )
+
+    assert len(reader.pages) == 1
+    assert "LASIK outcome / transition" in text
+    assert "OD: LASIK failed. Now evaluating PRK." in text
+    assert "The 490-499 µm isolated-thickness LASIK exception does not apply" in text
+    assert "thinnest pachymetry is 486 µm, below 490 µm" in text
 
 
 def test_full_report_rejects_incomplete_ps3_even_when_an_immediate_stop_exists():

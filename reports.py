@@ -414,9 +414,24 @@ def _conclusion_eye_rows(report: Mapping[str, Any]) -> list[list[str]]:
     planning = report.get("planning") or {}
     ml7 = report.get("microkeratome_planning") or {}
 
-    rows = [["Assessment", "Canonical result", "Conclusion detail"]]
-    rows.extend([
+    rows = [
+        ["Assessment", "Canonical result", "Conclusion detail"],
         ["Procedure", _text(report.get("procedure")), ""],
+    ]
+    procedure_transition = planning.get("procedure_transition")
+    prior_lasik_status = planning.get("prior_lasik_status")
+    prior_lasik_reasons = list(planning.get("prior_lasik_reasons") or [])
+    if procedure_transition or prior_lasik_status or prior_lasik_reasons:
+        transition_details = []
+        if procedure_transition:
+            transition_details.append(_text(procedure_transition))
+        transition_details.extend(_text(reason) for reason in prior_lasik_reasons)
+        rows.append([
+            "LASIK outcome / transition",
+            _text(prior_lasik_status),
+            "; ".join(transition_details) or "Not documented",
+        ])
+    rows.extend([
         [
             "Randleman / ERSS",
             _text(randleman.get("status"), "NOT APPLICABLE"),
