@@ -58,9 +58,10 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 - Manifest and intended corrections are normalized to minus-cylinder notation, then classified
   from their two principal meridians as myopic, hyperopic, simple astigmatism, or mixed
   astigmatism. Entering an equivalent plus-cylinder notation must not change the classification.
-- A valid surgeon-entered axis is required for a complete manifest or intended refraction,
-  including an explicitly entered zero cylinder. Missing values remain missing and are never
-  converted to zero; plus-cylinder transposition without an axis is never cleared.
+- A valid surgeon-entered axis is required when cylinder is nonzero. An explicitly entered
+  zero cylinder is spherical, requires no measured axis, and is canonically represented with
+  axis zero. Missing cylinder values remain missing and are never converted to zero;
+  plus-cylinder transposition without an axis is never cleared.
 
 ## Hyperopic and mixed-astigmatism pathway
 

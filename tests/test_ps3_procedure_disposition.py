@@ -80,6 +80,14 @@ def test_below_490_does_not_receive_lasik_exception(thickness):
     assert result["ps3_decision"]["exception_applied"] is False
     assert result["ps3_status"] == "STOP-DEFER"
     assert result["status"] == "STOP-DEFER"
+    assert [
+        finding.key for finding in result["ps3_decision"]["triggering_findings"]
+    ] == ["thinnest"]
+    assert f"Thinnest {thickness:g} µm is 470-499 µm" in result["ps3_decision"]["detail"]
+    assert (
+        f"thinnest pachymetry is {thickness:g} µm, below 490 µm"
+        in result["ps3_decision"]["detail"]
+    )
 
 
 @pytest.mark.parametrize(

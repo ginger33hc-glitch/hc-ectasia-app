@@ -301,7 +301,7 @@ def missing_manual_refraction(plans: dict[str, Any]) -> list[dict[str, str]]:
                     "form_id": f"{prefix}_{'manifest_cylinder' if role == 'manifest' else 'cylinder'}",
                     "label": f"{eye} {role} cylinder",
                 })
-            else:
+            elif float(plan[cylinder_key]) != 0.0:
                 axis_required = True
                 role_axis = any(_finite(plan.get(key)) for key in (
                     "entered_axis_deg", f"{role}_axis_deg", f"{role}_entered_axis_deg",

@@ -142,17 +142,29 @@ def test_confident_treatment_card_defaults_both_roles_when_surrounding_plan_is_b
 
 
 @pytest.mark.parametrize("sphere", [-3.0, -1.0, 3.0])
-def test_zero_cylinder_card_does_not_synthesize_missing_axis(sphere):
+def test_zero_cylinder_card_normalizes_axis_to_zero(sphere):
     plan = {"procedure": "LASIK", "prior": "no", "flap_um": 100.0, "ablation_um": 80.0}
     card = _card(sphere=sphere, cylinder=0.0, axis=None, axis_status="UNREADABLE")
     extracted = {"eyes": [_eye("OD")], "treatment_corrections": [card]}
     resolved = resolve_eye_plan(plan, extracted=extracted, eye_name="OD")
     assert resolved["manifest_entered_sphere_D"] == sphere
     assert resolved["manifest_cylinder_signed_D"] == 0.0
-    assert "manifest_axis_deg" not in resolved
+    assert resolved["manifest_axis_deg"] == 0.0
     assert resolved["intended_entered_sphere_D"] == sphere
     assert resolved["intended_cylinder_signed_D"] == 0.0
-    assert "intended_axis_deg" not in resolved
+    assert resolved["intended_axis_deg"] == 0.0
+
+
+def test_wholly_blank_intended_role_defaults_explicit_zero_cylinder_and_axis():
+    plan = {
+        "procedure": "LASIK", "prior": "no", "flap_um": 100.0, "ablation_um": 80.0,
+        "manifest_entered_sphere_D": -2.0, "manifest_cylinder_signed_D": 0.0,
+    }
+    resolved = resolve_eye_plan(plan, extracted={"eyes": [_eye("OD")]}, eye_name="OD")
+    assert resolved["intended_entered_sphere_D"] == -2.0
+    assert resolved["intended_cylinder_signed_D"] == 0.0
+    assert resolved["intended_axis_deg"] == 0.0
+    assert resolved["intended_source"] == "DEFAULTED_FROM_MANIFEST"
 
 
 def test_explicit_zero_manifest_cylinder_leaves_other_blank_fields_unchanged():

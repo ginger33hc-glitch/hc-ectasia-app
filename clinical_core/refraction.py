@@ -43,11 +43,16 @@ def normalize_minus_cylinder(sphere_d, cylinder_d, axis_deg) -> Optional[Refract
     cylinder sign, and rotating axis by 90 degrees modulo 180. Minus or zero
     cylinder is preserved except for canonical axis normalization to [0, 180).
     """
-    if not all(_finite(value) for value in (sphere_d, cylinder_d, axis_deg)):
+    if not all(_finite(value) for value in (sphere_d, cylinder_d)):
         return None
     sphere = float(sphere_d)
     cylinder = float(cylinder_d)
-    axis = float(axis_deg) % 180.0
+    if _finite(axis_deg):
+        axis = float(axis_deg) % 180.0
+    elif cylinder == 0.0:
+        axis = 0.0
+    else:
+        return None
     if cylinder > 0:
         sphere += cylinder
         cylinder = -cylinder

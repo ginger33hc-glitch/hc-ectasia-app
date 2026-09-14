@@ -48,3 +48,13 @@ def test_mixed_astigmatism_cannot_use_scalar_final_k_model():
 
 def test_invalid_refraction_is_incomplete():
     assert normalize_minus_cylinder(None, -1.0, 90) is None
+    assert normalize_minus_cylinder(-3.0, -1.0, None) is None
+
+
+def test_explicit_zero_cylinder_needs_no_axis_and_normalizes_to_axis_zero():
+    ref = normalize_minus_cylinder(-3.0, 0.0, None)
+    assert ref is not None
+    assert ref.sphere_d == -3.0
+    assert ref.cylinder_d == 0.0
+    assert ref.axis_deg == 0.0
+    assert ref.mrse_d == -3.0
