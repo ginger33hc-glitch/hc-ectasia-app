@@ -4,6 +4,7 @@ from io import BytesIO
 import inspect
 
 from docx import Document
+from pypdf import PdfReader
 import pytest
 
 from canonical_runtime_service import evaluate_case
@@ -207,6 +208,40 @@ def test_pdf_and_docx_use_same_model_and_do_not_mutate_canonical_snapshot():
     assert "OD — PASS" in text
     assert "Randleman / ERSS" in text
     assert payload == before
+
+
+def test_single_page_conclusion_uses_complete_canonical_snapshot_without_mutation():
+    payload = _payload()
+    before = deepcopy(payload)
+    pdf = reports.build_conclusion_pdf(payload)
+    reader = PdfReader(BytesIO(pdf))
+    text = "\n".join(page.extract_text() for page in reader.pages)
+
+    assert len(reader.pages) == 1
+    for required in (
+        "CER-AI SINGLE-PAGE CONCLUSION REPORT",
+        "Canonical Patient",
+        "OD — PASS",
+        "OS — PASS",
+        "Randleman / ERSS",
+        "NICE",
+        "Final BAD-D",
+        "PS3",
+        "Procedural safety",
+        "Selected procedure plan",
+        "ML7 planning",
+        "Decision basis",
+        "Plan A",
+        "Vacuum ring",
+    ):
+        assert required in text
+    assert payload == before
+
+
+def test_single_page_conclusion_uses_the_full_report_completion_gate():
+    payload = _payload(BAD_D=None)
+    with pytest.raises(reports.ReportContractError, match="Final BAD-D is incomplete"):
+        reports.build_conclusion_pdf(payload)
 
 
 def test_full_report_rejects_incomplete_ps3_even_when_an_immediate_stop_exists():

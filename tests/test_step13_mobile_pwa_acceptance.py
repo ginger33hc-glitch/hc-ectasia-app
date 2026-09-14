@@ -193,6 +193,9 @@ def test_mobile_report_and_archive_actions_are_touch_and_popup_safe():
     assert "preview.location.replace(url)" in app
     assert "setTimeout(()=>URL.revokeObjectURL(url),60000)" in app
     assert "Open / Download PDF" in app
+    assert "Open / Print one-page conclusion" in app
+    assert 'downloadReport("conclusion")' in app
+    assert "/report/conclusion/pdf" in app
     assert ".report-toolbar button{flex:1 1 145px;min-height:44px}" in app
     assert ".links a,.source-button,.case-button{font-size:12px;min-height:40px" in archive
     assert ".source-close{min-height:44px}" in archive
@@ -223,6 +226,6 @@ def test_mobile_ui_uses_one_server_workflow_from_upload_through_archive():
     assert "'/analysis/jobs'" in job_client
     assert "`/analysis/jobs/${encodeURIComponent(jobId)}`" in job_client
     assert "ceraiFetch('/assessment/complete'" in app
-    assert "ceraiFetch(`/report/${kind}`" in app
+    assert "ceraiFetch(endpoint" in app
     assert 'href="/archive-ui"' in access_ui
     assert 'request("/archive/search"' in archive

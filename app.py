@@ -38,7 +38,7 @@ from pentacam_field_registry import (
     KERATOMETRY_SOURCE_VALUES,
     PASSIVE_INFORMATIONAL_FIELDS,
 )
-from reports import ReportContractError, build_docx, build_pdf
+from reports import ReportContractError, build_conclusion_pdf, build_docx, build_pdf
 from canonical_input_adapter import (
     astigmatic_disparity_verification_eyes,
     resolve_case_plans,
@@ -879,6 +879,20 @@ def report_word(payload: Dict[str, Any] = Body(...)) -> StreamingResponse:
         BytesIO(content),
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": 'attachment; filename="CER-AI_Report.docx"'},
+    )
+
+
+@app.post("/report/conclusion/pdf")
+def report_conclusion_pdf(payload: Dict[str, Any] = Body(...)) -> StreamingResponse:
+    from assessment_workflow import export_payload
+    payload = export_payload(payload)
+    try:
+        content = build_conclusion_pdf(payload)
+    except ReportContractError as exc:
+        raise HTTPException(409, f"Complete canonical report unavailable: {exc}") from exc
+    return StreamingResponse(
+        BytesIO(content), media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="CER-AI_Conclusion.pdf"'},
     )
 
 
