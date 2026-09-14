@@ -83,8 +83,6 @@ def _refraction(mapping: Mapping[str, Any], prefix: str):
         if entered_sphere is None or signed_cylinder is None:
             return None
         axis = _raw_axis(mapping, prefix)
-        if axis is None:
-            return None
         return normalize_minus_cylinder(entered_sphere, signed_cylinder, axis)
 
     sphere = _first_number(mapping, f"{prefix}_sphere_D")
@@ -97,8 +95,6 @@ def _refraction(mapping: Mapping[str, Any], prefix: str):
         if sphere is None or magnitude is None:
             return None
         axis = _normalized_axis(mapping, prefix)
-        if axis is None:
-            return None
         return normalize_minus_cylinder(sphere, -abs(magnitude), axis)
     return None
 
@@ -198,6 +194,8 @@ def _set_raw_role(plan: dict[str, Any], prefix: str, correction) -> None:
     plan[f"{prefix}_cylinder_signed_D"] = cylinder
     if axis is not None:
         plan[f"{prefix}_axis_deg"] = axis
+    elif cylinder == 0.0:
+        plan[f"{prefix}_axis_deg"] = 0.0
 
 
 def _copy_manifest_to_intended(plan: dict[str, Any]) -> None:
@@ -207,13 +205,13 @@ def _copy_manifest_to_intended(plan: dict[str, Any]) -> None:
         plan.get("manifest_cylinder_signed_D"),
     )
     if all(value is not None for value in manifest_raw):
-        if any(abs(float(value)) <= 1e-12 for value in manifest_raw):
-            return
         plan["intended_entered_sphere_D"] = manifest_raw[0]
         plan["intended_cylinder_signed_D"] = manifest_raw[1]
         axis = _raw_axis(plan, "manifest")
         if axis is not None:
             plan["intended_axis_deg"] = axis
+        elif float(manifest_raw[1]) == 0.0:
+            plan["intended_axis_deg"] = 0.0
         return
 
     manifest_normalized = (
@@ -221,13 +219,13 @@ def _copy_manifest_to_intended(plan: dict[str, Any]) -> None:
         plan.get("manifest_cylinder_magnitude_D"),
     )
     if all(value is not None for value in manifest_normalized):
-        if any(abs(float(value)) <= 1e-12 for value in manifest_normalized):
-            return
         plan["intended_sphere_D"] = manifest_normalized[0]
         plan["intended_cylinder_magnitude_D"] = manifest_normalized[1]
         axis = _normalized_axis(plan, "manifest")
         if axis is not None:
             plan["intended_normalized_axis_deg"] = axis
+        elif float(manifest_normalized[1]) == 0.0:
+            plan["intended_normalized_axis_deg"] = 0.0
 
 
 def resolve_eye_plan(

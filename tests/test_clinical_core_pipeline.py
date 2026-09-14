@@ -7,6 +7,7 @@ from clinical_core import (
     ASSESSMENT_INCOMPLETE,
     CAUTION,
     ClinicalCoreInput,
+    PASS,
     PIPELINE_ORDER,
     PS3EyeInput,
     PS3InterEyeInput,
@@ -158,8 +159,18 @@ def test_missing_decision_critical_data_is_assessment_incomplete_not_pass():
     assert {driver.key for driver in result["final_disposition"].incomplete_drivers} == {"nice"}
 
 
-def test_zero_cylinder_never_synthesizes_a_missing_axis():
+def test_zero_cylinder_uses_spherical_logic_without_requiring_axis():
     result = evaluate_normalized_case(normal_lasik(intended_axis_deg=None))
+    assert "intended_axis_deg" not in result["procedural_safety"]["missing"]
+    assert result["procedural_safety"]["status"] == PASS
+    assert result["status"] == PASS
+
+
+def test_nonzero_cylinder_still_requires_axis():
+    result = evaluate_normalized_case(normal_lasik(
+        intended_cylinder_d=-1.0,
+        intended_axis_deg=None,
+    ))
     assert "intended_axis_deg" in result["procedural_safety"]["missing"]
     assert result["procedural_safety"]["status"] == ASSESSMENT_INCOMPLETE
     assert result["status"] == ASSESSMENT_INCOMPLETE

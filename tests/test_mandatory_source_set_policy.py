@@ -175,21 +175,21 @@ def test_unclassified_sixth_image_is_passive_optional_card_evidence():
     )
 
 
-def test_zero_cylinders_require_an_explicit_axis_at_the_intake_gate():
+def test_zero_cylinders_need_no_axis_but_nonzero_cylinders_do():
     plans = complete_refraction_plans()
     for plan in plans.values():
         plan["manifest_cylinder_signed_D"] = 0.0
         plan["intended_cylinder_signed_D"] = 0.0
         plan["entered_axis_deg"] = None
+    complete = policy.validate_preassessment_requirements(complete_set(False), plans)
+    assert complete["manual_refraction"]["complete"] is True
+
+    for plan in plans.values():
+        plan["intended_cylinder_signed_D"] = -0.5
     with pytest.raises(HTTPException) as exc:
         policy.validate_preassessment_requirements(complete_set(False), plans)
     assert exc.value.status_code == 422
     assert {item["field"] for item in exc.value.detail["missing_refraction"]} == {"entered_axis_deg"}
-
-    for plan in plans.values():
-        plan["entered_axis_deg"] = 0.0
-    complete = policy.validate_preassessment_requirements(complete_set(False), plans)
-    assert complete["manual_refraction"]["complete"] is True
 
 
 @pytest.mark.parametrize("missing_source", [True, False])

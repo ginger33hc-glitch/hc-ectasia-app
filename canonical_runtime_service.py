@@ -243,10 +243,9 @@ def _intended_refraction_from_input(inp):
     if not _finite_number(inp.intended_sphere_d) or not _finite_number(inp.intended_cylinder_d):
         return None
     cylinder = float(inp.intended_cylinder_d)
-    axis = inp.intended_axis_deg
-    if not _finite_number(axis):
-        return None
-    return normalize_minus_cylinder(inp.intended_sphere_d, cylinder, axis)
+    return normalize_minus_cylinder(
+        inp.intended_sphere_d, cylinder, inp.intended_axis_deg
+    )
 
 
 def _candidate_matches_actual_plan(plan: Mapping[str, Any], spec: Mapping[str, Any]) -> bool:

@@ -117,6 +117,7 @@
     "Examination date":"Muayene tarihi",
     "PATIENT":"Hasta","Patient age (years)":"Hasta yaşı (yıl)",
     "Intended treatment initially follows manifest refraction. Edit intended values only when the planned treatment differs.":"Hedeflenen tedavi başlangıçta manifest refraksiyonu izler. Yalnızca planlanan tedavi farklıysa hedeflenen değerleri değiştirin.",
+    "Intended treatment initially follows manifest refraction. An explicit zero cylinder also sets the intended cylinder and axis to zero; a nonzero cylinder requires an axis.":"Hedeflenen tedavi başlangıçta manifest refraksiyonu izler. Açıkça girilmiş sıfır silindir, hedef silindiri ve aksı da sıfıra ayarlar; sıfır olmayan silindir için aks gereklidir.",
     "Complete all items below, then continue. Existing inputs and image readings are retained. No calculation is required from the surgeon.":"Aşağıdaki tüm alanları tamamlayıp devam edin. Mevcut girdiler ve görüntü okumaları korunur. Cerrahın hesaplama yapması gerekmez.",
     "This cannot be completed by typing. Upload a source image that visibly shows QS: OK.":"Bu madde yazılarak tamamlanamaz. QS: OK ifadesini açıkça gösteren kaynak görüntüyü yükleyin.",
     "Explicit Pentacam QS: OK is required from the source image":"Kaynak görüntüde açıkça Pentacam QS: OK bulunması gerekir",

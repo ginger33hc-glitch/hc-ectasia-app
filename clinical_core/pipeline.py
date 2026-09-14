@@ -126,6 +126,14 @@ def _ps3_procedure_decision(
     moderate_keys = {
         finding.key for finding in ps3_result.findings if finding.status == "MODERATE"
     }
+    triggering_findings = tuple(
+        finding
+        for finding in ps3_result.findings
+        if finding.status in {"MODERATE", "HIGH"}
+    )
+    trigger_detail = "; ".join(
+        f"{finding.key}: {finding.detail}" for finding in triggering_findings
+    )
     isolated_borderline_thickness = (
         procedure == "LASIK"
         and selected == DEFER
@@ -150,6 +158,20 @@ def _ps3_procedure_decision(
     elif selected == DEFER:
         status = STOP_DEFER
         detail = f"Raw PS3 {procedure or 'selected procedure'} disposition: DEFER."
+        if trigger_detail:
+            detail += f" Triggering PS3 finding(s): {trigger_detail}"
+        if (
+            procedure == "LASIK"
+            and moderate_keys == {"thinnest"}
+            and ps3_result.high_count == 0
+            and ps3_result.moderate_count == 1
+            and _finite(thinnest_um)
+            and 470.0 <= float(thinnest_um) < 490.0
+        ):
+            detail += (
+                f" The 490-499 µm isolated-thickness LASIK exception does not apply "
+                f"because thinnest pachymetry is {float(thinnest_um):g} µm, below 490 µm."
+            )
     elif selected == ALLOWED and ps3_result.complete:
         status = PASS
         detail = f"Raw PS3 {procedure or 'selected procedure'} disposition: ALLOWED."
@@ -160,6 +182,7 @@ def _ps3_procedure_decision(
         "status": status,
         "raw_disposition": selected,
         "exception_applied": isolated_borderline_thickness,
+        "triggering_findings": triggering_findings,
         "detail": detail,
     }
 
@@ -189,11 +212,9 @@ def _intended_refraction(inp: ClinicalCoreInput):
     if not _finite(inp.intended_sphere_d) or not _finite(inp.intended_cylinder_d):
         return None
     cylinder = float(inp.intended_cylinder_d)
-    if _finite(inp.intended_axis_deg):
-        axis = float(inp.intended_axis_deg)
-    else:
-        return None
-    return normalize_minus_cylinder(inp.intended_sphere_d, cylinder, axis)
+    return normalize_minus_cylinder(
+        inp.intended_sphere_d, cylinder, inp.intended_axis_deg
+    )
 
 
 def _safety_status(
@@ -226,7 +247,8 @@ def _safety_status(
     missing.extend(name for name, value in required if not _finite(value))
     if not ablation_um_is_valid(inp.ablation_um):
         missing.append("ablation_um")
-    if _finite(inp.intended_cylinder_d) and not _finite(inp.intended_axis_deg):
+    if (_finite(inp.intended_cylinder_d) and float(inp.intended_cylinder_d) != 0.0
+            and not _finite(inp.intended_axis_deg)):
         missing.append("intended_axis_deg")
     if procedure == "LASIK" and not _finite(inp.flap_um):
         missing.append("flap_um")
