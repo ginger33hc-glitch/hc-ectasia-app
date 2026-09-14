@@ -1009,8 +1009,9 @@ async def _run_image_assessment(
 
     # Every image remains an independent extraction. Bounded concurrency prevents the total
     # request time from becoming the sum of all upstream calls and keeps FastAPI responsive.
-    concurrency = max(1, min(int(os.getenv("IMAGE_EXTRACTION_CONCURRENCY", "3")), 4))
+    concurrency = max(1, min(int(os.getenv("IMAGE_EXTRACTION_CONCURRENCY", "4")), 4))
     semaphore = asyncio.Semaphore(concurrency)
+    assessment_started = monotonic()
 
     async def extract_bounded(raw: bytes, filename: str) -> Dict[str, Any]:
         async with semaphore:
@@ -1020,6 +1021,12 @@ async def _run_image_assessment(
         async with analysis_slot():
             extraction_results = await asyncio.gather(
                 *(extract_bounded(raw, filename) for raw, filename in image_payloads)
+            )
+            print(
+                "ASSESSMENT TIMING:",
+                f"stage=primary_extraction duration_ms={round((monotonic() - assessment_started) * 1000)}",
+                f"images={len(image_payloads)}",
+                flush=True,
             )
             # Page identity from the primary read is the single source-set authority.
             # Stop here if one of the five mandatory sources is absent; no targeted
@@ -1052,6 +1059,11 @@ async def _run_image_assessment(
                 enrich_bounded(result, raw, filename)
                 for result, (raw, filename) in zip(extraction_results, image_payloads)
             ))
+            print(
+                "ASSESSMENT TIMING:",
+                f"stage=targeted_enrichment cumulative_ms={round((monotonic() - assessment_started) * 1000)}",
+                flush=True,
+            )
             if exam_date_reread_required:
                 promote_consistent_targeted_exam_dates(extraction_results)
 
