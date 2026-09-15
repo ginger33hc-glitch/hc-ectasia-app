@@ -291,6 +291,25 @@ def test_learning_center_exposes_the_full_public_education_architecture():
         assert json.loads(schema.group(1))["@type"] == "CollectionPage"
 
 
+def test_learning_center_offers_english_and_turkish_presentation_downloads():
+    english_path = "/static/education/presentations/CER-AI_English_Physician_Presentation_2026-09-15_v1.pptx"
+    turkish_path = "/static/education/presentations/CER-AI_Turkce_Hekim_Tanitimi_2026-09-15_v5.pptx"
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        for hub_path in ("/learning-center", "/tr/learning-center"):
+            response = client.get(hub_path)
+            assert response.status_code == 200
+            assert "CER-AI presentation examples" in response.text
+            assert f'href="{english_path}" download' in response.text
+            assert f'href="{turkish_path}" download' in response.text
+            assert "Download English presentation" in response.text
+            assert "Download Turkish presentation" in response.text
+
+        for presentation_path in (english_path, turkish_path):
+            response = client.get(presentation_path)
+            assert response.status_code == 200
+            assert response.content.startswith(b"PK")
+
+
 def test_learning_topics_are_crawlable_evidence_linked_and_nonclinical():
     with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
         paths = (
