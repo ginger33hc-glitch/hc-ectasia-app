@@ -120,8 +120,8 @@
       const response=await request(`${base}/sources`); if(!response.ok) throw new Error(await readError(response));
       const data=await response.json(), sources=data.sources||[];
       if(!sources.length){status.textContent="No source images are archived for this case.";return;}
-      status.textContent=capabilities?.owner_deidentified_access ? `${sources.length} de-identified source image(s). Patient demographics are masked and original filenames are hidden.` : `${sources.length} source image(s). Original filenames are shown only inside this authenticated workspace.`;
-      actions.innerHTML=`<a href="${base}/sources.zip">Download all ${capabilities?.owner_deidentified_access?"de-identified ":""}source images (ZIP)</a>`;
+      status.textContent=`${sources.length} source image(s). Original filenames are shown only to the doctor who created this case.`;
+      actions.innerHTML=`<a href="${base}/sources.zip">Download all source images (ZIP)</a>`;
       gallery.innerHTML=sources.map(source=>{
         const itemBase=`${base}/sources/${encodeURIComponent(source.ordinal)}`;
         const previewable=["image/bmp","image/gif","image/jpeg","image/png","image/tiff","image/webp"].includes(source.media_type);
@@ -145,7 +145,7 @@
         <td>${escapeHtml(creator.display_name || (creator.user_id ? creator.user_id : "Legacy / unassigned"))}</td>
         <td><button class="case-button" type="button" data-case-id="${escapeHtml(entry.case_id||"")}" data-revision-id="${escapeHtml(entry.revision_id||"")}">Open case</button><div class="mono">${escapeHtml(entry.revision_id || "")}</div></td>
         <td>${reportLinks(entry)}</td>
-        <td><button class="source-button" type="button" data-case-id="${escapeHtml(entry.case_id||"")}" data-revision-id="${escapeHtml(entry.revision_id||"")}">View source images</button></td>
+        <td>${capabilities?.original_source_access ? `<button class="source-button" type="button" data-case-id="${escapeHtml(entry.case_id||"")}" data-revision-id="${escapeHtml(entry.revision_id||"")}">View source images</button>` : "Restricted to case doctor"}</td>
       </tr>`;
     }).join("");
   };
@@ -209,7 +209,7 @@
     currentUser=(await responses[0].json()).user;
     capabilities=await responses[1].json();
     $("userLabel").textContent=`${currentUser.display_name} · ${currentUser.role}`;
-    $("scopeNote").textContent=currentUser.role==="OWNER" ? "OWNER retrospective scope: all cases are available only with patient name, patient ID, source filenames, report identity, and image demographics masked." : "DOCTOR scope: only cases created under your account, with original identity and source material.";
+    $("scopeNote").textContent=currentUser.role==="OWNER" ? "OWNER retrospective scope: patient name and ID are masked, reports are regenerated from de-identified data, and all original source images are inaccessible." : "DOCTOR scope: only cases created under your account, with original identity and source material.";
     if(currentUser.role==="OWNER") {
       $("patient_name").disabled=true; $("patient_name").placeholder="Masked in OWNER view";
       $("patient_id").disabled=true; $("patient_id").placeholder="Masked in OWNER view";

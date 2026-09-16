@@ -1,25 +1,17 @@
 """Canonical de-identification boundary for OWNER retrospective archive access.
 
 Doctors may retrieve original material only for cases they created. OWNER archive
-routes must pass every catalog entry, assessment, report, and source image through
-this module and must never return the immutable original artifact.
+routes must pass every catalog entry, assessment, and report through this module.
+OWNER accounts must never receive source-image bytes or immutable original reports.
 """
 
 from __future__ import annotations
 
 from copy import deepcopy
-from io import BytesIO
 from typing import Any
-
-from PIL import Image, ImageDraw
 
 
 MASKED = "Masked for owner"
-OWNER_SOURCE_MEDIA_TYPE = "image/png"
-
-# All accepted clinical screenshots place patient demographics in the header.
-# Mask the complete band so layout/language variations cannot leave an identifier.
-OWNER_IDENTITY_HEADER_HEIGHT = 0.16
 
 _IDENTITY_KEYS = {
     "patient_id", "patient_name", "patient_first_name", "patient_last_name",
@@ -90,25 +82,3 @@ def owner_assessment(assessment: dict[str, Any]) -> dict[str, Any]:
     patient["id"] = MASKED
     cleaned["owner_deidentified"] = True
     return cleaned
-
-
-def owner_source_image(raw: bytes) -> bytes:
-    """Return a PNG derivative with the complete patient-demographics header masked."""
-    with Image.open(BytesIO(raw)) as opened:
-        opened.verify()
-    with Image.open(BytesIO(raw)) as opened:
-        image = opened.convert("RGB")
-    width, height = image.size
-    if width <= 0 or height <= 0:
-        raise ValueError("invalid source-image dimensions")
-    mask_height = max(1, round(height * OWNER_IDENTITY_HEADER_HEIGHT))
-    draw = ImageDraw.Draw(image)
-    draw.rectangle((0, 0, width, mask_height), fill="white")
-    draw.text(
-        (max(8, width // 100), max(5, mask_height // 3)),
-        "CER-AI OWNER VIEW - PATIENT NAME / ID MASKED",
-        fill="black",
-    )
-    output = BytesIO()
-    image.save(output, format="PNG", optimize=True)
-    return output.getvalue()

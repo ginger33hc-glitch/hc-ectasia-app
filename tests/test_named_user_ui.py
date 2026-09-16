@@ -112,7 +112,7 @@ def test_archive_page_requires_session_and_contains_role_aware_tools():
     assert "Regenerate PDF EN" in allowed.text
     assert "Pentacam sources" in allowed.text
     assert "View source images" in allowed.text
-    assert "Download all ${capabilities?.owner_deidentified_access" in allowed.text
+    assert "Restricted to case doctor" in allowed.text
     assert allowed.headers["cache-control"] == "no-store"
 
 
@@ -130,6 +130,7 @@ def test_archive_capabilities_are_session_protected_and_role_aware():
         "identifiable_archive_access": True,
         "retrospective_archive_access": True,
         "owner_deidentified_access": False,
+        "original_source_access": True,
         "audit_enabled": True,
         "historical_report_enabled": True,
         "research_export_enabled": False,
@@ -146,12 +147,13 @@ def test_owner_capabilities_allow_only_deidentified_retrospective_archive():
     assert payload["identifiable_archive_access"] is False
     assert payload["retrospective_archive_access"] is True
     assert payload["owner_deidentified_access"] is True
+    assert payload["original_source_access"] is False
 
 
 def test_archive_page_hides_archive_until_retrospective_capability_is_confirmed():
     text = named_user_ui.ARCHIVE_HTML.read_text(encoding="utf-8")
     assert 'id="archiveSearch" class="card capability" hidden' in text
     assert 'id="archiveResults" class="card capability" hidden' in text
-    assert "OWNER retrospective scope: all cases are available only" in text
+    assert "OWNER retrospective scope: patient name and ID are masked" in text
     assert "if(capabilities.retrospective_archive_access)" in text
     assert "Masked in OWNER view" in text
