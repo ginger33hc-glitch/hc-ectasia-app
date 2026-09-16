@@ -362,6 +362,14 @@ function renderSourceSetStatus(summary){
   sourceSetStatus.hidden=false;
 }
 function resetAgeAcquisition(){
+  // An editable value was entered by the surgeon and remains authoritative
+  // when images are added or replaced for the same assessment. Only an age
+  // auto-derived from the previous image set (the read-only state) is stale.
+  if(ageInput.value.trim()!==""&&!ageInput.readOnly){
+    ageInput.required=false;
+    manualAgeRow.hidden=false;
+    return;
+  }
   ageInput.value="";
   ageInput.readOnly=false;
   ageInput.required=false;

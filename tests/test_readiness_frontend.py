@@ -190,6 +190,32 @@ def test_patient_age_completion_uses_one_shared_field():
     assert 'seek_patient_age=age is None' in (ROOT / 'app.py').read_text()
 
 
+def test_image_change_preserves_surgeon_age_but_discards_old_derived_age():
+    if not shutil.which('node'):
+        pytest.skip('Node is not available')
+    script = r'''
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const html=fs.readFileSync('static/index.html','utf8');
+const start=html.indexOf('function resetAgeAcquisition()');
+const end=html.indexOf('function renderSelectedFiles',start);
+const context={
+  ageInput:{value:'61',readOnly:false,required:true},
+  manualAgeRow:{hidden:false}
+};
+vm.createContext(context);vm.runInContext(html.slice(start,end),context);
+context.resetAgeAcquisition();
+assert.equal(context.ageInput.value,'61');
+assert.equal(context.ageInput.readOnly,false);
+assert.equal(context.manualAgeRow.hidden,false);
+context.ageInput.value='44';context.ageInput.readOnly=true;context.ageInput.required=false;
+context.resetAgeAcquisition();
+assert.equal(context.ageInput.value,'');
+assert.equal(context.ageInput.readOnly,false);
+assert.equal(context.manualAgeRow.hidden,true);
+'''
+    subprocess.run(['node', '-e', script], cwd=ROOT, check=True, capture_output=True, text=True)
+
+
 def test_nice_measurements_are_requested_only_after_canonical_reading_fails():
     html = (ROOT / 'static/index.html').read_text()
     assert 'nice_confirmation' not in html
