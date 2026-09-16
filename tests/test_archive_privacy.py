@@ -1,7 +1,3 @@
-from io import BytesIO
-
-from PIL import Image
-
 import archive_privacy
 
 
@@ -35,15 +31,3 @@ def test_owner_assessment_scrubs_identity_literals_and_source_filenames():
     assert cleaned["patient"]["age"] == 40
     assert cleaned["patient"]["reviewer"] == "Dr. Reviewer"
     assert cleaned["decision"]["status"] == "PASS"
-
-
-def test_owner_source_image_masks_only_header_band():
-    source = BytesIO()
-    Image.new("RGB", (100, 100), "blue").save(source, format="PNG")
-
-    masked = archive_privacy.owner_source_image(source.getvalue())
-
-    with Image.open(BytesIO(masked)) as image:
-        assert image.format == "PNG"
-        assert image.getpixel((95, 5)) == (255, 255, 255)
-        assert image.getpixel((95, 95)) == (0, 0, 255)

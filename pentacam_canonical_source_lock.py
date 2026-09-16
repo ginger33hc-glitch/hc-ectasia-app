@@ -45,6 +45,21 @@ CANONICAL_SOURCE_REGIONS = {
     BAD_STRIP: ("Belin/Ambrósio Display", "bottom BAD-D strip"),
 }
 
+# Display crops used only to make follow-up transcription requests smaller. The complete
+# original screen is always sent as well, and accepted readings must still satisfy the exact
+# source and label locks below. Keeping this mapping beside the source registry prevents a
+# second, conflicting definition of where a canonical field belongs.
+CANONICAL_SOURCE_REREAD_TILES = {
+    SHOW_2_CORNEA_FRONT: ("UPPER_LEFT", "UPPER_RIGHT"),
+    SHOW_2_CORNEA_BACK: ("LOWER_LEFT", "LOWER_RIGHT"),
+    SHOW_2_INDICES: ("LOWER_LEFT", "LOWER_RIGHT"),
+    FOUR_MAPS_LOWER_LEFT: ("LOWER_LEFT",),
+    BAD_CENTER: ("UPPER_LEFT", "UPPER_RIGHT"),
+    BAD_ELEVATION_ROW: ("LOWER_RIGHT",),
+    BAD_PPI: ("LOWER_RIGHT",),
+    BAD_STRIP: ("LOWER_LEFT", "LOWER_RIGHT"),
+}
+
 CANONICAL_FIELD_SOURCES = {
     # Show 2 Exams -> Cornea Front.
     "K1_D": (SHOW_2_CORNEA_FRONT, "K1"),
@@ -125,6 +140,11 @@ def canonical_source_region(field: str):
     screen, box = region
     label = canonical_label(field)
     return {"screen": screen, "box": f"{box} → {label}" if label else box}
+
+
+def canonical_reread_tiles(field: str):
+    """Return registry-owned broad crops for evidence-preserving follow-up rereads."""
+    return CANONICAL_SOURCE_REREAD_TILES.get(canonical_source_id(field), ())
 
 
 def source_family(field: str):

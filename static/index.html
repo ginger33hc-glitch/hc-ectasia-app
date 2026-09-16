@@ -102,6 +102,7 @@
     <div class="report-toolbar no-print">
       <button id="pdfBtn" type="button">Open / Download PDF</button>
       <button id="wordBtn" type="button" class="secondary">Download Word</button>
+      <button id="conclusionPdfBtn" type="button" class="secondary">Open / Print one-page conclusion</button>
       <button id="printBtn" type="button" class="secondary">Print report</button>
     </div>
     <article id="reportSheet" class="report-sheet">
@@ -132,7 +133,7 @@
 <footer class="app-legal-footer">Developed by Hüseyin Cengiz, MD. All rights reserved. Final responsibility rests with the surgeon at all times and under all circumstances.</footer>
 
 <script src="/static/i18n.js?v=10"></script>
-<script src="/static/assessment-readiness.js?v=5"></script>
+<script src="/static/assessment-readiness.js?v=6"></script>
 <script>
 const i18n=window.CERAI_I18N;
 async function ceraiFetch(url,options={}){
@@ -338,6 +339,7 @@ const reportCard = document.querySelector("#reportCard");
 const cardTransferNote = document.querySelector("#cardTransferNote");
 const pdfBtn = document.querySelector("#pdfBtn");
 const wordBtn = document.querySelector("#wordBtn");
+const conclusionPdfBtn = document.querySelector("#conclusionPdfBtn");
 const printBtn = document.querySelector("#printBtn");
 const imageInput = document.querySelector("#imageInput");
 const sourceSetStatus = document.querySelector("#sourceSetStatus");
@@ -714,17 +716,18 @@ function setReportMetadata(decision){
 }
 async function downloadReport(kind){
   if(!lastReport)return;
-  const button=kind==="pdf"?pdfBtn:wordBtn, original=button.textContent;
-  const preview=kind==="pdf"?window.open("about:blank","_blank"):null;
+  const button=kind==="pdf"?pdfBtn:kind==="conclusion"?conclusionPdfBtn:wordBtn, original=button.textContent;
+  const preview=kind==="pdf"||kind==="conclusion"?window.open("about:blank","_blank"):null;
   if(preview)preview.opener=null;
   button.disabled=true;button.textContent=i18n.translate("Preparing...");
   try{
-    const response=await ceraiFetch(`/report/${kind}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(lastReport)});
+    const endpoint=kind==="conclusion"?"/report/conclusion/pdf":`/report/${kind}`;
+    const response=await ceraiFetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(lastReport)});
     if(!response.ok)throw new Error(`Report export failed (${response.status})`);
     const blob=await response.blob(), url=URL.createObjectURL(blob), a=document.createElement("a");
     const id=(lastReport.patient.id||lastReport.patient.name||"Report").replace(/[^a-z0-9_-]+/gi,"_");
     a.href=url;
-    if(kind==="pdf"){
+    if(kind==="pdf"||kind==="conclusion"){
       if(preview)preview.location.replace(url);
       else{a.target="_blank";a.rel="noopener";document.body.appendChild(a);a.click();a.remove();}
     }else{
@@ -735,6 +738,7 @@ async function downloadReport(kind){
 }
 pdfBtn.addEventListener("click",()=>downloadReport("pdf"));
 wordBtn.addEventListener("click",()=>downloadReport("word"));
+conclusionPdfBtn.addEventListener("click",()=>downloadReport("conclusion"));
 printBtn.addEventListener("click",()=>{if(lastReport&&!reportCard.hidden)window.print();});
 // A report belongs to its assessed inputs, never to subsequently edited form values.
 f.addEventListener('input',()=>{reportCard.hidden=true;lastReport=null;});

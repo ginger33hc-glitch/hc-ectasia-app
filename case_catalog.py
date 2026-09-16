@@ -256,26 +256,22 @@ def _zip_source_filename(source: Any) -> str:
     return f"{source.ordinal:03d}_{cleaned}"
 
 
-def _source_inventory_record(source: Any, *, owner_view: bool) -> Dict[str, Any]:
-    if owner_view:
-        available = source.artifact.media_type in SAFE_INLINE_SOURCE_TYPES
-        return {
-            "ordinal": source.ordinal,
-            "original_filename": _generic_source_filename(source),
-            "media_type": (
-                archive_privacy.OWNER_SOURCE_MEDIA_TYPE
-                if available else "application/octet-stream"
-            ),
-            "owner_view_available": available,
-        }
+def _source_inventory_record(source: Any) -> Dict[str, Any]:
     return {
         "ordinal": source.ordinal,
         "original_filename": source.original_filename,
         "media_type": source.artifact.media_type,
         "plaintext_bytes": source.artifact.plaintext_bytes,
         "sha256": source.artifact.sha256,
-        "owner_view_available": True,
     }
+
+
+def _require_original_source_access(principal: Any) -> None:
+    if principal.role != "DOCTOR":
+        raise HTTPException(
+            403,
+            "Only the doctor who created this case may access its original source images.",
+        )
 
 
 def install(core: Any, archive_runtime: Any) -> None:
@@ -412,6 +408,7 @@ def install(core: Any, archive_runtime: Any) -> None:
             principal = user_access.require_current_principal()
             if not archive_runtime.enabled:
                 raise HTTPException(503, "CER-AI secure archive is not enabled.")
+            _require_original_source_access(principal)
             _authorized_review_entry(archive_runtime.archive, principal, case_id, revision_id)
             sources = archive_runtime.archive.list_sources(case_id)
             audit(
@@ -421,12 +418,8 @@ def install(core: Any, archive_runtime: Any) -> None:
                 revision_id=revision_id,
                 details={"source_count": len(sources)},
             )
-            owner_view = principal.role == "OWNER"
             return {
-                "sources": [
-                    _source_inventory_record(source, owner_view=owner_view)
-                    for source in sources
-                ],
+                "sources": [_source_inventory_record(source) for source in sources],
                 "count": len(sources),
             }
 
@@ -434,6 +427,7 @@ def install(core: Any, archive_runtime: Any) -> None:
             principal = user_access.require_current_principal()
             if not archive_runtime.enabled:
                 raise HTTPException(503, "CER-AI secure archive is not enabled.")
+            _require_original_source_access(principal)
             _authorized_review_entry(archive_runtime.archive, principal, case_id, revision_id)
             source = archive_runtime.archive.find_source(case_id, ordinal)
             if source is None:
@@ -443,15 +437,6 @@ def install(core: Any, archive_runtime: Any) -> None:
             content = archive_runtime.archive.get_bytes(source.artifact)
             media_type = source.artifact.media_type
             filename = _generic_source_filename(source)
-            if principal.role == "OWNER":
-                try:
-                    content = archive_privacy.owner_source_image(content)
-                except Exception as exc:
-                    raise HTTPException(
-                        415, "This source cannot be safely de-identified for OWNER review."
-                    ) from exc
-                media_type = archive_privacy.OWNER_SOURCE_MEDIA_TYPE
-                filename = f"CER-AI_Deidentified_Source_{source.ordinal:03d}.png"
             audit(
                 "SOURCE_PREVIEW" if disposition == "inline" else "SOURCE_DOWNLOAD",
                 actor=principal,
@@ -482,6 +467,7 @@ def install(core: Any, archive_runtime: Any) -> None:
             principal = user_access.require_current_principal()
             if not archive_runtime.enabled:
                 raise HTTPException(503, "CER-AI secure archive is not enabled.")
+            _require_original_source_access(principal)
             _authorized_review_entry(archive_runtime.archive, principal, case_id, revision_id)
             sources = archive_runtime.archive.list_sources(case_id)
             if not sources:
@@ -491,15 +477,6 @@ def install(core: Any, archive_runtime: Any) -> None:
                 for source in sources:
                     content = archive_runtime.archive.get_bytes(source.artifact)
                     filename = _zip_source_filename(source)
-                    if principal.role == "OWNER":
-                        try:
-                            content = archive_privacy.owner_source_image(content)
-                        except Exception as exc:
-                            raise HTTPException(
-                                415,
-                                "One or more sources cannot be safely de-identified for OWNER review.",
-                            ) from exc
-                        filename = f"{source.ordinal:03d}_CER-AI_Deidentified_Source.png"
                     bundle.writestr(filename, content)
             output.seek(0)
             audit(

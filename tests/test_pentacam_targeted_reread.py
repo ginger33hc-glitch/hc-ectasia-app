@@ -7,8 +7,10 @@ retired and replaced with direct canonical enrichment assertions below.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import canonical_engine
 from pentacam_canonical_source_lock import (
@@ -467,6 +469,120 @@ def test_required_field_can_resolve_on_fifth_standard_reread(monkeypatch):
     assert eye["B_Ele_Th_um"] == 8
 
 
+def test_focused_retry_requires_regions_for_every_outstanding_target():
+    result = pentacam_result()
+    eye = result["eyes"][0]
+    eye["unreadable_source_regions"] = {
+        "F_Ele_Th_um": {
+            "file": "od-bad.png",
+            "tile": "LOWER_RIGHT",
+            "source_box": [100, 120, 320, 210],
+        }
+    }
+
+    requested = {"OD": ["F_Ele_Th_um", "B_Ele_Th_um"]}
+    assert targeted._focused_retry_regions(result, requested, "od-bad.png") == []
+
+    eye["unreadable_source_regions"]["B_Ele_Th_um"] = {
+        "file": "od-bad.png",
+        "tile": "LOWER_RIGHT",
+        "source_box": [100, 120, 320, 210],
+    }
+    assert targeted._focused_retry_regions(result, requested, "od-bad.png") == [
+        {
+            "file": "od-bad.png",
+            "tile": "LOWER_RIGHT",
+            "source_box": [100, 120, 320, 210],
+        }
+    ]
+
+
+def test_region_without_exact_box_uses_canonical_tile_fallback_only():
+    result = pentacam_result()
+    result["eyes"][0]["unreadable_source_regions"] = {
+        "B_Ele_Th_um": {
+            "file": "od-bad.png",
+            "tile": "LOWER_RIGHT",
+            "source_box": None,
+        }
+    }
+    requested = {"OD": ["B_Ele_Th_um"]}
+
+    assert targeted._focused_retry_regions(result, requested, "od-bad.png") == []
+    assert targeted._canonical_retry_regions(
+        requested, pentacam_qs_requested=True,
+    ) == [
+        {"tile": "LOWER_RIGHT", "source_box": None},
+        {"tile": "TOP_HEADER", "source_box": None},
+    ]
+
+
+def test_first_reread_is_full_then_follow_up_uses_canonical_tiles(monkeypatch):
+    result = pentacam_result()
+    eye = result["eyes"][0]
+    for field in targeted.TARGET_FIELDS:
+        eye[field] = 1.0
+    eye["B_Ele_Th_um"] = None
+    result["document_context"].update({"patient_age_years": 40, "pentacam_qs": "OK"})
+    calls = []
+
+    def reread(*args):
+        calls.append(args)
+        value = 8 if len(calls) == 2 else None
+        return {
+            "screen_family": "BAD_DISPLAY",
+            "readings": [reading(
+                "B_Ele_Th_um", value, "B.Ele.Th",
+                status="CONFIDENT" if value is not None else "NOT_SHOWN",
+            )],
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(targeted, "targeted_reread", reread)
+    targeted.enrich_extraction(Core, result, b"image", "od-bad.png")
+
+    assert len(calls) == 2
+    assert len(calls[0]) == 7
+    assert calls[1][7] == [{"tile": "LOWER_RIGHT", "source_box": None}]
+    assert eye["B_Ele_Th_um"] == 8
+
+
+def test_focused_retry_sends_original_plus_only_exact_unread_region():
+    captured = {}
+
+    class FocusedCore(Core):
+        @staticmethod
+        def openai_client():
+            def create(**kwargs):
+                captured.update(kwargs)
+                return SimpleNamespace(output_text=json.dumps({
+                    "screen_family": "BAD_DISPLAY",
+                    "readings": [],
+                    "warnings": [],
+                }))
+
+            return SimpleNamespace(responses=SimpleNamespace(create=create))
+
+    targeted.targeted_reread(
+        FocusedCore,
+        image_bytes(),
+        "od-bad.png",
+        {"OD": ["B_Ele_Th_um"]},
+        focused_regions=[{
+            "file": "od-bad.png",
+            "tile": "LOWER_RIGHT",
+            "source_box": [100, 120, 320, 210],
+        }],
+    )
+
+    content = captured["input"][0]["content"]
+    images = [item for item in content if item["type"] == "input_image"]
+    labels = [item["text"] for item in content if item["type"] == "input_text"]
+    assert len(images) == 2
+    assert "ORIGINAL complete screen:" in labels
+    assert "LOWER_RIGHT focused crop of the same screen:" in labels
+
+
 def test_confident_four_maps_exam_date_reread_is_evidence_until_case_reconciliation():
     result = pentacam_result()
     result["eyes"][0]["screen_types"] = ["FOUR_MAPS_REFRACTIVE"]
@@ -496,6 +612,19 @@ def test_confident_four_maps_exam_date_reread_is_evidence_until_case_reconciliat
         "value": "03/09/2026",
         "promoted": False,
     }
+
+
+def test_surrogate_age_reread_is_skipped_when_surgeon_age_was_supplied(monkeypatch):
+    result = pentacam_result()
+    result["document_context"].pop("patient_age_years", None)
+
+    def unexpected_reread(*_args, **_kwargs):
+        raise AssertionError("surgeon-entered age must suppress patient-age OCR")
+
+    monkeypatch.setattr(targeted, "targeted_reread", unexpected_reread)
+    assert targeted.enrich_extraction(
+        Core, result, b"image", "od-four-maps.png", seek_patient_age=False,
+    ) is result
 
 
 PENTACAM_SOURCE_LOCK_RETIRED_TARGETED_TESTS = tuple(sorted(_RETIRED))

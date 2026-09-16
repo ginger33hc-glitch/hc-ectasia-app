@@ -17,13 +17,15 @@ from io import BytesIO
 import json
 import os
 import re
+from time import monotonic
 from typing import Any
 
 from PIL import Image, ImageOps
 from exam_date_reconciliation_policy import possible_calendar_dates
 from pentacam_canonical_source_lock import (
     BAD, FOURMAPS, SHOW2, CANONICAL_FIELD_SOURCES, SHOW_2_CORNEA_BACK,
-    SHOW_2_CORNEA_FRONT, SHOW_2_INDICES, canonical_source_id, source_family,
+    SHOW_2_CORNEA_FRONT, SHOW_2_INDICES, canonical_reread_tiles,
+    canonical_source_id, source_family,
 )
 from pentacam_field_registry import (
     CORNEA_FRONT_KERATOMETRY_FIELDS,
@@ -362,6 +364,96 @@ def build_overlapping_tiles(raw: bytes, *, include_top_header: bool = False) -> 
         crop.save(output, format="PNG", optimize=True)
         tiles.append((name, output.getvalue()))
     return tiles
+
+
+def _focused_retry_regions(
+    result: dict[str, Any],
+    requested: dict[str, list[str]],
+    filename: str,
+    *,
+    patient_age_requested: bool = False,
+    pentacam_qs_requested: bool = False,
+    exam_date_requested: bool = False,
+) -> list[dict[str, Any]]:
+    """Reuse exact unread regions only when every outstanding target has one."""
+    eyes = {
+        eye.get("eye"): eye
+        for eye in result.get("eyes") or []
+        if eye.get("eye") in {"OD", "OS"}
+    }
+    regions: list[dict[str, Any]] = []
+
+    def accept(region: Any) -> bool:
+        if not isinstance(region, dict):
+            return False
+        if str(region.get("file") or "") != filename:
+            return False
+        if region.get("tile") not in SOURCE_TILES:
+            return False
+        source_box = region.get("source_box")
+        if not isinstance(source_box, (list, tuple)) or len(source_box) != 4:
+            return False
+        if not all(isinstance(value, int) and not isinstance(value, bool) for value in source_box):
+            return False
+        x1, y1, x2, y2 = source_box
+        if not (0 <= x1 < x2 <= 999 and 0 <= y1 < y2 <= 999):
+            return False
+        regions.append(region)
+        return True
+
+    for eye_id, fields in requested.items():
+        unreadable = (eyes.get(eye_id) or {}).get("unreadable_source_regions") or {}
+        for field in fields:
+            if not accept(unreadable.get(field)):
+                return []
+
+    context = result.get("document_context") or {}
+    if patient_age_requested and not accept(context.get("targeted_unreadable_age_region")):
+        return []
+    if pentacam_qs_requested:
+        qs_region = next(
+            (
+                (eye.get("unreadable_source_regions") or {}).get("pentacam_qs")
+                for eye in eyes.values()
+                if (eye.get("unreadable_source_regions") or {}).get("pentacam_qs")
+            ),
+            None,
+        )
+        if not accept(qs_region):
+            return []
+    if exam_date_requested and not accept(context.get("targeted_unreadable_exam_date_region")):
+        return []
+
+    unique = {}
+    for region in regions:
+        key = (region.get("tile"), tuple(region.get("source_box") or ()))
+        unique[key] = region
+    return list(unique.values())
+
+
+def _canonical_retry_regions(
+    requested: dict[str, list[str]],
+    *,
+    patient_age_requested: bool = False,
+    pentacam_qs_requested: bool = False,
+    exam_date_requested: bool = False,
+) -> list[dict[str, Any]]:
+    """Use only registry-owned broad crops when exact unread boxes are unavailable."""
+    regions: list[dict[str, Any]] = []
+    for fields in requested.values():
+        for field in fields:
+            tiles = canonical_reread_tiles(field)
+            if not tiles:
+                return []
+            regions.extend({"tile": tile, "source_box": None} for tile in tiles)
+    if patient_age_requested or pentacam_qs_requested or exam_date_requested:
+        regions.append({"tile": "TOP_HEADER", "source_box": None})
+
+    unique = {}
+    for region in regions:
+        key = (region["tile"], tuple(region.get("source_box") or ()))
+        unique[key] = region
+    return list(unique.values())
 
 
 def render_source_region(raw: bytes, tile_name: str, source_box: Any = None) -> bytes:
@@ -704,6 +796,7 @@ def targeted_reread(
     patient_age_requested: bool = False,
     pentacam_qs_requested: bool = False,
     exam_date_requested: bool = False,
+    focused_regions: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     age_target = (
         "PATIENT: patient_age_years is requested."
@@ -733,13 +826,25 @@ def targeted_reread(
         {"type": "input_text", "text": "ORIGINAL complete screen:"},
         {"type": "input_image", "image_url": core.data_url(raw, filename), "detail": "original"},
     ]
-    for tile_name, tile_raw in build_overlapping_tiles(
-        raw, include_top_header=(
-            patient_age_requested or pentacam_qs_requested or exam_date_requested
+    if focused_regions:
+        tiles = [
+            (
+                str(region["tile"]),
+                render_source_region(raw, str(region["tile"]), region.get("source_box")),
+            )
+            for region in focused_regions
+            if not (region.get("tile") == "ORIGINAL" and region.get("source_box") is None)
+        ]
+    else:
+        tiles = build_overlapping_tiles(
+            raw,
+            include_top_header=(
+                patient_age_requested or pentacam_qs_requested or exam_date_requested
+            ),
         )
-    ):
+    for tile_name, tile_raw in tiles:
         content.extend((
-            {"type": "input_text", "text": f"{tile_name} crop of the same screen:"},
+            {"type": "input_text", "text": f"{tile_name} focused crop of the same screen:"},
             {"type": "input_image", "image_url": core.data_url(tile_raw, f"{tile_name}.png"), "detail": "original"},
         ))
     response = core.openai_client().responses.create(
@@ -765,15 +870,15 @@ def targeted_reread(
 
 def enrich_extraction(
     core: Any, result: dict[str, Any], raw: bytes, filename: str,
-    *, exam_date_requested: bool = False,
+    *, exam_date_requested: bool = False, seek_patient_age: bool = True,
 ) -> dict[str, Any]:
     """Retry unresolved required fields through the standard targeted pathway."""
     if not _enabled():
         return result
     attempt_errors: list[str] = []
-    for _attempt in range(TARGETED_REREAD_MAX_ATTEMPTS):
+    for attempt in range(1, TARGETED_REREAD_MAX_ATTEMPTS + 1):
         requested = missing_targets_by_eye(result)
-        patient_age_requested = patient_age_is_missing(result)
+        patient_age_requested = seek_patient_age and patient_age_is_missing(result)
         pentacam_qs_requested = pentacam_qs_is_missing(result)
         date_requested = exam_date_requested and not result.get(
             "document_context", {}
@@ -782,17 +887,61 @@ def enrich_extraction(
             requested or patient_age_requested or pentacam_qs_requested or date_requested
         ):
             break
-        try:
-            reread = targeted_reread(
-                core, raw, filename, requested, patient_age_requested, pentacam_qs_requested,
-                date_requested,
+        focused_regions = _focused_retry_regions(
+            result,
+            requested,
+            filename,
+            patient_age_requested=patient_age_requested,
+            pentacam_qs_requested=pentacam_qs_requested,
+            exam_date_requested=date_requested,
+        )
+        region_mode = "exact" if focused_regions else "full"
+        if attempt > 1 and not focused_regions:
+            focused_regions = _canonical_retry_regions(
+                requested,
+                patient_age_requested=patient_age_requested,
+                pentacam_qs_requested=pentacam_qs_requested,
+                exam_date_requested=date_requested,
             )
+            if focused_regions:
+                region_mode = "canonical"
+        started = monotonic()
+        outcome = "completed"
+        try:
+            reread_args = (
+                core, raw, filename, requested, patient_age_requested,
+                pentacam_qs_requested, date_requested,
+            )
+            if focused_regions:
+                reread = targeted_reread(*reread_args, focused_regions)
+            else:
+                reread = targeted_reread(*reread_args)
             apply_targeted_readings(
                 core, result, reread, requested, filename, patient_age_requested,
                 pentacam_qs_requested, date_requested,
             )
         except Exception as exc:
             attempt_errors.append(type(exc).__name__)
+            outcome = f"error:{type(exc).__name__}"
+        remaining = sum(len(fields) for fields in missing_targets_by_eye(result).values())
+        remaining += int(patient_age_is_missing(result))
+        remaining += int(pentacam_qs_is_missing(result))
+        remaining += int(
+            date_requested
+            and not result.get("document_context", {}).get(
+                "targeted_exam_date_reread_evidence"
+            )
+        )
+        print(
+            "PENTACAM REREAD:",
+            f"attempt={attempt}",
+            f"duration_ms={round((monotonic() - started) * 1000)}",
+            f"focused_regions={len(focused_regions)}",
+            f"region_mode={region_mode}",
+            f"remaining_targets={remaining}",
+            f"outcome={outcome}",
+            flush=True,
+        )
     if attempt_errors and (
         missing_targets_by_eye(result)
         or patient_age_is_missing(result)

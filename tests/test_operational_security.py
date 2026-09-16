@@ -41,6 +41,10 @@ def test_configured_access_key_protects_clinical_endpoints(monkeypatch):
     assert admitted.status_code == 410
 
 
+def test_single_page_conclusion_export_is_a_protected_clinical_endpoint():
+    assert security._is_protected_path("/report/conclusion/pdf")
+
+
 def test_non_image_upload_is_rejected_before_extraction():
     response = client.post(
         "/analyze",

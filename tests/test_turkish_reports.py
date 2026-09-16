@@ -54,6 +54,28 @@ def test_turkish_exports_translate_current_report_sections_and_preserve_snapshot
     assert payload == original
 
 
+def test_turkish_single_page_conclusion_is_translated_and_one_page():
+    payload = _payload(K1_D=40, K2_D=45)
+    payload['locale'] = 'tr'
+    pdf = reports.build_conclusion_pdf(payload)
+    reader = PdfReader(BytesIO(pdf))
+    text = _pdf_text(pdf)
+
+    assert len(reader.pages) == 1
+    for required in (
+        'CER-AI TEK SAYFALIK SONUÇ RAPORU',
+        'OD — UYGUN',
+        'OS — UYGUN',
+        'Değerlendirme',
+        'Sonuç ayrıntısı',
+        'Seçilen işlem planı',
+        'ML7 planlaması',
+        'Değerlendirme notları / uyarılar',
+    ):
+        assert required in text
+    assert 'Canonical result' not in text
+
+
 @pytest.mark.parametrize('status,label,color', [
     ('PASS', 'UYGUN', reports.GREEN_FILL),
     ('PASS WITH CAUTION', 'DİKKATLE UYGUN', reports.AMBER_FILL),

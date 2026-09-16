@@ -136,6 +136,11 @@ window.HCReadiness = class {
     }catch(error){status.textContent=tr('The unread source region could not be displayed. Enter the value from the original Pentacam/topography image.');}
   }
   collect() {
+    for(const input of this.panel.querySelectorAll('[data-source-form]')) {
+      if(!input.dataset.sourceForm)continue;
+      const original=document.getElementById(input.dataset.sourceForm);
+      if(original){original.value=input.value;original.setCustomValidity('');}
+    }
     for(const input of this.panel.querySelectorAll('[data-measurement]')) {
       if(!input.value.trim()) continue;
       let value=input.value;
@@ -189,7 +194,7 @@ window.HCReadiness = class {
         const original=document.getElementById(item.form_id);
         if(original){
           input=original.cloneNode(true);input.removeAttribute('id');input.removeAttribute('name');input.removeAttribute('required');
-          input.readOnly=false;input.value=original.value;
+          input.readOnly=false;input.value=original.value;input.dataset.sourceForm=item.form_id;
           if(item.form_id==='age'){
             const originalRow=original.closest('.row');if(originalRow)originalRow.hidden=true;
             original.required=false;input.required=true;

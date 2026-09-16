@@ -38,7 +38,7 @@ from pentacam_field_registry import (
     KERATOMETRY_SOURCE_VALUES,
     PASSIVE_INFORMATIONAL_FIELDS,
 )
-from reports import ReportContractError, build_docx, build_pdf
+from reports import ReportContractError, build_conclusion_pdf, build_docx, build_pdf
 from canonical_input_adapter import (
     astigmatic_disparity_verification_eyes,
     resolve_case_plans,
@@ -882,6 +882,20 @@ def report_word(payload: Dict[str, Any] = Body(...)) -> StreamingResponse:
     )
 
 
+@app.post("/report/conclusion/pdf")
+def report_conclusion_pdf(payload: Dict[str, Any] = Body(...)) -> StreamingResponse:
+    from assessment_workflow import export_payload
+    payload = export_payload(payload)
+    try:
+        content = build_conclusion_pdf(payload)
+    except ReportContractError as exc:
+        raise HTTPException(409, f"Complete canonical report unavailable: {exc}") from exc
+    return StreamingResponse(
+        BytesIO(content), media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="CER-AI_Conclusion.pdf"'},
+    )
+
+
 def normalize_document_context_identity(context: Dict[str, Any]) -> Dict[str, Any]:
     """Enforce Pentacam name provenance; never accept a name copied from another box."""
     context = dict(context)
@@ -995,8 +1009,9 @@ async def _run_image_assessment(
 
     # Every image remains an independent extraction. Bounded concurrency prevents the total
     # request time from becoming the sum of all upstream calls and keeps FastAPI responsive.
-    concurrency = max(1, min(int(os.getenv("IMAGE_EXTRACTION_CONCURRENCY", "3")), 4))
+    concurrency = max(1, min(int(os.getenv("IMAGE_EXTRACTION_CONCURRENCY", "4")), 4))
     semaphore = asyncio.Semaphore(concurrency)
+    assessment_started = monotonic()
 
     async def extract_bounded(raw: bytes, filename: str) -> Dict[str, Any]:
         async with semaphore:
@@ -1006,6 +1021,12 @@ async def _run_image_assessment(
         async with analysis_slot():
             extraction_results = await asyncio.gather(
                 *(extract_bounded(raw, filename) for raw, filename in image_payloads)
+            )
+            print(
+                "ASSESSMENT TIMING:",
+                f"stage=primary_extraction duration_ms={round((monotonic() - assessment_started) * 1000)}",
+                f"images={len(image_payloads)}",
+                flush=True,
             )
             # Page identity from the primary read is the single source-set authority.
             # Stop here if one of the five mandatory sources is absent; no targeted
@@ -1025,6 +1046,7 @@ async def _run_image_assessment(
                         exam_date_requested=(
                             exam_date_reread_required and _is_four_maps_refractive(result)
                         ),
+                        seek_patient_age=age is None,
                     )
                     reread = await asyncio.to_thread(
                         pentacam_targeted_reread.verify_threshold_level_bad_elevations,
@@ -1038,6 +1060,11 @@ async def _run_image_assessment(
                 enrich_bounded(result, raw, filename)
                 for result, (raw, filename) in zip(extraction_results, image_payloads)
             ))
+            print(
+                "ASSESSMENT TIMING:",
+                f"stage=targeted_enrichment cumulative_ms={round((monotonic() - assessment_started) * 1000)}",
+                flush=True,
+            )
             if exam_date_reread_required:
                 promote_consistent_targeted_exam_dates(extraction_results)
 

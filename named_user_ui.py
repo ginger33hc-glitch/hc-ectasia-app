@@ -40,6 +40,12 @@ def _authenticated_destination(request) -> str:
 
 def _authenticated_root_html(display_name: str) -> str:
     html = ROOT_HTML.read_text(encoding="utf-8")
+    # Authentication must preserve the canonical mobile transport. Without
+    # this client, the browser posts directly to /analyze and the proxy closes
+    # long-running assessments at five minutes.
+    from analysis_job_service import inject_client
+
+    html = inject_client(html)
     # Make the visual CER-AI logo itself a native link back to the public website.
     # A real anchor is used instead of JavaScript so the navigation works reliably
     # across browsers, touch devices, cached pages, and CSP/security wrappers.
@@ -57,10 +63,25 @@ def _authenticated_root_html(display_name: str) -> str:
     injection = f"""
 <div id="cerAiAccountBar" style="position:fixed;right:12px;bottom:12px;z-index:9999;background:#fff;border:1px solid #bcc8d1;border-radius:9px;padding:8px 10px;box-shadow:0 4px 18px rgba(0,0,0,.14);font:12px Arial,sans-serif;color:#173b57">
   <span style="margin-right:8px">{label}</span>
-  <a href="/archive-ui" style="font-weight:bold;color:#1f5e8c">Case Archive</a>
+  <a href="/archive-ui" style="font-weight:bold;color:#1f5e8c;margin-right:8px">Case Archive</a>
+  <button id="cerAiLogoutButton" type="button" style="border:1px solid #9caeba;border-radius:6px;background:#f6f9fb;color:#173b57;padding:4px 7px;font:inherit;cursor:pointer">Log out</button>
 </div>
 <script>
 const cerAiAuthenticatedReviewer = {reviewer_json};
+const cerAiLogoutButton = document.getElementById("cerAiLogoutButton");
+if (cerAiLogoutButton) {{
+  cerAiLogoutButton.addEventListener("click", async () => {{
+    cerAiLogoutButton.disabled = true;
+    try {{
+      const response = await fetch("/auth/logout", {{method: "POST"}});
+      if (!response.ok) throw new Error("Logout failed");
+      window.location.replace("/auth/login-page");
+    }} catch (_error) {{
+      cerAiLogoutButton.disabled = false;
+      window.alert("Could not log out. Please try again.");
+    }}
+  }});
+}}
 const cerAiReviewerField = document.getElementById("reviewer");
 if (cerAiReviewerField) {{
   cerAiReviewerField.value = cerAiAuthenticatedReviewer;
@@ -126,6 +147,9 @@ def install(core: Any) -> None:
                 ),
                 "owner_deidentified_access": bool(
                     archive_runtime and archive_runtime.enabled and principal.role == "OWNER"
+                ),
+                "original_source_access": bool(
+                    archive_runtime and archive_runtime.enabled and principal.role == "DOCTOR"
                 ),
                 "audit_enabled": bool(getattr(core, "_cerai_audit_log_installed", False)),
                 "historical_report_enabled": bool(

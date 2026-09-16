@@ -24,7 +24,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import KeepInFrame, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from cerai_i18n import authorship_notice, liability_notice, normalize_locale, translate_text
 
@@ -132,6 +132,8 @@ def _cell_palette(row, index, selected_plan_status=None):
         return _status_palette(row_status)
     safe_plan_rows = {
         "selected lasik plan",
+        "selected procedure plan",
+        "ml7 planning",
         "ml7 preferred hinge location",
         "ml7 vacuum ring",
         "ml7 vacuum pressure",
@@ -386,6 +388,124 @@ def canonical_report_model(payload: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def canonical_conclusion_model(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Project the complete canonical report into a compact, presentation-only model."""
+    reports = assert_complete_report_payload(payload)
+    decision = payload.get("decision") or {}
+    return {
+        "locale": normalize_locale(payload.get("locale")),
+        "patient": dict(payload.get("patient") or {}),
+        "status": decision.get("status"),
+        "action": decision.get("action"),
+        "identity_warnings": list(decision.get("identity_warnings") or []),
+        "source_quality_warnings": list(decision.get("source_quality_warnings") or []),
+        "eyes": [dict(report) for report in reports],
+    }
+
+
+def _conclusion_eye_rows(report: Mapping[str, Any]) -> list[list[str]]:
+    """Copy existing canonical outcomes into concise rows without rescoring."""
+    randleman = report.get("randleman") or {}
+    nice = report.get("nice") or {}
+    bad = report.get("bad") or {}
+    ps3 = report.get("ps3") or {}
+    ps3_decision = ps3.get("decision") or {}
+    safety = report.get("tissue_safety") or {}
+    planning = report.get("planning") or {}
+    ml7 = report.get("microkeratome_planning") or {}
+
+    rows = [
+        ["Assessment", "Canonical result", "Conclusion detail"],
+        ["Procedure", _text(report.get("procedure")), ""],
+    ]
+    procedure_transition = planning.get("procedure_transition")
+    prior_lasik_status = planning.get("prior_lasik_status")
+    prior_lasik_reasons = list(planning.get("prior_lasik_reasons") or [])
+    if procedure_transition or prior_lasik_status or prior_lasik_reasons:
+        transition_details = []
+        if procedure_transition:
+            transition_details.append(_text(procedure_transition))
+        transition_details.extend(_text(reason) for reason in prior_lasik_reasons)
+        rows.append([
+            "LASIK outcome / transition",
+            _text(prior_lasik_status),
+            "; ".join(transition_details) or "Not documented",
+        ])
+    rows.extend([
+        [
+            "Randleman / ERSS",
+            _text(randleman.get("status"), "NOT APPLICABLE"),
+            f"Total: {_text(randleman.get('total'))}; Classification: {_text(randleman.get('category'))}",
+        ],
+        [
+            "NICE",
+            _text(nice.get("status")),
+            f"Total: {_text(nice.get('total'))}; Classification: {_text(nice.get('category'))}",
+        ],
+        [
+            "Final BAD-D",
+            _text(bad.get("status")),
+            f"Value: {_text(bad.get('final_d'))}; Classification: {_text(bad.get('classification'))}",
+        ],
+        [
+            "PS3",
+            _text(ps3.get("status")),
+            (
+                f"Moderate / High: {_text(ps3.get('moderate_count'))} / {_text(ps3.get('high_count'))}; "
+                f"Procedure disposition: {_text(ps3_decision.get('detail'))}"
+            ),
+        ],
+    ])
+
+    safety_values = []
+    for key in (
+        "LASIK_RSB_um", "LASIK_PTA_percent", "PRK_RST_um", "PRK_PTA_percent",
+        "estimated_final_Kmean_D",
+    ):
+        if safety.get(key) is not None:
+            safety_values.append(f"{key}: {_text(safety.get(key))}")
+    rows.append([
+        "Procedural safety",
+        _text(safety.get("status")),
+        "; ".join(safety_values) or "Not documented",
+    ])
+
+    selected_plan = _selected_procedure_summary(planning)
+    rows.append([
+        "Selected procedure plan",
+        selected_plan[0] if selected_plan else _text(report.get("procedure")),
+        selected_plan[1] if selected_plan else "Not documented",
+    ])
+    if planning.get("mmc_guidance") not in {None, "", "NOT_APPLICABLE"}:
+        rows.append(["MMC guidance", _text(planning.get("mmc_guidance")), ""])
+    if ml7.get("applicable"):
+        rows.append([
+            "ML7 planning",
+            _text(ml7.get("hinge_location_preference")),
+            (
+                f"Vacuum ring: {_text(ml7.get('vacuum_ring_mm'))} mm; "
+                f"Vacuum pressure: {_text(ml7.get('vacuum_pressure_mmhg'))} mmHg"
+            ),
+        ])
+
+    drivers = report.get("decision_drivers") or {}
+    driver_details = []
+    for level in ("stop", "caution", "incomplete"):
+        for finding in drivers.get(level) or []:
+            detail = finding.get("detail") if isinstance(finding, Mapping) else finding
+            driver_details.append(f"{level.upper()}: {_text(detail)}")
+    rows.append([
+        "Decision basis",
+        _text(report.get("status")),
+        "; ".join(driver_details) or "None documented",
+    ])
+
+    review_notes = list(ps3.get("review_notes") or []) + list(ml7.get("warnings") or [])
+    if review_notes:
+        rows.append(["Review notes / warnings", "", "; ".join(_text(note) for note in review_notes)])
+    return rows
+
+
 TABLE_WIDTHS_IN = {2: [2.15, 4.0], 3: [1.35, 1.25, 3.55], 4: [1.25, 1.25, 1.7, 1.95]}
 
 
@@ -477,6 +597,115 @@ def build_pdf(payload: Mapping[str, Any]) -> bytes:
         canvas.drawRightString(7.85 * inch, .2 * inch, f"{tr('Page')} {pdf_doc.page}"); canvas.restoreState()
 
     doc.build(story, onFirstPage=footer, onLaterPages=footer)
+    return output.getvalue()
+
+
+def build_conclusion_pdf(payload: Mapping[str, Any]) -> bytes:
+    """Render a fixed one-page conclusion from the complete canonical report snapshot."""
+    model = canonical_conclusion_model(payload)
+    locale = model["locale"]
+
+    def tr(value):
+        return translate_text(value, locale)
+
+    # KeepInFrame scales its contents to preserve the one-page guarantee.
+    # Embedded TrueType fonts retain normal glyph spacing under that transform
+    # in PDF viewers where the built-in Type 1 fonts do not.
+    regular = PDF_UNICODE_REGULAR
+    bold = PDF_UNICODE_BOLD
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(
+        name="ConclusionTitle", parent=styles["Title"], fontName=bold,
+        fontSize=15, leading=17, textColor=_rl(NAVY), spaceAfter=2,
+    ))
+    styles.add(ParagraphStyle(
+        name="ConclusionEye", parent=styles["Heading2"], fontName=bold,
+        fontSize=11.5, leading=13, textColor=_rl(NAVY), spaceBefore=5,
+        spaceAfter=2, keepWithNext=True,
+    ))
+    styles.add(ParagraphStyle(
+        name="Cell", parent=styles["BodyText"], fontName=regular,
+        fontSize=6.6, leading=7.7, textColor=_rl(INK),
+    ))
+    styles.add(ParagraphStyle(
+        name="Head", parent=styles["BodyText"], fontName=bold,
+        fontSize=6.6, leading=7.7, textColor=colors.white,
+    ))
+    styles.add(ParagraphStyle(
+        name="ConclusionNotice", parent=styles["BodyText"], fontName=bold,
+        fontSize=7, leading=8.3, textColor=_rl(GRAY), backColor=_rl(GRAY_FILL),
+        borderPadding=4, spaceAfter=3,
+    ))
+    styles.add(ParagraphStyle(
+        name="ConclusionWarning", parent=styles["ConclusionNotice"],
+        textColor=_rl(AMBER), backColor=_rl(AMBER_FILL),
+    ))
+
+    content = [
+        Paragraph(tr("CER-AI SINGLE-PAGE CONCLUSION REPORT"), styles["ConclusionTitle"]),
+        Paragraph(escape(tr(PROGRAM_NAME)), styles["Cell"]),
+        Spacer(1, 3),
+        Paragraph(escape(liability_notice(locale)), styles["ConclusionNotice"]),
+    ]
+    patient = model["patient"]
+    content.append(_pdf_table([
+        [tr("Patient"), _text(patient.get("name"), tr("Not documented")), tr("Patient ID"), _text(patient.get("id"), tr("Not documented"))],
+        [tr("Age"), _text(patient.get("age"), tr("Not documented")), tr("Assessment date"), _text(patient.get("report_date"), tr("Not documented"))],
+        [tr("Reviewer"), _text(patient.get("reviewer"), tr("Not documented")), tr("Overall disposition"), _text(model.get("status"))],
+    ], styles, regular, bold, locale=locale, protected_cells=PATIENT_LITERAL_CELLS))
+    content.append(Spacer(1, 4))
+    foreground, background = _status_palette(model.get("status")) or (GRAY, GRAY_FILL)
+    overall_style = ParagraphStyle(
+        name="ConclusionOverall", parent=styles["ConclusionNotice"],
+        fontSize=9, leading=10.5, textColor=_rl(foreground), backColor=_rl(background),
+    )
+    overall = f"{tr('Overall disposition')}: {tr(_text(model.get('status')))}"
+    if model.get("action"):
+        overall += f" — {tr(_text(model.get('action')))}"
+    content.append(Paragraph(escape(overall), overall_style))
+    for warning in model["identity_warnings"] + model["source_quality_warnings"]:
+        content.append(Paragraph(escape(tr(_text(warning))), styles["ConclusionWarning"]))
+
+    for eye in model["eyes"]:
+        eye_foreground, _ = _status_palette(eye.get("status")) or (GRAY, GRAY_FILL)
+        eye_style = ParagraphStyle(
+            name=f"ConclusionEye{_text(eye.get('eye'))}",
+            parent=styles["ConclusionEye"], textColor=_rl(eye_foreground),
+        )
+        content.append(Paragraph(
+            f"{escape(_text(eye.get('eye')))} — {escape(tr(_text(eye.get('status'))))}",
+            eye_style,
+        ))
+        content.append(_pdf_table(
+            _conclusion_eye_rows(eye), styles, regular, bold,
+            eye.get("status"), locale=locale,
+        ))
+
+    conclusion_notice = (
+        "This report is generated under the CER-AI Preoperative Ectasia Risk Assessment Protocol "
+        "for corneal refractive surgery. CAUTION requires explicit surgeon review but does not "
+        "automatically defer surgery. STOP-DEFER means surgery must not proceed unless the stated "
+        "stop/defer condition is resolved. DATA INSUFFICIENT / NOT ASSESSED does not permit PASS. "
+        "This clinical decision-support report does not replace independent surgeon review."
+    )
+    content.extend([Spacer(1, 4), Paragraph(escape(tr(conclusion_notice)), styles["Cell"])])
+
+    output = BytesIO()
+    doc = SimpleDocTemplate(
+        output, pagesize=letter, leftMargin=.5 * inch, rightMargin=.5 * inch,
+        topMargin=.45 * inch, bottomMargin=.6 * inch,
+    )
+
+    def footer(canvas, pdf_doc):
+        canvas.saveState()
+        canvas.setFont(regular, 6.2)
+        canvas.setFillColor(_rl(GRAY))
+        canvas.drawCentredString(4.25 * inch, .3 * inch, authorship_notice(locale))
+        canvas.drawRightString(8 * inch, .18 * inch, f"{tr('Page')} 1")
+        canvas.restoreState()
+
+    one_page = KeepInFrame(doc.width, doc.height, content, mode="shrink")
+    doc.build([one_page], onFirstPage=footer)
     return output.getvalue()
 
 
