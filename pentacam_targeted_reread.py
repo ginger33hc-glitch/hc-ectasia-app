@@ -330,7 +330,10 @@ def _looks_like_pentacam(result: dict[str, Any]) -> bool:
     return False
 
 
-def missing_targets_by_eye(result: dict[str, Any]) -> dict[str, list[str]]:
+def missing_targets_by_eye(
+    result: dict[str, Any],
+    excluded_fields_by_eye: dict[str, set[str]] | None = None,
+) -> dict[str, list[str]]:
     """Return only still-empty table fields for explicitly identified OD/OS eyes."""
     if not _looks_like_pentacam(result):
         return {}
@@ -352,6 +355,7 @@ def missing_targets_by_eye(result: dict[str, Any]) -> dict[str, list[str]]:
             visible_families.add(SHOW2)
         missing = [
             field for field in TARGET_FIELDS
+            if field not in (excluded_fields_by_eye or {}).get(eye_id, set())
             if (not visible_families or source_family(field) in visible_families)
             and eye.get(field) is None
         ]
@@ -925,6 +929,7 @@ def targeted_reread(
 def enrich_extraction(
     core: Any, result: dict[str, Any], raw: bytes, filename: str,
     *, exam_date_requested: bool = False, seek_patient_age: bool = True,
+    excluded_fields_by_eye: dict[str, set[str]] | None = None,
     deadline_monotonic: float | None = None,
 ) -> dict[str, Any]:
     """Retry unresolved required fields through the standard targeted pathway."""
@@ -932,7 +937,7 @@ def enrich_extraction(
         return result
     attempt_errors: list[str] = []
     for attempt in range(1, TARGETED_REREAD_MAX_ATTEMPTS + 1):
-        requested = missing_targets_by_eye(result)
+        requested = missing_targets_by_eye(result, excluded_fields_by_eye)
         patient_age_requested = seek_patient_age and patient_age_is_missing(result)
         pentacam_qs_requested = pentacam_qs_is_missing(result)
         date_requested = exam_date_requested and not result.get(
@@ -984,8 +989,11 @@ def enrich_extraction(
         except Exception as exc:
             attempt_errors.append(type(exc).__name__)
             outcome = f"error:{type(exc).__name__}"
-        remaining = sum(len(fields) for fields in missing_targets_by_eye(result).values())
-        remaining += int(patient_age_is_missing(result))
+        remaining = sum(
+            len(fields)
+            for fields in missing_targets_by_eye(result, excluded_fields_by_eye).values()
+        )
+        remaining += int(seek_patient_age and patient_age_is_missing(result))
         remaining += int(pentacam_qs_is_missing(result))
         remaining += int(
             date_requested
@@ -1009,8 +1017,8 @@ def enrich_extraction(
             flush=True,
         )
     if attempt_errors and (
-        missing_targets_by_eye(result)
-        or patient_age_is_missing(result)
+        missing_targets_by_eye(result, excluded_fields_by_eye)
+        or (seek_patient_age and patient_age_is_missing(result))
         or pentacam_qs_is_missing(result)
         or (
             exam_date_requested

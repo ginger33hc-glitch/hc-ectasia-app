@@ -36,6 +36,8 @@ from pentacam_field_registry import (
     CORNEA_FRONT_KERATOMETRY_SOURCE,
     EXTRACTION_NUMERIC_FIELDS,
     KERATOMETRY_SOURCE_VALUES,
+    INITIAL_PASS_ONLY_CANONICAL_FIELDS,
+    NON_MANDATORY_EXTRACTION_FIELDS,
     PASSIVE_INFORMATIONAL_FIELDS,
 )
 from reports import ReportContractError, build_conclusion_pdf, build_docx, build_pdf
@@ -321,12 +323,14 @@ output-field name to
 table_verified_numeric_fields only when that labeled field is visible and the value was transcribed
 from it. The list must exactly match the non-null table-derived numeric outputs.
 
-PASSIVE INFORMATIONAL FIELDS:
-Thinnest-location X/Y coordinates, corneal volume, RMS HOA, vertical coma, total RMS, and spherical
-aberration are optional descriptive values. Retain one only when its own printed label and value are
+INITIAL-PASS-ONLY FIELDS:
+Only K2_D, Kmean_D, posterior_Kmean_D, I_S, central_pachy_um, pachy_thinnest_um, F_Ele_Th_um,
+B_Ele_Th_um, PPI_avg, and BAD_D are decision-required Pentacam fields. K1_D and
+corneal_diameter_mm are conditional later LASIK-planning inputs. Every other canonical or descriptive
+numeric field is optional. Retain an optional value only when its own printed label and value are
 immediately clear during the primary read. Otherwise return null without searching further, without
-adding it to missing_or_unreadable, and without issuing a warning. These fields are not requested in
-the targeted reread and do not enter surgeon completion, reports, scoring, or clinical decisions.
+adding it to missing_or_unreadable, and without issuing a warning. Optional fields never trigger a
+targeted reread or block the clinical report.
 
 I-S SOURCE LOCK: transcribe I_S only from the explicitly labeled "IS:" or "I-S:" field in
 Show 2 Exams Topometric center "Indices (in 8 mm zone)". Preserve its printed sign. Never substitute
@@ -494,27 +498,35 @@ def normalized_eye(raw_eye: Dict[str, Any]) -> Dict[str, Any]:
         for field in EXTRACTION_NUMERIC_FIELDS:
             if eye.get(field) is not None and field not in verified_set:
                 eye[field] = None
-                if field not in PASSIVE_INFORMATIONAL_FIELDS:
+                if field not in NON_MANDATORY_EXTRACTION_FIELDS:
                     missing.append(field)
         eye["missing_or_unreadable"] = [
             field for field in dict.fromkeys(missing)
-            if field not in PASSIVE_INFORMATIONAL_FIELDS
+            if field not in NON_MANDATORY_EXTRACTION_FIELDS
         ]
         eye["table_verified_numeric_fields"] = sorted(verified_set)
     return eye
 
 
-def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
+def merge_extractions(
+    results: List[Dict[str, Any]],
+    surgeon_authority: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     merged: Dict[str, Any] = {
         "eyes": [], "treatment_corrections": [], "laser_plans": [], "global_warnings": [], "identity_warnings": [],
         "document_contexts": [], "critical_input_issues": [], "extraction_models": [],
     }
+    authoritative_patient = (surgeon_authority or {}).get("patient") or set()
     by_eye: Dict[str, Dict[str, Any]] = {}
     quality_rank = {"INADEQUATE": 0, "LIMITED": 1, "ADEQUATE": 2}
     # Descriptive values that do not drive a CER-AI decision must never become unresolved conflicts
     # that prohibit PASS. Canonical numeric disagreements are never tolerance-reconciled.
-    non_decision_conflict_fields = set(PASSIVE_INFORMATIONAL_FIELDS) | {"morphology_confidence"}
-    planning_conflict_fields = {"K1_axis_deg", "K2_axis_deg", "corneal_diameter_mm"}
+    non_decision_conflict_fields = (
+        set(PASSIVE_INFORMATIONAL_FIELDS)
+        | set(INITIAL_PASS_ONLY_CANONICAL_FIELDS)
+        | {"morphology_confidence"}
+    )
+    planning_conflict_fields = {"K1_D", "corneal_diameter_mm"}
 
 
     for result in results:
@@ -536,8 +548,12 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 and is_four_maps_eye(eye)
             })
             merged["document_contexts"].append(context)
-            if context.get("document_type") == "PENTACAM_TOPOGRAPHY" and not (
+            if (
+                "name" not in authoritative_patient
+                and context.get("document_type") == "PENTACAM_TOPOGRAPHY"
+                and not (
                 context.get("patient_first_name") and context.get("patient_last_name")
+                )
             ):
                 missing_name_fields = [
                     label for field, label in (
@@ -553,8 +569,10 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
                 merged["critical_input_issues"].append(
                     f"Unclassified uploaded source: {context.get('source_filename', 'unknown file')}."
                 )
-            if context.get("document_type") in ("PENTACAM_TOPOGRAPHY", "TREATMENT_CARD") and not (
-                context.get("patient_id") or context.get("patient_name")
+            if (
+                not ({"name", "id"} & set(authoritative_patient))
+                and context.get("document_type") in ("PENTACAM_TOPOGRAPHY", "TREATMENT_CARD")
+                and not (context.get("patient_id") or context.get("patient_name"))
             ):
                 merged["identity_warnings"].append(
                     "PATIENT IDENTITY NOT VERIFIED: patient name/ID is not visible or readable in "
@@ -732,7 +750,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         eye["missing_or_unreadable"] = sorted(
             set(
                 key for key in eye.get("missing_or_unreadable", [])
-                if eye.get(key) is None and key not in PASSIVE_INFORMATIONAL_FIELDS
+                if eye.get(key) is None and key not in NON_MANDATORY_EXTRACTION_FIELDS
             )
         )
 
@@ -775,7 +793,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         f"{c.get('source_filename', 'unknown file')}: {c.get('patient_name') or 'unreadable'}"
         for c in pentacam_contexts
     )
-    if len(names) > 1:
+    if len(names) > 1 and "name" not in authoritative_patient:
         merged["identity_warnings"].append(
             "PATIENT IDENTITY NOT VERIFIED: different patient names were read from the Pentacam "
             f"First Name / Last Name fields ({identity_readings}). Surgeon confirmation is required."
@@ -787,7 +805,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         )
     elif age_resolution["age_years"] is not None:
         merged["derived_age_years"] = age_resolution["age_years"]
-    if len(ids) > 1:
+    if len(ids) > 1 and "id" not in authoritative_patient:
         if identity_corroborated_by_name_and_age:
             merged["identity_warnings"].append(
                 "PATIENT IDENTITY REQUIRES CONFIRMATION: different patient-ID strings were read, "
@@ -804,7 +822,7 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         eye for context in pentacam_contexts for eye in context.get("extracted_eyes", [])
         if eye in EYES
     }
-    if assessed_eyes == set(EYES):
+    if assessed_eyes == set(EYES) and not ({"name", "id"} & set(authoritative_patient)):
         relevant_contexts = [
             context for context in pentacam_contexts
             if set(context.get("extracted_eyes", [])) & set(EYES)
@@ -829,6 +847,8 @@ def merge_extractions(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     merged["identity_warnings"] = sorted(set(merged["identity_warnings"]))
     merged["critical_input_issues"] = sorted(set(merged["critical_input_issues"]))
     merged["extraction_models"] = sorted(set(merged["extraction_models"]))
+    if authoritative_patient:
+        merged["surgeon_authoritative_patient_fields"] = sorted(authoritative_patient)
 
     # One explicit post-merge extraction audit; this helper never owns or replaces merge_extractions.
     from extraction_guard import apply_extraction_validation
@@ -915,10 +935,110 @@ def normalize_document_context_identity(context: Dict[str, Any]) -> Dict[str, An
     return context
 
 
-def extract_one_image(raw: bytes, filename: str) -> Dict[str, Any]:
+def surgeon_image_authority(
+    age: Optional[int], plans: Dict[str, Any], metadata: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Describe pre-assessment surgeon values that image reading must not challenge."""
+    patient = set()
+    if str(metadata.get("name") or "").strip():
+        patient.add("name")
+    if str(metadata.get("id") or "").strip():
+        patient.add("id")
+    if age is not None:
+        patient.add("age")
+    eyes = {
+        eye: {"I_S"} if isinstance(plan, dict) and plan.get("surgeon_I_S_D") is not None else set()
+        for eye, plan in plans.items() if eye in EYES
+    }
+    return {"patient": patient, "eyes": eyes}
+
+
+def surgeon_authority_prompt(authority: Dict[str, Any]) -> str:
+    """Generate explicit no-read instructions for already authoritative inputs."""
+    rules = []
+    patient = authority.get("patient") or set()
+    if "name" in patient:
+        rules.append(
+            "Patient name was entered by the surgeon. Do not inspect or transcribe any image name; "
+            "return patient_first_name, patient_last_name, and patient_name as null, "
+            "patient_name_source=NOT_SHOWN, and do not list them as missing."
+        )
+    if "id" in patient:
+        rules.append(
+            "Patient ID was entered by the surgeon. Do not inspect or transcribe image patient ID; "
+            "return patient_id=null and do not list it as missing."
+        )
+    if "age" in patient:
+        rules.append(
+            "Patient age was entered by the surgeon. Do not inspect or transcribe image age or date "
+            "of birth; return patient_age_years=null and patient_date_of_birth=null and do not list "
+            "either as missing."
+        )
+    for eye, fields in sorted((authority.get("eyes") or {}).items()):
+        if "I_S" in fields:
+            rules.append(
+                f"{eye} I-S was entered by the surgeon. Do not inspect or transcribe {eye} I_S; "
+                "return it and its canonical source ID as null and do not list it as missing."
+            )
+    if not rules:
+        return ""
+    return (
+        "\n\nSURGEON-AUTHORITATIVE PRE-ASSESSMENT INPUTS:\n"
+        "The following values are final inputs, not facts to confirm against images. "
+        "Follow each no-read instruction exactly.\n- " + "\n- ".join(rules)
+    )
+
+
+def apply_surgeon_image_authority(
+    result: Dict[str, Any], authority: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Enforce no-read fields even if a model returned them despite the prompt."""
+    patient = authority.get("patient") or set()
+    context = result.get("document_context") or {}
+    missing = list(context.get("missing_or_unreadable") or [])
+    if "name" in patient:
+        for key in ("patient_first_name", "patient_last_name", "patient_name"):
+            context[key] = None
+            missing = [item for item in missing if item != key]
+        context["patient_name_source"] = "NOT_SHOWN"
+    if "id" in patient:
+        context["patient_id"] = None
+        missing = [item for item in missing if item != "patient_id"]
+    if "age" in patient:
+        context["patient_age_years"] = None
+        context["patient_date_of_birth"] = None
+        missing = [
+            item for item in missing
+            if item not in {"patient_age_years", "patient_date_of_birth"}
+        ]
+    context["missing_or_unreadable"] = missing
+    result["document_context"] = context
+
+    for eye in result.get("eyes") or []:
+        excluded = (authority.get("eyes") or {}).get(eye.get("eye"), set())
+        for field in excluded:
+            eye[field] = None
+            eye["table_verified_numeric_fields"] = [
+                item for item in eye.get("table_verified_numeric_fields") or [] if item != field
+            ]
+            if isinstance(eye.get("canonical_source_ids"), dict):
+                eye["canonical_source_ids"][field] = None
+            eye["missing_or_unreadable"] = [
+                item for item in eye.get("missing_or_unreadable") or [] if item != field
+            ]
+    return result
+
+
+def extract_one_image(
+    raw: bytes, filename: str, surgeon_authority: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """Run one independent image extraction outside the async server event loop."""
+    surgeon_authority = surgeon_authority or {}
     content = [
-        {"type": "input_text", "text": PROMPT},
+        {
+            "type": "input_text",
+            "text": PROMPT + surgeon_authority_prompt(surgeon_authority or {}),
+        },
         {
             "type": "input_image",
             "image_url": data_url(raw, filename),
@@ -952,6 +1072,7 @@ def extract_one_image(raw: bytes, filename: str) -> Dict[str, Any]:
     try:
         result = json.loads(output_text)
         result["extraction_model"] = MODEL
+        result = apply_surgeon_image_authority(result, surgeon_authority or {})
         context = normalize_document_context_identity(result.get("document_context", {}))
         context["source_filename"] = filename
         result["document_context"] = context
@@ -1014,10 +1135,13 @@ async def _run_image_assessment(
     automation_deadline = pentacam_targeted_reread.assessment_automation_deadline(
         assessment_started
     )
+    surgeon_authority = surgeon_image_authority(age, plans, metadata)
 
     async def extract_bounded(raw: bytes, filename: str) -> Dict[str, Any]:
         async with semaphore:
-            return await asyncio.to_thread(extract_one_image, raw, filename)
+            return await asyncio.to_thread(
+                extract_one_image, raw, filename, surgeon_authority
+            )
 
     try:
         async with analysis_slot():
@@ -1049,6 +1173,7 @@ async def _run_image_assessment(
                             exam_date_reread_required and _is_four_maps_refractive(result)
                         ),
                         seek_patient_age=age is None,
+                        excluded_fields_by_eye=surgeon_authority["eyes"],
                         deadline_monotonic=automation_deadline,
                     )
                     reread = await asyncio.to_thread(
@@ -1075,7 +1200,7 @@ async def _run_image_assessment(
             # A threshold-level BAD-flat/manifest disparity is a measurement-
             # validation warning, never a PS3 factor. Re-read the exact canonical
             # BAD box so the warning itself does not rest on a decimal/digit OCR error.
-            preliminary = merge_extractions(extraction_results)
+            preliminary = merge_extractions(extraction_results, surgeon_authority)
             preliminary_plans = resolve_case_plans(preliminary, plans)
             axis_verification_eyes = astigmatic_disparity_verification_eyes(
                 preliminary, preliminary_plans,
@@ -1112,7 +1237,7 @@ async def _run_image_assessment(
         ) from exc
 
     from assessment_workflow import begin
-    extracted = merge_extractions(extraction_results)
+    extracted = merge_extractions(extraction_results, surgeon_authority)
     extracted["mandatory_source_set"] = mandatory_source_set
     return begin(
         sys.modules[__name__], extracted, age, plans, modifiers, metadata,

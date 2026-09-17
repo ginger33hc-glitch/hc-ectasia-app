@@ -132,7 +132,9 @@ def test_standard_reread_requests_only_fields_owned_by_the_visible_screen():
     show2 = pentacam_result()
     show2["eyes"][0]["screen_types"] = ["SHOW_2_EXAMS_TOPOMETRIC"]
     show2_missing = set(targeted.missing_targets_by_eye(show2)["OD"])
-    assert {"K1_D", "K2_D", "Rmin_mm", "I_S"} <= show2_missing
+    assert {"K2_D", "Kmean_D", "posterior_Kmean_D", "I_S"} <= show2_missing
+    assert "K1_D" not in show2_missing
+    assert "Rmin_mm" not in show2_missing
     assert "F_Ele_Th_um" not in show2_missing
     assert "central_pachy_um" not in show2_missing
 
