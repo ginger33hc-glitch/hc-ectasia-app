@@ -240,6 +240,39 @@ def test_single_page_conclusion_uses_complete_canonical_snapshot_without_mutatio
     assert payload == before
 
 
+def test_reports_show_one_patient_identity_warning_without_changing_audit_evidence():
+    payload = _payload()
+    detailed_warnings = [
+        "PATIENT NAME NOT VERIFIED: Pentacam Last Name could not be read in od-bad.png.",
+        "PATIENT IDENTITY NOT VERIFIED: patient name/ID is unreadable in os-bad.png.",
+        "PATIENT IDENTITY NOT VERIFIED: OD and OS sources could not be confirmed as the same patient.",
+        "Pentacam examination-date conflict was surgeon reviewed and approved.",
+    ]
+    payload["decision"]["identity_warnings"] = detailed_warnings
+    before = deepcopy(payload)
+
+    full_pdf_text = " ".join(
+        "\n".join(page.extract_text() for page in PdfReader(
+            BytesIO(reports.build_pdf(payload))
+        ).pages).split()
+    )
+    conclusion_text = " ".join(
+        "\n".join(page.extract_text() for page in PdfReader(
+            BytesIO(reports.build_conclusion_pdf(payload))
+        ).pages).split()
+    )
+    document = Document(BytesIO(reports.build_docx(payload)))
+    docx_text = "\n".join(paragraph.text for paragraph in document.paragraphs)
+
+    for rendered in (full_pdf_text, conclusion_text, docx_text):
+        assert rendered.count(reports.PATIENT_IDENTITY_REPORT_WARNING) == 1
+        assert "od-bad.png" not in rendered
+        assert "os-bad.png" not in rendered
+        assert "examination-date conflict was surgeon reviewed and approved" in rendered
+    assert reports.canonical_report_model(payload)["identity_warnings"] == detailed_warnings
+    assert payload == before
+
+
 def test_single_page_conclusion_uses_the_full_report_completion_gate():
     payload = _payload(BAD_D=None)
     with pytest.raises(reports.ReportContractError, match="Final BAD-D is incomplete"):

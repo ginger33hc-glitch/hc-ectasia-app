@@ -92,6 +92,14 @@ PROTECTED_COLUMNS = {
 }
 
 REPORT_BLANK_LINE_PT = 12
+PATIENT_IDENTITY_REPORT_WARNING = (
+    "PATIENT IDENTITY NOT VERIFIED - SURGEON CONFIRMATION REQUIRED"
+)
+PATIENT_IDENTITY_WARNING_PREFIXES = (
+    "PATIENT NAME NOT VERIFIED:",
+    "PATIENT IDENTITY NOT VERIFIED:",
+    "PATIENT IDENTITY REQUIRES CONFIRMATION:",
+)
 
 
 def _rl(value: str):
@@ -188,6 +196,28 @@ def _text(value: Any, fallback: str = "Not documented") -> str:
     if isinstance(value, Mapping):
         return "; ".join(f"{key}: {_text(item)}" for key, item in value.items()) or fallback
     return str(value)
+
+
+def _report_warning_lines(model: Mapping[str, Any]) -> list[str]:
+    """Compact repeated identity evidence for display without altering audit data."""
+    identity_warnings = [
+        _text(warning) for warning in model.get("identity_warnings") or []
+    ]
+    patient_identity_warnings = [
+        warning for warning in identity_warnings
+        if warning.upper().startswith(PATIENT_IDENTITY_WARNING_PREFIXES)
+    ]
+    display_warnings = (
+        [PATIENT_IDENTITY_REPORT_WARNING] if patient_identity_warnings else []
+    )
+    display_warnings.extend(
+        warning for warning in identity_warnings
+        if warning not in patient_identity_warnings
+    )
+    display_warnings.extend(
+        _text(warning) for warning in model.get("source_quality_warnings") or []
+    )
+    return list(dict.fromkeys(display_warnings))
 
 
 def _provenance(entries: Any) -> str:
@@ -572,7 +602,7 @@ def build_pdf(payload: Mapping[str, Any]) -> bytes:
         foreground, background = _status_palette(model.get("status")) or (GRAY, GRAY_FILL)
         action_style = ParagraphStyle(name="ResultNotice", parent=styles["Notice"], textColor=_rl(foreground), backColor=_rl(background))
         story.append(Paragraph(escape(tr(_text(model["action"]))), action_style))
-    for warning in model["identity_warnings"] + model["source_quality_warnings"]:
+    for warning in _report_warning_lines(model):
         story.append(Paragraph(escape(tr(_text(warning))), styles["Warning"]))
     for eye in model["eyes"]:
         if eye["eye"] == "OD":
@@ -663,7 +693,7 @@ def build_conclusion_pdf(payload: Mapping[str, Any]) -> bytes:
     if model.get("action"):
         overall += f" — {tr(_text(model.get('action')))}"
     content.append(Paragraph(escape(overall), overall_style))
-    for warning in model["identity_warnings"] + model["source_quality_warnings"]:
+    for warning in _report_warning_lines(model):
         content.append(Paragraph(escape(tr(_text(warning))), styles["ConclusionWarning"]))
 
     for eye in model["eyes"]:
@@ -811,7 +841,7 @@ def build_docx(payload: Mapping[str, Any]) -> bytes:
     if model.get("action"):
         foreground, background = _status_palette(model.get("status")) or (GRAY, GRAY_FILL)
         _docx_notice(document, tr(_text(model["action"])), foreground, background)
-    for warning in model["identity_warnings"] + model["source_quality_warnings"]:
+    for warning in _report_warning_lines(model):
         _docx_notice(document, tr(_text(warning)), AMBER, AMBER_FILL)
     for eye in model["eyes"]:
         paragraph = document.add_heading(f"{_text(eye['eye'])} — {tr(_text(eye['status']))}", level=1)
