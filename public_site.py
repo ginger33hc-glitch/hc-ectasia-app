@@ -38,7 +38,8 @@ _PUBLIC_CANONICAL_BASE = os.getenv(
 ).rstrip("/")
 _PUBLIC_CONTENT_LASTMOD = "2026-09-11"
 _PUBLIC_PAGE_LASTMOD = {
-    "/corneal-ectasia-risk-assessment": "2026-09-12",
+    "/": "2026-09-17",
+    "/corneal-ectasia-risk-assessment": "2026-09-17",
     "/clinical-evidence": "2026-09-12",
     "/references": "2026-09-12",
 }
@@ -251,7 +252,7 @@ def _discovery_head(base: str, *, robots_directive: str) -> str:
                 "@id": f"{base}/#software",
                 "name": "CER-AI",
                 "url": f"{base}/",
-                "softwareVersion": "0.7.86",
+                "softwareVersion": "2.0",
                 "creator": {"@id": f"{base}/#clinical-author"},
                 "applicationCategory": "MedicalApplication",
                 "applicationSubCategory": (
@@ -324,7 +325,7 @@ def _discovery_head(base: str, *, robots_directive: str) -> str:
                 ],
                 "citation": citations,
                 "author": {"@id": f"{base}/#clinical-author"},
-                "dateModified": _PUBLIC_CONTENT_LASTMOD,
+                "dateModified": _PUBLIC_PAGE_LASTMOD["/"],
                 "mainEntity": {"@id": f"{base}/#software"},
                 "isPartOf": {"@id": f"{base}/#website"},
                 "inLanguage": "en",
