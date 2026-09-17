@@ -21,7 +21,10 @@ from time import monotonic
 from typing import Any
 
 from PIL import Image, ImageOps
-from exam_date_reconciliation_policy import possible_calendar_dates
+from exam_date_reconciliation_policy import (
+    FOUR_MAPS_EXAM_DATE_SOURCE,
+    possible_calendar_dates,
+)
 from pentacam_canonical_source_lock import (
     BAD, FOURMAPS, SHOW2, CANONICAL_FIELD_SOURCES, SHOW_2_CORNEA_BACK,
     SHOW_2_CORNEA_FRONT, SHOW_2_INDICES, canonical_reread_tiles,
@@ -50,7 +53,8 @@ BAD_ELEVATION_VERIFICATION_THRESHOLDS = {
 }
 
 SOURCE_TILES = (
-    "ORIGINAL", "TOP_HEADER", "UPPER_LEFT", "UPPER_RIGHT", "LOWER_LEFT", "LOWER_RIGHT"
+    "ORIGINAL", "TOP_HEADER", "FOUR_MAPS_EXAM_DATE", "UPPER_LEFT", "UPPER_RIGHT",
+    "LOWER_LEFT", "LOWER_RIGHT",
 )
 MAX_SOURCE_PIXELS = 60_000_000
 
@@ -289,12 +293,14 @@ the label/value box so it can be shown to the surgeon.
 
 FOUR MAPS EXAMINATION-DATE RULE:
 {exam_date_target}
-When requested, read only the explicitly labeled examination Date field in the patient/header area
-of this Four Maps Refractive page. Transcribe the complete printed date string exactly, including
-leading zeroes and separators. Do not use Date of Birth, examination time, image filename, another
-page, or arithmetic. Check every digit at original resolution and in the TOP_HEADER crop. Use
-CONFIDENT only when the Date label and every printed date digit are unambiguous. This focused result
-is case-reconciled with the other Four Maps page; never copy or assume the other eye's date.
+When requested, read only the value directly attached to the field explicitly labeled "Exam Date"
+in the UPPER-LEFT patient-information section of this Four Maps Refractive page. The dedicated
+FOUR_MAPS_EXAM_DATE crop contains this source box. Transcribe the complete printed value exactly,
+including leading zeroes and separators. Ignore Date of Birth, examination time, print/report/export
+dates, dates elsewhere on the page, differently formatted date areas, the image filename, another
+page, and arithmetic. printed_label must be "Exam Date"; a generic "Date" label is not accepted.
+Use CONFIDENT only when that exact label and every attached date digit are unambiguous. This focused
+result is case-reconciled with the other Four Maps page; never copy or assume the other eye's date.
 
 REQUESTED FIELDS BY EYE:
 {targets}
@@ -493,8 +499,10 @@ def _canonical_retry_regions(
             if not tiles:
                 return []
             regions.extend({"tile": tile, "source_box": None} for tile in tiles)
-    if patient_age_requested or pentacam_qs_requested or exam_date_requested:
+    if patient_age_requested or pentacam_qs_requested:
         regions.append({"tile": "TOP_HEADER", "source_box": None})
+    if exam_date_requested:
+        regions.append({"tile": "FOUR_MAPS_EXAM_DATE", "source_box": None})
 
     unique = {}
     for region in regions:
@@ -519,6 +527,9 @@ def render_source_region(raw: bytes, tile_name: str, source_box: Any = None) -> 
     boxes = {
         "ORIGINAL": (0, 0, width, height),
         "TOP_HEADER": (0, 0, width, max(1, round(height * 0.36))),
+        "FOUR_MAPS_EXAM_DATE": (
+            0, 0, max(1, round(width * 0.56)), max(1, round(height * 0.32))
+        ),
         "UPPER_LEFT": (0, 0, max(1, round(width * 0.58)), max(1, round(height * 0.58))),
         "UPPER_RIGHT": (min(width - 1, round(width * 0.42)), 0, width, max(1, round(height * 0.58))),
         "LOWER_LEFT": (0, min(height - 1, round(height * 0.42)), max(1, round(width * 0.58)), height),
@@ -801,7 +812,7 @@ def apply_targeted_readings(
         reading = reread.get("exam_date_reading") or {}
         value = reading.get("value")
         label = _normalize_label(reading.get("printed_label"))
-        valid_label = label in {"date", "examdate", "examinationdate"}
+        valid_label = label == "examdate"
         valid_date = isinstance(value, str) and bool(possible_calendar_dates(value))
         valid_source = reread.get("screen_family") == "FOUR_MAPS_REFRACTIVE"
         if (
@@ -810,7 +821,8 @@ def apply_targeted_readings(
         ):
             context["targeted_exam_date_reread_evidence"] = {
                 "file": filename,
-                "source": "TARGETED_FOUR_MAPS_HEADER_REREAD",
+                "source": FOUR_MAPS_EXAM_DATE_SOURCE,
+                "method": "TARGETED_REREAD",
                 "tile": reading.get("source_tile"),
                 "printed_label": reading.get("printed_label"),
                 "value": value,
@@ -960,6 +972,19 @@ def enrich_extraction(
             exam_date_requested=date_requested,
         )
         region_mode = "exact" if focused_regions else "full"
+        date_box_only = (
+            date_requested
+            and not requested
+            and not patient_age_requested
+            and not pentacam_qs_requested
+        )
+        if not focused_regions and date_box_only:
+            focused_regions = _canonical_retry_regions(
+                requested,
+                exam_date_requested=True,
+            )
+            if focused_regions:
+                region_mode = "exam-date-box"
         if attempt > 1 and not focused_regions:
             focused_regions = _canonical_retry_regions(
                 requested,
@@ -979,7 +1004,11 @@ def enrich_extraction(
             reread = targeted_reread(
                 *reread_args,
                 focused_regions or None,
-                attempt == 1 or not focused_regions,
+                (
+                    not focused_regions
+                    if date_box_only
+                    else attempt == 1 or not focused_regions
+                ),
                 timeout_seconds,
             )
             apply_targeted_readings(

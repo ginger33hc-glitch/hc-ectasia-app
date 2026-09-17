@@ -14,6 +14,7 @@ import re
 
 
 EXAM_DATE_CONFLICT_ISSUE = "Conflicting Pentacam examination dates across uploaded sources."
+FOUR_MAPS_EXAM_DATE_SOURCE = "FOUR_MAPS_REFRACTIVE_UPPER_LEFT_EXAM_DATE"
 EXAM_DATE_CONFIRMATION_KEY = "pentacam_exam_date_conflict"
 EXAM_DATE_APPROVAL = "APPROVE_CONTINUE"
 EXAM_DATE_APPROVAL_WARNING = (

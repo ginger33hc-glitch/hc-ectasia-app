@@ -22,8 +22,10 @@ import geometric_srax_policy
 import mandatory_source_set_policy
 from exam_date_reconciliation_policy import (
     EXAM_DATE_CONFLICT_ISSUE,
+    FOUR_MAPS_EXAM_DATE_SOURCE,
     _is_four_maps_refractive,
     authoritative_exam_date_conflict,
+    possible_calendar_dates,
     promote_consistent_targeted_exam_dates,
 )
 from patient_age_policy import resolve_patient_age
@@ -102,6 +104,10 @@ SCHEMA = {
                 "patient_age_years": {"type": ["integer", "null"]},
                 "patient_date_of_birth": {"type": ["string", "null"]},
                 "exam_date": {"type": ["string", "null"]},
+                "exam_date_source": {
+                    "type": "string",
+                    "enum": [FOUR_MAPS_EXAM_DATE_SOURCE, "UNREADABLE", "NOT_SHOWN"],
+                },
                 "exam_time": {"type": ["string", "null"]},
                 "laterality": {"type": "string", "enum": ["OD", "OS", "BOTH", "UNKNOWN"]},
                 "pentacam_qs": {
@@ -113,6 +119,7 @@ SCHEMA = {
             "required": [
                 "document_type", "patient_id", "patient_last_name", "patient_first_name",
                 "patient_name", "patient_name_source", "patient_age_years", "patient_date_of_birth", "exam_date",
+                "exam_date_source",
                 "exam_time", "laterality", "pentacam_qs", "missing_or_unreadable",
             ],
         },
@@ -296,8 +303,16 @@ UNREADABLE or NOT_SHOWN. On a non-Pentacam clinical document, use only an explic
 name field, set the two name components to null when they are not separately labeled, and use
 patient_name_source=OTHER_LABELED_PATIENT_NAME, UNREADABLE, or NOT_SHOWN as applicable.
 
-Transcribe the patient ID, explicitly printed patient age in completed years, exam date, exam time,
-laterality, and document type exactly when visible. Transcribe patient_id only from an
+Transcribe the patient ID, explicitly printed patient age in completed years, exam time,
+laterality, and document type exactly when visible. The examination date is source-locked: on a
+4 Maps Refractive page, transcribe exam_date ONLY from the upper-left patient-information field
+explicitly labeled "Exam Date" and from the value directly attached to that label. Ignore Date of
+Birth, examination time, print/report/export dates, dates elsewhere on the page, and dates in any
+other format or box. On BAD Display, Show 2 Exams Topometric, treatment cards, and every non-4-Maps
+page, return exam_date=null and exam_date_source=NOT_SHOWN even if another date is visible. On a
+4 Maps page, set exam_date_source=FOUR_MAPS_REFRACTIVE_UPPER_LEFT_EXAM_DATE only when the explicit
+"Exam Date" label and its attached complete value are visible; otherwise return exam_date=null with
+exam_date_source=UNREADABLE or NOT_SHOWN. Transcribe patient_id only from an
 explicitly labeled patient-ID field in the patient-demographics box (for example ID, Patient ID, or
 Pat.-ID). Never use an examination number, measurement number, scan number, accession number,
 page/report number, device serial number, date, time, or another unlabeled number as patient_id.
@@ -935,6 +950,31 @@ def normalize_document_context_identity(context: Dict[str, Any]) -> Dict[str, An
     return context
 
 
+def enforce_exam_date_source_lock(
+    result: Dict[str, Any], context: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Accept only the labeled upper-left Four Maps Exam Date field."""
+    context = dict(context)
+    valid = (
+        _is_four_maps_refractive(result)
+        and context.get("exam_date_source") == FOUR_MAPS_EXAM_DATE_SOURCE
+        and bool(possible_calendar_dates(context.get("exam_date")))
+    )
+    if not valid:
+        context["exam_date"] = None
+        context["exam_date_source"] = (
+            "UNREADABLE"
+            if _is_four_maps_refractive(result)
+            and context.get("exam_date_source") == "UNREADABLE"
+            else "NOT_SHOWN"
+        )
+        context["missing_or_unreadable"] = [
+            item for item in context.get("missing_or_unreadable") or []
+            if item != "exam_date"
+        ]
+    return context
+
+
 def surgeon_image_authority(
     age: Optional[int], plans: Dict[str, Any], metadata: Dict[str, Any],
 ) -> Dict[str, Any]:
@@ -1074,6 +1114,7 @@ def extract_one_image(
         result["extraction_model"] = MODEL
         result = apply_surgeon_image_authority(result, surgeon_authority or {})
         context = normalize_document_context_identity(result.get("document_context", {}))
+        context = enforce_exam_date_source_lock(result, context)
         context["source_filename"] = filename
         result["document_context"] = context
         for eye in result.get("eyes", []):

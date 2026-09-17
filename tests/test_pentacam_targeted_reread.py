@@ -686,8 +686,8 @@ def test_confident_four_maps_exam_date_reread_is_evidence_until_case_reconciliat
         "exam_date_reading": {
             "value": "03/09/2026",
             "status": "CONFIDENT",
-            "printed_label": "Date",
-            "source_tile": "TOP_HEADER",
+            "printed_label": "Exam Date",
+            "source_tile": "FOUR_MAPS_EXAM_DATE",
             "source_box": [20, 20, 300, 120],
         },
         "warnings": [],
@@ -699,12 +699,113 @@ def test_confident_four_maps_exam_date_reread_is_evidence_until_case_reconciliat
     assert context["exam_date"] == "23/09/2026"
     assert context["targeted_exam_date_reread_evidence"] == {
         "file": "od-four-maps.png",
-        "source": "TARGETED_FOUR_MAPS_HEADER_REREAD",
-        "tile": "TOP_HEADER",
-        "printed_label": "Date",
+        "source": "FOUR_MAPS_REFRACTIVE_UPPER_LEFT_EXAM_DATE",
+        "method": "TARGETED_REREAD",
+        "tile": "FOUR_MAPS_EXAM_DATE",
+        "printed_label": "Exam Date",
         "value": "03/09/2026",
         "promoted": False,
     }
+
+
+def test_generic_date_label_is_rejected_for_four_maps_exam_date():
+    result = pentacam_result()
+    result["eyes"][0]["screen_types"] = ["FOUR_MAPS_REFRACTIVE"]
+    reread = {
+        "screen_family": "FOUR_MAPS_REFRACTIVE",
+        "readings": [],
+        "exam_date_reading": {
+            "value": "03/09/2025",
+            "status": "CONFIDENT",
+            "printed_label": "Date",
+            "source_tile": "FOUR_MAPS_EXAM_DATE",
+            "source_box": [20, 20, 300, 120],
+        },
+        "warnings": [],
+    }
+    targeted.apply_targeted_readings(
+        Core, result, reread, {}, "od-four-maps.png", exam_date_requested=True,
+    )
+    assert "targeted_exam_date_reread_evidence" not in result["document_context"]
+    assert any(
+        "date reread rejected" in warning.casefold()
+        for warning in result["global_warnings"]
+    )
+
+
+def test_exam_date_conflict_rereads_only_dedicated_upper_left_box(monkeypatch):
+    result = pentacam_result()
+    result["eyes"][0]["screen_types"] = ["FOUR_MAPS_REFRACTIVE"]
+    for field in targeted.TARGET_FIELDS:
+        result["eyes"][0][field] = 1.0
+    result["document_context"].update({"patient_age_years": 40, "pentacam_qs": "OK"})
+    calls = []
+
+    def reread(*args):
+        calls.append(args)
+        return {
+            "screen_family": "FOUR_MAPS_REFRACTIVE",
+            "readings": [],
+            "exam_date_reading": {
+                "value": "03/09/2026",
+                "status": "CONFIDENT",
+                "printed_label": "Exam Date",
+                "source_tile": "FOUR_MAPS_EXAM_DATE",
+                "source_box": [20, 20, 300, 120],
+            },
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(targeted, "targeted_reread", reread)
+    targeted.enrich_extraction(
+        Core, result, b"image", "od-four-maps.png", exam_date_requested=True,
+    )
+
+    assert len(calls) == 1
+    assert calls[0][7] == [{"tile": "FOUR_MAPS_EXAM_DATE", "source_box": None}]
+    assert calls[0][8] is False
+    assert result["document_context"]["targeted_exam_date_reread_evidence"]["value"] == "03/09/2026"
+
+
+def test_primary_prompt_source_locks_exam_date_to_four_maps_exam_date_box():
+    assert 'explicitly labeled "Exam Date"' in canonical_engine.core.PROMPT
+    assert "return exam_date=null and exam_date_source=NOT_SHOWN" in canonical_engine.core.PROMPT
+
+
+def test_primary_exam_date_requires_exact_four_maps_source_identifier():
+    result = {
+        "eyes": [{"eye": "OD", "screen_types": ["FOUR_MAPS_REFRACTIVE"]}],
+    }
+    exact = canonical_engine.core.enforce_exam_date_source_lock(result, {
+        "exam_date": "03/09/2026",
+        "exam_date_source": "FOUR_MAPS_REFRACTIVE_UPPER_LEFT_EXAM_DATE",
+        "missing_or_unreadable": [],
+    })
+    assert exact["exam_date"] == "03/09/2026"
+
+    wrong_source = canonical_engine.core.enforce_exam_date_source_lock(result, {
+        "exam_date": "03/09/2025",
+        "exam_date_source": "NOT_SHOWN",
+        "missing_or_unreadable": [],
+    })
+    assert wrong_source["exam_date"] is None
+
+    other_page = canonical_engine.core.enforce_exam_date_source_lock({
+        "eyes": [{"eye": "OD", "screen_types": ["BAD_DISPLAY"]}],
+    }, {
+        "exam_date": "03/09/2026",
+        "exam_date_source": "FOUR_MAPS_REFRACTIVE_UPPER_LEFT_EXAM_DATE",
+        "missing_or_unreadable": [],
+    })
+    assert other_page["exam_date"] is None
+
+
+def test_primary_schema_requires_exam_date_source_provenance():
+    context_schema = canonical_engine.core.SCHEMA["properties"]["document_context"]
+    assert "exam_date_source" in context_schema["required"]
+    assert context_schema["properties"]["exam_date_source"]["enum"] == [
+        "FOUR_MAPS_REFRACTIVE_UPPER_LEFT_EXAM_DATE", "UNREADABLE", "NOT_SHOWN",
+    ]
 
 
 def test_surrogate_age_reread_is_skipped_when_surgeon_age_was_supplied(monkeypatch):
