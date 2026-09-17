@@ -18,7 +18,7 @@ REPORT_EXTRACTION_FIELDS = (
     "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmean_D",
     "topographic_astig_D", "topographic_steep_axis_deg", "bad_flat_axis_deg",
     "Rmin_mm", "ISV", "IVA", "KI", "CKI", "IHA", "IHD",
-    "topometric_RMin", "TKC", "KISA", "I_S",
+    "topometric_RMin", "KISA", "I_S",
     "central_pachy_um", "pachy_thinnest_um", "Kmax_D",
     "corneal_diameter_mm", "F_Ele_Th_um", "B_Ele_Th_um",
     "PPI_min", "PPI_avg", "PPI_max", "ARTmax_um",

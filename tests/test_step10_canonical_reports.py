@@ -21,7 +21,7 @@ def _eye(name, **overrides):
         "BAD_D": 1.0, "Df": -0.2, "Db": 0.4, "Dp": 0.3, "Dt": 0.2, "Da": 0.5,
         "ARTmax_um": 380.0, "PPI_min": 0.7, "PPI_avg": 1.0, "PPI_max": 1.2,
         "I_S": 0.0, "ISV": 20, "IVA": 0.12, "KI": 1.02, "CKI": 1.0,
-        "IHA": 2.0, "IHD": 0.01, "TKC": "-", "KISA": 5.0,
+        "IHA": 2.0, "IHD": 0.01, "KISA": 5.0,
         "topographic_astig_D": 1.0, "bad_flat_axis_deg": 90.0, "topographic_steep_axis_deg": 90.0,
         "posterior_Kmean_D": -6.0 if name == "OD" else -6.05,
         "F_Ele_Th_um": 5.0, "B_Ele_Th_um": 10.0,

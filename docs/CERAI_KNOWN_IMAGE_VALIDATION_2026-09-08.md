@@ -45,7 +45,7 @@ No claim is made that OCR/model runtime output equals the visible values until t
 | IHA | 0.4 | 4.5 | Show 2 Exams, center 8-mm indices |
 | IHD | 0.012 | 0.018 | Show 2 Exams, center 8-mm indices |
 | Topometric RMin | 7.84 | 7.84 | Show 2 Exams, center 8-mm indices |
-| TKC | `-` | `poss.` | Show 2 Exams, center 8-mm indices |
+| TKC | Not extracted | Not extracted | Device classification intentionally excluded from CER-AI extraction |
 | KISA | 6.533 | 13.229 | Show 2 Exams, center 8-mm indices |
 | Signed I-S | +0.61 D | +1.03 D | Show 2 Exams, center 8-mm indices |
 | Pupil Center pachymetry | 530 µm | 532 µm | 4 Maps Refractive, lower-left numeric box |

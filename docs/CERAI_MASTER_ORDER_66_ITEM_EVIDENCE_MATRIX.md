@@ -43,7 +43,7 @@ represented as known-image, real-case, Railway, mobile-device, or production val
 | 4 | One canonical Pentacam source registry | **PASS (LOCAL)** | `pentacam_canonical_source_lock.py` is the sole registry and exposes field, screen, box, label, family, no-fallback, and no-derivation rules. |
 | 5 | Show 2 Exams Cornea Front K values | **PASS (LOCAL)** | K1/axes/K2/Km/astigmatism/axis map only to `SHOW_2_EXAMS_TOPOMETRIC_CORNEA_FRONT`; reread requires the Cornea Front group. |
 | 6 | Posterior Rmin from Show 2 Cornea Back | **PASS (LOCAL)** | `Rmin_mm` is locked to Cornea Back; front source is rejected; obsolete `rmin_front_source_policy.py` is absent. |
-| 7 | Topometric indices from center 8-mm box | **PASS (LOCAL)** | ISV/IVA/KI/CKI/IHA/IHD/topometric RMin/TKC/KISA/I-S are locked to `SHOW_2_INDICES`; no derivation is allowed. |
+| 7 | Topometric indices from center 8-mm box | **PASS (LOCAL)** | ISV/IVA/KI/CKI/IHA/IHD/topometric RMin/KISA/I-S are locked to `SHOW_2_INDICES`; no derivation is allowed. TKC is intentionally not extracted. |
 | 8 | Keep posterior and topometric RMin distinct | **PASS (LOCAL)** | Separate fields and separate source IDs; explicit cross-source rejection in `test_source_interchange_regression.py`. |
 | 9 | Signed I-S classification, unlimited negative AST | **PASS (LOCAL)** | Canonical rule classifies every value <−0.50 D as AST; −1.00/−1.50/−3.00 and positive boundaries are tested. Exactly −0.50 is normal. |
 | 10 | Four Maps lower-left numerical box | **PASS (LOCAL)** | Pupil Center, Thinnest, Kmax, and HWTW are locked to the labeled lower-left box; label interchange tests prevent Pupil Center/Thinnest and K/Kmax swaps. |

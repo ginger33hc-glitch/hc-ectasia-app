@@ -35,7 +35,7 @@ COMPLETION_NUMERIC_FIELDS = {
     "Kmax_D": "Kmax (D)", "srax_deg": "SRAX (degrees)",
     "corneal_diameter_mm": "HWTW (mm; 4 Maps Refractive lower-left labeled box)",
     "Rmin_mm": "Cornea Back Rmin (mm)", "topometric_RMin": "Topometric RMin (8 mm indices)",
-    "I_S": "Signed I-S (D; not ISV/IVA)", "TKC": "TKC (Show 2 Exams center indices)",
+    "I_S": "Signed I-S (D; not ISV/IVA)",
     "topographic_astig_D": "Topographic Astig. (D; Cornea Front)",
     "topographic_steep_axis_deg": "Topographic Axis (steep) (degrees; Cornea Front)",
     "bad_flat_axis_deg": "PS3 BAD Axis (degrees; upper-middle box beside K1; flat meridian)",

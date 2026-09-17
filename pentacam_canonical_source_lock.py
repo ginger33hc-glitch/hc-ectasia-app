@@ -85,7 +85,6 @@ CANONICAL_FIELD_SOURCES = {
     "IHA": (SHOW_2_INDICES, "IHA"),
     "IHD": (SHOW_2_INDICES, "IHD"),
     "topometric_RMin": (SHOW_2_INDICES, "RMin"),
-    "TKC": (SHOW_2_INDICES, "TKC"),
     "KISA": (SHOW_2_INDICES, "KISA"),
     "I_S": (SHOW_2_INDICES, "I-S"),
 

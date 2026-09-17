@@ -600,7 +600,7 @@ def label_supports_field(field: str, printed_label: Any, group_label: Any = None
         "K2_D": {"k2", "k2d"},
         "Kmax_D": {"kmax", "kmaxd"}, "Kmean_D": {"km", "kmean", "kmeand"},
         "Rmin_mm": {"rmin", "rminmm"}, "topometric_RMin": {"rmin", "rminmm"},
-        "TKC": {"tkc"}, "F_Ele_Th_um": {"feleth", "felethum", "fronteleth"},
+        "F_Ele_Th_um": {"feleth", "felethum", "fronteleth"},
         "posterior_Kmean_D": {"km", "kmean", "kmeand"},
         "topographic_astig_D": {"astig", "astigd"},
         "bad_flat_axis_deg": {"axis"},

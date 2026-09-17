@@ -502,13 +502,13 @@ TECHNICAL_TABLES = {
             ("Required Pentacam source set", ("Source image", "Required set", "CER-AI extraction role"), (
                 ("4 Maps Refractive", "One OD and one OS", "Pupil Center pachymetry, circle-marked Thinnest Location, K Max (Front), HWTW, acquisition/identity evidence, and deterministic SRAX geometry."),
                 ("Belin/Ambrósio BAD Display", "One OD and one OS", "Signed F.Ele.Th and B.Ele.Th; PPI Min/Avg/Max and ARTmax; Df/Db/Dp/Dt/Da and Final D; the specific upper-middle Axis field is retained for its validation role. BAD K1/K2 are not required for ML7."),
-                ("Show 2 Exams Topometric", "One bilateral comparison page", "For each eye: Cornea Front K1/K2/axes/Km/Astig; Cornea Back Km and Rmin; center 8-mm indices including ISV, IVA, KI, CKI, IHA, IHD, RMin, TKC, KISA, and signed I-S."),
+                ("Show 2 Exams Topometric", "One bilateral comparison page", "For each eye: Cornea Front K1/K2/axes/Km/Astig; Cornea Back Km and Rmin; center 8-mm indices including ISV, IVA, KI, CKI, IHA, IHD, RMin, KISA, and signed I-S."),
                 ("Excimer treatment card", "Optional sixth image", "Only the labeled Düzeltme Miktarı row may supply treatment correction. If absent, the surgeon provides complete manifest and intended refraction for both eyes."),
             ), "All five Pentacam pages must be identified before targeted rereading, geometric SRAX analysis, clinical scoring, or report generation. A duplicate page never substitutes for a missing source family."),
             ("Source-locked field map", ("Registered region", "Accepted fields", "Prohibited substitution"), (
                 ("Show 2 → Cornea Front", "K1, K1 axis, K2, K2 axis, printed Km, Astig and steep axis", "No Cornea Back, Kmax, True Net Power, map spot, or calculated mean"),
                 ("Show 2 → Cornea Back", "Printed posterior Km and posterior Rmin", "No Cornea Front Rmin or center topometric RMin"),
-                ("Show 2 → center Indices (8 mm)", "ISV, IVA, KI, CKI, IHA, IHD, topometric RMin, TKC, KISA, signed I-S", "No index may substitute for I-S; preserve the printed sign"),
+                ("Show 2 → center Indices (8 mm)", "ISV, IVA, KI, CKI, IHA, IHD, topometric RMin, KISA, signed I-S", "No index may substitute for I-S; preserve the printed sign"),
                 ("4 Maps → lower-left labeled box", "Pupil Center pachymetry, Thinnest Location pachymetry, K Max (Front), HWTW", "No Pachy Vertex, map color/spot, or neighboring number"),
                 ("BAD → elevation row", "Signed F.Ele.Th and B.Ele.Th in µm", "No elevation-map spot, K field, or unlabeled value"),
                 ("BAD → Progression Index", "PPI Min/Avg/Max and ARTmax", "No back-calculation of Dp or Da"),
@@ -640,13 +640,13 @@ TECHNICAL_TABLES = {
             ("Zorunlu Pentacam kaynak kümesi", ("Kaynak görüntü", "Zorunlu küme", "CER-AI çıkarım rolü"), (
                 ("4 Maps Refractive", "Bir OD ve bir OS", "Pupil Center pakimetrisi, daireyle işaretli Thinnest Location, K Max (Front), HWTW, çekim/kimlik kanıtı ve deterministik SRAX geometrisi."),
                 ("Belin/Ambrósio BAD Display", "Bir OD ve bir OS", "İşaretli F.Ele.Th ve B.Ele.Th; PPI Min/Avg/Max ve ARTmax; Df/Db/Dp/Dt/Da ve Final D; belirli üst-orta Axis alanı doğrulama rolü için korunur. ML7 için BAD K1/K2 gerekli değildir."),
-                ("Show 2 Exams Topometric", "Bir bilateral karşılaştırma sayfası", "Her göz için: Cornea Front K1/K2/eksenler/Km/Astig; Cornea Back Km ve Rmin; ISV, IVA, KI, CKI, IHA, IHD, RMin, TKC, KISA ve işaretli I-S dahil orta 8 mm indeksleri."),
+                ("Show 2 Exams Topometric", "Bir bilateral karşılaştırma sayfası", "Her göz için: Cornea Front K1/K2/eksenler/Km/Astig; Cornea Back Km ve Rmin; ISV, IVA, KI, CKI, IHA, IHD, RMin, KISA ve işaretli I-S dahil orta 8 mm indeksleri."),
                 ("Excimer tedavi kartı", "İsteğe bağlı altıncı görüntü", "Yalnız etiketli Düzeltme Miktarı satırı tedavi düzeltmesini sağlayabilir. Kart yoksa cerrah iki göz için tam manifest ve hedeflenen refraksiyonu girer."),
             ), "Hedefli yeniden okuma, geometrik SRAX analizi, klinik skorlama veya rapor üretiminden önce beş Pentacam sayfasının tamamı tanımlanmalıdır. Yinelenen sayfa eksik kaynak ailesinin yerine geçmez."),
             ("Kaynağı kilitli alan haritası", ("Kayıtlı bölge", "Kabul edilen alanlar", "Yasak ikame"), (
                 ("Show 2 → Cornea Front", "K1, K1 ekseni, K2, K2 ekseni, yazılı Km, Astig ve dik eksen", "Cornea Back, Kmax, True Net Power, harita noktası veya hesaplanmış ortalama yok"),
                 ("Show 2 → Cornea Back", "Yazılı posterior Km ve posterior Rmin", "Cornea Front Rmin veya orta topometrik RMin yok"),
-                ("Show 2 → orta Indices (8 mm)", "ISV, IVA, KI, CKI, IHA, IHD, topometrik RMin, TKC, KISA, işaretli I-S", "Hiçbir indeks I-S yerine geçmez; yazılı işaret korunur"),
+                ("Show 2 → orta Indices (8 mm)", "ISV, IVA, KI, CKI, IHA, IHD, topometrik RMin, KISA, işaretli I-S", "Hiçbir indeks I-S yerine geçmez; yazılı işaret korunur"),
                 ("4 Maps → sol-alt etiketli kutu", "Pupil Center pakimetrisi, Thinnest Location pakimetrisi, K Max (Front), HWTW", "Pachy Vertex, harita rengi/noktası veya komşu sayı yok"),
                 ("BAD → elevasyon satırı", "µm cinsinden işaretli F.Ele.Th ve B.Ele.Th", "Elevasyon haritası noktası, K alanı veya etiketsiz değer yok"),
                 ("BAD → Progression Index", "PPI Min/Avg/Max ve ARTmax", "Dp veya Da geriye doğru hesaplanmaz"),

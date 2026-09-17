@@ -67,7 +67,7 @@ FIELD_LABELS = {
     "topographic_steep_axis_deg": "Displayed steep/astigmatic axis",
     "Rmin_mm": "Posterior Rmin", "topometric_RMin": "Topometric RMin",
     "ISV": "ISV", "IVA": "IVA", "KI": "KI", "CKI": "CKI",
-    "IHA": "IHA", "IHD": "IHD", "TKC": "TKC", "KISA": "KISA",
+    "IHA": "IHA", "IHD": "IHD", "KISA": "KISA",
     "I_S": "Signed I-S", "central_pachy_um": "Pupil Center pachymetry",
     "pachy_thinnest_um": "Thinnest pachymetry", "Kmax_D": "Kmax (Front)",
     "corneal_diameter_mm": "HWTW", "F_Ele_Th_um": "F.Ele.Th",

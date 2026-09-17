@@ -145,7 +145,6 @@ SCHEMA = {
                     "topographic_steep_axis_deg": {"type": ["number", "null"]},
                     "bad_flat_axis_deg": {"type": ["number", "null"]},
                     "topometric_RMin": {"type": ["number", "null"]},
-                    "TKC": {"type": ["number", "null"]},
                     "corneal_diameter_mm": {"type": ["number", "null"]},
                     "pachy_thinnest_um": {"type": ["number", "null"]},
                     "BAD_D": {"type": ["number", "null"]},
@@ -189,7 +188,7 @@ SCHEMA = {
                     "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um", "Kmean_D",
                     "total_RMS_um", "spherical_aberration_um",
                     "central_pachy_um", "B_Ele_Th_um", "F_Ele_Th_um", "posterior_Kmean_D",
-                    "topographic_astig_D", "topographic_steep_axis_deg", "bad_flat_axis_deg", "topometric_RMin", "TKC",
+                    "topographic_astig_D", "topographic_steep_axis_deg", "bad_flat_axis_deg", "topometric_RMin",
                     "srax", "srax_deg",
                 ],
             },
@@ -361,7 +360,7 @@ EXCLUSIVE LABELED-BOX SOURCE LOCK:
 - ML7 planning reuses the canonical K1_D and K2_D values above. Do not create or request a second
   ML7-specific K1/K2 pair. HWTW remains in the 4 Maps Refractive lower-left HWTW box.
 - bad_flat_axis_deg: for PS3 prescription-axis comparison ONLY, read the Axis box beside K1 in the BAD Display upper-middle numeric area. Never substitute the steep axis or derive a rotated value. Preserve all other axis sources and SRAX geometry.
-- topometric_RMin and TKC: use only Show 2 Exams Topometric center Indices (in 8 mm zone).
+- topometric_RMin: use only Show 2 Exams Topometric center Indices (in 8 mm zone).
 - Kmax_D: use only the numeric value in the explicitly printed "KMax"/"Kmax" row.
 - ARTmax_um: use only the numeric value in the explicitly printed "ARTmax" row beneath the
   Progression Index panel.
