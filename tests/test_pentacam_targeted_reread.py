@@ -243,7 +243,7 @@ def test_threshold_level_bad_elevations_are_read_exactly_three_times(monkeypatch
     result = _threshold_elevation_result()
     calls = []
 
-    def reread(_core, _raw, _filename, requested):
+    def reread(_core, _raw, _filename, requested, *_args):
         calls.append(requested)
         return {
             "screen_family": "BAD_DISPLAY",
@@ -300,7 +300,7 @@ def test_discordant_or_unreadable_bad_elevation_rereads_require_surgeon(monkeypa
     result = _threshold_elevation_result(front=13, back=10)
     values = iter((4, 5, None))
 
-    def reread(_core, _raw, _filename, _requested):
+    def reread(_core, _raw, _filename, _requested, *_args):
         value = next(values)
         return {
             "screen_family": "BAD_DISPLAY",
@@ -542,8 +542,10 @@ def test_first_reread_is_full_then_follow_up_uses_canonical_tiles(monkeypatch):
     targeted.enrich_extraction(Core, result, b"image", "od-bad.png")
 
     assert len(calls) == 2
-    assert len(calls[0]) == 7
+    assert len(calls[0]) == 10
     assert calls[1][7] == [{"tile": "LOWER_RIGHT", "source_box": None}]
+    assert calls[0][8] is True
+    assert calls[1][8] is False
     assert eye["B_Ele_Th_um"] == 8
 
 
@@ -581,6 +583,95 @@ def test_focused_retry_sends_original_plus_only_exact_unread_region():
     assert len(images) == 2
     assert "ORIGINAL complete screen:" in labels
     assert "LOWER_RIGHT focused crop of the same screen:" in labels
+
+
+def test_repeat_focused_reread_omits_original_and_uses_fast_transcription_settings():
+    captured = {}
+
+    class FocusedCore(Core):
+        @staticmethod
+        def openai_client():
+            def create(**kwargs):
+                captured.update(kwargs)
+                return SimpleNamespace(output_text=json.dumps({
+                    "screen_family": "BAD_DISPLAY",
+                    "readings": [],
+                    "warnings": [],
+                }))
+
+            return SimpleNamespace(responses=SimpleNamespace(create=create))
+
+    targeted.targeted_reread(
+        FocusedCore,
+        image_bytes(),
+        "od-bad.png",
+        {"OD": ["B_Ele_Th_um"]},
+        focused_regions=[{
+            "file": "od-bad.png",
+            "tile": "LOWER_RIGHT",
+            "source_box": [100, 120, 320, 210],
+        }],
+        include_original=False,
+        timeout_seconds=37,
+    )
+
+    content = captured["input"][0]["content"]
+    images = [item for item in content if item["type"] == "input_image"]
+    labels = [item["text"] for item in content if item["type"] == "input_text"]
+    assert len(images) == 1
+    assert "ORIGINAL complete screen:" not in labels
+    assert "LOWER_RIGHT focused crop of the same screen:" in labels
+    assert captured["reasoning"] == {"effort": "low"}
+    assert captured["text"]["verbosity"] == "low"
+    assert captured["timeout"] == 37
+
+
+def test_expired_assessment_budget_stops_rereads_and_requests_surgeon_confirmation(monkeypatch):
+    result = pentacam_result()
+    result["document_context"].update({"patient_age_years": 40, "pentacam_qs": "OK"})
+
+    def unexpected_reread(*_args, **_kwargs):
+        raise AssertionError("no upstream call may start after the assessment budget")
+
+    monkeypatch.setattr(targeted, "targeted_reread", unexpected_reread)
+    targeted.enrich_extraction(
+        Core, result, b"image", "od-bad.png",
+        deadline_monotonic=targeted.monotonic() - 1,
+    )
+
+    assert any(
+        "time budget reached" in warning
+        and "No value was inferred" in warning
+        for warning in result["global_warnings"]
+    )
+
+
+def test_reread_timeout_is_capped_by_remaining_assessment_budget(monkeypatch):
+    result = pentacam_result()
+    eye = result["eyes"][0]
+    for field in targeted.TARGET_FIELDS:
+        eye[field] = 1.0
+    eye["B_Ele_Th_um"] = None
+    result["document_context"].update({"patient_age_years": 40, "pentacam_qs": "OK"})
+    calls = []
+
+    def reread(*args):
+        calls.append(args)
+        return {
+            "screen_family": "BAD_DISPLAY",
+            "readings": [reading("B_Ele_Th_um", 8, "B.Ele.Th")],
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(targeted, "monotonic", lambda: 100.0)
+    monkeypatch.setattr(targeted, "targeted_reread", reread)
+    targeted.enrich_extraction(
+        Core, result, b"image", "od-bad.png", deadline_monotonic=120.0,
+    )
+
+    assert len(calls) == 1
+    assert calls[0][9] == 20.0
+    assert eye["B_Ele_Th_um"] == 8
 
 
 def test_confident_four_maps_exam_date_reread_is_evidence_until_case_reconciliation():

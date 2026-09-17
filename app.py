@@ -1012,6 +1012,9 @@ async def _run_image_assessment(
     concurrency = max(1, min(int(os.getenv("IMAGE_EXTRACTION_CONCURRENCY", "4")), 4))
     semaphore = asyncio.Semaphore(concurrency)
     assessment_started = monotonic()
+    automation_deadline = pentacam_targeted_reread.assessment_automation_deadline(
+        assessment_started
+    )
 
     async def extract_bounded(raw: bytes, filename: str) -> Dict[str, Any]:
         async with semaphore:
@@ -1047,10 +1050,12 @@ async def _run_image_assessment(
                             exam_date_reread_required and _is_four_maps_refractive(result)
                         ),
                         seek_patient_age=age is None,
+                        deadline_monotonic=automation_deadline,
                     )
                     reread = await asyncio.to_thread(
                         pentacam_targeted_reread.verify_threshold_level_bad_elevations,
                         sys.modules[__name__], reread, raw, filename,
+                        deadline_monotonic=automation_deadline,
                     )
                     return await asyncio.to_thread(
                         geometric_srax_policy.enrich_extraction, reread, raw, filename,
@@ -1085,12 +1090,19 @@ async def _run_image_assessment(
                             pentacam_targeted_reread.verify_astigmatic_disparity_bad_flat_axes,
                             sys.modules[__name__], result, raw, filename,
                             axis_verification_eyes,
+                            deadline_monotonic=automation_deadline,
                         )
 
                 extraction_results = await asyncio.gather(*(
                     verify_axis_bounded(result, raw, filename)
                     for result, (raw, filename) in zip(extraction_results, image_payloads)
                 ))
+            print(
+                "ASSESSMENT TIMING:",
+                f"stage=automatic_extraction_complete cumulative_ms={round((monotonic() - assessment_started) * 1000)}",
+                f"budget_ms={round(pentacam_targeted_reread.assessment_automation_budget_seconds() * 1000)}",
+                flush=True,
+            )
     except HTTPException:
         raise
     except Exception as exc:

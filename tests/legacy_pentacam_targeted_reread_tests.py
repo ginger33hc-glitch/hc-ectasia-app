@@ -530,8 +530,8 @@ def test_targeted_call_uses_original_and_four_crops_with_focused_settings(monkey
     images = [item for item in content if item["type"] == "input_image"]
     assert len(images) == 5
     assert all(item["detail"] == "original" for item in images)
-    assert captured["reasoning"] == {"effort": "medium"}
-    assert captured["text"]["verbosity"] == "high"
+    assert captured["reasoning"] == {"effort": "low"}
+    assert captured["text"]["verbosity"] == "low"
     assert captured["text"]["format"]["strict"] is True
 
 

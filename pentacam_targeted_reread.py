@@ -54,6 +54,48 @@ SOURCE_TILES = (
 )
 MAX_SOURCE_PIXELS = 60_000_000
 
+
+def _bounded_env_float(name: str, default: float, minimum: float, maximum: float) -> float:
+    try:
+        value = float(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, min(value, maximum))
+
+
+def targeted_reread_timeout_seconds() -> float:
+    """One authoritative timeout for each upstream targeted transcription call."""
+    return _bounded_env_float("CERAI_TARGETED_REREAD_TIMEOUT_SECONDS", 75.0, 15.0, 180.0)
+
+
+def assessment_automation_budget_seconds() -> float:
+    """Maximum wall time for automatic extraction before surgeon completion takes over."""
+    return _bounded_env_float("CERAI_ASSESSMENT_AUTOMATION_BUDGET_SECONDS", 210.0, 90.0, 600.0)
+
+
+def assessment_automation_deadline(started_at: float | None = None) -> float:
+    return (monotonic() if started_at is None else float(started_at)) + assessment_automation_budget_seconds()
+
+
+def _call_timeout(deadline_monotonic: float | None) -> float | None:
+    timeout = targeted_reread_timeout_seconds()
+    if deadline_monotonic is None:
+        return timeout
+    remaining = float(deadline_monotonic) - monotonic()
+    if remaining < 1.0:
+        return None
+    return min(timeout, remaining)
+
+
+def _record_budget_exhausted(result: dict[str, Any]) -> None:
+    warning = (
+        "Automatic Pentacam reread time budget reached; unresolved fields require "
+        "explicit surgeon confirmation. No value was inferred or treated as normal."
+    )
+    warnings = result.setdefault("global_warnings", [])
+    if warning not in warnings:
+        warnings.append(warning)
+
 REREAD_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -180,8 +222,9 @@ REREAD_SCHEMA = {
 }
 
 REREAD_PROMPT = """You are ONLY a targeted Pentacam labeled-numeric-field transcriber.
-The first image is the complete original screen. The remaining images are overlapping crops from
-that exact same screen, supplied only to make small printed text easier to read.
+Every supplied image comes from the same Pentacam screen. A complete original screen may be
+followed by crops; a repeat attempt may contain only canonical crops of that already-reviewed
+screen. Crops are supplied only to make small printed text easier to read.
 
 Read only the requested fields listed below. Return a reading only when the field's own printed
 label and its attached numeric value are both visible. Preserve decimal point, sign, and eye
@@ -797,6 +840,8 @@ def targeted_reread(
     pentacam_qs_requested: bool = False,
     exam_date_requested: bool = False,
     focused_regions: list[dict[str, Any]] | None = None,
+    include_original: bool = True,
+    timeout_seconds: float | None = None,
 ) -> dict[str, Any]:
     age_target = (
         "PATIENT: patient_age_years is requested."
@@ -813,19 +858,20 @@ def targeted_reread(
         if exam_date_requested
         else "PATIENT: the examination Date is not requested; return null/NOT_SHOWN."
     )
-    content: list[dict[str, Any]] = [
-        {
-            "type": "input_text",
-            "text": REREAD_PROMPT.format(
-                targets=_target_summary(requested) or "No eye-level numeric fields requested.",
-                age_target=age_target,
-                qs_target=qs_target,
-                exam_date_target=exam_date_target,
-            ),
-        },
-        {"type": "input_text", "text": "ORIGINAL complete screen:"},
-        {"type": "input_image", "image_url": core.data_url(raw, filename), "detail": "original"},
-    ]
+    content: list[dict[str, Any]] = [{
+        "type": "input_text",
+        "text": REREAD_PROMPT.format(
+            targets=_target_summary(requested) or "No eye-level numeric fields requested.",
+            age_target=age_target,
+            qs_target=qs_target,
+            exam_date_target=exam_date_target,
+        ),
+    }]
+    if include_original:
+        content.extend((
+            {"type": "input_text", "text": "ORIGINAL complete screen:"},
+            {"type": "input_image", "image_url": core.data_url(raw, filename), "detail": "original"},
+        ))
     if focused_regions:
         tiles = [
             (
@@ -835,25 +881,32 @@ def targeted_reread(
             for region in focused_regions
             if not (region.get("tile") == "ORIGINAL" and region.get("source_box") is None)
         ]
-    else:
+    elif include_original:
         tiles = build_overlapping_tiles(
             raw,
             include_top_header=(
                 patient_age_requested or pentacam_qs_requested or exam_date_requested
             ),
         )
+    else:
+        raise ValueError("crop-only targeted reread requires at least one canonical region")
     for tile_name, tile_raw in tiles:
         content.extend((
             {"type": "input_text", "text": f"{tile_name} focused crop of the same screen:"},
             {"type": "input_image", "image_url": core.data_url(tile_raw, f"{tile_name}.png"), "detail": "original"},
         ))
-    response = core.openai_client().responses.create(
+    client = core.openai_client()
+    if callable(getattr(client, "with_options", None)):
+        # The explicit five-attempt policy is the only retry authority. Hidden SDK
+        # retries would multiply latency without adding independent clinical evidence.
+        client = client.with_options(max_retries=0)
+    response = client.responses.create(
         model=core.MODEL,
         store=False,
-        reasoning={"effort": "medium"},
+        reasoning={"effort": "low"},
         input=[{"role": "user", "content": content}],
         text={
-            "verbosity": "high",
+            "verbosity": "low",
             "format": {
                 "type": "json_schema",
                 "name": "cerai_pentacam_targeted_reread",
@@ -861,6 +914,7 @@ def targeted_reread(
                 "schema": REREAD_SCHEMA,
             },
         },
+        timeout=timeout_seconds or targeted_reread_timeout_seconds(),
     )
     if not response.output_text or not response.output_text.strip():
         raise RuntimeError("targeted Pentacam reread returned empty output")
@@ -871,6 +925,7 @@ def targeted_reread(
 def enrich_extraction(
     core: Any, result: dict[str, Any], raw: bytes, filename: str,
     *, exam_date_requested: bool = False, seek_patient_age: bool = True,
+    deadline_monotonic: float | None = None,
 ) -> dict[str, Any]:
     """Retry unresolved required fields through the standard targeted pathway."""
     if not _enabled():
@@ -886,6 +941,10 @@ def enrich_extraction(
         if not (
             requested or patient_age_requested or pentacam_qs_requested or date_requested
         ):
+            break
+        timeout_seconds = _call_timeout(deadline_monotonic)
+        if timeout_seconds is None:
+            _record_budget_exhausted(result)
             break
         focused_regions = _focused_retry_regions(
             result,
@@ -912,10 +971,12 @@ def enrich_extraction(
                 core, raw, filename, requested, patient_age_requested,
                 pentacam_qs_requested, date_requested,
             )
-            if focused_regions:
-                reread = targeted_reread(*reread_args, focused_regions)
-            else:
-                reread = targeted_reread(*reread_args)
+            reread = targeted_reread(
+                *reread_args,
+                focused_regions or None,
+                attempt == 1 or not focused_regions,
+                timeout_seconds,
+            )
             apply_targeted_readings(
                 core, result, reread, requested, filename, patient_age_requested,
                 pentacam_qs_requested, date_requested,
@@ -939,6 +1000,11 @@ def enrich_extraction(
             f"focused_regions={len(focused_regions)}",
             f"region_mode={region_mode}",
             f"remaining_targets={remaining}",
+            "target_keys=" + ",".join(sorted({
+                field for fields in requested.values() for field in fields
+            } | ({"patient_age_years"} if patient_age_requested else set())
+              | ({"pentacam_qs"} if pentacam_qs_requested else set())
+              | ({"exam_date"} if date_requested else set()))),
             f"outcome={outcome}",
             flush=True,
         )
@@ -966,6 +1032,8 @@ def verify_astigmatic_disparity_bad_flat_axes(
     raw: bytes,
     filename: str,
     eye_ids: set[str],
+    *,
+    deadline_monotonic: float | None = None,
 ) -> dict[str, Any]:
     """Focused-reread threshold-level BAD axes before disparity reporting.
 
@@ -992,9 +1060,16 @@ def verify_astigmatic_disparity_bad_flat_axes(
     if not requested:
         return result
 
+    timeout_seconds = _call_timeout(deadline_monotonic)
     try:
-        reread = targeted_reread(core, raw, filename, requested)
-        apply_targeted_readings(core, result, reread, requested, filename)
+        if timeout_seconds is None:
+            _record_budget_exhausted(result)
+        else:
+            reread = targeted_reread(
+                core, raw, filename, requested,
+                False, False, False, None, True, timeout_seconds,
+            )
+            apply_targeted_readings(core, result, reread, requested, filename)
     except Exception as exc:
         result.setdefault("global_warnings", []).append(
             f"Astigmatic-disparity BAD flat-axis verification failed for {filename}: "
@@ -1033,6 +1108,8 @@ def verify_threshold_level_bad_elevations(
     result: dict[str, Any],
     raw: bytes,
     filename: str,
+    *,
+    deadline_monotonic: float | None = None,
 ) -> dict[str, Any]:
     """Triple-read threshold-level BAD elevations before any clinical scoring.
 
@@ -1064,8 +1141,21 @@ def verify_threshold_level_bad_elevations(
     accepted: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     attempts: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for attempt_number in range(1, BAD_ELEVATION_VERIFICATION_READS + 1):
+        timeout_seconds = _call_timeout(deadline_monotonic)
+        if timeout_seconds is None:
+            _record_budget_exhausted(result)
+            for eye_id, fields in requested.items():
+                for field in fields:
+                    attempts[(eye_id, field)].append({
+                        "attempt": attempt_number,
+                        "status": "BUDGET_EXHAUSTED",
+                    })
+            break
         try:
-            reread = targeted_reread(core, raw, filename, requested)
+            reread = targeted_reread(
+                core, raw, filename, requested,
+                False, False, False, None, True, timeout_seconds,
+            )
         except Exception as exc:
             for eye_id, fields in requested.items():
                 for field in fields:
