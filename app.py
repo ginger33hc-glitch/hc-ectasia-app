@@ -20,6 +20,7 @@ import pentacam_targeted_reread
 import geometric_srax_policy
 
 import mandatory_source_set_policy
+from assessment_progress import publish_progress
 from exam_date_reconciliation_policy import (
     EXAM_DATE_CONFLICT_ISSUE,
     FOUR_MAPS_EXAM_DATE_SOURCE,
@@ -1112,10 +1113,16 @@ async def _run_image_assessment(
         assessment_started
     )
     surgeon_authority = surgeon_image_authority(age, plans, metadata)
+    completed_images = 0
+
+    await publish_progress(
+        "ANALYZING_IMAGES", completed_images=0, total_images=len(image_payloads)
+    )
 
     async def extract_bounded(
         image_number: int, raw: bytes, filename: str,
     ) -> Dict[str, Any]:
+        nonlocal completed_images
         async with semaphore:
             image_started = monotonic()
             result = await asyncio.to_thread(
@@ -1140,6 +1147,12 @@ async def _run_image_assessment(
                 f"source_role={json.dumps(source_roles, separators=(',', ':'))}",
                 flush=True,
             )
+            completed_images += 1
+            await publish_progress(
+                "ANALYZING_IMAGES",
+                completed_images=completed_images,
+                total_images=len(image_payloads),
+            )
             return result
 
     try:
@@ -1163,6 +1176,25 @@ async def _run_image_assessment(
                 extraction_results, plans
             )
             exam_date_reread_required = authoritative_exam_date_conflict(extraction_results)
+
+            verification_fields = {
+                field
+                for result in extraction_results
+                for fields in pentacam_targeted_reread.missing_targets_by_eye(
+                    result, surgeon_authority["eyes"]
+                ).values()
+                for field in fields
+            }
+            if age is None and any(
+                pentacam_targeted_reread.patient_age_is_missing(result)
+                for result in extraction_results
+            ):
+                verification_fields.add("patient_age_years")
+            if exam_date_reread_required:
+                verification_fields.add("exam_date")
+            await publish_progress(
+                "VERIFYING_REQUIRED_VALUES", fields=sorted(verification_fields)
+            )
 
             async def enrich_bounded(
                 result: Dict[str, Any], raw: bytes, filename: str,
@@ -1198,6 +1230,8 @@ async def _run_image_assessment(
             )
             if exam_date_reread_required:
                 promote_consistent_targeted_exam_dates(extraction_results)
+
+            await publish_progress("CALCULATING_ASSESSMENT")
 
             print(
                 "ASSESSMENT TIMING:",

@@ -231,6 +231,13 @@ def test_mobile_ui_uses_one_server_workflow_from_upload_through_archive():
     access_ui = (ROOT / "named_user_ui.py").read_text(encoding="utf-8")
     assert "'/analysis/jobs'" in job_client
     assert "`/analysis/jobs/${encodeURIComponent(jobId)}`" in job_client
+    assert "ANALYZING_IMAGES" in job_client
+    assert "VERIFYING_REQUIRED_VALUES" in job_client
+    assert "CALCULATING_ASSESSMENT" in job_client
+    assert "elapsed_ms" in job_client
+    assert "navigator.wakeLock.request('screen')" in job_client
+    assert "document.addEventListener('visibilitychange'" in job_client
+    assert "window.addEventListener('online',refreshNow)" in job_client
     assert "ceraiFetch('/assessment/complete'" in app
     assert "ceraiFetch(endpoint" in app
     assert 'href="/archive-ui"' in access_ui
