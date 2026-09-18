@@ -5,7 +5,6 @@ from astigmatic_disparity_policy import (
     NOT_EVALUATED,
     VALIDATION_REQUIRED,
     axis_difference_deg,
-    axis_requires_targeted_verification,
     evaluate_astigmatic_disparity,
 )
 
@@ -31,7 +30,6 @@ def test_ten_degree_axis_difference_requests_validation_but_never_scores_ps3():
     assert result.axis_difference_deg == 10
     assert result.affects_ps3 is False
     assert result.affects_procedure_eligibility is False
-    assert axis_requires_targeted_verification(result)
 
 
 def test_one_diopter_magnitude_difference_requests_validation_only():

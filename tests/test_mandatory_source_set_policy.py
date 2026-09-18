@@ -206,7 +206,7 @@ def test_source_or_no_card_refraction_failure_prevents_all_enrichment(
     payloads = [(b"image", f"source-{index}.png") for index in range(len(sources))]
     by_name = {filename: source for source, (_raw, filename) in zip(sources, payloads)}
 
-    monkeypatch.setattr(app, "extract_one_image", lambda raw, filename: by_name[filename])
+    monkeypatch.setattr(app, "extract_one_image", lambda raw, filename, authority: by_name[filename])
     monkeypatch.setattr(operational_security, "admit_analysis", lambda: None)
 
     @asynccontextmanager
@@ -235,7 +235,7 @@ def test_complete_intake_runs_post_gate_enrichment_and_enters_workflow(monkeypat
     by_name = {filename: source for source, (_raw, filename) in zip(sources, payloads)}
     calls = []
 
-    monkeypatch.setattr(app, "extract_one_image", lambda raw, filename: by_name[filename])
+    monkeypatch.setattr(app, "extract_one_image", lambda raw, filename, authority: by_name[filename])
     monkeypatch.setattr(operational_security, "admit_analysis", lambda: None)
 
     @asynccontextmanager
@@ -254,7 +254,7 @@ def test_complete_intake_runs_post_gate_enrichment_and_enters_workflow(monkeypat
 
     monkeypatch.setattr(app.pentacam_targeted_reread, "enrich_extraction", targeted)
     monkeypatch.setattr(app.geometric_srax_policy, "enrich_extraction", geometric)
-    monkeypatch.setattr(app, "merge_extractions", lambda results: {"eyes": [], "items": results})
+    monkeypatch.setattr(app, "merge_extractions", lambda results, authority: {"eyes": [], "items": results})
     monkeypatch.setattr(
         assessment_workflow, "begin",
         lambda core, extracted, age, plans, modifiers, metadata, source_images: {
@@ -281,7 +281,7 @@ def test_false_primary_four_maps_date_conflict_requests_only_two_header_rereads(
     by_name = {filename: source for source, (_raw, filename) in zip(sources, payloads)}
     calls = []
 
-    monkeypatch.setattr(app, "extract_one_image", lambda raw, filename: by_name[filename])
+    monkeypatch.setattr(app, "extract_one_image", lambda raw, filename, authority: by_name[filename])
     monkeypatch.setattr(operational_security, "admit_analysis", lambda: None)
 
     @asynccontextmanager
@@ -301,7 +301,7 @@ def test_false_primary_four_maps_date_conflict_requests_only_two_header_rereads(
 
     monkeypatch.setattr(app.pentacam_targeted_reread, "enrich_extraction", targeted)
     monkeypatch.setattr(app.geometric_srax_policy, "enrich_extraction", lambda result, *_: result)
-    monkeypatch.setattr(app, "merge_extractions", lambda results: {"eyes": [], "items": results})
+    monkeypatch.setattr(app, "merge_extractions", lambda results, authority: {"eyes": [], "items": results})
     monkeypatch.setattr(
         assessment_workflow, "begin",
         lambda core, extracted, age, plans, modifiers, metadata, source_images: extracted,

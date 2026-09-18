@@ -89,7 +89,7 @@ Accepted behavior:
 - registry-derived source-family rejection;
 - no map fallback for locked fields;
 - source-aware reread rejection;
-- TKC/topometric-RMin/F.Ele.Th label validation.
+- topometric-RMin/F.Ele.Th label validation.
 
 Canonical destination:
 - direct extraction/reread validation using `pentacam_canonical_source_lock.py`;

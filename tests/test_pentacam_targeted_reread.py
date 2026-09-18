@@ -14,7 +14,6 @@ from types import SimpleNamespace
 
 import canonical_engine
 from pentacam_canonical_source_lock import (
-    BAD_CENTER,
     BAD_ELEVATION_ROW,
     BAD_PPI,
     FOUR_MAPS_LOWER_LEFT,
@@ -58,51 +57,6 @@ assessment_workflow = _legacy.assessment_workflow
 image_bytes = _legacy.image_bytes
 
 
-def _axis_result(value):
-    result = pentacam_result(bad_flat_axis_deg=value)
-    eye = result["eyes"][0]
-    eye["canonical_source_ids"] = {"bad_flat_axis_deg": BAD_CENTER}
-    eye["table_verified_numeric_fields"] = ["bad_flat_axis_deg"]
-    eye["missing_or_unreadable"] = []
-    return result
-
-
-def test_disparity_verification_replaces_bad_axis_from_same_canonical_box(monkeypatch):
-    result = _axis_result(13.1)
-    response = {
-        "screen_family": "BAD_DISPLAY",
-        "readings": [reading("bad_flat_axis_deg", 1.1, "Axis", tile="UPPER_RIGHT")],
-        "warnings": [],
-    }
-    monkeypatch.setattr(targeted, "targeted_reread", lambda *args, **kwargs: response)
-
-    targeted.verify_astigmatic_disparity_bad_flat_axes(Core, result, b"image", "os-bad.png", {"OD"})
-
-    eye = result["eyes"][0]
-    assert eye["bad_flat_axis_deg"] == 1.1
-    assert eye["astigmatic_disparity_verification_evidence"]["bad_flat_axis_deg"] == {
-        "file": "os-bad.png",
-        "primary_value": 13.1,
-        "verified_value": 1.1,
-        "status": "VERIFIED",
-    }
-    assert any("from 13.1° to 1.1°" in warning for warning in result["global_warnings"])
-
-
-def test_unresolved_disparity_axis_does_not_retain_unverified_warning_value(monkeypatch):
-    result = _axis_result(13.1)
-    monkeypatch.setattr(targeted, "targeted_reread", lambda *args, **kwargs: {
-        "screen_family": "BAD_DISPLAY", "readings": [], "warnings": [],
-    })
-
-    targeted.verify_astigmatic_disparity_bad_flat_axes(Core, result, b"image", "os-bad.png", {"OD"})
-
-    eye = result["eyes"][0]
-    assert eye["bad_flat_axis_deg"] is None
-    assert eye["astigmatic_disparity_verification_evidence"]["bad_flat_axis_deg"]["status"] == "UNRESOLVED"
-    assert any("surgeon confirmation is recommended" in warning for warning in result["global_warnings"])
-
-
 def test_canonical_eye_fields_suppress_duplicate_targeted_reread_requests():
     result = pentacam_result()
     eye = result["eyes"][0]
@@ -132,7 +86,9 @@ def test_standard_reread_requests_only_fields_owned_by_the_visible_screen():
     show2 = pentacam_result()
     show2["eyes"][0]["screen_types"] = ["SHOW_2_EXAMS_TOPOMETRIC"]
     show2_missing = set(targeted.missing_targets_by_eye(show2)["OD"])
-    assert {"K1_D", "K2_D", "Rmin_mm", "I_S"} <= show2_missing
+    assert {"K2_D", "Kmean_D", "posterior_Kmean_D", "I_S"} <= show2_missing
+    assert "K1_D" not in show2_missing
+    assert "Rmin_mm" not in show2_missing
     assert "F_Ele_Th_um" not in show2_missing
     assert "central_pachy_um" not in show2_missing
 
@@ -243,7 +199,7 @@ def test_threshold_level_bad_elevations_are_read_exactly_three_times(monkeypatch
     result = _threshold_elevation_result()
     calls = []
 
-    def reread(_core, _raw, _filename, requested):
+    def reread(_core, _raw, _filename, requested, *_args):
         calls.append(requested)
         return {
             "screen_family": "BAD_DISPLAY",
@@ -300,7 +256,7 @@ def test_discordant_or_unreadable_bad_elevation_rereads_require_surgeon(monkeypa
     result = _threshold_elevation_result(front=13, back=10)
     values = iter((4, 5, None))
 
-    def reread(_core, _raw, _filename, _requested):
+    def reread(_core, _raw, _filename, _requested, *_args):
         value = next(values)
         return {
             "screen_family": "BAD_DISPLAY",
@@ -542,8 +498,10 @@ def test_first_reread_is_full_then_follow_up_uses_canonical_tiles(monkeypatch):
     targeted.enrich_extraction(Core, result, b"image", "od-bad.png")
 
     assert len(calls) == 2
-    assert len(calls[0]) == 7
+    assert len(calls[0]) == 10
     assert calls[1][7] == [{"tile": "LOWER_RIGHT", "source_box": None}]
+    assert calls[0][8] is True
+    assert calls[1][8] is False
     assert eye["B_Ele_Th_um"] == 8
 
 
@@ -583,6 +541,95 @@ def test_focused_retry_sends_original_plus_only_exact_unread_region():
     assert "LOWER_RIGHT focused crop of the same screen:" in labels
 
 
+def test_repeat_focused_reread_omits_original_and_uses_fast_transcription_settings():
+    captured = {}
+
+    class FocusedCore(Core):
+        @staticmethod
+        def openai_client():
+            def create(**kwargs):
+                captured.update(kwargs)
+                return SimpleNamespace(output_text=json.dumps({
+                    "screen_family": "BAD_DISPLAY",
+                    "readings": [],
+                    "warnings": [],
+                }))
+
+            return SimpleNamespace(responses=SimpleNamespace(create=create))
+
+    targeted.targeted_reread(
+        FocusedCore,
+        image_bytes(),
+        "od-bad.png",
+        {"OD": ["B_Ele_Th_um"]},
+        focused_regions=[{
+            "file": "od-bad.png",
+            "tile": "LOWER_RIGHT",
+            "source_box": [100, 120, 320, 210],
+        }],
+        include_original=False,
+        timeout_seconds=37,
+    )
+
+    content = captured["input"][0]["content"]
+    images = [item for item in content if item["type"] == "input_image"]
+    labels = [item["text"] for item in content if item["type"] == "input_text"]
+    assert len(images) == 1
+    assert "ORIGINAL complete screen:" not in labels
+    assert "LOWER_RIGHT focused crop of the same screen:" in labels
+    assert captured["reasoning"] == {"effort": "low"}
+    assert captured["text"]["verbosity"] == "low"
+    assert captured["timeout"] == 37
+
+
+def test_expired_assessment_budget_stops_rereads_and_requests_surgeon_confirmation(monkeypatch):
+    result = pentacam_result()
+    result["document_context"].update({"patient_age_years": 40, "pentacam_qs": "OK"})
+
+    def unexpected_reread(*_args, **_kwargs):
+        raise AssertionError("no upstream call may start after the assessment budget")
+
+    monkeypatch.setattr(targeted, "targeted_reread", unexpected_reread)
+    targeted.enrich_extraction(
+        Core, result, b"image", "od-bad.png",
+        deadline_monotonic=targeted.monotonic() - 1,
+    )
+
+    assert any(
+        "time budget reached" in warning
+        and "No value was inferred" in warning
+        for warning in result["global_warnings"]
+    )
+
+
+def test_reread_timeout_is_capped_by_remaining_assessment_budget(monkeypatch):
+    result = pentacam_result()
+    eye = result["eyes"][0]
+    for field in targeted.TARGET_FIELDS:
+        eye[field] = 1.0
+    eye["B_Ele_Th_um"] = None
+    result["document_context"].update({"patient_age_years": 40, "pentacam_qs": "OK"})
+    calls = []
+
+    def reread(*args):
+        calls.append(args)
+        return {
+            "screen_family": "BAD_DISPLAY",
+            "readings": [reading("B_Ele_Th_um", 8, "B.Ele.Th")],
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(targeted, "monotonic", lambda: 100.0)
+    monkeypatch.setattr(targeted, "targeted_reread", reread)
+    targeted.enrich_extraction(
+        Core, result, b"image", "od-bad.png", deadline_monotonic=120.0,
+    )
+
+    assert len(calls) == 1
+    assert calls[0][9] == 20.0
+    assert eye["B_Ele_Th_um"] == 8
+
+
 def test_confident_four_maps_exam_date_reread_is_evidence_until_case_reconciliation():
     result = pentacam_result()
     result["eyes"][0]["screen_types"] = ["FOUR_MAPS_REFRACTIVE"]
@@ -593,8 +640,8 @@ def test_confident_four_maps_exam_date_reread_is_evidence_until_case_reconciliat
         "exam_date_reading": {
             "value": "03/09/2026",
             "status": "CONFIDENT",
-            "printed_label": "Date",
-            "source_tile": "TOP_HEADER",
+            "printed_label": "Exam Date",
+            "source_tile": "FOUR_MAPS_EXAM_DATE",
             "source_box": [20, 20, 300, 120],
         },
         "warnings": [],
@@ -606,12 +653,113 @@ def test_confident_four_maps_exam_date_reread_is_evidence_until_case_reconciliat
     assert context["exam_date"] == "23/09/2026"
     assert context["targeted_exam_date_reread_evidence"] == {
         "file": "od-four-maps.png",
-        "source": "TARGETED_FOUR_MAPS_HEADER_REREAD",
-        "tile": "TOP_HEADER",
-        "printed_label": "Date",
+        "source": "FOUR_MAPS_REFRACTIVE_UPPER_LEFT_EXAM_DATE",
+        "method": "TARGETED_REREAD",
+        "tile": "FOUR_MAPS_EXAM_DATE",
+        "printed_label": "Exam Date",
         "value": "03/09/2026",
         "promoted": False,
     }
+
+
+def test_generic_date_label_is_rejected_for_four_maps_exam_date():
+    result = pentacam_result()
+    result["eyes"][0]["screen_types"] = ["FOUR_MAPS_REFRACTIVE"]
+    reread = {
+        "screen_family": "FOUR_MAPS_REFRACTIVE",
+        "readings": [],
+        "exam_date_reading": {
+            "value": "03/09/2025",
+            "status": "CONFIDENT",
+            "printed_label": "Date",
+            "source_tile": "FOUR_MAPS_EXAM_DATE",
+            "source_box": [20, 20, 300, 120],
+        },
+        "warnings": [],
+    }
+    targeted.apply_targeted_readings(
+        Core, result, reread, {}, "od-four-maps.png", exam_date_requested=True,
+    )
+    assert "targeted_exam_date_reread_evidence" not in result["document_context"]
+    assert any(
+        "date reread rejected" in warning.casefold()
+        for warning in result["global_warnings"]
+    )
+
+
+def test_exam_date_conflict_rereads_only_dedicated_upper_left_box(monkeypatch):
+    result = pentacam_result()
+    result["eyes"][0]["screen_types"] = ["FOUR_MAPS_REFRACTIVE"]
+    for field in targeted.TARGET_FIELDS:
+        result["eyes"][0][field] = 1.0
+    result["document_context"].update({"patient_age_years": 40, "pentacam_qs": "OK"})
+    calls = []
+
+    def reread(*args):
+        calls.append(args)
+        return {
+            "screen_family": "FOUR_MAPS_REFRACTIVE",
+            "readings": [],
+            "exam_date_reading": {
+                "value": "03/09/2026",
+                "status": "CONFIDENT",
+                "printed_label": "Exam Date",
+                "source_tile": "FOUR_MAPS_EXAM_DATE",
+                "source_box": [20, 20, 300, 120],
+            },
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(targeted, "targeted_reread", reread)
+    targeted.enrich_extraction(
+        Core, result, b"image", "od-four-maps.png", exam_date_requested=True,
+    )
+
+    assert len(calls) == 1
+    assert calls[0][7] == [{"tile": "FOUR_MAPS_EXAM_DATE", "source_box": None}]
+    assert calls[0][8] is False
+    assert result["document_context"]["targeted_exam_date_reread_evidence"]["value"] == "03/09/2026"
+
+
+def test_primary_prompt_source_locks_exam_date_to_four_maps_exam_date_box():
+    assert 'explicitly labeled "Exam Date"' in canonical_engine.core.PROMPT
+    assert "return exam_date=null and exam_date_source=NOT_SHOWN" in canonical_engine.core.PROMPT
+
+
+def test_primary_exam_date_requires_exact_four_maps_source_identifier():
+    result = {
+        "eyes": [{"eye": "OD", "screen_types": ["FOUR_MAPS_REFRACTIVE"]}],
+    }
+    exact = canonical_engine.core.enforce_exam_date_source_lock(result, {
+        "exam_date": "03/09/2026",
+        "exam_date_source": "FOUR_MAPS_REFRACTIVE_UPPER_LEFT_EXAM_DATE",
+        "missing_or_unreadable": [],
+    })
+    assert exact["exam_date"] == "03/09/2026"
+
+    wrong_source = canonical_engine.core.enforce_exam_date_source_lock(result, {
+        "exam_date": "03/09/2025",
+        "exam_date_source": "NOT_SHOWN",
+        "missing_or_unreadable": [],
+    })
+    assert wrong_source["exam_date"] is None
+
+    other_page = canonical_engine.core.enforce_exam_date_source_lock({
+        "eyes": [{"eye": "OD", "screen_types": ["BAD_DISPLAY"]}],
+    }, {
+        "exam_date": "03/09/2026",
+        "exam_date_source": "FOUR_MAPS_REFRACTIVE_UPPER_LEFT_EXAM_DATE",
+        "missing_or_unreadable": [],
+    })
+    assert other_page["exam_date"] is None
+
+
+def test_primary_schema_requires_exam_date_source_provenance():
+    context_schema = canonical_engine.core.SCHEMA["properties"]["document_context"]
+    assert "exam_date_source" in context_schema["required"]
+    assert context_schema["properties"]["exam_date_source"]["enum"] == [
+        "FOUR_MAPS_REFRACTIVE_UPPER_LEFT_EXAM_DATE", "UNREADABLE", "NOT_SHOWN",
+    ]
 
 
 def test_surrogate_age_reread_is_skipped_when_surgeon_age_was_supplied(monkeypatch):

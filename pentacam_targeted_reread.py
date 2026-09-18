@@ -21,7 +21,10 @@ from time import monotonic
 from typing import Any
 
 from PIL import Image, ImageOps
-from exam_date_reconciliation_policy import possible_calendar_dates
+from exam_date_reconciliation_policy import (
+    FOUR_MAPS_EXAM_DATE_SOURCE,
+    possible_calendar_dates,
+)
 from pentacam_canonical_source_lock import (
     BAD, FOURMAPS, SHOW2, CANONICAL_FIELD_SOURCES, SHOW_2_CORNEA_BACK,
     SHOW_2_CORNEA_FRONT, SHOW_2_INDICES, canonical_reread_tiles,
@@ -50,9 +53,52 @@ BAD_ELEVATION_VERIFICATION_THRESHOLDS = {
 }
 
 SOURCE_TILES = (
-    "ORIGINAL", "TOP_HEADER", "UPPER_LEFT", "UPPER_RIGHT", "LOWER_LEFT", "LOWER_RIGHT"
+    "ORIGINAL", "TOP_HEADER", "FOUR_MAPS_EXAM_DATE", "UPPER_LEFT", "UPPER_RIGHT",
+    "LOWER_LEFT", "LOWER_RIGHT",
 )
 MAX_SOURCE_PIXELS = 60_000_000
+
+
+def _bounded_env_float(name: str, default: float, minimum: float, maximum: float) -> float:
+    try:
+        value = float(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, min(value, maximum))
+
+
+def targeted_reread_timeout_seconds() -> float:
+    """One authoritative timeout for each upstream targeted transcription call."""
+    return _bounded_env_float("CERAI_TARGETED_REREAD_TIMEOUT_SECONDS", 75.0, 15.0, 180.0)
+
+
+def assessment_automation_budget_seconds() -> float:
+    """Maximum wall time for automatic extraction before surgeon completion takes over."""
+    return _bounded_env_float("CERAI_ASSESSMENT_AUTOMATION_BUDGET_SECONDS", 210.0, 90.0, 600.0)
+
+
+def assessment_automation_deadline(started_at: float | None = None) -> float:
+    return (monotonic() if started_at is None else float(started_at)) + assessment_automation_budget_seconds()
+
+
+def _call_timeout(deadline_monotonic: float | None) -> float | None:
+    timeout = targeted_reread_timeout_seconds()
+    if deadline_monotonic is None:
+        return timeout
+    remaining = float(deadline_monotonic) - monotonic()
+    if remaining < 1.0:
+        return None
+    return min(timeout, remaining)
+
+
+def _record_budget_exhausted(result: dict[str, Any]) -> None:
+    warning = (
+        "Automatic Pentacam reread time budget reached; unresolved fields require "
+        "explicit surgeon confirmation. No value was inferred or treated as normal."
+    )
+    warnings = result.setdefault("global_warnings", [])
+    if warning not in warnings:
+        warnings.append(warning)
 
 REREAD_SCHEMA = {
     "type": "object",
@@ -180,8 +226,9 @@ REREAD_SCHEMA = {
 }
 
 REREAD_PROMPT = """You are ONLY a targeted Pentacam labeled-numeric-field transcriber.
-The first image is the complete original screen. The remaining images are overlapping crops from
-that exact same screen, supplied only to make small printed text easier to read.
+Every supplied image comes from the same Pentacam screen. A complete original screen may be
+followed by crops; a repeat attempt may contain only canonical crops of that already-reviewed
+screen. Crops are supplied only to make small printed text easier to read.
 
 Read only the requested fields listed below. Return a reading only when the field's own printed
 label and its attached numeric value are both visible. Preserve decimal point, sign, and eye
@@ -246,12 +293,14 @@ the label/value box so it can be shown to the surgeon.
 
 FOUR MAPS EXAMINATION-DATE RULE:
 {exam_date_target}
-When requested, read only the explicitly labeled examination Date field in the patient/header area
-of this Four Maps Refractive page. Transcribe the complete printed date string exactly, including
-leading zeroes and separators. Do not use Date of Birth, examination time, image filename, another
-page, or arithmetic. Check every digit at original resolution and in the TOP_HEADER crop. Use
-CONFIDENT only when the Date label and every printed date digit are unambiguous. This focused result
-is case-reconciled with the other Four Maps page; never copy or assume the other eye's date.
+When requested, read only the value directly attached to the field explicitly labeled "Exam Date"
+in the UPPER-LEFT patient-information section of this Four Maps Refractive page. The dedicated
+FOUR_MAPS_EXAM_DATE crop contains this source box. Transcribe the complete printed value exactly,
+including leading zeroes and separators. Ignore Date of Birth, examination time, print/report/export
+dates, dates elsewhere on the page, differently formatted date areas, the image filename, another
+page, and arithmetic. printed_label must be "Exam Date"; a generic "Date" label is not accepted.
+Use CONFIDENT only when that exact label and every attached date digit are unambiguous. This focused
+result is case-reconciled with the other Four Maps page; never copy or assume the other eye's date.
 
 REQUESTED FIELDS BY EYE:
 {targets}
@@ -287,7 +336,10 @@ def _looks_like_pentacam(result: dict[str, Any]) -> bool:
     return False
 
 
-def missing_targets_by_eye(result: dict[str, Any]) -> dict[str, list[str]]:
+def missing_targets_by_eye(
+    result: dict[str, Any],
+    excluded_fields_by_eye: dict[str, set[str]] | None = None,
+) -> dict[str, list[str]]:
     """Return only still-empty table fields for explicitly identified OD/OS eyes."""
     if not _looks_like_pentacam(result):
         return {}
@@ -309,6 +361,7 @@ def missing_targets_by_eye(result: dict[str, Any]) -> dict[str, list[str]]:
             visible_families.add(SHOW2)
         missing = [
             field for field in TARGET_FIELDS
+            if field not in (excluded_fields_by_eye or {}).get(eye_id, set())
             if (not visible_families or source_family(field) in visible_families)
             and eye.get(field) is None
         ]
@@ -446,8 +499,10 @@ def _canonical_retry_regions(
             if not tiles:
                 return []
             regions.extend({"tile": tile, "source_box": None} for tile in tiles)
-    if patient_age_requested or pentacam_qs_requested or exam_date_requested:
+    if patient_age_requested or pentacam_qs_requested:
         regions.append({"tile": "TOP_HEADER", "source_box": None})
+    if exam_date_requested:
+        regions.append({"tile": "FOUR_MAPS_EXAM_DATE", "source_box": None})
 
     unique = {}
     for region in regions:
@@ -472,6 +527,9 @@ def render_source_region(raw: bytes, tile_name: str, source_box: Any = None) -> 
     boxes = {
         "ORIGINAL": (0, 0, width, height),
         "TOP_HEADER": (0, 0, width, max(1, round(height * 0.36))),
+        "FOUR_MAPS_EXAM_DATE": (
+            0, 0, max(1, round(width * 0.56)), max(1, round(height * 0.32))
+        ),
         "UPPER_LEFT": (0, 0, max(1, round(width * 0.58)), max(1, round(height * 0.58))),
         "UPPER_RIGHT": (min(width - 1, round(width * 0.42)), 0, width, max(1, round(height * 0.58))),
         "LOWER_LEFT": (0, min(height - 1, round(height * 0.42)), max(1, round(width * 0.58)), height),
@@ -557,7 +615,7 @@ def label_supports_field(field: str, printed_label: Any, group_label: Any = None
         "K2_D": {"k2", "k2d"},
         "Kmax_D": {"kmax", "kmaxd"}, "Kmean_D": {"km", "kmean", "kmeand"},
         "Rmin_mm": {"rmin", "rminmm"}, "topometric_RMin": {"rmin", "rminmm"},
-        "TKC": {"tkc"}, "F_Ele_Th_um": {"feleth", "felethum", "fronteleth"},
+        "F_Ele_Th_um": {"feleth", "felethum", "fronteleth"},
         "posterior_Kmean_D": {"km", "kmean", "kmeand"},
         "topographic_astig_D": {"astig", "astigd"},
         "bad_flat_axis_deg": {"axis"},
@@ -754,7 +812,7 @@ def apply_targeted_readings(
         reading = reread.get("exam_date_reading") or {}
         value = reading.get("value")
         label = _normalize_label(reading.get("printed_label"))
-        valid_label = label in {"date", "examdate", "examinationdate"}
+        valid_label = label == "examdate"
         valid_date = isinstance(value, str) and bool(possible_calendar_dates(value))
         valid_source = reread.get("screen_family") == "FOUR_MAPS_REFRACTIVE"
         if (
@@ -763,7 +821,8 @@ def apply_targeted_readings(
         ):
             context["targeted_exam_date_reread_evidence"] = {
                 "file": filename,
-                "source": "TARGETED_FOUR_MAPS_HEADER_REREAD",
+                "source": FOUR_MAPS_EXAM_DATE_SOURCE,
+                "method": "TARGETED_REREAD",
                 "tile": reading.get("source_tile"),
                 "printed_label": reading.get("printed_label"),
                 "value": value,
@@ -797,6 +856,8 @@ def targeted_reread(
     pentacam_qs_requested: bool = False,
     exam_date_requested: bool = False,
     focused_regions: list[dict[str, Any]] | None = None,
+    include_original: bool = True,
+    timeout_seconds: float | None = None,
 ) -> dict[str, Any]:
     age_target = (
         "PATIENT: patient_age_years is requested."
@@ -813,19 +874,20 @@ def targeted_reread(
         if exam_date_requested
         else "PATIENT: the examination Date is not requested; return null/NOT_SHOWN."
     )
-    content: list[dict[str, Any]] = [
-        {
-            "type": "input_text",
-            "text": REREAD_PROMPT.format(
-                targets=_target_summary(requested) or "No eye-level numeric fields requested.",
-                age_target=age_target,
-                qs_target=qs_target,
-                exam_date_target=exam_date_target,
-            ),
-        },
-        {"type": "input_text", "text": "ORIGINAL complete screen:"},
-        {"type": "input_image", "image_url": core.data_url(raw, filename), "detail": "original"},
-    ]
+    content: list[dict[str, Any]] = [{
+        "type": "input_text",
+        "text": REREAD_PROMPT.format(
+            targets=_target_summary(requested) or "No eye-level numeric fields requested.",
+            age_target=age_target,
+            qs_target=qs_target,
+            exam_date_target=exam_date_target,
+        ),
+    }]
+    if include_original:
+        content.extend((
+            {"type": "input_text", "text": "ORIGINAL complete screen:"},
+            {"type": "input_image", "image_url": core.data_url(raw, filename), "detail": "original"},
+        ))
     if focused_regions:
         tiles = [
             (
@@ -835,25 +897,32 @@ def targeted_reread(
             for region in focused_regions
             if not (region.get("tile") == "ORIGINAL" and region.get("source_box") is None)
         ]
-    else:
+    elif include_original:
         tiles = build_overlapping_tiles(
             raw,
             include_top_header=(
                 patient_age_requested or pentacam_qs_requested or exam_date_requested
             ),
         )
+    else:
+        raise ValueError("crop-only targeted reread requires at least one canonical region")
     for tile_name, tile_raw in tiles:
         content.extend((
             {"type": "input_text", "text": f"{tile_name} focused crop of the same screen:"},
             {"type": "input_image", "image_url": core.data_url(tile_raw, f"{tile_name}.png"), "detail": "original"},
         ))
-    response = core.openai_client().responses.create(
+    client = core.openai_client()
+    if callable(getattr(client, "with_options", None)):
+        # The explicit five-attempt policy is the only retry authority. Hidden SDK
+        # retries would multiply latency without adding independent clinical evidence.
+        client = client.with_options(max_retries=0)
+    response = client.responses.create(
         model=core.MODEL,
         store=False,
-        reasoning={"effort": "medium"},
+        reasoning={"effort": "low"},
         input=[{"role": "user", "content": content}],
         text={
-            "verbosity": "high",
+            "verbosity": "low",
             "format": {
                 "type": "json_schema",
                 "name": "cerai_pentacam_targeted_reread",
@@ -861,6 +930,7 @@ def targeted_reread(
                 "schema": REREAD_SCHEMA,
             },
         },
+        timeout=timeout_seconds or targeted_reread_timeout_seconds(),
     )
     if not response.output_text or not response.output_text.strip():
         raise RuntimeError("targeted Pentacam reread returned empty output")
@@ -871,13 +941,15 @@ def targeted_reread(
 def enrich_extraction(
     core: Any, result: dict[str, Any], raw: bytes, filename: str,
     *, exam_date_requested: bool = False, seek_patient_age: bool = True,
+    excluded_fields_by_eye: dict[str, set[str]] | None = None,
+    deadline_monotonic: float | None = None,
 ) -> dict[str, Any]:
     """Retry unresolved required fields through the standard targeted pathway."""
     if not _enabled():
         return result
     attempt_errors: list[str] = []
     for attempt in range(1, TARGETED_REREAD_MAX_ATTEMPTS + 1):
-        requested = missing_targets_by_eye(result)
+        requested = missing_targets_by_eye(result, excluded_fields_by_eye)
         patient_age_requested = seek_patient_age and patient_age_is_missing(result)
         pentacam_qs_requested = pentacam_qs_is_missing(result)
         date_requested = exam_date_requested and not result.get(
@@ -886,6 +958,10 @@ def enrich_extraction(
         if not (
             requested or patient_age_requested or pentacam_qs_requested or date_requested
         ):
+            break
+        timeout_seconds = _call_timeout(deadline_monotonic)
+        if timeout_seconds is None:
+            _record_budget_exhausted(result)
             break
         focused_regions = _focused_retry_regions(
             result,
@@ -896,6 +972,19 @@ def enrich_extraction(
             exam_date_requested=date_requested,
         )
         region_mode = "exact" if focused_regions else "full"
+        date_box_only = (
+            date_requested
+            and not requested
+            and not patient_age_requested
+            and not pentacam_qs_requested
+        )
+        if not focused_regions and date_box_only:
+            focused_regions = _canonical_retry_regions(
+                requested,
+                exam_date_requested=True,
+            )
+            if focused_regions:
+                region_mode = "exam-date-box"
         if attempt > 1 and not focused_regions:
             focused_regions = _canonical_retry_regions(
                 requested,
@@ -912,10 +1001,16 @@ def enrich_extraction(
                 core, raw, filename, requested, patient_age_requested,
                 pentacam_qs_requested, date_requested,
             )
-            if focused_regions:
-                reread = targeted_reread(*reread_args, focused_regions)
-            else:
-                reread = targeted_reread(*reread_args)
+            reread = targeted_reread(
+                *reread_args,
+                focused_regions or None,
+                (
+                    not focused_regions
+                    if date_box_only
+                    else attempt == 1 or not focused_regions
+                ),
+                timeout_seconds,
+            )
             apply_targeted_readings(
                 core, result, reread, requested, filename, patient_age_requested,
                 pentacam_qs_requested, date_requested,
@@ -923,8 +1018,11 @@ def enrich_extraction(
         except Exception as exc:
             attempt_errors.append(type(exc).__name__)
             outcome = f"error:{type(exc).__name__}"
-        remaining = sum(len(fields) for fields in missing_targets_by_eye(result).values())
-        remaining += int(patient_age_is_missing(result))
+        remaining = sum(
+            len(fields)
+            for fields in missing_targets_by_eye(result, excluded_fields_by_eye).values()
+        )
+        remaining += int(seek_patient_age and patient_age_is_missing(result))
         remaining += int(pentacam_qs_is_missing(result))
         remaining += int(
             date_requested
@@ -939,12 +1037,17 @@ def enrich_extraction(
             f"focused_regions={len(focused_regions)}",
             f"region_mode={region_mode}",
             f"remaining_targets={remaining}",
+            "target_keys=" + ",".join(sorted({
+                field for fields in requested.values() for field in fields
+            } | ({"patient_age_years"} if patient_age_requested else set())
+              | ({"pentacam_qs"} if pentacam_qs_requested else set())
+              | ({"exam_date"} if date_requested else set()))),
             f"outcome={outcome}",
             flush=True,
         )
     if attempt_errors and (
-        missing_targets_by_eye(result)
-        or patient_age_is_missing(result)
+        missing_targets_by_eye(result, excluded_fields_by_eye)
+        or (seek_patient_age and patient_age_is_missing(result))
         or pentacam_qs_is_missing(result)
         or (
             exam_date_requested
@@ -960,79 +1063,13 @@ def enrich_extraction(
     return result
 
 
-def verify_astigmatic_disparity_bad_flat_axes(
-    core: Any,
-    result: dict[str, Any],
-    raw: bytes,
-    filename: str,
-    eye_ids: set[str],
-) -> dict[str, Any]:
-    """Focused-reread threshold-level BAD axes before disparity reporting.
-
-    Only the canonical BAD flat-axis field is eligible. If the focused reading
-    is not confident and source-valid, the value is left unresolved rather than
-    retaining an unverified validation warning. This path cannot affect PS3.
-    """
-    requested: dict[str, list[str]] = {}
-    originals: dict[str, float] = {}
-    source_id = canonical_source_id("bad_flat_axis_deg")
-    for eye in result.get("eyes") or []:
-        eye_id = eye.get("eye")
-        if eye_id not in eye_ids or not core.is_number(eye.get("bad_flat_axis_deg")):
-            continue
-        if (eye.get("canonical_source_ids") or {}).get("bad_flat_axis_deg") != source_id:
-            continue
-        originals[eye_id] = float(eye["bad_flat_axis_deg"])
-        eye["bad_flat_axis_deg"] = None
-        missing = list(eye.get("missing_or_unreadable") or [])
-        if "bad_flat_axis_deg" not in missing:
-            missing.append("bad_flat_axis_deg")
-        eye["missing_or_unreadable"] = missing
-        requested[eye_id] = ["bad_flat_axis_deg"]
-    if not requested:
-        return result
-
-    try:
-        reread = targeted_reread(core, raw, filename, requested)
-        apply_targeted_readings(core, result, reread, requested, filename)
-    except Exception as exc:
-        result.setdefault("global_warnings", []).append(
-            f"Astigmatic-disparity BAD flat-axis verification failed for {filename}: "
-            f"{type(exc).__name__}; surgeon confirmation is required."
-        )
-
-    eyes = {
-        eye.get("eye"): eye for eye in result.get("eyes") or []
-        if eye.get("eye") in requested
-    }
-    for eye_id, primary_value in originals.items():
-        eye = eyes[eye_id]
-        verified_value = eye.get("bad_flat_axis_deg")
-        eye.setdefault("astigmatic_disparity_verification_evidence", {})["bad_flat_axis_deg"] = {
-            "file": filename,
-            "primary_value": primary_value,
-            "verified_value": verified_value,
-            "status": "VERIFIED" if core.is_number(verified_value) else "UNRESOLVED",
-        }
-        if core.is_number(verified_value):
-            if abs(float(verified_value) - primary_value) > 1e-9:
-                result.setdefault("global_warnings", []).append(
-                    f"{eye_id} BAD flat axis corrected by focused canonical-box reread "
-                    f"from {primary_value:g}° to {float(verified_value):g}°."
-                )
-        else:
-            result.setdefault("global_warnings", []).append(
-                f"{eye_id} BAD flat axis associated with an astigmatic-disparity warning "
-                "could not be verified; surgeon confirmation is recommended."
-            )
-    return result
-
-
 def verify_threshold_level_bad_elevations(
     core: Any,
     result: dict[str, Any],
     raw: bytes,
     filename: str,
+    *,
+    deadline_monotonic: float | None = None,
 ) -> dict[str, Any]:
     """Triple-read threshold-level BAD elevations before any clinical scoring.
 
@@ -1064,8 +1101,21 @@ def verify_threshold_level_bad_elevations(
     accepted: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     attempts: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for attempt_number in range(1, BAD_ELEVATION_VERIFICATION_READS + 1):
+        timeout_seconds = _call_timeout(deadline_monotonic)
+        if timeout_seconds is None:
+            _record_budget_exhausted(result)
+            for eye_id, fields in requested.items():
+                for field in fields:
+                    attempts[(eye_id, field)].append({
+                        "attempt": attempt_number,
+                        "status": "BUDGET_EXHAUSTED",
+                    })
+            break
         try:
-            reread = targeted_reread(core, raw, filename, requested)
+            reread = targeted_reread(
+                core, raw, filename, requested,
+                False, False, False, None, True, timeout_seconds,
+            )
         except Exception as exc:
             for eye_id, fields in requested.items():
                 for field in fields:

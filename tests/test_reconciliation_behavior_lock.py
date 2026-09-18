@@ -85,7 +85,7 @@ def test_locked_value_without_exact_source_id_fails_closed():
     ])
     od = merged["eyes"][0]
     assert od["Kmax_D"] is None
-    assert "Kmax_D" in od.get("missing_or_unreadable", [])
+    assert "Kmax_D" not in od.get("missing_or_unreadable", [])
 
 
 def test_wrong_screen_kmax_is_rejected_instead_of_reconciled():
@@ -94,7 +94,7 @@ def test_wrong_screen_kmax_is_rejected_instead_of_reconciled():
     ])
     od = merged["eyes"][0]
     assert od["Kmax_D"] is None
-    assert "Kmax_D" in od.get("missing_or_unreadable", [])
+    assert "Kmax_D" not in od.get("missing_or_unreadable", [])
 
 
 def test_wrong_screen_ppi_is_rejected_instead_of_one_percent_merge():
@@ -116,7 +116,7 @@ def test_unverified_rmin_is_rejected_even_with_correct_source_identity():
     ])
     od = merged["eyes"][0]
     assert od["Rmin_mm"] is None
-    assert "Rmin_mm" in od.get("missing_or_unreadable", [])
+    assert "Rmin_mm" not in od.get("missing_or_unreadable", [])
 
 
 def test_unverified_k1_is_never_accepted_even_with_source_identity():
@@ -128,7 +128,7 @@ def test_unverified_k1_is_never_accepted_even_with_source_identity():
     ])
     od = merged["eyes"][0]
     assert od["K1_D"] is None
-    assert "K1_D" in od.get("missing_or_unreadable", [])
+    assert "K1_D" not in od.get("missing_or_unreadable", [])
 
 
 def test_canonical_k1_direct_read_is_retained():

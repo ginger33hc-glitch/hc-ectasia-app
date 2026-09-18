@@ -2,6 +2,7 @@ from pathlib import Path
 
 import canonical_engine
 import pentacam_targeted_reread as targeted_reread
+from clinical_core.report_payload import REPORT_EXTRACTION_FIELDS
 from pentacam_canonical_source_lock import (
     BAD,
     BAD_CENTER,
@@ -20,6 +21,11 @@ from pentacam_canonical_source_lock import (
     derivation_is_allowed,
     source_family,
     source_is_allowed,
+)
+from pentacam_field_registry import (
+    COMPLETION_NUMERIC_FIELDS,
+    EXTRACTION_NUMERIC_FIELDS,
+    TARGET_FIELDS,
 )
 
 
@@ -99,9 +105,21 @@ def test_cornea_back_is_exact_source_for_posterior_values():
 
 
 def test_show2_indices_are_exact_center_index_sources():
-    for field in ("ISV", "IVA", "KI", "CKI", "IHA", "IHD", "TKC", "KISA", "I_S", "topometric_RMin"):
+    for field in ("ISV", "IVA", "KI", "CKI", "IHA", "IHD", "KISA", "I_S", "topometric_RMin"):
         assert canonical_source_id(field) == SHOW_2_INDICES
         assert source_family(field) == SHOW2
+
+
+def test_tkc_is_not_an_extraction_completion_or_report_field():
+    eye_schema = canonical_engine.core.SCHEMA["properties"]["eyes"]["items"]
+
+    assert "TKC" not in CANONICAL_FIELD_SOURCES
+    assert "TKC" not in TARGET_FIELDS
+    assert "TKC" not in EXTRACTION_NUMERIC_FIELDS
+    assert "TKC" not in COMPLETION_NUMERIC_FIELDS
+    assert "TKC" not in REPORT_EXTRACTION_FIELDS
+    assert "TKC" not in eye_schema["properties"]
+    assert "TKC" not in eye_schema["required"]
 
 
 def test_four_maps_lower_left_fields_are_exact_sources():

@@ -40,7 +40,7 @@ GRAY = "52616D"
 GRAY_FILL = "EEF2F5"
 LINE = "D7E0E7"
 INK = "17212B"
-APP_VERSION = "0.7.86"
+APP_VERSION = "2.0"
 PROGRAM_NAME = "Corneal Ectasia Risk Assessment Intelligence"
 
 PDF_UNICODE_REGULAR = "CER-AI-Vera"
@@ -67,7 +67,7 @@ FIELD_LABELS = {
     "topographic_steep_axis_deg": "Displayed steep/astigmatic axis",
     "Rmin_mm": "Posterior Rmin", "topometric_RMin": "Topometric RMin",
     "ISV": "ISV", "IVA": "IVA", "KI": "KI", "CKI": "CKI",
-    "IHA": "IHA", "IHD": "IHD", "TKC": "TKC", "KISA": "KISA",
+    "IHA": "IHA", "IHD": "IHD", "KISA": "KISA",
     "I_S": "Signed I-S", "central_pachy_um": "Pupil Center pachymetry",
     "pachy_thinnest_um": "Thinnest pachymetry", "Kmax_D": "Kmax (Front)",
     "corneal_diameter_mm": "HWTW", "F_Ele_Th_um": "F.Ele.Th",
@@ -92,6 +92,14 @@ PROTECTED_COLUMNS = {
 }
 
 REPORT_BLANK_LINE_PT = 12
+PATIENT_IDENTITY_REPORT_WARNING = (
+    "PATIENT IDENTITY NOT VERIFIED - SURGEON CONFIRMATION REQUIRED"
+)
+PATIENT_IDENTITY_WARNING_PREFIXES = (
+    "PATIENT NAME NOT VERIFIED:",
+    "PATIENT IDENTITY NOT VERIFIED:",
+    "PATIENT IDENTITY REQUIRES CONFIRMATION:",
+)
 
 
 def _rl(value: str):
@@ -188,6 +196,28 @@ def _text(value: Any, fallback: str = "Not documented") -> str:
     if isinstance(value, Mapping):
         return "; ".join(f"{key}: {_text(item)}" for key, item in value.items()) or fallback
     return str(value)
+
+
+def _report_warning_lines(model: Mapping[str, Any]) -> list[str]:
+    """Compact repeated identity evidence for display without altering audit data."""
+    identity_warnings = [
+        _text(warning) for warning in model.get("identity_warnings") or []
+    ]
+    patient_identity_warnings = [
+        warning for warning in identity_warnings
+        if warning.upper().startswith(PATIENT_IDENTITY_WARNING_PREFIXES)
+    ]
+    display_warnings = (
+        [PATIENT_IDENTITY_REPORT_WARNING] if patient_identity_warnings else []
+    )
+    display_warnings.extend(
+        warning for warning in identity_warnings
+        if warning not in patient_identity_warnings
+    )
+    display_warnings.extend(
+        _text(warning) for warning in model.get("source_quality_warnings") or []
+    )
+    return list(dict.fromkeys(display_warnings))
 
 
 def _provenance(entries: Any) -> str:
@@ -563,16 +593,16 @@ def build_pdf(payload: Mapping[str, Any]) -> bytes:
     story.append(Spacer(1, REPORT_BLANK_LINE_PT))
     patient = model["patient"]
     story.append(_pdf_table([
-        [tr("Patient"), _text(patient.get("name"), tr("Not documented")), tr("Patient ID"), _text(patient.get("id"), tr("Not documented"))],
-        [tr("Age"), _text(patient.get("age"), tr("Not documented")), tr("Assessment date"), _text(patient.get("report_date"), tr("Not documented"))],
-        [tr("Reviewer"), _text(patient.get("reviewer"), tr("Not documented")), tr("Overall disposition"), _text(model.get("status"))],
+        [tr("Patient"), _text(patient.get("name"), tr("Not documented")), tr("Age"), _text(patient.get("age"), tr("Not documented"))],
+        [tr("Assessment date"), _text(patient.get("report_date"), tr("Not documented")), tr("Reviewer"), _text(patient.get("reviewer"), tr("Not documented"))],
+        [tr("Eyes"), _text([eye.get("eye") for eye in model.get("eyes") or []]), tr("Overall disposition"), _text(model.get("status"))],
     ], styles, regular, bold, locale=locale, protected_cells=PATIENT_LITERAL_CELLS))
     story.append(Spacer(1, REPORT_BLANK_LINE_PT))
     if model.get("action"):
         foreground, background = _status_palette(model.get("status")) or (GRAY, GRAY_FILL)
         action_style = ParagraphStyle(name="ResultNotice", parent=styles["Notice"], textColor=_rl(foreground), backColor=_rl(background))
         story.append(Paragraph(escape(tr(_text(model["action"]))), action_style))
-    for warning in model["identity_warnings"] + model["source_quality_warnings"]:
+    for warning in _report_warning_lines(model):
         story.append(Paragraph(escape(tr(_text(warning))), styles["Warning"]))
     for eye in model["eyes"]:
         if eye["eye"] == "OD":
@@ -649,9 +679,9 @@ def build_conclusion_pdf(payload: Mapping[str, Any]) -> bytes:
     ]
     patient = model["patient"]
     content.append(_pdf_table([
-        [tr("Patient"), _text(patient.get("name"), tr("Not documented")), tr("Patient ID"), _text(patient.get("id"), tr("Not documented"))],
-        [tr("Age"), _text(patient.get("age"), tr("Not documented")), tr("Assessment date"), _text(patient.get("report_date"), tr("Not documented"))],
-        [tr("Reviewer"), _text(patient.get("reviewer"), tr("Not documented")), tr("Overall disposition"), _text(model.get("status"))],
+        [tr("Patient"), _text(patient.get("name"), tr("Not documented")), tr("Age"), _text(patient.get("age"), tr("Not documented"))],
+        [tr("Assessment date"), _text(patient.get("report_date"), tr("Not documented")), tr("Reviewer"), _text(patient.get("reviewer"), tr("Not documented"))],
+        [tr("Eyes"), _text([eye.get("eye") for eye in model.get("eyes") or []]), tr("Overall disposition"), _text(model.get("status"))],
     ], styles, regular, bold, locale=locale, protected_cells=PATIENT_LITERAL_CELLS))
     content.append(Spacer(1, 4))
     foreground, background = _status_palette(model.get("status")) or (GRAY, GRAY_FILL)
@@ -663,7 +693,7 @@ def build_conclusion_pdf(payload: Mapping[str, Any]) -> bytes:
     if model.get("action"):
         overall += f" — {tr(_text(model.get('action')))}"
     content.append(Paragraph(escape(overall), overall_style))
-    for warning in model["identity_warnings"] + model["source_quality_warnings"]:
+    for warning in _report_warning_lines(model):
         content.append(Paragraph(escape(tr(_text(warning))), styles["ConclusionWarning"]))
 
     for eye in model["eyes"]:
@@ -800,9 +830,9 @@ def build_docx(payload: Mapping[str, Any]) -> bytes:
     notice.paragraph_format.space_after = Pt(8 + REPORT_BLANK_LINE_PT)
     patient = model["patient"]
     _docx_table(document, [
-        [tr("Patient"), _text(patient.get("name"), tr("Not documented")), tr("Patient ID"), _text(patient.get("id"), tr("Not documented"))],
-        [tr("Age"), _text(patient.get("age"), tr("Not documented")), tr("Assessment date"), _text(patient.get("report_date"), tr("Not documented"))],
-        [tr("Reviewer"), _text(patient.get("reviewer"), tr("Not documented")), tr("Overall disposition"), _text(model.get("status"))],
+        [tr("Patient"), _text(patient.get("name"), tr("Not documented")), tr("Age"), _text(patient.get("age"), tr("Not documented"))],
+        [tr("Assessment date"), _text(patient.get("report_date"), tr("Not documented")), tr("Reviewer"), _text(patient.get("reviewer"), tr("Not documented"))],
+        [tr("Eyes"), _text([eye.get("eye") for eye in model.get("eyes") or []]), tr("Overall disposition"), _text(model.get("status"))],
     ], locale=locale, protected_cells=PATIENT_LITERAL_CELLS)
     gap = document.add_paragraph()
     gap.paragraph_format.line_spacing = Pt(REPORT_BLANK_LINE_PT)
@@ -811,7 +841,7 @@ def build_docx(payload: Mapping[str, Any]) -> bytes:
     if model.get("action"):
         foreground, background = _status_palette(model.get("status")) or (GRAY, GRAY_FILL)
         _docx_notice(document, tr(_text(model["action"])), foreground, background)
-    for warning in model["identity_warnings"] + model["source_quality_warnings"]:
+    for warning in _report_warning_lines(model):
         _docx_notice(document, tr(_text(warning)), AMBER, AMBER_FILL)
     for eye in model["eyes"]:
         paragraph = document.add_heading(f"{_text(eye['eye'])} — {tr(_text(eye['status']))}", level=1)

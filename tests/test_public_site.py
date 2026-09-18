@@ -65,20 +65,20 @@ def test_public_homepage_identifies_software_and_clinical_author():
         assert match is not None
         graph = json.loads(match.group(1))["@graph"]
         by_type = {item["@type"]: item for item in graph}
-        assert by_type["SoftwareApplication"]["softwareVersion"] == "0.7.86"
+        assert by_type["SoftwareApplication"]["softwareVersion"] == "2.0"
         assert by_type["Person"]["name"] == "Hüseyin Cengiz, M.D."
         assert by_type["Person"]["url"] == "https://cer-ai.com/about/huseyin-cengiz"
         assert by_type["Person"]["sameAs"] == [
             "https://www.linkedin.com/in/huseyin-cengiz-md-881b9797/"
         ]
-        assert by_type["MedicalWebPage"]["dateModified"] == "2026-09-11"
+        assert by_type["MedicalWebPage"]["dateModified"] == "2026-09-17"
 
 
 def test_clinical_app_has_stable_app_entry():
     with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
         response = client.get("/app")
         assert response.status_code == 200
-        assert "CER-AI — Corneal Ectasia Risk Assessment Intelligence v0.7.86" in response.text
+        assert "CER-AI — Corneal Ectasia Risk Assessment Intelligence v2.0" in response.text
         assert "public-home" not in response.text
 
 
@@ -133,7 +133,7 @@ def test_sitemap_contains_only_public_discovery_pages():
         ) in text
         assert (
             "<loc>https://cer-ai.com/learning-center</loc>"
-            "<lastmod>2026-09-11</lastmod>"
+                "<lastmod>2026-09-11</lastmod>"
         ) in text
         for private_path in ("/app", "/analyze", "/assessment/", "/archive"):
             assert f"<loc>https://cer-ai.com{private_path}" not in text

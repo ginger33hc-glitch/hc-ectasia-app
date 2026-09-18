@@ -41,11 +41,12 @@ def test_turkish_exports_translate_current_report_sections_and_preserve_snapshot
             'Mitomisin-C önerisi', 'NORMAL / UYGUN', 'yalnızca bilgilendirme',
             'UYGUN — CER-AI nihai birleştirme ölçütleri karşılandı',
             'Kaynak: Axial/Sagittal Curvature (Front).',
-            'No Source Şule Işık', 'PASS-NO-035', 'Dr. Çağrı Şen',
+                'No Source Şule Işık', 'Dr. Çağrı Şen',
             'SHOW_2_CORNEA_BACK / show2.png', 'BAD_D_STRIP / OD-bad.png',
                 'CER-AI-2026-09-10-PS3-490-499-LASIK-EXCEPTION-V8',
         ):
             assert required in content
+        assert 'PASS-NO-035' not in content
         for obsolete in ('Canonical result', 'Procedure disposition', 'selected_plan',
                          'information only', 'Recommendation only;', 'Inter-eye score',
                          'Corneal Ectasia Risk Assessment Intelligence'):

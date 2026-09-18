@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>CER-AI — Corneal Ectasia Risk Assessment Intelligence v0.7.86</title>
+  <title>CER-AI — Corneal Ectasia Risk Assessment Intelligence v2.0</title>
   <link rel="manifest" href="/static/manifest.webmanifest?v=12">
   <meta name="apple-mobile-web-app-title" content="CER-AI Staging">
   <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png?v=8">
@@ -42,7 +42,7 @@
   <style>@media print{.report-card[hidden]{display:none!important}}</style>
 </head>
 <body>
-<header class="app-header"><div class="brand-lockup"><div class="brand-logo-frame" aria-label="CER-AI"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=5" alt="CER-AI"></div><div class="brand-subtitle">Corneal Ectasia Risk <span class="brand-initial">A</span>ssessment <span class="brand-initial">I</span>ntelligence</div><span class="brand-version">v0.7.86</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI — Corneal Ectasia Risk Assessment Intelligence v0.7.86</h1></header>
+<header class="app-header"><div class="brand-lockup"><div class="brand-logo-frame" aria-label="CER-AI"><img class="brand-logo" src="/static/branding/cer-ai-logo-final.png?v=5" alt="CER-AI"></div><div class="brand-subtitle">Corneal Ectasia Risk <span class="brand-initial">A</span>ssessment <span class="brand-initial">I</span>ntelligence</div><span class="brand-version">v2.0</span></div><div class="language-switch no-print" role="group" aria-label="Language"><span>Language</span><button type="button" data-language="en">English</button><button type="button" data-language="tr">Türkçe</button></div><h1 class="sr-only">CER-AI — Corneal Ectasia Risk Assessment Intelligence v2.0</h1></header>
 <main>
   <div class="card">
     <h2>Case inputs</h2>
@@ -52,7 +52,6 @@
       <h3>Report identification</h3>
       <div class="grid">
         <div class="row"><label>Patient name</label><input id="patient_name" type="text" autocomplete="off"></div>
-        <div class="row"><label>Patient ID / record number</label><input id="patient_id" type="text" autocomplete="off"></div>
         <div class="row" id="manualAgeRow" hidden><label>Patient age (years)</label><input id="age" name="age" type="number" min="18" max="120" step="1"></div>
         <div class="row"><label>Reviewer / surgeon</label><input id="reviewer" type="text" autocomplete="off"></div>
         <div class="row"><label>Assessment date</label><input id="report_date" type="date"></div>
@@ -103,18 +102,19 @@
       <button id="pdfBtn" type="button">Open / Download PDF</button>
       <button id="wordBtn" type="button" class="secondary">Download Word</button>
       <button id="conclusionPdfBtn" type="button" class="secondary">Open / Print one-page conclusion</button>
+      <button id="shareConclusionBtn" type="button" class="secondary">Share one-page conclusion</button>
       <button id="printBtn" type="button" class="secondary">Print report</button>
     </div>
     <article id="reportSheet" class="report-sheet">
       <div class="report-masthead">
         <div><div class="report-kicker">CER-AI Clinical Decision Support</div><div class="note">Corneal Ectasia Risk Assessment Intelligence</div><h2>PREOPERATIVE ECTASIA RISK ASSESSMENT</h2><div class="note">Corneal refractive surgery assessment report</div></div>
-        <div class="report-version"><strong>Software v0.7.86</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
+        <div class="report-version"><strong>Software v2.0</strong><br>Eye-specific assessment<br><span id="generatedAt"></span></div>
       </div>
       <p class="report-liability-notice">The final surgical decision and all associated responsibility and liability rest with the surgeon. This application is a clinical decision-support aid only.</p>
       <table class="meta-table"><tbody>
-        <tr><th>Patient</th><td id="reportPatient">Not documented</td><th>Patient ID</th><td id="reportPatientId">Not documented</td></tr>
-        <tr><th>Age</th><td id="reportAge">Not documented</td><th>Date</th><td id="reportDate">Not documented</td></tr>
-        <tr><th>Reviewer</th><td id="reportReviewer">Not documented</td><th>Eyes</th><td id="reportEyes">—</td></tr>
+        <tr><th>Patient</th><td id="reportPatient">Not documented</td><th>Age</th><td id="reportAge">Not documented</td></tr>
+        <tr><th>Date</th><td id="reportDate">Not documented</td><th>Reviewer</th><td id="reportReviewer">Not documented</td></tr>
+        <tr><th>Eyes</th><td id="reportEyes" colspan="3">—</td></tr>
       </tbody></table>
       <div class="report-section-title">Overall disposition</div>
       <div id="reportPatientBanner" class="report-patient-name">PATIENT NAME NOT DOCUMENTED</div>
@@ -340,6 +340,7 @@ const cardTransferNote = document.querySelector("#cardTransferNote");
 const pdfBtn = document.querySelector("#pdfBtn");
 const wordBtn = document.querySelector("#wordBtn");
 const conclusionPdfBtn = document.querySelector("#conclusionPdfBtn");
+const shareConclusionBtn = document.querySelector("#shareConclusionBtn");
 const printBtn = document.querySelector("#printBtn");
 const imageInput = document.querySelector("#imageInput");
 const sourceSetStatus = document.querySelector("#sourceSetStatus");
@@ -362,6 +363,14 @@ function renderSourceSetStatus(summary){
   sourceSetStatus.hidden=false;
 }
 function resetAgeAcquisition(){
+  // An editable value was entered by the surgeon and remains authoritative
+  // when images are added or replaced for the same assessment. Only an age
+  // auto-derived from the previous image set (the read-only state) is stale.
+  if(ageInput.value.trim()!==""&&!ageInput.readOnly){
+    ageInput.required=false;
+    manualAgeRow.hidden=false;
+    return;
+  }
   ageInput.value="";
   ageInput.readOnly=false;
   ageInput.required=false;
@@ -698,7 +707,7 @@ function renderEye(r){
 }
 
 function patientPayload(){return {
-  name:value("patient_name")||null, id:value("patient_id")||null, age:numberOrNull("age"),
+  name:value("patient_name")||null, age:numberOrNull("age"),
   reviewer:value("reviewer")||null, report_date:value("report_date")||null
 }}
 const orderedEyes=(eyes)=>[...(eyes||[])].sort((a,b)=>({OD:0,OS:1}[a.eye]??2)-({OD:0,OS:1}[b.eye]??2));
@@ -706,7 +715,6 @@ function setReportMetadata(decision){
   const p=patientPayload();
   document.querySelector("#reportPatient").textContent=p.name||i18n.translate("Not documented");
   document.querySelector("#reportPatientBanner").textContent=p.name||i18n.translate("PATIENT NAME NOT DOCUMENTED");
-  document.querySelector("#reportPatientId").textContent=p.id||i18n.translate("Not documented");
   document.querySelector("#reportAge").textContent=p.age??i18n.translate("Not documented");
   document.querySelector("#reportDate").textContent=p.report_date||i18n.translate("Not documented");
   document.querySelector("#reportReviewer").textContent=p.reviewer||i18n.translate("Not documented");
@@ -725,7 +733,7 @@ async function downloadReport(kind){
     const response=await ceraiFetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(lastReport)});
     if(!response.ok)throw new Error(`Report export failed (${response.status})`);
     const blob=await response.blob(), url=URL.createObjectURL(blob), a=document.createElement("a");
-    const id=(lastReport.patient.id||lastReport.patient.name||"Report").replace(/[^a-z0-9_-]+/gi,"_");
+    const id=(lastReport.patient.name||"Report").replace(/[^a-z0-9_-]+/gi,"_");
     a.href=url;
     if(kind==="pdf"||kind==="conclusion"){
       if(preview)preview.location.replace(url);
@@ -736,9 +744,35 @@ async function downloadReport(kind){
     setTimeout(()=>URL.revokeObjectURL(url),60000);
   }catch(err){if(preview)preview.close();alert(String(err))}finally{button.disabled=false;button.textContent=original}
 }
+async function shareConclusionReport(){
+  if(!lastReport)return;
+  const original=shareConclusionBtn.textContent;
+  shareConclusionBtn.disabled=true;shareConclusionBtn.textContent=i18n.translate("Preparing...");
+  try{
+    const response=await ceraiFetch("/report/conclusion/pdf",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(lastReport)});
+    if(!response.ok)throw new Error(`Report export failed (${response.status})`);
+    const blob=await response.blob();
+    const id=(lastReport.patient.name||"Report").replace(/[^a-z0-9_-]+/gi,"_");
+    const filename=`CER-AI_${id}_Conclusion.pdf`;
+    const file=new File([blob],filename,{type:"application/pdf"});
+    if(typeof navigator.share==="function"&&typeof navigator.canShare==="function"&&navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({files:[file],title:"CER-AI one-page conclusion"});
+      }catch(error){
+        if(error?.name!=="AbortError")throw error;
+      }
+    }else{
+      const url=URL.createObjectURL(blob),a=document.createElement("a");
+      a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),60000);
+      alert(i18n.translate("The PDF was downloaded. Attach the downloaded file in WhatsApp."));
+    }
+  }catch(error){alert(String(error))}finally{shareConclusionBtn.disabled=false;shareConclusionBtn.textContent=original}
+}
 pdfBtn.addEventListener("click",()=>downloadReport("pdf"));
 wordBtn.addEventListener("click",()=>downloadReport("word"));
 conclusionPdfBtn.addEventListener("click",()=>downloadReport("conclusion"));
+shareConclusionBtn.addEventListener("click",shareConclusionReport);
 printBtn.addEventListener("click",()=>{if(lastReport&&!reportCard.hidden)window.print();});
 // A report belongs to its assessed inputs, never to subsequently edited form values.
 f.addEventListener('input',()=>{reportCard.hidden=true;lastReport=null;});

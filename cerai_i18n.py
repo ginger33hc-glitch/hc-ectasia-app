@@ -205,7 +205,6 @@ TR = {
     "Manual / not documented": "Manuel / belgelenmedi",
     "axis unavailable": "aks mevcut değil",
     "Patient": "Hasta",
-    "Patient ID": "Hasta kimliği",
     "Age": "Yaş",
     "Assessment date": "Değerlendirme tarihi",
     "Reviewer": "Değerlendiren",

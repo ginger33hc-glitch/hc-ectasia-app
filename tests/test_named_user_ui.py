@@ -154,6 +154,7 @@ def test_archive_page_hides_archive_until_retrospective_capability_is_confirmed(
     text = named_user_ui.ARCHIVE_HTML.read_text(encoding="utf-8")
     assert 'id="archiveSearch" class="card capability" hidden' in text
     assert 'id="archiveResults" class="card capability" hidden' in text
-    assert "OWNER retrospective scope: patient name and ID are masked" in text
+    assert "OWNER retrospective scope: patient names are masked" in text
+    assert 'id="patient_id"' not in text
     assert "if(capabilities.retrospective_archive_access)" in text
     assert "Masked in OWNER view" in text

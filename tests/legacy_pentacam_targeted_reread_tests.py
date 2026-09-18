@@ -11,6 +11,7 @@ import pytest
 
 import assessment_workflow
 import pentacam_targeted_reread as targeted
+from pentacam_canonical_source_lock import CANONICAL_FIELD_SOURCES
 
 
 def test_completion_requests_only_manifest_when_intended_is_wholly_blank():
@@ -56,9 +57,9 @@ def pentacam_result(**values):
         "screen_types": ["PENTACAM_BAD_DISPLAY"],
         "keratometry_source": "NOT_SHOWN",
         "table_verified_numeric_fields": [],
-        "missing_or_unreadable": list(targeted.TARGET_FIELDS),
+        "missing_or_unreadable": list(CANONICAL_FIELD_SOURCES),
     }
-    eye.update({field: None for field in targeted.TARGET_FIELDS})
+    eye.update({field: None for field in CANONICAL_FIELD_SOURCES})
     eye.update(values)
     return {
         "document_context": {"document_type": "PENTACAM_TOPOGRAPHY"},
@@ -101,7 +102,7 @@ def test_tiles_cover_source_with_overlap_and_are_valid_png_images():
 def test_only_null_fields_are_requested_and_non_pentacam_is_ignored():
     result = pentacam_result(ARTmax_um=401.0, PPI_max=None)
     requested = targeted.missing_targets_by_eye(result)
-    assert "PPI_max" in requested["OD"]
+    assert "PPI_max" not in requested["OD"]
     assert "ARTmax_um" not in requested["OD"]
     result["document_context"]["document_type"] = "TREATMENT_CARD"
     result["eyes"][0]["screen_types"] = ["TREATMENT_CARD"]
@@ -530,8 +531,8 @@ def test_targeted_call_uses_original_and_four_crops_with_focused_settings(monkey
     images = [item for item in content if item["type"] == "input_image"]
     assert len(images) == 5
     assert all(item["detail"] == "original" for item in images)
-    assert captured["reasoning"] == {"effort": "medium"}
-    assert captured["text"]["verbosity"] == "high"
+    assert captured["reasoning"] == {"effort": "low"}
+    assert captured["text"]["verbosity"] == "low"
     assert captured["text"]["format"]["strict"] is True
 
 

@@ -21,7 +21,6 @@
     <form id="searchForm">
       <div class="grid">
         <div class="field"><label for="patient_name">Patient name</label><input id="patient_name" autocomplete="off"></div>
-        <div class="field"><label for="patient_id">Patient ID</label><input id="patient_id" autocomplete="off"></div>
         <div class="field"><label for="report_date">Report date</label><input id="report_date" placeholder="YYYY-MM-DD" autocomplete="off"></div>
         <div class="field"><label for="decision">Decision</label><input id="decision" placeholder="PASS / PASS WITH CAUTION / CAUTION / STOP-DEFER" autocomplete="off"></div>
         <div class="field"><label for="reviewer">Reviewer</label><input id="reviewer" autocomplete="off"></div>
@@ -34,7 +33,7 @@
 
   <section id="archiveResults" class="card capability" hidden>
     <h2>Results</h2>
-    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Patient</th><th>ID</th><th>Decision</th><th>Reviewer</th><th>Created by</th><th>Revision</th><th>Reports</th><th>Pentacam sources</th></tr></thead><tbody id="resultsBody"><tr><td colspan="9">Run a search to list cases.</td></tr></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Patient</th><th>Decision</th><th>Reviewer</th><th>Created by</th><th>Revision</th><th>Reports</th><th>Pentacam sources</th></tr></thead><tbody id="resultsBody"><tr><td colspan="8">Run a search to list cases.</td></tr></tbody></table></div>
   </section>
 
   <section id="ownerTools" class="card owner-only" hidden>
@@ -109,7 +108,7 @@
       const response=await request(base);if(!response.ok)throw new Error(await readError(response));
       const data=await response.json(),entry=data.catalog||{},assessment=data.assessment||{},patient=entry.patient||{},creator=entry.created_by||{},decision=assessment.decision||entry.decision||{};
       const eyes=(decision.eyes||[]).map(eye=>`${escapeHtml(eye.eye||"")}: <span class="decision ${decisionClass(eye.status)}">${escapeHtml(eye.status||"")}</span>`).join(" · ")||"Not documented";
-      detail.innerHTML=`<div class="case-summary"><div><strong>Patient</strong>${escapeHtml(patient.name||"Not documented")}</div><div><strong>Patient ID</strong>${escapeHtml(patient.id||"Not documented")}</div><div><strong>Report date</strong>${escapeHtml(entry.report_date||"Not documented")}</div><div><strong>Surgeon / reviewer</strong>${escapeHtml(entry.reviewer||"Not documented")}</div><div><strong>Archived by</strong>${escapeHtml(creator.display_name||"Legacy / unassigned")}</div><div><strong>Overall decision</strong><span class="decision ${decisionClass(decision.status)}">${escapeHtml(decision.status||"Not documented")}</span></div><div><strong>Eye decisions</strong>${eyes}</div><div><strong>Revision</strong><span class="mono">${escapeHtml(entry.revision_id||revisionId)}</span></div></div>${reportLinks(entry)}`;
+      detail.innerHTML=`<div class="case-summary"><div><strong>Patient</strong>${escapeHtml(patient.name||"Not documented")}</div><div><strong>Report date</strong>${escapeHtml(entry.report_date||"Not documented")}</div><div><strong>Surgeon / reviewer</strong>${escapeHtml(entry.reviewer||"Not documented")}</div><div><strong>Archived by</strong>${escapeHtml(creator.display_name||"Legacy / unassigned")}</div><div><strong>Overall decision</strong><span class="decision ${decisionClass(decision.status)}">${escapeHtml(decision.status||"Not documented")}</span></div><div><strong>Eye decisions</strong>${eyes}</div><div><strong>Revision</strong><span class="mono">${escapeHtml(entry.revision_id||revisionId)}</span></div></div>${reportLinks(entry)}`;
       status.textContent=capabilities?.owner_deidentified_access ? "De-identified archived assessment reopened. Patient identity and source filenames are masked; no clinical score was recalculated." : "Archived canonical assessment reopened. Values are displayed from the saved snapshot; no clinical score was recalculated.";
     } catch(exc){status.className="status error";status.textContent=exc.message||"Unable to reopen archived case.";}
   };
@@ -133,13 +132,12 @@
   };
   const renderResults = results => {
     const body = $("resultsBody");
-    if (!results.length) { body.innerHTML = `<tr><td colspan="9">No matching archived cases.</td></tr>`; return; }
+    if (!results.length) { body.innerHTML = `<tr><td colspan="8">No matching archived cases.</td></tr>`; return; }
     body.innerHTML = results.map(entry => {
       const patient = entry.patient || {}, decision = entry.decision || {}, creator = entry.created_by || {};
       return `<tr>
         <td>${escapeHtml(entry.report_date || "")}</td>
         <td>${escapeHtml(patient.name || "")}</td>
-        <td>${escapeHtml(patient.id || "")}</td>
         <td><span class="decision ${decisionClass(decision.status)}">${escapeHtml(decision.status || "")}</span></td>
         <td>${escapeHtml(entry.reviewer || "")}</td>
         <td>${escapeHtml(creator.display_name || (creator.user_id ? creator.user_id : "Legacy / unassigned"))}</td>
@@ -155,7 +153,7 @@
     status.className = "status"; status.textContent = "Searching…";
     $("searchButton").disabled = true;
     const payload = {};
-    ["patient_name","patient_id","report_date","decision","reviewer"].forEach(id => { const value = $(id).value.trim(); if (value && !(capabilities?.owner_deidentified_access && ["patient_name","patient_id"].includes(id))) payload[id] = value; });
+    ["patient_name","report_date","decision","reviewer"].forEach(id => { const value = $(id).value.trim(); if (value && !(capabilities?.owner_deidentified_access && id === "patient_name")) payload[id] = value; });
     payload.limit = Number($("limit").value);
     try {
       const response = await request("/archive/search", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
@@ -192,7 +190,7 @@
   };
 
   $("searchForm").addEventListener("submit", e => { e.preventDefault(); search(); });
-  $("clearButton").addEventListener("click", () => { ["patient_name","patient_id","report_date","decision","reviewer"].forEach(id => $(id).value=""); $("limit").value="100"; renderResults([]); $("searchStatus").textContent=""; });
+  $("clearButton").addEventListener("click", () => { ["patient_name","report_date","decision","reviewer"].forEach(id => $(id).value=""); $("limit").value="100"; renderResults([]); $("searchStatus").textContent=""; });
   $("resultsBody").addEventListener("click", event => { const sourceButton=event.target.closest(".source-button"),caseButton=event.target.closest(".case-button"); if(sourceButton)showSources(sourceButton.dataset.caseId,sourceButton.dataset.revisionId);if(caseButton)showCase(caseButton.dataset.caseId,caseButton.dataset.revisionId); });
   $("sourceClose").addEventListener("click", closeSources);
   $("sourceModal").addEventListener("click", event => { if(event.target===$("sourceModal")) closeSources(); });
@@ -209,10 +207,9 @@
     currentUser=(await responses[0].json()).user;
     capabilities=await responses[1].json();
     $("userLabel").textContent=`${currentUser.display_name} · ${currentUser.role}`;
-    $("scopeNote").textContent=currentUser.role==="OWNER" ? "OWNER retrospective scope: patient name and ID are masked, reports are regenerated from de-identified data, and all original source images are inaccessible." : "DOCTOR scope: only cases created under your account, with original identity and source material.";
+    $("scopeNote").textContent=currentUser.role==="OWNER" ? "OWNER retrospective scope: patient names are masked, reports are regenerated from de-identified data, and all original source images are inaccessible." : "DOCTOR scope: only cases created under your account, with original identity and source material.";
     if(currentUser.role==="OWNER") {
       $("patient_name").disabled=true; $("patient_name").placeholder="Masked in OWNER view";
-      $("patient_id").disabled=true; $("patient_id").placeholder="Masked in OWNER view";
       $("ownerTools").hidden=false;
       $("researchControls").hidden=!capabilities.research_export_enabled;
       $("auditControls").hidden=!capabilities.audit_enabled;

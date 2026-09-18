@@ -101,7 +101,3 @@ def evaluate_astigmatic_disparity(
         round(axis_difference, 1) if axis_difference is not None else None,
         f"Astigmatic disparity within validation thresholds: magnitude difference {magnitude_difference:.2f} D{axis_text}; no PS3 consequence.",
     )
-
-
-def axis_requires_targeted_verification(result: AstigmaticDisparityResult) -> bool:
-    return result.axis_difference_deg is not None and result.axis_difference_deg >= 10.0

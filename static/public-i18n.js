@@ -64,7 +64,7 @@
     "Enter the clinical application":"Klinik uygulamaya girin",
     "Select Access CER-AI and enter the authorized doctor name in the current supervised trial login flow.":"CER-AI'ye Eriş seçeneğini seçin ve mevcut kontrollü deneme girişinde yetkili doktor adını girin.",
     "Complete case information":"Vaka bilgilerini tamamlayın",
-    "Enter patient identification, age, planned procedure, refraction, treatment parameters, and clinical modifiers.":"Hasta kimliği, yaş, planlanan prosedür, refraksiyon, tedavi parametreleri ve klinik değiştiricileri girin.",
+    "Enter patient name, age, planned procedure, refraction, treatment parameters, and clinical modifiers.":"Hasta adını, yaşı, planlanan prosedürü, refraksiyonu, tedavi parametrelerini ve klinik değiştiricileri girin.",
     "Upload Pentacam material":"Pentacam materyalini yükleyin",
     "Upload required Pentacam screenshots or source images. CER-AI retains source provenance.":"Gerekli Pentacam ekran görüntülerini veya kaynak görselleri yükleyin. CER-AI kaynak bilgisini korur.",
     "Resolve unread or conflicting fields":"Okunamayan veya çelişkili alanları çözün",
