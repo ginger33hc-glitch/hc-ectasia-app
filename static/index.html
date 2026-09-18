@@ -102,6 +102,7 @@
       <button id="pdfBtn" type="button">Open / Download PDF</button>
       <button id="wordBtn" type="button" class="secondary">Download Word</button>
       <button id="conclusionPdfBtn" type="button" class="secondary">Open / Print one-page conclusion</button>
+      <button id="shareConclusionBtn" type="button" class="secondary">Share one-page conclusion</button>
       <button id="printBtn" type="button" class="secondary">Print report</button>
     </div>
     <article id="reportSheet" class="report-sheet">
@@ -339,6 +340,7 @@ const cardTransferNote = document.querySelector("#cardTransferNote");
 const pdfBtn = document.querySelector("#pdfBtn");
 const wordBtn = document.querySelector("#wordBtn");
 const conclusionPdfBtn = document.querySelector("#conclusionPdfBtn");
+const shareConclusionBtn = document.querySelector("#shareConclusionBtn");
 const printBtn = document.querySelector("#printBtn");
 const imageInput = document.querySelector("#imageInput");
 const sourceSetStatus = document.querySelector("#sourceSetStatus");
@@ -731,7 +733,7 @@ async function downloadReport(kind){
     const response=await ceraiFetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(lastReport)});
     if(!response.ok)throw new Error(`Report export failed (${response.status})`);
     const blob=await response.blob(), url=URL.createObjectURL(blob), a=document.createElement("a");
-    const id=(lastReport.patient.id||lastReport.patient.name||"Report").replace(/[^a-z0-9_-]+/gi,"_");
+    const id=(lastReport.patient.name||"Report").replace(/[^a-z0-9_-]+/gi,"_");
     a.href=url;
     if(kind==="pdf"||kind==="conclusion"){
       if(preview)preview.location.replace(url);
@@ -742,9 +744,35 @@ async function downloadReport(kind){
     setTimeout(()=>URL.revokeObjectURL(url),60000);
   }catch(err){if(preview)preview.close();alert(String(err))}finally{button.disabled=false;button.textContent=original}
 }
+async function shareConclusionReport(){
+  if(!lastReport)return;
+  const original=shareConclusionBtn.textContent;
+  shareConclusionBtn.disabled=true;shareConclusionBtn.textContent=i18n.translate("Preparing...");
+  try{
+    const response=await ceraiFetch("/report/conclusion/pdf",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(lastReport)});
+    if(!response.ok)throw new Error(`Report export failed (${response.status})`);
+    const blob=await response.blob();
+    const id=(lastReport.patient.name||"Report").replace(/[^a-z0-9_-]+/gi,"_");
+    const filename=`CER-AI_${id}_Conclusion.pdf`;
+    const file=new File([blob],filename,{type:"application/pdf"});
+    if(typeof navigator.share==="function"&&typeof navigator.canShare==="function"&&navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({files:[file],title:"CER-AI one-page conclusion"});
+      }catch(error){
+        if(error?.name!=="AbortError")throw error;
+      }
+    }else{
+      const url=URL.createObjectURL(blob),a=document.createElement("a");
+      a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),60000);
+      alert(i18n.translate("The PDF was downloaded. Attach the downloaded file in WhatsApp."));
+    }
+  }catch(error){alert(String(error))}finally{shareConclusionBtn.disabled=false;shareConclusionBtn.textContent=original}
+}
 pdfBtn.addEventListener("click",()=>downloadReport("pdf"));
 wordBtn.addEventListener("click",()=>downloadReport("word"));
 conclusionPdfBtn.addEventListener("click",()=>downloadReport("conclusion"));
+shareConclusionBtn.addEventListener("click",shareConclusionReport);
 printBtn.addEventListener("click",()=>{if(lastReport&&!reportCard.hidden)window.print();});
 // A report belongs to its assessed inputs, never to subsequently edited form values.
 f.addEventListener('input',()=>{reportCard.hidden=true;lastReport=null;});
