@@ -18,12 +18,14 @@ from fastapi import File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.datastructures import Headers
 
+from assessment_progress import bind_progress_sink
+
 
 JOB_TTL_SECONDS = 60 * 60
 MAX_JOBS = 64
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
 MAX_TOTAL_BYTES = 80 * 1024 * 1024
-_CLIENT_SCRIPT = "/static/analysis-jobs-client.js?v=1"
+_CLIENT_SCRIPT = "/static/analysis-jobs-client.js?v=2"
 _APP_HTML = Path("static/index.html")
 
 _jobs: dict[str, dict[str, Any]] = {}
@@ -100,23 +102,43 @@ async def _run(core, job_id: str) -> None:
         if not job:
             return
         job["status"] = "PROCESSING"
+        job["processing_started"] = monotonic()
+        job["progress"] = {
+            "code": "ANALYZING_IMAGES",
+            "completed_images": 0,
+            "total_images": len(job["images"]),
+        }
         job["updated"] = monotonic()
         payload = dict(job["payload"])
         captured = list(job["images"])
+    async def receive_progress(code: str, details: dict[str, Any]) -> None:
+        allowed = {
+            "completed_images", "total_images", "fields",
+        }
+        progress = {key: value for key, value in details.items() if key in allowed}
+        progress["code"] = str(code)
+        async with _lock:
+            current = _jobs.get(job_id)
+            if current and current["status"] == "PROCESSING":
+                current["progress"] = progress
+                current["updated"] = monotonic()
+
     try:
-        result = await core.analyze(
-            images=_uploads(captured),
-            age=payload["age"],
-            eye_plans=payload["eye_plans"],
-            patient_modifiers=payload["patient_modifiers"],
-            patient_metadata=payload["patient_metadata"],
-            assessment_request_id=job_id,
-        )
+        with bind_progress_sink(receive_progress):
+            result = await core.analyze(
+                images=_uploads(captured),
+                age=payload["age"],
+                eye_plans=payload["eye_plans"],
+                patient_modifiers=payload["patient_modifiers"],
+                patient_metadata=payload["patient_metadata"],
+                assessment_request_id=job_id,
+            )
     except HTTPException as exc:
         async with _lock:
             job = _jobs.get(job_id)
             if job:
                 job.update(status="FAILED", http_status=exc.status_code, error=exc.detail,
+                           progress={"code": "FAILED"},
                            updated=monotonic(), expires=monotonic() + JOB_TTL_SECONDS)
         return
     except asyncio.CancelledError:
@@ -126,12 +148,14 @@ async def _run(core, job_id: str) -> None:
             job = _jobs.get(job_id)
             if job:
                 job.update(status="FAILED", http_status=500, error=str(exc),
+                           progress={"code": "FAILED"},
                            updated=monotonic(), expires=monotonic() + JOB_TTL_SECONDS)
         return
     async with _lock:
         job = _jobs.get(job_id)
         if job:
-            job.update(status="COMPLETED", result=result, updated=monotonic(),
+            job.update(status="COMPLETED", result=result,
+                       progress={"code": "COMPLETED"}, updated=monotonic(),
                        expires=monotonic() + JOB_TTL_SECONDS)
             # Raw image bytes are no longer needed after canonical /analyze has
             # created its readiness/report state. Release them promptly.
@@ -189,6 +213,7 @@ def install(core) -> None:
                 return JSONResponse({
                     "job_id": job_id,
                     "status": existing["status"],
+                    "progress": existing.get("progress"),
                     "message": "Existing CER-AI assessment job recovered.",
                 }, status_code=202)
             _jobs[job_id] = {
@@ -196,6 +221,11 @@ def install(core) -> None:
                 "updated": now,
                 "expires": now + JOB_TTL_SECONDS,
                 "status": "UPLOADED",
+                "progress": {
+                    "code": "IMAGES_RECEIVED",
+                    "completed_images": 0,
+                    "total_images": len(captured),
+                },
                 "images": captured,
                 "payload": {
                     "age": age,
@@ -215,6 +245,11 @@ def install(core) -> None:
         return JSONResponse({
             "job_id": job_id,
             "status": "UPLOADED",
+            "progress": {
+                "code": "IMAGES_RECEIVED",
+                "completed_images": 0,
+                "total_images": len(captured),
+            },
             "message": "Images received. CER-AI assessment is running on the server.",
         }, status_code=202)
 
@@ -229,14 +264,24 @@ def install(core) -> None:
                 raise HTTPException(403, "You do not have access to this assessment job.")
             job["expires"] = monotonic() + JOB_TTL_SECONDS
             status = job["status"]
+            started = job.get("processing_started", job["created"])
+            elapsed_ms = max(0, round((monotonic() - started) * 1000))
             if status == "COMPLETED":
-                return JSONResponse({"job_id": job_id, "status": status, "result": job["result"]})
+                return JSONResponse({
+                    "job_id": job_id, "status": status, "result": job["result"],
+                    "progress": job.get("progress"), "elapsed_ms": elapsed_ms,
+                })
             if status == "FAILED":
                 return JSONResponse({
                     "job_id": job_id,
                     "status": status,
                     "detail": job["error"],
+                    "progress": job.get("progress"),
+                    "elapsed_ms": elapsed_ms,
                 }, status_code=int(job.get("http_status") or 500))
-            return JSONResponse({"job_id": job_id, "status": status}, status_code=202)
+            return JSONResponse({
+                "job_id": job_id, "status": status,
+                "progress": job.get("progress"), "elapsed_ms": elapsed_ms,
+            }, status_code=202)
 
     core._cerai_analysis_jobs_installed = True

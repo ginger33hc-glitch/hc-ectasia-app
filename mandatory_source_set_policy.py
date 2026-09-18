@@ -52,6 +52,8 @@ def _screen_tokens(result: dict[str, Any]) -> set[str]:
         if context.get(key):
             tokens.add(_norm(context.get(key)))
     for eye in result.get("eyes") or []:
+        if eye.get("source_family"):
+            tokens.add(_norm(eye.get("source_family")))
         for item in eye.get("screen_types") or []:
             tokens.add(_norm(item))
     return tokens

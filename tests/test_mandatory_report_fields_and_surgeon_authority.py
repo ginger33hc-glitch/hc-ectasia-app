@@ -9,6 +9,7 @@ from pentacam_field_registry import (
     CONDITIONAL_REPORT_FIELDS,
     DECISION_REQUIRED_FIELDS,
     INITIAL_PASS_ONLY_CANONICAL_FIELDS,
+    REPORT_CONTEXT_REREAD_FIELDS,
     TARGET_FIELDS,
 )
 
@@ -49,19 +50,20 @@ def _result():
     }
 
 
-def test_only_clinical_dependencies_are_targeted_or_completed():
-    assert TARGET_FIELDS == DECISION_REQUIRED_FIELDS
+def test_decision_and_bad_report_context_fields_are_targeted_without_extra_completion_fields():
+    assert TARGET_FIELDS == DECISION_REQUIRED_FIELDS + REPORT_CONTEXT_REREAD_FIELDS
     assert set(COMPLETION_NUMERIC_FIELDS) == (
         set(DECISION_REQUIRED_FIELDS) | set(CONDITIONAL_REPORT_FIELDS)
     )
     assert set(INITIAL_PASS_ONLY_CANONICAL_FIELDS) == (
         set(CANONICAL_FIELD_SOURCES)
         - set(DECISION_REQUIRED_FIELDS)
+        - set(REPORT_CONTEXT_REREAD_FIELDS)
         - set(CONDITIONAL_REPORT_FIELDS)
     )
 
 
-def test_optional_initial_pass_fields_never_become_reread_targets():
+def test_bad_report_context_is_targeted_but_other_optional_fields_are_not():
     result = _result()
     result["eyes"][0].update({field: None for field in CANONICAL_FIELD_SOURCES})
     requested = set(targeted.missing_targets_by_eye(result)["OD"])

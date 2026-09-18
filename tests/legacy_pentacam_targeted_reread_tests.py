@@ -99,10 +99,10 @@ def test_tiles_cover_source_with_overlap_and_are_valid_png_images():
     assert sizes[0][1] * 2 > 800
 
 
-def test_only_null_fields_are_requested_and_non_pentacam_is_ignored():
+def test_missing_bad_report_context_is_requested_and_non_pentacam_is_ignored():
     result = pentacam_result(ARTmax_um=401.0, PPI_max=None)
     requested = targeted.missing_targets_by_eye(result)
-    assert "PPI_max" not in requested["OD"]
+    assert "PPI_max" in requested["OD"]
     assert "ARTmax_um" not in requested["OD"]
     result["document_context"]["document_type"] = "TREATMENT_CARD"
     result["eyes"][0]["screen_types"] = ["TREATMENT_CARD"]

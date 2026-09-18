@@ -89,8 +89,8 @@ def test_authenticated_clinical_app_injects_archive_navigation_and_escapes_displ
     assert "Doctor <One>" not in response.text
     assert 'cerAiReviewerField.readOnly = true' in response.text
     assert 'Report attribution is bound to the authenticated CER-AI user.' in response.text
-    assert response.text.count('/static/analysis-jobs-client.js?v=1') == 1
-    assert response.text.index('/static/analysis-jobs-client.js?v=1') < response.text.index(
+    assert response.text.count('/static/analysis-jobs-client.js?v=2') == 1
+    assert response.text.index('/static/analysis-jobs-client.js?v=2') < response.text.index(
         'async function ceraiFetch'
     )
     assert response.headers["cache-control"] == "no-store"

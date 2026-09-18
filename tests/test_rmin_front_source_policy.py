@@ -11,11 +11,13 @@ def test_rmin_has_one_canonical_source_and_no_map_fallback():
     assert not Path("rmin_front_source_policy.py").exists()
 
 
-def test_canonical_prompt_locks_rmin_to_show2_cornea_back():
+def test_optional_rmin_is_omitted_from_compact_primary_contract():
     prompt = canonical_engine.core.PROMPT
-    assert "Rmin_mm: exactly one accepted source" in prompt
-    assert "Cornea Back" in prompt
-    assert "No numeric map fallback is permitted" in prompt
+    show_two_fields = canonical_engine.core.SOURCE_SPECIFIC_EYE_FIELDS[
+        "SHOW_2_EXAMS_TOPOMETRIC"
+    ]
+    assert "Rmin_mm" not in show_two_fields
+    assert "Rmin_mm: exactly one accepted source" not in prompt
 
 
 def test_targeted_reread_rejects_cornea_front_rmin_source():

@@ -8,12 +8,20 @@ defined in this module.
 from pentacam_canonical_source_lock import CANONICAL_FIELD_SOURCES
 
 # These are the only Pentacam values whose absence can prevent the canonical
-# clinical decision/report from being completed.  Only this set is eligible for
-# automatic targeted rereads.
+# clinical decision/report from being completed. They retain the existing
+# five-attempt targeted-reread policy.
 DECISION_REQUIRED_FIELDS = (
     "K2_D", "Kmean_D", "posterior_Kmean_D", "I_S",
     "central_pachy_um", "pachy_thinnest_um",
     "F_Ele_Th_um", "B_Ele_Th_um", "PPI_avg", "BAD_D",
+)
+
+# Context displayed in the canonical BAD section is important for surgeon
+# review even though Final BAD-D remains the only BAD disposition signal.
+# Give missing values one focused reread, without turning them into completion
+# blockers or independent clinical scores.
+REPORT_CONTEXT_REREAD_FIELDS = (
+    "PPI_min", "PPI_max", "ARTmax_um", "Df", "Db", "Dp", "Dt", "Da",
 )
 
 # These values are not decision inputs.  They are requested from the surgeon
@@ -24,21 +32,28 @@ CONDITIONAL_REPORT_FIELDS = (
 )
 
 # Retain these canonical values when their printed label/value is clear on the
-# initial pass.  If absent or unreadable, bypass them without reread, completion
-# request, warning, or report block.
+# initial pass. If absent or unreadable, bypass them without reread, completion
+# request, warning, or report block. This includes the non-scoring Topometric
+# indices requested for one primary-pass attempt.
 INITIAL_PASS_ONLY_CANONICAL_FIELDS = tuple(
     field for field in CANONICAL_FIELD_SOURCES
-    if field not in set(DECISION_REQUIRED_FIELDS) | set(CONDITIONAL_REPORT_FIELDS)
+    if field not in (
+        set(DECISION_REQUIRED_FIELDS)
+        | set(REPORT_CONTEXT_REREAD_FIELDS)
+        | set(CONDITIONAL_REPORT_FIELDS)
+    )
 )
 
 assert set(DECISION_REQUIRED_FIELDS).isdisjoint(CONDITIONAL_REPORT_FIELDS)
+assert set(REPORT_CONTEXT_REREAD_FIELDS).isdisjoint(DECISION_REQUIRED_FIELDS)
 assert (
     set(DECISION_REQUIRED_FIELDS)
+    | set(REPORT_CONTEXT_REREAD_FIELDS)
     | set(CONDITIONAL_REPORT_FIELDS)
     | set(INITIAL_PASS_ONLY_CANONICAL_FIELDS)
 ) == set(CANONICAL_FIELD_SOURCES)
 
-TARGET_FIELDS = DECISION_REQUIRED_FIELDS
+TARGET_FIELDS = DECISION_REQUIRED_FIELDS + REPORT_CONTEXT_REREAD_FIELDS
 
 # Optional descriptive values may be retained when their own printed label and
 # value are immediately readable during the primary pass. They never trigger a
@@ -50,6 +65,7 @@ PASSIVE_INFORMATIONAL_FIELDS = (
 
 NON_MANDATORY_EXTRACTION_FIELDS = (
     CONDITIONAL_REPORT_FIELDS
+    + REPORT_CONTEXT_REREAD_FIELDS
     + INITIAL_PASS_ONLY_CANONICAL_FIELDS
     + PASSIVE_INFORMATIONAL_FIELDS
 )
