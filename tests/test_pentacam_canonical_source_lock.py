@@ -111,15 +111,15 @@ def test_show2_indices_are_exact_center_index_sources():
 
 
 def test_tkc_is_not_an_extraction_completion_or_report_field():
-    eye_schema = canonical_engine.core.SCHEMA["properties"]["eyes"]["items"]
+    eye_schemas = canonical_engine.core.SCHEMA["properties"]["eyes"]["items"]["anyOf"]
 
     assert "TKC" not in CANONICAL_FIELD_SOURCES
     assert "TKC" not in TARGET_FIELDS
     assert "TKC" not in EXTRACTION_NUMERIC_FIELDS
     assert "TKC" not in COMPLETION_NUMERIC_FIELDS
     assert "TKC" not in REPORT_EXTRACTION_FIELDS
-    assert "TKC" not in eye_schema["properties"]
-    assert "TKC" not in eye_schema["required"]
+    assert all("TKC" not in schema["properties"] for schema in eye_schemas)
+    assert all("TKC" not in schema["required"] for schema in eye_schemas)
 
 
 def test_four_maps_lower_left_fields_are_exact_sources():

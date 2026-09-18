@@ -30,14 +30,13 @@ from exam_date_reconciliation_policy import (
 )
 from patient_age_policy import resolve_patient_age
 from pentacam_canonical_source_lock import (
-    is_four_maps_eye,
-    CANONICAL_FIELD_SOURCES, LOCKED_FIELDS, canonical_source_id,
+    is_four_maps_eye, source_family as canonical_source_family,
+    LOCKED_FIELDS, canonical_source_id,
 )
 from pentacam_field_registry import (
     CORNEA_FRONT_KERATOMETRY_FIELDS,
     CORNEA_FRONT_KERATOMETRY_SOURCE,
     EXTRACTION_NUMERIC_FIELDS,
-    KERATOMETRY_SOURCE_VALUES,
     INITIAL_PASS_ONLY_CANONICAL_FIELDS,
     NON_MANDATORY_EXTRACTION_FIELDS,
     PASSIVE_INFORMATIONAL_FIELDS,
@@ -74,6 +73,63 @@ _analysis_request_lock = RLock()
 _analysis_request_tasks: Dict[tuple[str, str], tuple[float, asyncio.Task]] = {}
 
 EYES = ("OD", "OS")
+
+# One canonical extraction contract with source-specific eye variants.  The
+# model chooses the page family visible in the image and emits only fields that
+# belong to that family's registered source boxes.  Downstream receives the
+# same normalized flat eye dictionary after ``normalized_eye`` fills absent
+# fields with nulls and reconstructs registry-owned provenance.
+SOURCE_SPECIFIC_EYE_FIELDS = {
+    "FOUR_MAPS_REFRACTIVE": (
+        "central_pachy_um", "pachy_thinnest_um", "Kmax_D", "corneal_diameter_mm",
+    ),
+    "BAD_DISPLAY": (
+        "F_Ele_Th_um", "B_Ele_Th_um", "PPI_avg", "BAD_D", "bad_flat_axis_deg",
+    ),
+    "SHOW_2_EXAMS_TOPOMETRIC": (
+        "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmean_D",
+        "posterior_Kmean_D", "topographic_astig_D",
+        "topographic_steep_axis_deg", "I_S",
+    ),
+    "OTHER": (),
+}
+
+
+def _source_specific_eye_schema(family: str) -> Dict[str, Any]:
+    fields = SOURCE_SPECIFIC_EYE_FIELDS[family]
+    keratometry_values = (
+        [CORNEA_FRONT_KERATOMETRY_SOURCE, "UNREADABLE", "NOT_SHOWN"]
+        if family == "SHOW_2_EXAMS_TOPOMETRIC"
+        else ["OTHER_PENTACAM_SOURCE", "UNREADABLE", "NOT_SHOWN"]
+    )
+    properties: Dict[str, Any] = {
+        "eye": {"type": "string", "enum": ["OD", "OS", "UNKNOWN"]},
+        "source_family": {"type": "string", "enum": [family]},
+        "screen_types": {"type": "array", "items": {"type": "string"}},
+        "quality": {"type": "string", "enum": ["ADEQUATE", "LIMITED", "INADEQUATE"]},
+        "missing_or_unreadable": {"type": "array", "items": {"type": "string"}},
+        "table_verified_numeric_fields": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": list(fields) or ["NO_NUMERIC_FIELDS"],
+            },
+        },
+        "keratometry_source": {"type": "string", "enum": keratometry_values},
+    }
+    properties.update({field: {"type": ["number", "null"]} for field in fields})
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": properties,
+        "required": list(properties),
+    }
+
+
+SOURCE_SPECIFIC_EYE_SCHEMAS = [
+    _source_specific_eye_schema(family) for family in SOURCE_SPECIFIC_EYE_FIELDS
+]
+
 SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -120,82 +176,7 @@ SCHEMA = {
         },
         "eyes": {
             "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "eye": {"type": "string", "enum": ["OD", "OS", "UNKNOWN"]},
-                    "screen_types": {"type": "array", "items": {"type": "string"}},
-                    "quality": {"type": "string", "enum": ["ADEQUATE", "LIMITED", "INADEQUATE"]},
-                    "missing_or_unreadable": {"type": "array", "items": {"type": "string"}},
-                    "table_verified_numeric_fields": {
-                        "type": "array",
-                        "items": {"type": "string", "enum": list(EXTRACTION_NUMERIC_FIELDS)},
-                    },
-                    "keratometry_source": {
-                        "type": "string",
-                        "enum": list(KERATOMETRY_SOURCE_VALUES),
-                    },
-                    "K1_D": {"type": ["number", "null"]},
-                    "K1_axis_deg": {"type": ["number", "null"]},
-                    "K2_D": {"type": ["number", "null"]},
-                    "K2_axis_deg": {"type": ["number", "null"]},
-                    "Kmax_D": {"type": ["number", "null"]},
-                    "central_pachy_um": {"type": ["number", "null"]},
-                    "B_Ele_Th_um": {"type": ["number", "null"]},
-                    "F_Ele_Th_um": {"type": ["number", "null"]},
-                    "posterior_Kmean_D": {"type": ["number", "null"]},
-                    "topographic_astig_D": {"type": ["number", "null"]},
-                    "topographic_steep_axis_deg": {"type": ["number", "null"]},
-                    "bad_flat_axis_deg": {"type": ["number", "null"]},
-                    "topometric_RMin": {"type": ["number", "null"]},
-                    "corneal_diameter_mm": {"type": ["number", "null"]},
-                    "pachy_thinnest_um": {"type": ["number", "null"]},
-                    "BAD_D": {"type": ["number", "null"]},
-                    "Df": {"type": ["number", "null"]},
-                    "Db": {"type": ["number", "null"]},
-                    "Dp": {"type": ["number", "null"]},
-                    "Dt": {"type": ["number", "null"]},
-                    "Da": {"type": ["number", "null"]},
-                    "PPI_avg": {"type": ["number", "null"]},
-                    "PPI_min": {"type": ["number", "null"]},
-                    "PPI_max": {"type": ["number", "null"]},
-                    "ARTmax_um": {"type": ["number", "null"]},
-                    "ISV": {"type": ["number", "null"]},
-                    "IVA": {"type": ["number", "null"]},
-                    "KI": {"type": ["number", "null"]},
-                    "CKI": {"type": ["number", "null"]},
-                    "IHD": {"type": ["number", "null"]},
-                    "I_S": {"type": ["number", "null"]},
-                    "KISA": {"type": ["number", "null"]},
-                    "IHA": {"type": ["number", "null"]},
-                    "Rmin_mm": {"type": ["number", "null"]},
-                    "thinnest_x_mm": {"type": ["number", "null"]},
-                    "thinnest_y_mm": {"type": ["number", "null"]},
-                    "corneal_volume_mm3": {"type": ["number", "null"]},
-                    "RMS_HOA_um": {"type": ["number", "null"]},
-                    "vertical_coma_um": {"type": ["number", "null"]},
-                    "Kmean_D": {"type": ["number", "null"]},
-                    "total_RMS_um": {"type": ["number", "null"]},
-                    "spherical_aberration_um": {"type": ["number", "null"]},
-                    "srax": {"type": "string", "enum": ["YES", "NO", "UNCERTAIN"]},
-                    "srax_deg": {"type": ["number", "null"]},
-                },
-                "required": [
-                    "eye", "screen_types", "quality", "missing_or_unreadable",
-                    "table_verified_numeric_fields", "keratometry_source",
-                    "K1_D", "K1_axis_deg",
-                    "K2_D", "K2_axis_deg", "Kmax_D", "corneal_diameter_mm", "pachy_thinnest_um",
-                    "BAD_D", "Df", "Db", "Dp", "Dt", "Da",
-                    "PPI_avg", "PPI_min", "PPI_max", "ARTmax_um", "ISV", "IVA", "KI", "CKI", "IHD",
-                    "I_S", "KISA", "IHA", "Rmin_mm", "thinnest_x_mm", "thinnest_y_mm",
-                    "corneal_volume_mm3", "RMS_HOA_um", "vertical_coma_um", "Kmean_D",
-                    "total_RMS_um", "spherical_aberration_um",
-                    "central_pachy_um", "B_Ele_Th_um", "F_Ele_Th_um", "posterior_Kmean_D",
-                    "topographic_astig_D", "topographic_steep_axis_deg", "bad_flat_axis_deg", "topometric_RMin",
-                    "srax", "srax_deg",
-                ],
-            },
+            "items": {"anyOf": SOURCE_SPECIFIC_EYE_SCHEMAS},
         },
         "treatment_corrections": {
             "type": "array",
@@ -264,20 +245,6 @@ SCHEMA["properties"]["laser_plans"] = {
 }}
 SCHEMA["required"].append("laser_plans")
 
-_CANONICAL_SOURCE_ID_PROPERTIES = {
-    field: {"type": ["string", "null"], "enum": [source_id, None]}
-    for field, (source_id, _label) in CANONICAL_FIELD_SOURCES.items()
-}
-_eye_schema = SCHEMA["properties"]["eyes"]["items"]
-_eye_schema["properties"]["canonical_source_ids"] = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": _CANONICAL_SOURCE_ID_PROPERTIES,
-    "required": list(CANONICAL_FIELD_SOURCES),
-}
-if "canonical_source_ids" not in _eye_schema["required"]:
-    _eye_schema["required"].append("canonical_source_ids")
-
 PROMPT = """You are a strict data-extraction component for preoperative corneal-refractive-surgery images.
 The image may be a Pentacam/topography screen, an Excimer Laser Follow-up Card (Excimer Laser Takip
 Karti), or another clinical document. Extract only values visibly supported by the supplied image.
@@ -323,29 +290,31 @@ explicitly visible acceptable/OK QS. Use NOT_OK for a visible non-OK status, UNR
 area is present but cannot be read, and NOT_SHOWN when no QS field is visible. Treatment cards and
 non-Pentacam documents use NOT_APPLICABLE.
 
-PENTACAM NUMERIC-SOURCE RULE — source-locked values are never read from maps:
-Inspect only the canonical labeled parameter panel or numerical box registered for each field.
-Every source-locked numeric output listed under CANONICAL EXACT-SOURCE PROVENANCE must be copied
-only from its own explicitly labeled printed field at that canonical source. Add the exact
-output-field name to
-table_verified_numeric_fields only when that labeled field is visible and the value was transcribed
-from it. The list must exactly match the non-null table-derived numeric outputs.
+CANONICAL SOURCE-SPECIFIC OUTPUT CONTRACT:
+For each Pentacam eye item, first classify only the visible page as FOUR_MAPS_REFRACTIVE,
+BAD_DISPLAY, SHOW_2_EXAMS_TOPOMETRIC, or OTHER in source_family. Return only the numeric properties
+present in that source_family's schema variant. Never emit or search for a field belonging to another
+page family. Add a field to table_verified_numeric_fields only when its own printed label and value
+were transcribed from the exact box defined below. The list must exactly match the non-null numeric
+outputs. Null is required when the authoritative label, sign, digits, units, or laterality are unclear.
+No numeric map fallback, cross-page comparison, calculation, or derivation is permitted.
 
-INITIAL-PASS-ONLY FIELDS:
+- FOUR_MAPS_REFRACTIVE: central_pachy_um, pachy_thinnest_um, Kmax_D, corneal_diameter_mm only.
+- BAD_DISPLAY: F_Ele_Th_um, B_Ele_Th_um, PPI_avg, BAD_D, bad_flat_axis_deg only.
+- SHOW_2_EXAMS_TOPOMETRIC: K1_D, K1_axis_deg, K2_D, K2_axis_deg, Kmean_D,
+  posterior_Kmean_D, topographic_astig_D, topographic_steep_axis_deg, and I_S only.
+- OTHER: no eye numeric fields.
+
 Only K2_D, Kmean_D, posterior_Kmean_D, I_S, central_pachy_um, pachy_thinnest_um, F_Ele_Th_um,
 B_Ele_Th_um, PPI_avg, and BAD_D are decision-required Pentacam fields. K1_D and
-corneal_diameter_mm are conditional later LASIK-planning inputs. Every other canonical or descriptive
-numeric field is optional. Retain an optional value only when its own printed label and value are
-immediately clear during the primary read. Otherwise return null without searching further, without
-adding it to missing_or_unreadable, and without issuing a warning. Optional fields never trigger a
-targeted reread or block the clinical report.
+corneal_diameter_mm are conditional later LASIK-planning inputs. Kmax_D and the displayed axes or
+astigmatism values are retained only when immediately clear from their exact labeled boxes; their
+absence never triggers a targeted reread or blocks the clinical report.
 
 I-S SOURCE LOCK: transcribe I_S only from the explicitly labeled "IS:" or "I-S:" field in
 Show 2 Exams Topometric center "Indices (in 8 mm zone)". Preserve its printed sign. Never substitute
 ISV, IVA, IHD, IHA, KISA, Q-value, a color, or a curvature-map spot for I_S.
 If the IS label, sign, digits, or eye laterality is uncertain, return I_S=null; never calculate I-S.
-
-No numeric map fallback is permitted. If the authoritative labeled field is absent, obscured, or unreadable, return null. Never substitute a local map number, color-scale value, or neighboring measurement.
 
 EXCLUSIVE LABELED-BOX SOURCE LOCK:
 - K1_D, K1_axis_deg, K2_D, K2_axis_deg, and Kmean_D have exactly one accepted source:
@@ -357,7 +326,6 @@ EXCLUSIVE LABELED-BOX SOURCE LOCK:
   add them to table_verified_numeric_fields, and set keratometry_source to OTHER_PENTACAM_SOURCE,
   UNREADABLE, or NOT_SHOWN. Never use Cornea Back, True Net Power, Total Corneal Refractive Power,
   another map/display, a color-map number, Kmax, or another K/Km-like field for these outputs.
-- Rmin_mm: exactly one accepted source: "Show 2 Exams Topometric" -> panel headed "Cornea Back" -> printed Rmin row. Never use Cornea Front Rmin, the center topometric RMin index, Four Maps, a map spot, or any calculated value.
 - central_pachy_um: use only 4 Maps Refractive lower-left Pupil Center (+) pachymetry.
 - F_Ele_Th_um: on the Belin/Ambrósio BAD Display, first locate the literal F.Ele.Th label in the
   central results table's elevation row immediately above the Progression Index section, then
@@ -372,24 +340,16 @@ EXCLUSIVE LABELED-BOX SOURCE LOCK:
 - ML7 planning reuses the canonical K1_D and K2_D values above. Do not create or request a second
   ML7-specific K1/K2 pair. HWTW remains in the 4 Maps Refractive lower-left HWTW box.
 - bad_flat_axis_deg: for PS3 prescription-axis comparison ONLY, read the Axis box beside K1 in the BAD Display upper-middle numeric area. Never substitute the steep axis or derive a rotated value. Preserve all other axis sources and SRAX geometry.
-- topometric_RMin: use only Show 2 Exams Topometric center Indices (in 8 mm zone).
 - Kmax_D: use only the numeric value in the explicitly printed "KMax"/"Kmax" row.
-- ARTmax_um: use only the numeric value in the explicitly printed "ARTmax" row beneath the
-  Progression Index panel.
 - pachy_thinnest_um: use only the pachymetry value in the circle-marked printed
   "Thinnest Locat." row. Never use Pachy Vertex N., Pupil Center, or a thickness-map number.
 These are single authoritative labeled-box readings. Never compare them with a map value,
 neighboring number, calculated value, or another Pentacam screen to create a conflict. If the
 authoritative row/panel is unreadable, return null for that field.
 
-Never substitute a generic map spot value, color-scale value, axis label, neighboring parameter,
-calculated value, average, or visual estimate for K1, K2, their axes, horizontal white-to-white
-(HWTW), Kmax,
-Rmin, BAD-D/components, PPI, ARTmax, topometric
-indices, coordinates, corneal volume, HOA, or coma. Those summary/calculated fields must remain null
-when their own labeled table value is unreadable. A labeled BAD-display center/bottom numeric box
-counts as a printed parameter field; an unlabeled number inside the map does not. A local-map
-fallback is prohibited even when the canonical field is unreadable.
+Never substitute a generic map spot, color-scale value, neighboring parameter, calculation, average,
+or visual estimate for an output field. A labeled BAD-display center/bottom numeric box counts as a
+printed parameter field; an unlabeled number inside a map does not.
 
 ERSS VISUAL MORPHOLOGY DISABLED:
 General ERSS/Randleman visual morphology classification is disabled. Do not visually score asymmetric
@@ -399,18 +359,14 @@ morphology category.
 ERSS SRAX SOURCE LOCK — MODEL ESTIMATION DISABLED:
 SRAX is measured outside the extraction model by CER-AI's deterministic geometric image-analysis
 engine using only the Axial/Sagittal Curvature (Front) map on the Pentacam 4 Maps Refractive page.
-Do not visually estimate SRAX, return a numeric srax_deg from map appearance, or derive SRAX from
-KISA, Kmax, I-S, astigmatism tables, K1/K2/global Axis, BAD values, elevation, pachymetry, or any surrogate.
-For every image handled by this model, return srax=UNCERTAIN and srax_deg=null. The deterministic
-geometry layer may replace those values only when the correct Front map and both hemimeridian axes
-are resolved with adequate confidence.
+Do not visually estimate or return SRAX, and do not derive it from Kmax, I-S, astigmatism tables,
+K1/K2/global Axis, BAD values, elevation, pachymetry, or any surrogate. SRAX is absent from this
+model's schema; the deterministic geometry layer owns it exclusively.
 BELIN/AMBROSIO BAD DISPLAY SOURCE LOCK:
-BAD_D, Df, Db, Dp, Dt, and Da may be transcribed ONLY from the explicitly labeled bottom BAD-D
-component strip on a visible Belin/Ambrosio Display for the same eye. Preserve every printed sign
-exactly. Never derive or reconstruct Df from anterior elevation, Db from B.Ele.Th/posterior elevation,
-Dp from PPI, Dt from thinnest pachymetry, Da from ARTmax, or Final D from the component values. Never
-substitute a color, map spot, neighboring value, or another screen/eye. If the label, sign, digits, or
-laterality is unreadable, return null for that field. Final BAD-D remains the printed overall BAD signal.
+BAD_D may be transcribed ONLY from the explicitly labeled final D value in the bottom BAD-D strip on
+a visible Belin/Ambrosio Display for the same eye. Preserve every printed sign exactly. Never derive or
+reconstruct Final D from component values and never return the component values. Never substitute a
+color, map spot, neighboring value, or another screen/eye.
 
 For an Excimer Laser Takip Karti, extract treatment_corrections only from the row explicitly labeled
 "Duzeltme Miktari" (including Turkish characters). Do not substitute values from "Subjektif
@@ -431,17 +387,10 @@ Duzeltme Miktari is treated as both preoperative manifest refraction and intende
 the clinician separately enters or otherwise explicitly identifies a different value for either role."""
 
 
-_CANONICAL_SOURCE_PROMPT = "\n".join(
-    f"- {field}: source_id={source_id}; printed label={label}"
-    for field, (source_id, label) in CANONICAL_FIELD_SOURCES.items()
-)
 PROMPT += (
-    "\n\nCANONICAL EXACT-SOURCE PROVENANCE — REQUIRED FOR EVERY LOCKED FIELD:\n"
-    "Return canonical_source_ids for every locked field. Use the exact source_id listed below only when "
-    "that field was transcribed from that exact screen/panel/box. Otherwise return null for both the "
-    "field source id and, if no canonical reading exists, the field value. Never assign a canonical "
-    "source id to a wrong-screen or inferred value.\n"
-    + _CANONICAL_SOURCE_PROMPT
+    "\n\nCANONICAL PROVENANCE:\n"
+    "Do not return source identifiers. CER-AI reconstructs provenance deterministically from "
+    "source_family, table_verified_numeric_fields, and its single canonical field-source registry."
 )
 PROMPT += "\n" + mandatory_source_set_policy.BAD_DISPLAY_RECOGNITION_PROMPT
 
@@ -478,6 +427,29 @@ def is_number(value: Any) -> bool:
 
 def normalized_eye(raw_eye: Dict[str, Any]) -> Dict[str, Any]:
     eye = dict(raw_eye)
+    declared_family = eye.get("source_family")
+    verified = eye.get("table_verified_numeric_fields")
+    verified_set = set(verified) if isinstance(verified, list) else set()
+    if declared_family in SOURCE_SPECIFIC_EYE_FIELDS:
+        allowed_fields = set(SOURCE_SPECIFIC_EYE_FIELDS[declared_family])
+        verified_set &= allowed_fields
+        for field in EXTRACTION_NUMERIC_FIELDS:
+            if field not in allowed_fields:
+                eye[field] = None
+        eye["canonical_source_ids"] = {
+            field: (
+                canonical_source_id(field)
+                if field in verified_set and canonical_source_family(field) == declared_family
+                else None
+            )
+            for field in LOCKED_FIELDS
+        }
+        eye["table_verified_numeric_fields"] = sorted(verified_set)
+    for field in EXTRACTION_NUMERIC_FIELDS:
+        eye.setdefault(field, None)
+    eye.setdefault("canonical_source_ids", {})
+    eye.setdefault("srax", None)
+    eye.setdefault("srax_deg", None)
     # UNCERTAIN means no SRAX observation on this source, not a measured
     # disagreement with the Front-map geometry from another page.
     if eye.get("srax") == "UNCERTAIN":
@@ -615,6 +587,7 @@ def merge_extractions(
                 # value. Keep one canonical transfer path even for imported/legacy extractions.
                 source_eye["_pentacam_qs"] = context.get("pentacam_qs", "NOT_SHOWN")
             eye = normalized_eye(source_eye)
+            eye.pop("source_family", None)
             eye_id = eye.get("eye", "UNKNOWN")
             source_filename = eye.get("_source_filename")
             eye["source_files"] = [source_filename] if source_filename else []
@@ -977,7 +950,7 @@ def surgeon_authority_prompt(authority: Dict[str, Any]) -> str:
         if "I_S" in fields:
             rules.append(
                 f"{eye} I-S was entered by the surgeon. Do not inspect or transcribe {eye} I_S; "
-                "return it and its canonical source ID as null and do not list it as missing."
+                "return it as null, omit it from table_verified_numeric_fields, and do not list it as missing."
             )
     if not rules:
         return ""
