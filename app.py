@@ -1113,6 +1113,12 @@ def _cached_analysis_task(key: tuple[str, str]) -> Optional[asyncio.Task]:
         return record[1] if record else None
 
 
+def primary_extraction_concurrency(image_count: int) -> int:
+    """Start the five mandatory source reads together, with a bounded override."""
+    configured = int(os.getenv("IMAGE_EXTRACTION_CONCURRENCY", "5"))
+    return max(1, min(configured, 5, max(1, image_count)))
+
+
 async def _run_image_assessment(
     image_payloads: list[tuple[bytes, str]],
     age: Optional[int],
@@ -1126,7 +1132,7 @@ async def _run_image_assessment(
 
     # Every image remains an independent extraction. Bounded concurrency prevents the total
     # request time from becoming the sum of all upstream calls and keeps FastAPI responsive.
-    concurrency = max(1, min(int(os.getenv("IMAGE_EXTRACTION_CONCURRENCY", "4")), 4))
+    concurrency = primary_extraction_concurrency(len(image_payloads))
     semaphore = asyncio.Semaphore(concurrency)
     assessment_started = monotonic()
     automation_deadline = pentacam_targeted_reread.assessment_automation_deadline(
@@ -1134,16 +1140,42 @@ async def _run_image_assessment(
     )
     surgeon_authority = surgeon_image_authority(age, plans, metadata)
 
-    async def extract_bounded(raw: bytes, filename: str) -> Dict[str, Any]:
+    async def extract_bounded(
+        image_number: int, raw: bytes, filename: str,
+    ) -> Dict[str, Any]:
         async with semaphore:
-            return await asyncio.to_thread(
+            image_started = monotonic()
+            result = await asyncio.to_thread(
                 extract_one_image, raw, filename, surgeon_authority
             )
+            source_set = mandatory_source_set_policy.classify_source_set([result])
+            source_roles = [
+                item["label"] for item in source_set["required_sources"]
+                if item["present"]
+            ]
+            if not source_roles:
+                optional_card = source_set["optional_treatment_card"]
+                source_roles = [
+                    "Excimer laser treatment card"
+                    if optional_card["present"] else "Unclassified source"
+                ]
+            print(
+                "ASSESSMENT TIMING:",
+                "stage=primary_image",
+                f"image={image_number}",
+                f"duration_ms={round((monotonic() - image_started) * 1000)}",
+                f"source_role={json.dumps(source_roles, separators=(',', ':'))}",
+                flush=True,
+            )
+            return result
 
     try:
         async with analysis_slot():
             extraction_results = await asyncio.gather(
-                *(extract_bounded(raw, filename) for raw, filename in image_payloads)
+                *(
+                    extract_bounded(image_number, raw, filename)
+                    for image_number, (raw, filename) in enumerate(image_payloads, start=1)
+                )
             )
             print(
                 "ASSESSMENT TIMING:",
