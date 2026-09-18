@@ -22,10 +22,7 @@ from copy import deepcopy
 from typing import Any, Mapping, Optional
 
 from clinical_core.pipeline import ClinicalCoreInput
-from astigmatic_disparity_policy import (
-    axis_requires_targeted_verification,
-    evaluate_astigmatic_disparity,
-)
+from astigmatic_disparity_policy import evaluate_astigmatic_disparity
 from clinical_core.ps3 import PS3EyeInput, PS3InterEyeInput
 from clinical_core.refraction import normalize_minus_cylinder
 
@@ -336,24 +333,6 @@ def build_astigmatic_disparity(eye, manifest):
 def astigmatic_disparity_from_plan(eye, plan):
     """Resolve manifest precedence, then evaluate the non-scoring comparison."""
     return build_astigmatic_disparity(eye, _refraction(plan, "manifest"))
-
-
-def astigmatic_disparity_verification_eyes(
-    extracted: Mapping[str, Any],
-    resolved_plans: Mapping[str, Mapping[str, Any]],
-) -> set[str]:
-    """Return eyes whose disparity axis needs a focused source verification."""
-    eyes = {
-        item.get("eye"): item
-        for item in extracted.get("eyes", [])
-        if isinstance(item, Mapping) and item.get("eye") in {"OD", "OS"}
-    }
-    required: set[str] = set()
-    for eye_name, eye in eyes.items():
-        plan = resolved_plans.get(eye_name) or {}
-        if axis_requires_targeted_verification(astigmatic_disparity_from_plan(eye, plan)):
-            required.add(eye_name)
-    return required
 
 
 def build_inter_eye_ps3(extracted):

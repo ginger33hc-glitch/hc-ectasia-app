@@ -43,10 +43,6 @@ from pentacam_field_registry import (
     PASSIVE_INFORMATIONAL_FIELDS,
 )
 from reports import ReportContractError, build_conclusion_pdf, build_docx, build_pdf
-from canonical_input_adapter import (
-    astigmatic_disparity_verification_eyes,
-    resolve_case_plans,
-)
 
 
 @asynccontextmanager
@@ -1198,30 +1194,6 @@ async def _run_image_assessment(
             if exam_date_reread_required:
                 promote_consistent_targeted_exam_dates(extraction_results)
 
-            # A threshold-level BAD-flat/manifest disparity is a measurement-
-            # validation warning, never a PS3 factor. Re-read the exact canonical
-            # BAD box so the warning itself does not rest on a decimal/digit OCR error.
-            preliminary = merge_extractions(extraction_results, surgeon_authority)
-            preliminary_plans = resolve_case_plans(preliminary, plans)
-            axis_verification_eyes = astigmatic_disparity_verification_eyes(
-                preliminary, preliminary_plans,
-            )
-            if axis_verification_eyes:
-                async def verify_axis_bounded(
-                    result: Dict[str, Any], raw: bytes, filename: str,
-                ) -> Dict[str, Any]:
-                    async with semaphore:
-                        return await asyncio.to_thread(
-                            pentacam_targeted_reread.verify_astigmatic_disparity_bad_flat_axes,
-                            sys.modules[__name__], result, raw, filename,
-                            axis_verification_eyes,
-                            deadline_monotonic=automation_deadline,
-                        )
-
-                extraction_results = await asyncio.gather(*(
-                    verify_axis_bounded(result, raw, filename)
-                    for result, (raw, filename) in zip(extraction_results, image_payloads)
-                ))
             print(
                 "ASSESSMENT TIMING:",
                 f"stage=automatic_extraction_complete cumulative_ms={round((monotonic() - assessment_started) * 1000)}",

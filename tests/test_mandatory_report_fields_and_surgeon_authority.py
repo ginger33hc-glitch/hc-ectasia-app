@@ -1,3 +1,4 @@
+import inspect
 from pathlib import Path
 
 import app
@@ -133,3 +134,10 @@ def test_patient_id_is_outside_the_active_extraction_contract():
     assert 'id="patient_id"' not in clinical_ui
     assert 'id="reportPatientId"' not in clinical_ui
     assert 'id="patient_id"' not in archive_ui
+
+
+def test_passive_astigmatic_disparity_does_not_schedule_an_ai_reread():
+    source = inspect.getsource(app._run_image_assessment)
+    assert "astigmatic_disparity_verification_eyes" not in source
+    assert "verify_astigmatic_disparity_bad_flat_axes" not in source
+    assert not hasattr(targeted, "verify_astigmatic_disparity_bad_flat_axes")
