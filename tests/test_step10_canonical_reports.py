@@ -244,7 +244,7 @@ def test_reports_show_one_patient_identity_warning_without_changing_audit_eviden
     payload = _payload()
     detailed_warnings = [
         "PATIENT NAME NOT VERIFIED: Pentacam Last Name could not be read in od-bad.png.",
-        "PATIENT IDENTITY NOT VERIFIED: patient name/ID is unreadable in os-bad.png.",
+        "PATIENT IDENTITY NOT VERIFIED: patient name is unreadable in os-bad.png.",
         "PATIENT IDENTITY NOT VERIFIED: OD and OS sources could not be confirmed as the same patient.",
         "Pentacam examination-date conflict was surgeon reviewed and approved.",
     ]
@@ -266,6 +266,7 @@ def test_reports_show_one_patient_identity_warning_without_changing_audit_eviden
 
     for rendered in (full_pdf_text, conclusion_text, docx_text):
         assert rendered.count(reports.PATIENT_IDENTITY_REPORT_WARNING) == 1
+        assert "Patient ID" not in rendered
         assert "od-bad.png" not in rendered
         assert "os-bad.png" not in rendered
         assert "examination-date conflict was surgeon reviewed and approved" in rendered

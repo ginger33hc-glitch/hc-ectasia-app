@@ -52,7 +52,6 @@
       <h3>Report identification</h3>
       <div class="grid">
         <div class="row"><label>Patient name</label><input id="patient_name" type="text" autocomplete="off"></div>
-        <div class="row"><label>Patient ID / record number</label><input id="patient_id" type="text" autocomplete="off"></div>
         <div class="row" id="manualAgeRow" hidden><label>Patient age (years)</label><input id="age" name="age" type="number" min="18" max="120" step="1"></div>
         <div class="row"><label>Reviewer / surgeon</label><input id="reviewer" type="text" autocomplete="off"></div>
         <div class="row"><label>Assessment date</label><input id="report_date" type="date"></div>
@@ -112,9 +111,9 @@
       </div>
       <p class="report-liability-notice">The final surgical decision and all associated responsibility and liability rest with the surgeon. This application is a clinical decision-support aid only.</p>
       <table class="meta-table"><tbody>
-        <tr><th>Patient</th><td id="reportPatient">Not documented</td><th>Patient ID</th><td id="reportPatientId">Not documented</td></tr>
-        <tr><th>Age</th><td id="reportAge">Not documented</td><th>Date</th><td id="reportDate">Not documented</td></tr>
-        <tr><th>Reviewer</th><td id="reportReviewer">Not documented</td><th>Eyes</th><td id="reportEyes">—</td></tr>
+        <tr><th>Patient</th><td id="reportPatient">Not documented</td><th>Age</th><td id="reportAge">Not documented</td></tr>
+        <tr><th>Date</th><td id="reportDate">Not documented</td><th>Reviewer</th><td id="reportReviewer">Not documented</td></tr>
+        <tr><th>Eyes</th><td id="reportEyes" colspan="3">—</td></tr>
       </tbody></table>
       <div class="report-section-title">Overall disposition</div>
       <div id="reportPatientBanner" class="report-patient-name">PATIENT NAME NOT DOCUMENTED</div>
@@ -706,7 +705,7 @@ function renderEye(r){
 }
 
 function patientPayload(){return {
-  name:value("patient_name")||null, id:value("patient_id")||null, age:numberOrNull("age"),
+  name:value("patient_name")||null, age:numberOrNull("age"),
   reviewer:value("reviewer")||null, report_date:value("report_date")||null
 }}
 const orderedEyes=(eyes)=>[...(eyes||[])].sort((a,b)=>({OD:0,OS:1}[a.eye]??2)-({OD:0,OS:1}[b.eye]??2));
@@ -714,7 +713,6 @@ function setReportMetadata(decision){
   const p=patientPayload();
   document.querySelector("#reportPatient").textContent=p.name||i18n.translate("Not documented");
   document.querySelector("#reportPatientBanner").textContent=p.name||i18n.translate("PATIENT NAME NOT DOCUMENTED");
-  document.querySelector("#reportPatientId").textContent=p.id||i18n.translate("Not documented");
   document.querySelector("#reportAge").textContent=p.age??i18n.translate("Not documented");
   document.querySelector("#reportDate").textContent=p.report_date||i18n.translate("Not documented");
   document.querySelector("#reportReviewer").textContent=p.reviewer||i18n.translate("Not documented");

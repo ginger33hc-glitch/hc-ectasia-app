@@ -90,7 +90,6 @@ SCHEMA = {
                     "type": "string",
                     "enum": ["PENTACAM_TOPOGRAPHY", "TREATMENT_CARD", "OTHER", "UNKNOWN"],
                 },
-                "patient_id": {"type": ["string", "null"]},
                 "patient_last_name": {"type": ["string", "null"]},
                 "patient_first_name": {"type": ["string", "null"]},
                 "patient_name": {"type": ["string", "null"]},
@@ -117,7 +116,7 @@ SCHEMA = {
                 "missing_or_unreadable": {"type": "array", "items": {"type": "string"}},
             },
             "required": [
-                "document_type", "patient_id", "patient_last_name", "patient_first_name",
+                "document_type", "patient_last_name", "patient_first_name",
                 "patient_name", "patient_name_source", "patient_age_years", "patient_date_of_birth", "exam_date",
                 "exam_date_source",
                 "exam_time", "laterality", "pentacam_qs", "missing_or_unreadable",
@@ -303,7 +302,7 @@ UNREADABLE or NOT_SHOWN. On a non-Pentacam clinical document, use only an explic
 name field, set the two name components to null when they are not separately labeled, and use
 patient_name_source=OTHER_LABELED_PATIENT_NAME, UNREADABLE, or NOT_SHOWN as applicable.
 
-Transcribe the patient ID, explicitly printed patient age in completed years, exam time,
+Transcribe the explicitly printed patient age in completed years, exam time,
 laterality, and document type exactly when visible. The examination date is source-locked: on a
 4 Maps Refractive page, transcribe exam_date ONLY from the upper-left patient-information field
 explicitly labeled "Exam Date" and from the value directly attached to that label. Ignore Date of
@@ -312,12 +311,10 @@ other format or box. On BAD Display, Show 2 Exams Topometric, treatment cards, a
 page, return exam_date=null and exam_date_source=NOT_SHOWN even if another date is visible. On a
 4 Maps page, set exam_date_source=FOUR_MAPS_REFRACTIVE_UPPER_LEFT_EXAM_DATE only when the explicit
 "Exam Date" label and its attached complete value are visible; otherwise return exam_date=null with
-exam_date_source=UNREADABLE or NOT_SHOWN. Transcribe patient_id only from an
-explicitly labeled patient-ID field in the patient-demographics box (for example ID, Patient ID, or
-Pat.-ID). Never use an examination number, measurement number, scan number, accession number,
-page/report number, device serial number, date, time, or another unlabeled number as patient_id.
-If the patient-ID label or its value is not clearly readable, return patient_id=null. Use null/UNKNOWN
-when other identity fields are absent or unreadable. Patient age is one patient-level value shared by
+exam_date_source=UNREADABLE or NOT_SHOWN. Do not inspect or transcribe patient ID, record number,
+examination number, measurement number, scan number, or accession number. Patient name is the sole
+patient-identity field used by CER-AI. Use null/UNKNOWN when other identity fields are absent or
+unreadable. Patient age is one patient-level value shared by
 OD and OS: on every Pentacam source, inspect the top patient-demographics/header area for the explicitly
 printed Age field, but return it only when the label and completed-year integer are both unambiguous.
 On 4 Maps Refractive, transcribe the labeled Date of Birth exactly into patient_date_of_birth,
@@ -585,12 +582,12 @@ def merge_extractions(
                     f"Unclassified uploaded source: {context.get('source_filename', 'unknown file')}."
                 )
             if (
-                not ({"name", "id"} & set(authoritative_patient))
+                "name" not in authoritative_patient
                 and context.get("document_type") in ("PENTACAM_TOPOGRAPHY", "TREATMENT_CARD")
-                and not (context.get("patient_id") or context.get("patient_name"))
+                and not context.get("patient_name")
             ):
                 merged["identity_warnings"].append(
-                    "PATIENT IDENTITY NOT VERIFIED: patient name/ID is not visible or readable in "
+                    "PATIENT NAME NOT VERIFIED: patient name is not visible or readable in "
                     f"{context.get('source_filename', 'an uploaded source')}. Surgeon confirmation is required."
                 )
             if (
@@ -781,10 +778,6 @@ def merge_extractions(
     pentacam_contexts = [
         c for c in merged["document_contexts"] if c.get("document_type") == "PENTACAM_TOPOGRAPHY"
     ]
-    ids = {
-        str(c.get("patient_id")).strip().casefold()
-        for c in pentacam_contexts if c.get("patient_id")
-    }
     normalized_names = [
         " ".join(str(c.get("patient_name") or "").casefold().split())
         for c in pentacam_contexts
@@ -793,17 +786,6 @@ def merge_extractions(
     age_resolution = resolve_patient_age(results)
     merged["patient_age_resolution"] = age_resolution
     pentacam_ages = set(age_resolution["candidate_ages"])
-    shared_readable_name = (
-        bool(normalized_names)
-        and all(normalized_names)
-        and all(c.get("patient_first_name") and c.get("patient_last_name") for c in pentacam_contexts)
-        and len(set(normalized_names)) == 1
-    )
-    age_is_consistent = len(pentacam_ages) <= 1
-    identity_corroborated_by_name_and_age = (
-        shared_readable_name and age_is_consistent and len(pentacam_ages) == 1
-    )
-
     identity_readings = "; ".join(
         f"{c.get('source_filename', 'unknown file')}: {c.get('patient_name') or 'unreadable'}"
         for c in pentacam_contexts
@@ -820,16 +802,6 @@ def merge_extractions(
         )
     elif age_resolution["age_years"] is not None:
         merged["derived_age_years"] = age_resolution["age_years"]
-    if len(ids) > 1 and "id" not in authoritative_patient:
-        if identity_corroborated_by_name_and_age:
-            merged["identity_warnings"].append(
-                "PATIENT IDENTITY REQUIRES CONFIRMATION: different patient-ID strings were read, "
-                "although the Pentacam First Name / Last Name fields and printed age agree."
-            )
-        else:
-            merged["identity_warnings"].append(
-                "PATIENT IDENTITY NOT VERIFIED: conflicting patient IDs were read across Pentacam sources. Surgeon confirmation is required."
-            )
     if authoritative_exam_date_conflict(results):
         merged["critical_input_issues"].append(EXAM_DATE_CONFLICT_ISSUE)
 
@@ -837,23 +809,21 @@ def merge_extractions(
         eye for context in pentacam_contexts for eye in context.get("extracted_eyes", [])
         if eye in EYES
     }
-    if assessed_eyes == set(EYES) and not ({"name", "id"} & set(authoritative_patient)):
+    if assessed_eyes == set(EYES) and "name" not in authoritative_patient:
         relevant_contexts = [
             context for context in pentacam_contexts
             if set(context.get("extracted_eyes", [])) & set(EYES)
         ]
-        normalized_ids = [str(c.get("patient_id") or "").strip().casefold() for c in relevant_contexts]
         normalized_names = [
             " ".join(str(c.get("patient_name") or "").casefold().split()) for c in relevant_contexts
         ]
-        verified_by_id = bool(normalized_ids) and all(normalized_ids) and len(set(normalized_ids)) == 1
         verified_by_name = (
             bool(normalized_names)
             and all(normalized_names)
             and all(c.get("patient_first_name") and c.get("patient_last_name") for c in relevant_contexts)
             and len(set(normalized_names)) == 1
         )
-        if not (verified_by_id or verified_by_name):
+        if not verified_by_name:
             merged["identity_warnings"].append(
                 "PATIENT IDENTITY NOT VERIFIED: OD and OS Pentacam sources could not be confirmed "
                 f"as the same patient ({identity_readings}). Surgeon confirmation is required."
@@ -982,8 +952,6 @@ def surgeon_image_authority(
     patient = set()
     if str(metadata.get("name") or "").strip():
         patient.add("name")
-    if str(metadata.get("id") or "").strip():
-        patient.add("id")
     if age is not None:
         patient.add("age")
     eyes = {
@@ -1002,11 +970,6 @@ def surgeon_authority_prompt(authority: Dict[str, Any]) -> str:
             "Patient name was entered by the surgeon. Do not inspect or transcribe any image name; "
             "return patient_first_name, patient_last_name, and patient_name as null, "
             "patient_name_source=NOT_SHOWN, and do not list them as missing."
-        )
-    if "id" in patient:
-        rules.append(
-            "Patient ID was entered by the surgeon. Do not inspect or transcribe image patient ID; "
-            "return patient_id=null and do not list it as missing."
         )
     if "age" in patient:
         rules.append(
@@ -1041,9 +1004,6 @@ def apply_surgeon_image_authority(
             context[key] = None
             missing = [item for item in missing if item != key]
         context["patient_name_source"] = "NOT_SHOWN"
-    if "id" in patient:
-        context["patient_id"] = None
-        missing = [item for item in missing if item != "patient_id"]
     if "age" in patient:
         context["patient_age_years"] = None
         context["patient_date_of_birth"] = None

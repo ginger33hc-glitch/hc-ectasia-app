@@ -98,24 +98,23 @@ def test_search_is_turkish_diacritic_and_punctuation_insensitive():
     assert len(by_reviewer) == 1
 
 
-def test_search_supports_patient_id_date_and_decision_filters_together():
+def test_search_supports_name_date_and_decision_filters_together():
     archive = make_archive()
     case_catalog.write_entry(archive, revision("6" * 32), ready_payload(status="CAUTION"))
     matches = case_catalog.search_entries(
         archive,
-        patient_id="p123",
+        patient_name="sule isik",
         report_date="2026/08/31",
         decision="caution",
     )
     assert len(matches) == 1
-    assert matches[0]["patient"]["id"] == "P-123"
+    assert matches[0]["patient"]["name"] == "Şule Işık"
 
 
 def test_search_does_not_return_nonmatching_patient():
     archive = make_archive()
     case_catalog.write_entry(archive, revision("7" * 32), ready_payload())
     assert case_catalog.search_entries(archive, patient_name="different patient") == []
-    assert case_catalog.search_entries(archive, patient_id="ZZZ") == []
 
 
 def test_multiple_revisions_remain_distinct_for_auditable_history():

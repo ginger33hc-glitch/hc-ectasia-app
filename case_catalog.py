@@ -185,7 +185,6 @@ def search_entries(
     archive: EncryptedArchive,
     *,
     patient_name: Optional[str] = None,
-    patient_id: Optional[str] = None,
     report_date: Optional[str] = None,
     decision: Optional[str] = None,
     reviewer: Optional[str] = None,
@@ -194,7 +193,6 @@ def search_entries(
 ) -> list[Dict[str, Any]]:
     limit = max(1, min(int(limit), 500))
     name_q = _search_text(patient_name)
-    id_q = _search_text(patient_id)
     date_q = _search_text(report_date)
     decision_q = _search_text(decision)
     reviewer_q = _search_text(reviewer)
@@ -208,8 +206,6 @@ def search_entries(
         if creator_q and str(creator.get("user_id") or "") != creator_q:
             continue
         if name_q and name_q not in _search_text(patient.get("name")):
-            continue
-        if id_q and id_q not in _search_text(patient.get("id")):
             continue
         if date_q and date_q not in _search_text(entry.get("report_date")):
             continue
@@ -301,12 +297,12 @@ def install(core: Any, archive_runtime: Any) -> None:
                 raise HTTPException(403, "This role cannot access the clinical archive.")
             if not archive_runtime.enabled:
                 raise HTTPException(503, "CER-AI secure archive is not enabled.")
-            allowed = {"patient_name", "patient_id", "report_date", "decision", "reviewer", "limit"}
+            allowed = {"patient_name", "report_date", "decision", "reviewer", "limit"}
             unknown = set(payload) - allowed
             if unknown:
                 raise HTTPException(422, "Unsupported archive search field(s): " + ", ".join(sorted(unknown)))
-            if principal.role == "OWNER" and (payload.get("patient_name") or payload.get("patient_id")):
-                raise HTTPException(422, "OWNER cannot search by patient name or patient ID.")
+            if principal.role == "OWNER" and payload.get("patient_name"):
+                raise HTTPException(422, "OWNER cannot search by patient name.")
             filters = {key: payload.get(key) for key in allowed if key in payload}
             if principal.role == "DOCTOR":
                 filters["created_by_user_id"] = principal.user_id

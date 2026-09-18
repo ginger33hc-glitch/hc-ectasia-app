@@ -593,9 +593,9 @@ def build_pdf(payload: Mapping[str, Any]) -> bytes:
     story.append(Spacer(1, REPORT_BLANK_LINE_PT))
     patient = model["patient"]
     story.append(_pdf_table([
-        [tr("Patient"), _text(patient.get("name"), tr("Not documented")), tr("Patient ID"), _text(patient.get("id"), tr("Not documented"))],
-        [tr("Age"), _text(patient.get("age"), tr("Not documented")), tr("Assessment date"), _text(patient.get("report_date"), tr("Not documented"))],
-        [tr("Reviewer"), _text(patient.get("reviewer"), tr("Not documented")), tr("Overall disposition"), _text(model.get("status"))],
+        [tr("Patient"), _text(patient.get("name"), tr("Not documented")), tr("Age"), _text(patient.get("age"), tr("Not documented"))],
+        [tr("Assessment date"), _text(patient.get("report_date"), tr("Not documented")), tr("Reviewer"), _text(patient.get("reviewer"), tr("Not documented"))],
+        [tr("Eyes"), _text([eye.get("eye") for eye in model.get("eyes") or []]), tr("Overall disposition"), _text(model.get("status"))],
     ], styles, regular, bold, locale=locale, protected_cells=PATIENT_LITERAL_CELLS))
     story.append(Spacer(1, REPORT_BLANK_LINE_PT))
     if model.get("action"):
@@ -679,9 +679,9 @@ def build_conclusion_pdf(payload: Mapping[str, Any]) -> bytes:
     ]
     patient = model["patient"]
     content.append(_pdf_table([
-        [tr("Patient"), _text(patient.get("name"), tr("Not documented")), tr("Patient ID"), _text(patient.get("id"), tr("Not documented"))],
-        [tr("Age"), _text(patient.get("age"), tr("Not documented")), tr("Assessment date"), _text(patient.get("report_date"), tr("Not documented"))],
-        [tr("Reviewer"), _text(patient.get("reviewer"), tr("Not documented")), tr("Overall disposition"), _text(model.get("status"))],
+        [tr("Patient"), _text(patient.get("name"), tr("Not documented")), tr("Age"), _text(patient.get("age"), tr("Not documented"))],
+        [tr("Assessment date"), _text(patient.get("report_date"), tr("Not documented")), tr("Reviewer"), _text(patient.get("reviewer"), tr("Not documented"))],
+        [tr("Eyes"), _text([eye.get("eye") for eye in model.get("eyes") or []]), tr("Overall disposition"), _text(model.get("status"))],
     ], styles, regular, bold, locale=locale, protected_cells=PATIENT_LITERAL_CELLS))
     content.append(Spacer(1, 4))
     foreground, background = _status_palette(model.get("status")) or (GRAY, GRAY_FILL)
@@ -830,9 +830,9 @@ def build_docx(payload: Mapping[str, Any]) -> bytes:
     notice.paragraph_format.space_after = Pt(8 + REPORT_BLANK_LINE_PT)
     patient = model["patient"]
     _docx_table(document, [
-        [tr("Patient"), _text(patient.get("name"), tr("Not documented")), tr("Patient ID"), _text(patient.get("id"), tr("Not documented"))],
-        [tr("Age"), _text(patient.get("age"), tr("Not documented")), tr("Assessment date"), _text(patient.get("report_date"), tr("Not documented"))],
-        [tr("Reviewer"), _text(patient.get("reviewer"), tr("Not documented")), tr("Overall disposition"), _text(model.get("status"))],
+        [tr("Patient"), _text(patient.get("name"), tr("Not documented")), tr("Age"), _text(patient.get("age"), tr("Not documented"))],
+        [tr("Assessment date"), _text(patient.get("report_date"), tr("Not documented")), tr("Reviewer"), _text(patient.get("reviewer"), tr("Not documented"))],
+        [tr("Eyes"), _text([eye.get("eye") for eye in model.get("eyes") or []]), tr("Overall disposition"), _text(model.get("status"))],
     ], locale=locale, protected_cells=PATIENT_LITERAL_CELLS)
     gap = document.add_paragraph()
     gap.paragraph_format.line_spacing = Pt(REPORT_BLANK_LINE_PT)

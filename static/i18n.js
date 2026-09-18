@@ -20,7 +20,7 @@
     "NOT_APPLICABLE":"Uygulanamaz","ALLOWED":"UYGULANABİLİR","NOT_ALLOWED":"UYGULANAMAZ",
     "English":"English","Turkish":"Türkçe","Language":"Dil",
     "Case inputs":"Vaka girdileri","Report identification":"Rapor kimlik bilgileri",
-    "Patient name":"Hasta adı","Patient ID / record number":"Hasta kimliği / dosya numarası",
+    "Patient name":"Hasta adı",
     "Reviewer / surgeon":"Değerlendiren / cerrah","Assessment date":"Değerlendirme tarihi",
     "Pentacam/topography and treatment-card images":"Pentacam/topografi ve tedavi kartı görüntüleri",
     "Required image confirmation":"Zorunlu görüntü doğrulaması","Optional treatment card":"İsteğe bağlı tedavi kartı",
