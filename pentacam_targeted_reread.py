@@ -34,6 +34,7 @@ from pentacam_field_registry import (
     CORNEA_FRONT_KERATOMETRY_FIELDS,
     CORNEA_FRONT_KERATOMETRY_SOURCE,
     TARGET_FIELDS,
+    REPORT_CONTEXT_REREAD_FIELDS,
 )
 from pentacam_source_regions import record_unreadable_region
 
@@ -46,6 +47,7 @@ PENTACAM_SCREEN_FAMILIES = {
     "SHOW_2_EXAMS_TOPOMETRIC",
 }
 TARGETED_REREAD_MAX_ATTEMPTS = 5
+REPORT_CONTEXT_REREAD_MAX_SECONDS = 60.0
 BAD_ELEVATION_VERIFICATION_READS = 3
 BAD_ELEVATION_VERIFICATION_THRESHOLDS = {
     "F_Ele_Th_um": 12.0,
@@ -950,6 +952,15 @@ def enrich_extraction(
     attempt_errors: list[str] = []
     for attempt in range(1, TARGETED_REREAD_MAX_ATTEMPTS + 1):
         requested = missing_targets_by_eye(result, excluded_fields_by_eye)
+        if attempt > 1:
+            requested = {
+                eye: [
+                    field for field in fields
+                    if field not in REPORT_CONTEXT_REREAD_FIELDS
+                ]
+                for eye, fields in requested.items()
+            }
+            requested = {eye: fields for eye, fields in requested.items() if fields}
         patient_age_requested = seek_patient_age and patient_age_is_missing(result)
         pentacam_qs_requested = pentacam_qs_is_missing(result)
         date_requested = exam_date_requested and not result.get(
@@ -963,6 +974,11 @@ def enrich_extraction(
         if timeout_seconds is None:
             _record_budget_exhausted(result)
             break
+        requested_fields = {
+            field for fields in requested.values() for field in fields
+        }
+        if requested_fields and requested_fields <= set(REPORT_CONTEXT_REREAD_FIELDS):
+            timeout_seconds = min(timeout_seconds, REPORT_CONTEXT_REREAD_MAX_SECONDS)
         focused_regions = _focused_retry_regions(
             result,
             requested,

@@ -80,6 +80,7 @@ def test_standard_reread_requests_only_fields_owned_by_the_visible_screen():
     bad = pentacam_result()
     bad_missing = set(targeted.missing_targets_by_eye(bad)["OD"])
     assert {"F_Ele_Th_um", "B_Ele_Th_um", "BAD_D"} <= bad_missing
+    assert {"PPI_min", "PPI_max", "ARTmax_um", "Df", "Db", "Dp", "Dt", "Da"} <= bad_missing
     assert "K1_D" not in bad_missing
     assert "central_pachy_um" not in bad_missing
 
@@ -423,6 +424,30 @@ def test_required_field_can_resolve_on_fifth_standard_reread(monkeypatch):
     assert len(calls) == targeted.TARGETED_REREAD_MAX_ATTEMPTS == 5
     assert all(call == {"OD": ["B_Ele_Th_um"]} for call in calls)
     assert eye["B_Ele_Th_um"] == 8
+
+
+def test_bad_report_context_receives_exactly_one_focused_reread(monkeypatch):
+    result = pentacam_result()
+    eye = result["eyes"][0]
+    for field in targeted.TARGET_FIELDS:
+        eye[field] = 1.0
+    eye["Df"] = None
+    result["document_context"].update({"patient_age_years": 40, "pentacam_qs": "OK"})
+    calls = []
+
+    def reread(_core, _raw, _filename, requested, *_args):
+        calls.append(requested)
+        return {
+            "screen_family": "BAD_DISPLAY",
+            "readings": [reading("Df", None, "Df", status="UNREADABLE")],
+            "warnings": [],
+        }
+
+    monkeypatch.setattr(targeted, "targeted_reread", reread)
+    targeted.enrich_extraction(Core, result, b"image", "od-bad.png")
+
+    assert calls == [{"OD": ["Df"]}]
+    assert eye["Df"] is None
 
 
 def test_focused_retry_requires_regions_for_every_outstanding_target():

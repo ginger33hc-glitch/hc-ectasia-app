@@ -85,12 +85,15 @@ SOURCE_SPECIFIC_EYE_FIELDS = {
         "central_pachy_um", "pachy_thinnest_um", "Kmax_D", "corneal_diameter_mm",
     ),
     "BAD_DISPLAY": (
-        "F_Ele_Th_um", "B_Ele_Th_um", "PPI_avg", "BAD_D", "bad_flat_axis_deg",
+        "F_Ele_Th_um", "B_Ele_Th_um", "PPI_min", "PPI_avg", "PPI_max",
+        "ARTmax_um", "Df", "Db", "Dp", "Dt", "Da", "BAD_D",
+        "bad_flat_axis_deg",
     ),
     "SHOW_2_EXAMS_TOPOMETRIC": (
         "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmean_D",
         "posterior_Kmean_D", "topographic_astig_D",
-        "topographic_steep_axis_deg", "I_S",
+        "topographic_steep_axis_deg", "ISV", "IVA", "KI", "CKI", "IHA",
+        "IHD", "topometric_RMin", "KISA", "I_S",
     ),
     "OTHER": (),
 }
@@ -301,16 +304,20 @@ outputs. Null is required when the authoritative label, sign, digits, units, or 
 No numeric map fallback, cross-page comparison, calculation, or derivation is permitted.
 
 - FOUR_MAPS_REFRACTIVE: central_pachy_um, pachy_thinnest_um, Kmax_D, corneal_diameter_mm only.
-- BAD_DISPLAY: F_Ele_Th_um, B_Ele_Th_um, PPI_avg, BAD_D, bad_flat_axis_deg only.
+- BAD_DISPLAY: F_Ele_Th_um, B_Ele_Th_um, PPI_min, PPI_avg, PPI_max, ARTmax_um,
+  Df, Db, Dp, Dt, Da, BAD_D, and bad_flat_axis_deg only.
 - SHOW_2_EXAMS_TOPOMETRIC: K1_D, K1_axis_deg, K2_D, K2_axis_deg, Kmean_D,
-  posterior_Kmean_D, topographic_astig_D, topographic_steep_axis_deg, and I_S only.
+  posterior_Kmean_D, topographic_astig_D, topographic_steep_axis_deg, ISV, IVA, KI, CKI,
+  IHA, IHD, topometric_RMin, KISA, and I_S only.
 - OTHER: no eye numeric fields.
 
 Only K2_D, Kmean_D, posterior_Kmean_D, I_S, central_pachy_um, pachy_thinnest_um, F_Ele_Th_um,
 B_Ele_Th_um, PPI_avg, and BAD_D are decision-required Pentacam fields. K1_D and
-corneal_diameter_mm are conditional later LASIK-planning inputs. Kmax_D and the displayed axes or
-astigmatism values are retained only when immediately clear from their exact labeled boxes; their
-absence never triggers a targeted reread or blocks the clinical report.
+corneal_diameter_mm are conditional later LASIK-planning inputs. Read every BAD component for report
+context; a missing PPI Min/Max, ARTmax, Df, Db, Dp, Dt, or Da receives one focused reread but never
+becomes an independent score or completion blocker. Attempt every listed Topometric index during the
+primary read only; an unread optional index passes through without a reread. Kmax_D and displayed axes
+or astigmatism values are retained only when immediately clear from their exact labeled boxes.
 
 I-S SOURCE LOCK: transcribe I_S only from the explicitly labeled "IS:" or "I-S:" field in
 Show 2 Exams Topometric center "Indices (in 8 mm zone)". Preserve its printed sign. Never substitute
@@ -364,10 +371,12 @@ Do not visually estimate or return SRAX, and do not derive it from Kmax, I-S, as
 K1/K2/global Axis, BAD values, elevation, pachymetry, or any surrogate. SRAX is absent from this
 model's schema; the deterministic geometry layer owns it exclusively.
 BELIN/AMBROSIO BAD DISPLAY SOURCE LOCK:
-BAD_D may be transcribed ONLY from the explicitly labeled final D value in the bottom BAD-D strip on
-a visible Belin/Ambrosio Display for the same eye. Preserve every printed sign exactly. Never derive or
-reconstruct Final D from component values and never return the component values. Never substitute a
-color, map spot, neighboring value, or another screen/eye.
+Df, Db, Dp, Dt, Da, and BAD_D may be transcribed ONLY from their own explicitly labeled values in the
+bottom BAD-D strip on a visible Belin/Ambrosio Display for the same eye. PPI_min, PPI_avg, PPI_max,
+and ARTmax_um may be transcribed only from their own printed labels in the Progression Index section.
+Preserve every printed sign exactly. Never derive or reconstruct Final D from component values or
+derive one component from another measurement. Never substitute a color, map spot, neighboring
+value, or another screen/eye.
 
 For an Excimer Laser Takip Karti, extract treatment_corrections only from the row explicitly labeled
 "Duzeltme Miktari" (including Turkish characters). Do not substitute values from "Subjektif

@@ -11,8 +11,8 @@ def test_bad_display_prompt_is_source_locked_directly_in_canonical_extractor():
     assert "Preserve every printed sign" in prompt
     assert "Never derive or" in prompt
     assert "reconstruct Final D from component values" in prompt
-    assert "never return the component values" in prompt
-    assert not set(("Df", "Db", "Dp", "Dt", "Da")) & set(
+    assert "Never derive or reconstruct Final D from component values" in prompt
+    assert set(("Df", "Db", "Dp", "Dt", "Da")) <= set(
         runtime.core.SOURCE_SPECIFIC_EYE_FIELDS["BAD_DISPLAY"]
     )
     assert not hasattr(runtime.core, "_cerai_bad_display_source_lock_installed")

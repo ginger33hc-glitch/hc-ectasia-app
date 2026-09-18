@@ -39,18 +39,28 @@ def test_primary_eye_schema_has_one_compact_variant_per_source_family():
         assert "srax_deg" not in schema["properties"]
 
 
-def test_show_two_schema_contains_only_report_and_decision_relevant_fields():
+def test_show_two_schema_attempts_each_registered_center_index_once():
     show_two = set(app.SOURCE_SPECIFIC_EYE_FIELDS["SHOW_2_EXAMS_TOPOMETRIC"])
 
     assert show_two == {
         "K1_D", "K1_axis_deg", "K2_D", "K2_axis_deg", "Kmean_D",
         "posterior_Kmean_D", "topographic_astig_D",
-        "topographic_steep_axis_deg", "I_S",
+        "topographic_steep_axis_deg", "ISV", "IVA", "KI", "CKI", "IHA",
+        "IHD", "topometric_RMin", "KISA", "I_S",
     }
     assert not show_two & {
-        "ISV", "IVA", "KI", "CKI", "IHA", "IHD", "KISA",
-        "topometric_RMin", "Rmin_mm", "corneal_volume_mm3",
+        "Rmin_mm", "corneal_volume_mm3",
     }
+
+
+def test_bad_schema_contains_complete_canonical_bad_report_context():
+    bad = set(app.SOURCE_SPECIFIC_EYE_FIELDS["BAD_DISPLAY"])
+
+    assert {
+        "F_Ele_Th_um", "B_Ele_Th_um", "PPI_min", "PPI_avg", "PPI_max",
+        "ARTmax_um", "Df", "Db", "Dp", "Dt", "Da", "BAD_D",
+        "bad_flat_axis_deg",
+    } == bad
 
 
 def test_normalization_reconstructs_registry_provenance_for_show_two():
