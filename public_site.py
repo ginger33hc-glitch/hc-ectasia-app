@@ -33,6 +33,7 @@ _REFERENCES_PAGE = Path("static/references.html")
 _CLINICAL_AUTHOR_PAGE = Path("static/huseyin-cengiz.html")
 _EDITORIAL_POLICY_PAGE = Path("static/editorial-policy.html")
 _TESTING_NOTICE = Path("static/testing-notice.html")
+_CLINICAL_APP_PAGE = Path("static/index.html")
 _PUBLIC_CANONICAL_BASE = os.getenv(
     "CERAI_PUBLIC_CANONICAL_BASE", "https://cer-ai.com"
 ).rstrip("/")
@@ -174,6 +175,43 @@ def _is_indexable_host(request: Request) -> bool:
     """Only the canonical production host may enter public search indexes."""
     hostname = (request.url.hostname or "").lower().rstrip(".")
     return hostname in {"cer-ai.com", "www.cer-ai.com"}
+
+
+def _is_staging_environment(request: Request) -> bool:
+    """Resolve the presentation environment without touching clinical runtime state."""
+    configured = os.getenv(
+        "CERAI_DEPLOYMENT_ENV", os.getenv("RAILWAY_ENVIRONMENT_NAME", "")
+    ).strip().lower()
+    if configured:
+        return configured not in {"production", "prod"}
+    hostname = (request.url.hostname or "").lower().rstrip(".")
+    return "staging" in hostname
+
+
+def _apply_pwa_identity(html: str, request: Request) -> str:
+    """Render one explicit install identity for the current deployment environment."""
+    staging = _is_staging_environment(request)
+    title = "CER-AI Staging" if staging else "CER-AI"
+    manifest = (
+        "/static/manifest.staging.webmanifest?v=13"
+        if staging
+        else "/static/manifest.webmanifest?v=13"
+    )
+    html = re.sub(
+        r'<link\s+rel="manifest"\s+href="[^"]+">',
+        f'<link rel="manifest" href="{manifest}">',
+        html,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+    html = re.sub(
+        r'<meta\s+name="apple-mobile-web-app-title"\s+content="[^"]*">',
+        f'<meta name="apple-mobile-web-app-title" content="{title}">',
+        html,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+    return html
 
 
 def _robots_directive(request: Request) -> str:
@@ -362,6 +400,7 @@ def _discovery_head(base: str, *, robots_directive: str) -> str:
 
 def _render_public_home(request: Request) -> HTMLResponse:
     html = _PUBLIC_HOME.read_text(encoding="utf-8")
+    html = _apply_pwa_identity(html, request)
     directive = _robots_directive(request)
     discovery = _discovery_head(_site_base(request), robots_directive=directive)
     if "</head>" in html:
@@ -737,7 +776,8 @@ def install(core) -> None:
 
     # Separate non-public entry point retained for the current authorized testing phase.
     @core.app.get("/testing-app", include_in_schema=False)
-    def clinical_testing_entry() -> FileResponse:
-        return FileResponse("static/index.html")
+    def clinical_testing_entry(request: Request) -> HTMLResponse:
+        html = _CLINICAL_APP_PAGE.read_text(encoding="utf-8")
+        return HTMLResponse(_apply_pwa_identity(html, request))
 
     core._cerai_public_site_installed = True

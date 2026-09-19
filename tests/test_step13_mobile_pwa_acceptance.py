@@ -29,19 +29,25 @@ def _png_size(path: Path) -> tuple[int, int]:
     return struct.unpack(">II", data[16:24])
 
 
-def test_staging_manifest_has_a_distinct_install_identity_and_opens_the_clinical_app():
-    manifest = json.loads((STATIC / "manifest.webmanifest").read_text(encoding="utf-8"))
-    assert manifest["name"] == "CER-AI Staging"
-    assert manifest["short_name"] == "CER-AI Staging"
-    assert manifest["id"] == "/cer-ai-staging"
-    assert manifest["start_url"] == "/app"
-    assert manifest["scope"] == "/"
-    assert manifest["display"] == "standalone"
+def test_production_and_staging_manifests_have_distinct_install_identities():
+    production = json.loads((STATIC / "manifest.webmanifest").read_text(encoding="utf-8"))
+    staging = json.loads(
+        (STATIC / "manifest.staging.webmanifest").read_text(encoding="utf-8")
+    )
+    assert production["name"] == production["short_name"] == "CER-AI"
+    assert production["id"] == "/cer-ai-production"
+    assert staging["name"] == staging["short_name"] == "CER-AI Staging"
+    assert staging["id"] == "/cer-ai-staging"
+    for key in ("start_url", "scope", "display", "icons", "share_target"):
+        assert production[key] == staging[key]
+    assert production["start_url"] == "/app"
+    assert production["scope"] == "/"
+    assert production["display"] == "standalone"
     for filename in ("index.html", "public-home.html"):
         page = (STATIC / filename).read_text(encoding="utf-8")
-        assert '/static/manifest.webmanifest?v=12' in page
-        assert '<meta name="apple-mobile-web-app-title" content="CER-AI Staging">' in page
-    target = manifest["share_target"]
+        assert '/static/manifest.webmanifest?v=13' in page
+        assert '<meta name="apple-mobile-web-app-title" content="CER-AI">' in page
+    target = production["share_target"]
     assert target == {
         "action": "/share-target",
         "method": "POST",
@@ -56,6 +62,30 @@ def test_staging_manifest_has_a_distinct_install_identity_and_opens_the_clinical
     }
     for filename, size in expected_icons.items():
         assert _png_size(STATIC / "icons" / filename) == size
+
+
+def test_public_and_clinical_pages_select_the_environment_manifest(monkeypatch):
+    monkeypatch.delenv("CERAI_DEPLOYMENT_ENV", raising=False)
+    monkeypatch.delenv("RAILWAY_ENVIRONMENT_NAME", raising=False)
+    app = FastAPI()
+    public_site.install(SimpleNamespace(app=app))
+
+    with TestClient(app, base_url="https://cer-ai.com") as client:
+        for path in ("/", "/testing-app"):
+            page = client.get(path)
+            assert '/static/manifest.webmanifest?v=13' in page.text
+            assert 'content="CER-AI"' in page.text
+            assert "CER-AI Staging" not in page.text
+
+    staging_app = FastAPI()
+    public_site.install(SimpleNamespace(app=staging_app))
+    with TestClient(
+        staging_app, base_url="https://cer-ai-staging-staging.up.railway.app"
+    ) as client:
+        for path in ("/", "/testing-app"):
+            page = client.get(path)
+            assert '/static/manifest.staging.webmanifest?v=13' in page.text
+            assert 'content="CER-AI Staging"' in page.text
 
 
 def test_share_worker_redirects_to_the_clinical_app_and_enforces_upload_limits():
@@ -220,8 +250,8 @@ def test_public_renderer_directly_owns_mobile_install_content_without_wrapper():
     assert page.status_code == 200
     assert page.text.count('id="mobile-install"') == 1
     assert "Install CER-AI on your phone" in page.text
-    assert '/static/manifest.webmanifest?v=12' in page.text
-    assert '<meta name="apple-mobile-web-app-title" content="CER-AI Staging">' in page.text
+    assert '/static/manifest.webmanifest?v=13' in page.text
+    assert '<meta name="apple-mobile-web-app-title" content="CER-AI">' in page.text
 
 
 def test_mobile_ui_uses_one_server_workflow_from_upload_through_archive():
