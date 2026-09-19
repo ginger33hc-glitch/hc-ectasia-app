@@ -60,18 +60,9 @@ jobs:
           SERVER_PID=$!
           trap 'kill "$SERVER_PID"' EXIT
           python scripts/check_public_developer_locale.py --baseline-ref cf903be1db314a7477a7132af1945374236bdb6a
-      - name: Verify deployed public scripts and live homepage after promotion
-        if: github.event_name == 'push'
-        shell: bash
-        run: |
-          if [ "$GITHUB_REF_NAME" = "main" ]; then
-            TARGET=production
-          else
-            TARGET=staging
-          fi
-          python scripts/check_public_developer_locale.py --environment "$TARGET"
-          set -o pipefail
-          python scripts/check_public_discovery.py --environment "$TARGET" | tee "public-developer-artifacts/$TARGET/public-http.json"
+      # Live HTTP verification cannot run inside a pre-deploy check: Railway waits
+      # for every GitHub check suite before promotion. Post-deploy verification is
+      # performed separately after Railway reports SUCCESS.
       - name: Preserve language regression evidence
         if: always()
         uses: actions/upload-artifact@v4
