@@ -62,7 +62,7 @@
     "Using CER-AI":"CER-AI Kullanımı",
     "A practical workflow for qualified ophthalmic professionals using the clinical application.":"Klinik uygulamayı kullanan yetkin göz hekimleri için pratik bir iş akışı.",
     "Enter the clinical application":"Klinik uygulamaya girin",
-    "Select Access CER-AI and enter the authorized doctor name in the current supervised trial login flow.":"CER-AI'ye Eriş seçeneğini seçin ve mevcut kontrollü deneme girişinde yetkili doktor adını girin.",
+    "Select Access CER-AI and sign in with your authorized username and password.":"CER-AI'ye Eriş seçeneğini seçin ve yetkili kullanıcı adınız ve parolanızla giriş yapın.",
     "Complete case information":"Vaka bilgilerini tamamlayın",
     "Enter patient name, age, planned procedure, refraction, treatment parameters, and clinical modifiers.":"Hasta adını, yaşı, planlanan prosedürü, refraksiyonu, tedavi parametrelerini ve klinik değiştiricileri girin.",
     "Upload Pentacam material":"Pentacam materyalini yükleyin",
