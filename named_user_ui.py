@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from html import escape
 import json
+import os
 from pathlib import Path
 import re
 from urllib.parse import quote
@@ -159,6 +160,67 @@ def install(core: Any) -> None:
                     getattr(core, "_cerai_research_export_enabled", False)
                 ),
             }
+
+        @core.app.get("/archive/operational-status", include_in_schema=False)
+        def archive_operational_status():
+            principal = user_access.require_current_principal()
+            if principal.role != "OWNER":
+                from fastapi import HTTPException
+
+                raise HTTPException(403, "Only the CER-AI OWNER role may review archive status.")
+            archive_runtime = getattr(core, "_cerai_case_archive_runtime", None)
+            enabled = bool(archive_runtime and archive_runtime.enabled)
+            required = bool(archive_runtime and archive_runtime.required)
+            canary = {"status": "NOT_AVAILABLE" if not enabled else "NOT_FOUND"}
+            if enabled:
+                import case_archive
+
+                try:
+                    canary = case_archive.latest_storage_canary(archive_runtime.archive) or canary
+                except Exception:
+                    canary = {"status": "ERROR"}
+            deployment_sha = str(os.getenv("RAILWAY_GIT_COMMIT_SHA") or "").strip()
+            return {
+                "software_version": str(getattr(core, "APP_VERSION", "")),
+                "deployment_sha": deployment_sha or None,
+                "archive_enabled": enabled,
+                "archive_required": required,
+                "archive_mode": "REQUIRED" if required else ("OPTIONAL" if enabled else "DISABLED"),
+                "storage_canary": canary,
+                "report_endpoints": {
+                    "current_pdf": callable(getattr(core, "build_pdf", None)),
+                    "current_docx": callable(getattr(core, "build_docx", None)),
+                    "historical": bool(getattr(core, "_cerai_historical_report_installed", False)),
+                },
+            }
+
+        @core.app.post("/archive/operational-canary", include_in_schema=False)
+        def archive_operational_canary():
+            from fastapi import HTTPException
+            import case_archive
+
+            principal = user_access.require_current_principal()
+            if principal.role != "OWNER":
+                raise HTTPException(403, "Only the CER-AI OWNER role may verify archive storage.")
+            archive_runtime = getattr(core, "_cerai_case_archive_runtime", None)
+            if not archive_runtime or not archive_runtime.enabled:
+                raise HTTPException(503, "CER-AI secure archive is not enabled.")
+            try:
+                result = case_archive.verify_storage_canary(archive_runtime.archive)
+            except Exception as exc:
+                raise HTTPException(503, "CER-AI archive storage verification failed.") from exc
+            audit = getattr(core, "_cerai_audit_event", None)
+            if audit is not None:
+                audit(
+                    "ARCHIVE_CANARY_VERIFIED",
+                    actor=principal,
+                    details={
+                        "contains_phi": False,
+                        "verified_at_utc": result["verified_at_utc"],
+                        "sha256": result["sha256"],
+                    },
+                )
+            return result
 
         @core.app.middleware("http")
         async def named_user_page_gate(request, call_next):

@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 import named_user_ui
 import operational_security
 import user_access
+import case_archive
 
 
 def make_client(role="DOCTOR"):
@@ -148,6 +149,55 @@ def test_owner_capabilities_allow_only_deidentified_retrospective_archive():
     assert payload["retrospective_archive_access"] is True
     assert payload["owner_deidentified_access"] is True
     assert payload["original_source_access"] is False
+
+
+def test_archive_operational_status_is_owner_only_and_contains_no_storage_credentials(monkeypatch):
+    doctor_client, _doctor_core = make_client("DOCTOR")
+    doctor_client.cookies.set("cer_ai_session", "valid")
+    assert doctor_client.get("/archive/operational-status").status_code == 403
+
+    owner_client, core = make_client("OWNER")
+    owner_client.cookies.set("cer_ai_session", "valid")
+    archive = case_archive.EncryptedArchive(
+        case_archive.MemoryObjectStore(), bytes(range(32))
+    )
+    core._cerai_case_archive_runtime = case_archive.CaseArchiveRuntime(archive, required=True)
+    core.APP_VERSION = "test-version"
+    core.build_pdf = lambda payload: b"pdf"
+    core.build_docx = lambda payload: b"docx"
+    monkeypatch.setenv("RAILWAY_GIT_COMMIT_SHA", "a" * 40)
+
+    before = owner_client.get("/archive/operational-status")
+    assert before.status_code == 200
+    assert before.json()["storage_canary"] == {"status": "NOT_FOUND"}
+
+    verified = owner_client.post("/archive/operational-canary")
+    assert verified.status_code == 200
+    assert verified.json()["status"] == "VERIFIED"
+
+    status = owner_client.get("/archive/operational-status")
+    assert status.status_code == 200
+    payload = status.json()
+    assert payload["software_version"] == "test-version"
+    assert payload["deployment_sha"] == "a" * 40
+    assert payload["archive_enabled"] is True
+    assert payload["archive_required"] is True
+    assert payload["archive_mode"] == "REQUIRED"
+    assert payload["storage_canary"] == verified.json()
+    assert payload["report_endpoints"] == {
+        "current_pdf": True,
+        "current_docx": True,
+        "historical": True,
+    }
+    serialized = status.text.lower()
+    for forbidden in ("bucket", "access_key", "secret_access", "storage.railway"):
+        assert forbidden not in serialized
+
+
+def test_archive_operational_routes_require_authentication():
+    client, _core = make_client("OWNER")
+    assert client.get("/archive/operational-status").status_code == 401
+    assert client.post("/archive/operational-canary").status_code == 401
 
 
 def test_archive_page_hides_archive_until_retrospective_capability_is_confirmed():

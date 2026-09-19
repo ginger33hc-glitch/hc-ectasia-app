@@ -396,6 +396,33 @@ def test_memory_store_lists_keys_in_sorted_order():
     assert store.list("p/") == ["p/a", "p/z"]
 
 
+def test_non_phi_storage_canary_round_trip_and_latest_status():
+    archive = make_archive()
+    first = case_archive.verify_storage_canary(
+        archive, created_at_utc="2026-09-18T09:00:00+00:00"
+    )
+    second = case_archive.verify_storage_canary(
+        archive, created_at_utc="2026-09-19T09:00:00+00:00"
+    )
+
+    assert first["status"] == "VERIFIED"
+    assert second["status"] == "VERIFIED"
+    assert first["sha256"] != second["sha256"]
+    assert case_archive.latest_storage_canary(archive) == second
+    plaintext = [
+        archive.get_bytes(key)
+        for key in archive.store.list("cases/")
+        if "/verification/" in key
+    ]
+    assert plaintext
+    assert all(b'"contains_phi":false' in payload for payload in plaintext)
+    assert all(b"patient" not in payload.lower() for payload in plaintext)
+
+
+def test_latest_storage_canary_returns_none_when_not_yet_run():
+    assert case_archive.latest_storage_canary(make_archive()) is None
+
+
 def test_s3_store_creates_missing_object_once():
     client = FakeS3Client()
     store = case_archive.S3ObjectStore(client, "bucket")

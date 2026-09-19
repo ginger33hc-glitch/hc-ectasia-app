@@ -35,6 +35,10 @@ from fastapi import HTTPException
 ARCHIVE_FORMAT = "CER-AI-ARCHIVE-v1"
 ENVELOPE_MAGIC = b"CER-AI1"
 MAX_TOKEN_CASE_MAPPINGS = 256
+_CANARY_KEY_RE = re.compile(
+    r"^cases/(?P<case_id>[0-9a-f]{32})/verification/"
+    r"non-phi-canary-(?P<sha256>[0-9a-f]{64})\.enc$"
+)
 
 
 class ArchiveConfigurationError(RuntimeError):
@@ -596,6 +600,79 @@ class EncryptedArchive:
         except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
             raise ArchiveIntegrityError("Archived canonical assessment is unreadable.") from exc
         return payload if isinstance(payload, dict) else None
+
+
+def verify_storage_canary(
+    archive: EncryptedArchive,
+    *,
+    created_at_utc: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Write, authenticate, read back, and list one non-PHI archive canary."""
+    timestamp = created_at_utc or datetime.now(timezone.utc).isoformat()
+    case_id = archive.new_case_id()
+    payload = json.dumps(
+        {
+            "type": "CER-AI archive verification canary",
+            "contains_phi": False,
+            "created_at_utc": timestamp,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    ref = archive.put_bytes(
+        case_id,
+        "verification",
+        "non-phi-canary",
+        payload,
+        media_type="application/json",
+    )
+    if archive.get_bytes(ref) != payload:
+        raise ArchiveIntegrityError("Archive verification canary read-back mismatch.")
+    if ref.key not in archive.store.list(f"cases/{case_id}/verification/"):
+        raise ArchiveIntegrityError("Archive verification canary is absent from prefix listing.")
+    return {
+        "status": "VERIFIED",
+        "verified_at_utc": timestamp,
+        "sha256": ref.sha256,
+        "plaintext_bytes": ref.plaintext_bytes,
+    }
+
+
+def latest_storage_canary(archive: EncryptedArchive) -> Optional[Dict[str, Any]]:
+    """Return the newest authenticated non-PHI canary without exposing storage coordinates."""
+    latest: Optional[Dict[str, Any]] = None
+    for key in archive.store.list("cases/"):
+        match = _CANARY_KEY_RE.fullmatch(key)
+        if not match:
+            continue
+        try:
+            payload = json.loads(archive.get_bytes(key))
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ArchiveIntegrityError("Archive verification canary is unreadable.") from exc
+        if not isinstance(payload, dict) or payload.get("type") != "CER-AI archive verification canary":
+            raise ArchiveIntegrityError("Archive verification canary type is invalid.")
+        if payload.get("contains_phi") is not False:
+            raise ArchiveIntegrityError("Archive verification canary must be explicitly non-PHI.")
+        timestamp = str(payload.get("created_at_utc") or "")
+        try:
+            parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ArchiveIntegrityError("Archive verification canary timestamp is invalid.") from exc
+        candidate = {
+            "status": "VERIFIED",
+            "verified_at_utc": timestamp,
+            "sha256": match.group("sha256"),
+            "plaintext_bytes": len(
+                json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ),
+            "_parsed": parsed,
+        }
+        if latest is None or candidate["_parsed"] > latest["_parsed"]:
+            latest = candidate
+    if latest is None:
+        return None
+    latest.pop("_parsed", None)
+    return latest
 
 
 class CaseArchiveRuntime:
