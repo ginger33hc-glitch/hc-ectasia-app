@@ -41,7 +41,7 @@ jobs:
           python-version: '3.13'
           cache: pip
       - name: Install test dependencies
-        run: pip install -r requirements-dev.txt
+        run: pip install --require-hashes -r requirements-dev.txt
       - name: JavaScript syntax and translation contracts
         run: |
           node --check static/public-i18n.js
@@ -51,7 +51,6 @@ jobs:
         run: python -m pytest -q
       - name: Install browser and retrieve original bug baseline
         run: |
-          pip install playwright
           python -m playwright install --with-deps chromium
           git fetch --depth=1 origin cf903be1db314a7477a7132af1945374236bdb6a
       - name: Reproduce original bug and verify desktop/phone language recovery

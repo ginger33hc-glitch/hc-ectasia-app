@@ -1,0 +1,7 @@
+-r requirements.in
+pytest==9.1.1
+pytest-cov==7.1.0
+pypdf==6.16.2
+ruff==0.12.11
+pip-audit==2.9.0
+playwright==1.63.0

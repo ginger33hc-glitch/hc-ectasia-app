@@ -39,7 +39,7 @@ jobs:
           python-version: '3.13'
           cache: pip
       - name: Install test dependencies
-        run: pip install -r requirements-dev.txt
+        run: pip install --require-hashes -r requirements-dev.txt
       - name: Compile public-only additions
         run: python -m py_compile scripts/check_public_discovery.py tests/test_public_search_discovery.py
       - name: Public site and discovery contracts
@@ -48,7 +48,6 @@ jobs:
         run: python -m pytest -q
       - name: Install browser test dependency
         run: |
-          pip install playwright
           python -m playwright install --with-deps chromium
       - name: Desktop and phone EN/TR presentation
         run: |

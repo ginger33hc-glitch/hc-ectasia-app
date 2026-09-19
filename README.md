@@ -197,7 +197,13 @@ python -m pytest -q
 
 The test suite covers exact structural and treatment-range boundaries, signed manifest/intended input and axis requirements, phone-safe sign-only entry, fixed OD-before-OS reporting, prior-surgery routing, identity warnings, date/QS gates, invalid numeric inputs, fellow-eye completeness, ERSS/PRK-EWSS categories, extraction merging, runtime isolation, and valid PDF/DOCX generation.
 
-Dependencies are exact-version pinned. The extraction model is restricted to the reviewed configuration; changing it requires explicit non-clinical override and revalidation.
+Direct production and development requirements are maintained in `requirements.in` and
+`requirements-dev.in`. The corresponding `.txt` files are complete Python 3.13 dependency locks:
+every transitive package is version-pinned and every downloadable artifact is SHA-256 verified.
+Regenerate them with the `uv pip compile --generate-hashes` commands recorded at the top of each
+lock file. CI installs the development lock in hash-required mode and audits both production and
+development locks. The extraction model is restricted to the reviewed configuration; changing it
+requires explicit non-clinical override and revalidation.
 
 
 ## Authorized update and deployment workflow
