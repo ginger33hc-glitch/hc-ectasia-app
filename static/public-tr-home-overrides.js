@@ -11,12 +11,24 @@
   }
 
   function ensurePwaMetadata() {
-    if (!document.querySelector('link[rel="manifest"]')) {
-      const manifest = document.createElement("link");
+    const staging = window.location.hostname.toLowerCase().includes("staging");
+    const manifestHref = staging
+      ? "/static/manifest.staging.webmanifest?v=13"
+      : "/static/manifest.webmanifest?v=13";
+    let manifest = document.querySelector('link[rel="manifest"]');
+    if (!manifest) {
+      manifest = document.createElement("link");
       manifest.rel = "manifest";
-      manifest.href = "/static/manifest.webmanifest?v=12";
       document.head.appendChild(manifest);
     }
+    manifest.href = manifestHref;
+    let appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+    if (!appleTitle) {
+      appleTitle = document.createElement("meta");
+      appleTitle.name = "apple-mobile-web-app-title";
+      document.head.appendChild(appleTitle);
+    }
+    appleTitle.content = staging ? "CER-AI Staging" : "CER-AI";
     if (!document.querySelector('link[rel="apple-touch-icon"]')) {
       const appleIcon = document.createElement("link");
       appleIcon.rel = "apple-touch-icon";

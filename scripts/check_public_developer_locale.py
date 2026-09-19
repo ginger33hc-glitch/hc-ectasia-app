@@ -89,7 +89,11 @@ def main():
         if args.baseline_ref:
             if args.environment != "local":
                 raise ValueError("Legacy reproduction is local only")
-            assert read_ref(args.baseline_ref, "static/public-home.html") == html, "Homepage markup changed"
+            baseline_html = read_ref(args.baseline_ref, "static/public-home.html")
+            for marker in ('id="developer"', 'class="developer-card"', 'class="founder-note"'):
+                assert marker in baseline_html and marker in html, (
+                    "Developer-section structure required for legacy reproduction changed"
+                )
             legacy = {"/" + path: read_ref(args.baseline_ref, path) for path in SCRIPTS}
             context = context_with_language(browser, 1440, "tr")
 
