@@ -6,8 +6,6 @@ The canary is intentionally retained as an immutable audit artifact; it contains
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-import json
 from pathlib import Path
 import sys
 
@@ -16,41 +14,17 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from case_archive import EncryptedArchive
+from case_archive import EncryptedArchive, verify_storage_canary
 
 
 def main() -> None:
     archive = EncryptedArchive.from_environment()
-    case_id = archive.new_case_id()
-    payload = json.dumps(
-        {
-            "type": "CER-AI archive verification canary",
-            "contains_phi": False,
-            "created_at_utc": datetime.now(timezone.utc).isoformat(),
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-
-    ref = archive.put_bytes(
-        case_id,
-        "verification",
-        "non-phi-canary",
-        payload,
-        media_type="application/json",
-    )
-    recovered = archive.get_bytes(ref)
-    if recovered != payload:
-        raise SystemExit("CER-AI archive verification failed: read-back mismatch.")
-    listed = archive.store.list(f"cases/{case_id}/verification/")
-    if ref.key not in listed:
-        raise SystemExit("CER-AI archive verification failed: object not visible in prefix listing.")
+    result = verify_storage_canary(archive)
 
     print("CER-AI archive verification passed.")
-    print(f"case_id={case_id}")
-    print(f"key={ref.key}")
-    print(f"sha256={ref.sha256}")
-    print(f"plaintext_bytes={ref.plaintext_bytes}")
+    print(f"verified_at_utc={result['verified_at_utc']}")
+    print(f"sha256={result['sha256']}")
+    print(f"plaintext_bytes={result['plaintext_bytes']}")
 
 
 if __name__ == "__main__":
