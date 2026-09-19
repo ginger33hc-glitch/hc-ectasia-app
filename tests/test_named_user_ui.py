@@ -208,3 +208,10 @@ def test_archive_page_hides_archive_until_retrospective_capability_is_confirmed(
     assert 'id="patient_id"' not in text
     assert "if(capabilities.retrospective_archive_access)" in text
     assert "Masked in OWNER view" in text
+    assert 'id="operationalControls" class="capability" hidden' in text
+    assert 'id="archiveStatusButton"' in text
+    assert 'id="archiveCanaryButton"' in text
+    assert 'request("/archive/operational-status")' in text
+    assert 'request("/archive/operational-canary",{method:"POST"})' in text
+    assert '$("operationalControls").hidden=false' in text
+    assert "No patient data was used." in text

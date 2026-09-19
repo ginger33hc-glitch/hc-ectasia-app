@@ -42,8 +42,10 @@
     <div class="actions">
       <span id="researchControls" class="capability" hidden><button id="researchLatest" type="button">Research CSV · latest revisions</button> <button id="researchAll" class="secondary" type="button">Research CSV · all revisions</button></span>
       <span id="auditControls" class="capability" hidden><button id="auditButton" class="secondary" type="button">Load recent audit events</button></span>
+      <span id="operationalControls" class="capability" hidden><button id="archiveStatusButton" class="secondary" type="button">Archive status</button> <button id="archiveCanaryButton" type="button">Verify archive storage</button></span>
     </div>
     <div id="ownerStatus" class="status" aria-live="polite"></div>
+    <div id="operationalStatus" class="audit-box mono" hidden></div>
     <div id="auditBox" class="audit-box" hidden></div>
   </section>
 </main>
@@ -188,6 +190,32 @@
       status.textContent=`${events.length} audit event(s) loaded.`;
     } catch(exc){status.className="status error";status.textContent=exc.message||"Audit search failed.";}
   };
+  const renderOperationalStatus = data => {
+    const box=$("operationalStatus"),canary=data.storage_canary||{},verified=canary.verified_at_utc||"Not yet verified",checksum=canary.sha256||"Not available";
+    box.hidden=false;
+    box.textContent=`Archive: ${data.archive_mode||"UNKNOWN"}\nSoftware: ${data.software_version||"Unknown"}\nDeployment: ${data.deployment_sha||"Unavailable"}\nCanary: ${canary.status||"UNKNOWN"}\nVerified: ${verified}\nChecksum: ${checksum}`;
+  };
+  const loadOperationalStatus = async () => {
+    const status=$("ownerStatus");
+    status.className="status";status.textContent="Loading protected archive status…";
+    try {
+      const response=await request("/archive/operational-status");if(!response.ok)throw new Error(await readError(response));
+      renderOperationalStatus(await response.json());status.textContent="Protected archive status loaded.";
+    } catch(exc){status.className="status error";status.textContent=exc.message||"Unable to load archive status.";}
+  };
+  const verifyArchiveStorage = async () => {
+    if(!window.confirm("Run the encrypted non-patient archive storage verification now?"))return;
+    const status=$("ownerStatus"),button=$("archiveCanaryButton");
+    status.className="status";status.textContent="Writing and reading the encrypted non-patient canary…";button.disabled=true;
+    try {
+      const response=await request("/archive/operational-canary",{method:"POST"});if(!response.ok)throw new Error(await readError(response));
+      const verified=await response.json();
+      renderOperationalStatus({archive_mode:"ACTIVE",software_version:"Current production",deployment_sha:null,storage_canary:verified});
+      status.textContent="Archive storage verification passed. No patient data was used.";
+      await loadOperationalStatus();
+    } catch(exc){status.className="status error";status.textContent=exc.message||"Archive storage verification failed.";}
+    finally{button.disabled=false;}
+  };
 
   $("searchForm").addEventListener("submit", e => { e.preventDefault(); search(); });
   $("clearButton").addEventListener("click", () => { ["patient_name","report_date","decision","reviewer"].forEach(id => $(id).value=""); $("limit").value="100"; renderResults([]); $("searchStatus").textContent=""; });
@@ -200,6 +228,8 @@
   $("researchLatest").addEventListener("click", () => downloadResearch(true));
   $("researchAll").addEventListener("click", () => downloadResearch(false));
   $("auditButton").addEventListener("click", loadAudit);
+  $("archiveStatusButton").addEventListener("click", loadOperationalStatus);
+  $("archiveCanaryButton").addEventListener("click", verifyArchiveStorage);
 
   Promise.all([request("/auth/me"), request("/archive/capabilities")]).then(async responses => {
     if (!responses[0].ok) throw new Error(await readError(responses[0]));
@@ -213,6 +243,7 @@
       $("ownerTools").hidden=false;
       $("researchControls").hidden=!capabilities.research_export_enabled;
       $("auditControls").hidden=!capabilities.audit_enabled;
+      $("operationalControls").hidden=false;
     }
     if(!capabilities.archive_enabled){
       $("searchButton").disabled=true;
