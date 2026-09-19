@@ -18,9 +18,11 @@ jobs:
           python-version: '3.13'
           cache: pip
       - name: Install dependencies
-        run: pip install -r requirements-dev.txt
+        run: pip install --require-hashes -r requirements-dev.txt
       - name: Audit production dependencies
         run: pip-audit -r requirements.txt
+      - name: Audit development dependencies
+        run: pip-audit -r requirements-dev.txt
       - name: Critical static checks
         run: ruff check --select E9,F63,F7,F82 .
       - name: Compile decision-critical runtime modules
