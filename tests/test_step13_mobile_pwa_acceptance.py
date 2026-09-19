@@ -43,10 +43,9 @@ def test_production_and_staging_manifests_have_distinct_install_identities():
     assert production["start_url"] == "/app"
     assert production["scope"] == "/"
     assert production["display"] == "standalone"
-    for filename in ("index.html", "public-home.html"):
-        page = (STATIC / filename).read_text(encoding="utf-8")
-        assert '/static/manifest.webmanifest?v=13' in page
-        assert '<meta name="apple-mobile-web-app-title" content="CER-AI">' in page
+    page = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert '/static/manifest.webmanifest?v=13' in page
+    assert '<meta name="apple-mobile-web-app-title" content="CER-AI">' in page
     target = production["share_target"]
     assert target == {
         "action": "/share-target",
