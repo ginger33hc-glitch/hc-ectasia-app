@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 import re
 
 os.environ.setdefault("OPENAI_API_KEY", "test-key-for-import-only")
@@ -406,6 +407,22 @@ def test_learning_center_documents_current_scoring_and_report_pipeline():
             assert response.status_code == 200
             for phrase in phrases:
                 assert phrase in response.text
+
+
+def test_project_guidance_matches_current_dispositions_and_named_sign_in():
+    readme = Path("README.md").read_text(encoding="utf-8")
+    homepage = Path("static/public-home.html").read_text(encoding="utf-8")
+    translations = Path("static/public-i18n.js").read_text(encoding="utf-8")
+
+    assert "four-category contract" in readme
+    assert "`PASS WITH CAUTION`" in readme
+    assert "three-category contract" not in readme
+    current_login = "Select Access CER-AI and sign in with your authorized username and password."
+    assert current_login in homepage
+    assert current_login in translations
+    assert "current supervised trial login flow" not in homepage
+    assert "current supervised trial login flow" not in translations
+    assert "yetkili kullanıcı adınız ve parolanızla giriş yapın" in translations
 
 
 def test_pentacam_module_documents_five_sources_quadrants_and_extraction_pipeline():

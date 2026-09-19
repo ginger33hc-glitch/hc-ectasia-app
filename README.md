@@ -4,9 +4,11 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 
 ## What v2.0 implements
 
-- Clinical dispositions now use one centralized three-category contract: `PASS`, `CAUTION`, and
-  `STOP-DEFER`. NICE 5–8 produces `CAUTION` without automatic defer; NICE ≥9 remains a
-  `STOP-DEFER` hard stop. Incomplete-data and post-refractive routing states remain separate.
+- Clinical dispositions now use one centralized four-category contract: `PASS`,
+  `PASS WITH CAUTION`, `CAUTION`, and `STOP-DEFER`. Across the four completed independent systems,
+  zero or one `CAUTION` yields `PASS`, two yield `PASS WITH CAUTION`, and three or four yield
+  `CAUTION`; any hard stop yields `STOP-DEFER`. Incomplete-data and post-refractive routing states
+  remain separate.
 
 - Pentacam acquisition quality and literal QS remain faithfully recorded but no longer suppress a
   report when the decision-critical clinical measurements are readable. A non-OK, unreadable, or
