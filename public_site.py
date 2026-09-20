@@ -10,7 +10,7 @@ from html import escape
 from pathlib import Path
 
 from fastapi import Request
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 
 from public_education import (
     SAMPLE_CASE_BY_SLUG,
@@ -32,7 +32,6 @@ _EVIDENCE_PAGE = Path("static/clinical-evidence.html")
 _REFERENCES_PAGE = Path("static/references.html")
 _CLINICAL_AUTHOR_PAGE = Path("static/huseyin-cengiz.html")
 _EDITORIAL_POLICY_PAGE = Path("static/editorial-policy.html")
-_TESTING_NOTICE = Path("static/testing-notice.html")
 _CLINICAL_APP_PAGE = Path("static/index.html")
 _PUBLIC_CANONICAL_BASE = os.getenv(
     "CERAI_PUBLIC_CANONICAL_BASE", "https://cer-ai.com"
@@ -422,7 +421,10 @@ def _render_public_home(request: Request) -> HTMLResponse:
         marker = '<div class="guide-alert"><strong>Clinical use:'
         if marker in html:
             html = html.replace(marker, _MOBILE_INSTALL_SECTION + marker, 1)
-    return HTMLResponse(html, headers={"X-Robots-Tag": directive})
+    return HTMLResponse(
+        html,
+        headers={"X-Robots-Tag": directive, "Cache-Control": "no-cache"},
+    )
 
 
 def _public_page_discovery_head(base: str, canonical_path: str) -> str:
@@ -769,15 +771,16 @@ def install(core) -> None:
             )
         return Response(_sitemap_xml(_site_base(request)), media_type="application/xml")
 
-    # Public website application links intentionally land on the testing notice.
+    # Canonical clinical entry. Named-user middleware redirects unauthenticated
+    # production visitors to doctor verification before this fallback can render.
     @core.app.get("/app", include_in_schema=False)
-    def public_application_notice() -> FileResponse:
-        return FileResponse(_TESTING_NOTICE)
-
-    # Separate non-public entry point retained for the current authorized testing phase.
-    @core.app.get("/testing-app", include_in_schema=False)
-    def clinical_testing_entry(request: Request) -> HTMLResponse:
+    def clinical_application_entry(request: Request) -> HTMLResponse:
         html = _CLINICAL_APP_PAGE.read_text(encoding="utf-8")
         return HTMLResponse(_apply_pwa_identity(html, request))
+
+    # Retired testing-phase address remains only as a compatibility redirect.
+    @core.app.get("/testing-app", include_in_schema=False)
+    def retired_clinical_testing_entry() -> RedirectResponse:
+        return RedirectResponse(url="/app", status_code=308)
 
     core._cerai_public_site_installed = True
