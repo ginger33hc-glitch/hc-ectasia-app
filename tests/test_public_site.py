@@ -39,8 +39,10 @@ def test_public_homepage_mobile_navigation_exposes_learning_resources():
         response = client.get("/")
         assert response.status_code == 200
         assert '/static/public-i18n.js?v=3' in response.text
-        assert '/static/public-tr-home-overrides.js?v=3' in response.text
+        assert '/static/public-tr-home-overrides.js?v=4' in response.text
     helper = open("static/public-tr-home-overrides.js", encoding="utf-8").read()
+    assert "testing-notice" not in helper
+    assert "routePublicAccessButtons" not in helper
     expected = (
         '["Learning Center", "/learning-center"]',
         '["Eğitim Merkezi", "/tr/learning-center"]',
