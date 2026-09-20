@@ -70,18 +70,21 @@ def test_public_and_clinical_pages_select_the_environment_manifest(monkeypatch):
     public_site.install(SimpleNamespace(app=app))
 
     with TestClient(app, base_url="https://cer-ai.com") as client:
-        for path in ("/", "/testing-app"):
+        for path in ("/", "/app"):
             page = client.get(path)
             assert '/static/manifest.webmanifest?v=13' in page.text
             assert 'content="CER-AI"' in page.text
             assert "CER-AI Staging" not in page.text
+        retired = client.get("/testing-app", follow_redirects=False)
+        assert retired.status_code == 308
+        assert retired.headers["location"] == "/app"
 
     staging_app = FastAPI()
     public_site.install(SimpleNamespace(app=staging_app))
     with TestClient(
         staging_app, base_url="https://cer-ai-staging-staging.up.railway.app"
     ) as client:
-        for path in ("/", "/testing-app"):
+        for path in ("/", "/app"):
             page = client.get(path)
             assert '/static/manifest.staging.webmanifest?v=13' in page.text
             assert 'content="CER-AI Staging"' in page.text

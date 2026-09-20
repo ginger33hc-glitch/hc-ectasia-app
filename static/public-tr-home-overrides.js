@@ -1,14 +1,7 @@
-/* CER-AI public homepage access guard, PWA bootstrap, and mobile navigation. No clinical logic.
+/* CER-AI public homepage PWA bootstrap and mobile navigation. No clinical logic.
    public-i18n.js exclusively owns developer/founder text localization. */
 (() => {
-  const NOTICE_PATH = "/static/testing-notice.html";
   const LANGUAGE_KEY = "cerai-public-language";
-
-  function routePublicAccessButtons() {
-    document.querySelectorAll('a[href="/app"]').forEach(link => {
-      link.setAttribute("href", NOTICE_PATH);
-    });
-  }
 
   function ensurePwaMetadata() {
     const staging = window.location.hostname.toLowerCase().includes("staging");
@@ -128,7 +121,6 @@
   }
 
   function init() {
-    routePublicAccessButtons();
     ensurePwaMetadata();
     ensureMobileSectionNav();
     watchLanguageSwitch();
