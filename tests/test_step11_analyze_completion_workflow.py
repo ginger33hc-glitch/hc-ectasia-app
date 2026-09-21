@@ -325,3 +325,43 @@ const shown=readiness.show({assessment_token:'t',workflow_status:'CONTACT_LENS_W
 assert.equal(shown,true);assert.equal(panel.hidden,false);assert.equal(readiness.token,'t');
 '''
     subprocess.run(["node", "-e", script], cwd=ROOT, check=True, capture_output=True, text=True)
+
+
+@pytest.mark.parametrize(("canonical_key", "plan_key", "form_id"), [
+    ("refractive_stability", "stable", "od_stable"),
+    ("documented_progression", "progression", "od_progression"),
+    ("unexplained_cdva_below_20_20", "cdva_below_20_20", "od_cdva"),
+])
+def test_canonical_eligibility_missing_keys_map_back_to_editable_eye_controls(
+    canonical_key, plan_key, form_id,
+):
+    request = workflow._request(
+        "OD", f"Clinical eligibility: {canonical_key}", {"eyes": []},
+    )
+    assert request["eye"] == "OD"
+    assert request["kind"] == "form"
+    assert request["key"] == plan_key
+    assert request["form_id"] == form_id
+
+
+def test_workflow_trace_redacts_unlisted_blocker_text_and_never_logs_values(caplog):
+    response = {
+        "workflow_status": "NEEDS_INPUT",
+        "input_requests": [
+            {"eye": "OD", "key": "srax", "kind": "select", "destination": "measurement"},
+            {"eye": "GLOBAL", "key": "patient-secret", "kind": "instruction", "destination": "source"},
+        ],
+    }
+    session = {"trace_id": "abc123"}
+    with caplog.at_level("INFO", logger="uvicorn.error"):
+        workflow._trace_response(
+            session,
+            "complete",
+            response,
+            submitted_measurements={("OD", "srax")},
+        )
+    message = caplog.messages[-1]
+    assert "('OD', 'srax')" in message
+    assert "UNLISTED_BLOCKER" in message
+    assert "patient-secret" not in message
+    assert "YES" not in message and "NO" not in message

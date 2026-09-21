@@ -8,6 +8,7 @@ from copy import deepcopy
 from math import isfinite
 from threading import RLock
 from time import monotonic
+import logging
 import re
 import secrets
 
@@ -35,6 +36,50 @@ MAX_SESSIONS = 64
 
 NUMERIC_FIELDS = COMPLETION_NUMERIC_FIELDS
 SELECT_FIELDS = {"srax": ("YES", "NO")}
+_logger = logging.getLogger("uvicorn.error")
+
+_SAFE_TRACE_KEYS = frozenset({
+    *NUMERIC_FIELDS,
+    *SELECT_FIELDS,
+    EXAM_DATE_CONFIRMATION_KEY,
+    "age", "patient_name", "contact_lens_type", "contact_lens_discontinuation_days",
+    "prior", "procedure", "ablation_um", "flap_um",
+    "manifest_entered_sphere_D", "manifest_cylinder_signed_D", "manifest_axis_deg",
+    "intended_sphere_D", "intended_cylinder_signed_D", "intended_axis_deg",
+    "stable", "progression", "cdva_below_20_20",
+    "refractive_stability", "documented_progression", "unexplained_cdva_below_20_20",
+})
+
+
+def _request_signature(requests):
+    """Return a PHI-free workflow signature containing only approved field names."""
+    result = []
+    for item in requests or []:
+        key = item.get("key")
+        if key not in _SAFE_TRACE_KEYS:
+            key = "UNLISTED_BLOCKER"
+        eye = item.get("eye") if item.get("eye") in {"OD", "OS", "PATIENT", "GLOBAL"} else "GLOBAL"
+        kind = item.get("kind") if item.get("kind") in {"number", "select", "form", "confirmation", "instruction"} else "instruction"
+        destination = item.get("destination") if item.get("destination") in {"measurement", "source", "source_confirmation", "separate_pathway"} else "source"
+        result.append((eye, key, kind, destination))
+    return tuple(sorted(set(result)))
+
+
+def _trace_response(session, phase, response, *, submitted_measurements=(), submitted_confirmations=()):
+    signature = _request_signature(response.get("input_requests"))
+    previous = session.get("last_request_signature")
+    _logger.info(
+        "assessment_workflow trace=%s phase=%s status=%s submitted_measurements=%s "
+        "submitted_confirmations=%s requests=%s unchanged=%s",
+        session["trace_id"],
+        phase,
+        response.get("workflow_status"),
+        tuple(sorted(submitted_measurements)),
+        tuple(sorted(submitted_confirmations)),
+        signature,
+        previous is not None and signature == previous,
+    )
+    session["last_request_signature"] = signature
 
 
 def _finite(value):
@@ -311,13 +356,19 @@ def _request(eye, message, extracted):
     if lower.startswith("clinical eligibility: "):
         key = text.split(":", 1)[1].strip()
         per_eye_forms = {
-            "stable": "stable", "progression": "progression", "cdva_below_20_20": "cdva",
+            "stable": ("stable", "stable"),
+            "refractive_stability": ("stable", "stable"),
+            "progression": ("progression", "progression"),
+            "documented_progression": ("progression", "progression"),
+            "cdva_below_20_20": ("cdva_below_20_20", "cdva"),
+            "unexplained_cdva_below_20_20": ("cdva_below_20_20", "cdva"),
         }
-        form_id = f"{prefix}_{per_eye_forms[key]}" if key in per_eye_forms else key
+        plan_key, suffix = per_eye_forms.get(key, (key, key))
+        form_id = f"{prefix}_{suffix}" if key in per_eye_forms else key
         return {
             "eye": eye if key in per_eye_forms else "PATIENT",
             "label": f"Clinical eligibility: document {key.replace('_', ' ')}",
-            "kind": "form", "key": key, "destination": "source", "form_id": form_id,
+            "kind": "form", "key": plan_key, "destination": "source", "form_id": form_id,
             "help": "Document this clinical eligibility item before a final assessment can be issued.",
             "required_for": ["Clinical eligibility"],
             "source_screen": "Clinical eligibility and stability",
@@ -694,9 +745,11 @@ def begin(core, extracted, age, plans, modifiers, metadata, source_images=None):
             "ready": None,
             "source_images": list(source_images or []),
             "completion_requests": set(),
+            "trace_id": secrets.token_hex(6),
         }
         _sessions[token] = session
         response = _respond(core, token, session, age, plans, modifiers, metadata, {})
+        _trace_response(session, "begin", response)
     runtime = getattr(core, "_cerai_case_archive_runtime", None)
     if runtime is not None:
         archive_state = runtime.begin_case(
@@ -716,6 +769,17 @@ def complete(core, payload):
         token = payload.get("assessment_token")
         session = _session(token)
         session["ready"] = None
+        submitted_measurements = {
+            (eye, key)
+            for eye, values in (payload.get("clinical_overrides") or {}).items()
+            if eye in {"OD", "OS"} and isinstance(values, dict)
+            for key in values
+            if key in _SAFE_TRACE_KEYS
+        }
+        submitted_confirmations = {
+            key for key in (payload.get("source_confirmations") or {})
+            if key == EXAM_DATE_CONFIRMATION_KEY
+        }
         response = _respond(
             core,
             token,
@@ -726,6 +790,13 @@ def complete(core, payload):
             metadata,
             payload.get("clinical_overrides", {}),
             payload.get("source_confirmations", {}),
+        )
+        _trace_response(
+            session,
+            "complete",
+            response,
+            submitted_measurements=submitted_measurements,
+            submitted_confirmations=submitted_confirmations,
         )
     return _finalize_archive(core, response, session)
 

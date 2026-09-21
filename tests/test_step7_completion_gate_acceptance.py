@@ -138,6 +138,26 @@ def test_missing_final_bad_d_blocks_report_and_requests_only_canonical_d_box():
     assert {"field": "BAD_D", "original": None, "value": 1.2, "label": "SURGEON_CONFIRMED"} in corrections
 
 
+def test_entered_thinnest_location_pachymetry_is_accepted_and_not_requested_again():
+    session = _session(od=_eye("OD", pachy_thinnest_um=None))
+    first = _respond(session)
+    request = next(
+        item for item in first["input_requests"]
+        if item.get("eye") == "OD" and item.get("key") == "pachy_thinnest_um"
+    )
+    assert request["kind"] == "number"
+
+    completed = _respond(session, overrides={"OD": {"pachy_thinnest_um": 512}})
+    assert completed["workflow_status"] == "READY"
+    assert not any(
+        item.get("eye") == "OD" and item.get("key") == "pachy_thinnest_um"
+        for item in completed["input_requests"]
+    )
+    od = next(item for item in completed["extracted"]["eyes"] if item["eye"] == "OD")
+    assert od["pachy_thinnest_um"] == 512
+    assert od["field_provenance"]["pachy_thinnest_um"] == [{"source": "SURGEON_CONFIRMED"}]
+
+
 def test_missing_ps3_ppi_average_blocks_report_with_one_canonical_ppi_request():
     result = _respond(_session(od=_eye("OD", PPI_avg=None)), procedure="PRK")
     assert result["workflow_status"] == "NEEDS_INPUT"

@@ -43,6 +43,8 @@ assert.equal(readiness.collect().OS.srax,'YES');
 panel.inputs=[];assert.deepEqual(readiness.collect(),{});assert.deepEqual(readiness.overrides,{});
 panel.inputs=[{value:'NO',tagName:'SELECT',dataset:{eye:'OS',measurement:'srax'}}];
 assert.equal(readiness.collect().OS.srax,'NO');
+panel.inputs=[{value:'512',tagName:'INPUT',dataset:{eye:'OD',measurement:'pachy_thinnest_um'}}];
+assert.equal(readiness.collect().OD.pachy_thinnest_um,512);
 panel.inputs=[{value:'APPROVE_CONTINUE',dataset:{sourceConfirmation:'pentacam_exam_date_conflict'}}];
 assert.equal(readiness.collectSourceConfirmations().pentacam_exam_date_conflict,'APPROVE_CONTINUE');
 panel.inputs=[];assert.deepEqual(readiness.collectSourceConfirmations(),{});
