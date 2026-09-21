@@ -206,6 +206,34 @@ def test_entered_sub_480_thinnest_is_known_hard_stop_not_repeated_missing_input(
     assert "Randleman: pachymetry" not in od["missing"]
 
 
+def test_existing_default_flap_is_not_requested_when_only_actual_ablation_is_missing():
+    plans = {"OD": _plan(), "OS": _plan()}
+    for plan in plans.values():
+        plan.update({
+            "ablation_um": None,
+            "manifest_entered_sphere_D": 1.0,
+            "manifest_cylinder_signed_D": -2.0,
+            "intended_entered_sphere_D": 1.0,
+            "intended_cylinder_signed_D": -2.0,
+        })
+    session = _session()
+    result = workflow._respond(
+        SimpleNamespace(APP_VERSION="step7-runtime-acceptance"),
+        "token",
+        session,
+        35,
+        plans,
+        _modifiers(),
+        {"name": "Step 7 Patient"},
+        {},
+    )
+    requested = {(item.get("eye"), item.get("key")) for item in result["input_requests"]}
+    assert ("OD", "ablation_um") in requested
+    assert ("OS", "ablation_um") in requested
+    assert ("OD", "flap_um") not in requested
+    assert ("OS", "flap_um") not in requested
+
+
 def test_missing_ps3_ppi_average_blocks_report_with_one_canonical_ppi_request():
     result = _respond(_session(od=_eye("OD", PPI_avg=None)), procedure="PRK")
     assert result["workflow_status"] == "NEEDS_INPUT"

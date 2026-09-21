@@ -52,6 +52,7 @@ def test_finite_sub_480_pachymetry_is_unscored_hard_stop_input_not_missing_data(
     assert result["rows"]["pachymetry"] is None
     assert result["total"] is None
     assert "pachymetry" not in result["missing"]
+    assert result["no_clearance_score_reason"] == "PREOP_THICKNESS_HARD_STOP"
 
 
 def test_i_s_inferior_steepening_band_scores_three():

@@ -99,8 +99,15 @@ def _missing(core_result: Mapping[str, Any], eligibility_missing=()) -> list[str
     bad = core_result.get("bad_d") or {}
     if bad.get("classification") == "UNAVAILABLE":
         missing.append("BAD-D: BAD_D")
+    safety_missing = list((core_result.get("procedural_safety") or {}).get("missing") or [])
+    safety_missing_keys = set(safety_missing)
     erss = core_result.get("erss") or {}
     for key in erss.get("missing") or []:
+        # RSB/RST is a derived value.  When its actual source dependency is
+        # already identified by procedural safety, request that exact field
+        # rather than incorrectly asking again for a flap that is already set.
+        if key == "RSB" and safety_missing_keys.intersection({"ablation_um", "flap_um"}):
+            continue
         missing.append(f"Randleman: {key}")
     for field in (core_result.get("nice") or {}).get("missing") or []:
         missing.append(f"NICE: {field}")
@@ -108,7 +115,7 @@ def _missing(core_result: Mapping[str, Any], eligibility_missing=()) -> list[str
     if ps3 is not None:
         for key in getattr(ps3, "missing_keys", ()):
             missing.append(f"PS3: {key}")
-    for key in (core_result.get("procedural_safety") or {}).get("missing") or []:
+    for key in safety_missing:
         missing.append(f"Safety: {key}")
     for key in eligibility_missing or ():
         missing.append(f"Clinical eligibility: {key}")

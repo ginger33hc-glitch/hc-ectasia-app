@@ -192,6 +192,16 @@ def test_erss_ectatic_stop_is_explained_and_highlighted_in_owning_section():
     assert reports._cell_palette(trigger, 2) == (reports.RED, reports.RED_FILL)
 
 
+def test_sub_480_hard_stop_generates_complete_reports_without_inventing_erss_points():
+    payload = _payload(pachy_thinnest_um=472.0)
+    model = reports.canonical_report_model(payload)
+    rows = _section(model, "OD", "Randleman / ERSS")
+    assert ["Preoperative pachymetry", "Hard stop; no clearance score", ""] in rows
+    assert ["Total", "Not calculated — independent hard stop", ""] in rows
+    assert reports.build_pdf(payload).startswith(b"%PDF")
+    assert Document(BytesIO(reports.build_docx(payload)))
+
+
 def test_decision_basis_stop_and_caution_rows_use_risk_colors():
     assert reports._cell_palette(["STOP", "canonical driver"], 1) == (reports.RED, reports.RED_FILL)
     assert reports._cell_palette(["CAUTION", "canonical driver"], 1) == (reports.AMBER, reports.AMBER_FILL)

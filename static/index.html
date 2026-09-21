@@ -674,7 +674,8 @@ function statusHeadline(r){
 function renderEye(r){
   const p=r.report_payload||{},erss=p.randleman,nice=p.nice||{},ps3=p.ps3||{},bad=p.bad||{},badContext=bad.context||{};
   const triggerRows=section=>(p.section_drivers?.[section]||[]).map(item=>["Decision trigger",item.status,item.detail]);
-  const erssRows=(erss?Object.entries(erss.rows||{}).map(([key,value])=>[key,value,""]).concat([["Total",erss.total,""],["Topography category",erss.category,""],["Disposition",erss.status,""]]):[["Applicability","Not applicable to selected non-LASIK procedure",""]]).concat(triggerRows("randleman"));
+  const noERSSThicknessClearance=erss?.no_clearance_score_reason==="PREOP_THICKNESS_HARD_STOP";
+  const erssRows=(erss?Object.entries(erss.rows||{}).map(([key,value])=>[key,key==="pachymetry"&&noERSSThicknessClearance?"Hard stop; no clearance score":value,""]).concat([["Total",noERSSThicknessClearance?"Not calculated — independent hard stop":erss.total,""],["Topography category",erss.category,""],["Disposition",erss.status,""]]):[["Applicability","Not applicable to selected non-LASIK procedure",""]]).concat(triggerRows("randleman"));
   const niceValueKeys={K2:"K2_D",central_pachymetry:"central_pachy_um",B_Ele_Th:"B_Ele_Th_um",I_S:"I_S_D"};
   const niceRows=Object.entries(nice.rows||{}).map(([key,points])=>[key,nice.values?.[niceValueKeys[key]],points]).concat([["Total","",nice.total],["Classification",nice.category,nice.status]],triggerRows("nice"));
   const ps3Rows=(ps3.findings||[]).map(item=>[item.key,item.status,item.detail]).concat([["Moderate / High",ps3.moderate_count,ps3.high_count],["Procedure disposition",ps3.status,ps3.disposition]],triggerRows("ps3"));

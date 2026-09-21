@@ -116,7 +116,23 @@ def erss_total(
         missing.append("MRSE")
     missing = list(dict.fromkeys(missing))
     total = None if missing or any(value is None for value in rows.values()) else int(sum(rows.values()))
-    return {"category": category, "rows": rows, "total": total, "missing": missing}
+    # A finite pachymetry value below the CER-AI clearance boundary is known
+    # clinical evidence, not an unanswered ERSS input.  Preserve the absence of
+    # a clearance score explicitly so readiness and every report renderer can
+    # distinguish it from genuinely incomplete data without duplicating the
+    # pachymetry threshold outside the canonical rule owner.
+    no_clearance_score_reason = (
+        "PREOP_THICKNESS_HARD_STOP"
+        if _finite(thinnest_um) and rows["pachymetry"] is None and "pachymetry" not in missing
+        else None
+    )
+    return {
+        "category": category,
+        "rows": rows,
+        "total": total,
+        "missing": missing,
+        "no_clearance_score_reason": no_clearance_score_reason,
+    }
 
 
 def erss_disposition(total) -> str:
