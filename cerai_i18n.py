@@ -24,8 +24,6 @@ TR = {
     "Applicability": "Uygulanabilirlik",
     "Not applicable to selected non-LASIK procedure": "Seçilen LASIK dışı işlem için uygulanamaz",
     "Points / disposition": "Puan / karar",
-    "Hard stop; no clearance score": "Kesin durdurma; uygunluk puanı verilmez",
-    "Not calculated — independent hard stop": "Hesaplanmadı — bağımsız kesin durdurma",
     "Displayed component; not recalculated": "Gösterilen bileşen; yeniden hesaplanmadı",
     "Information / QC only": "Yalnızca bilgi / kalite kontrolü",
     "HWTW (mm; 4 Maps Refractive lower-left labeled box)": "HWTW (mm; 4 Maps Refractive sol alt etiketli kutu)",

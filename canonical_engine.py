@@ -47,7 +47,7 @@ def runtime_invariants():
     # Canonical clinical boundaries are validated directly at their owning modules.
     if [erss_age_points(x) for x in (18, 19, 20, 21, 30)] != [3, 2, 2, 0, 0]:
         errors.append("Canonical Randleman age policy is invalid")
-    if [erss_pachymetry_points(x) for x in (479, 480, 499, 500, 509, 510)] != [None, 2, 2, 1, 1, 0]:
+    if [erss_pachymetry_points(x) for x in (449, 450, 451, 480, 481, 510, 511)] != [4, 4, 3, 3, 2, 2, 0]:
         errors.append("Canonical Randleman pachymetry policy is invalid")
     if [erss_rsb_points(x) for x in (239, 240, 259, 260, 279, 280, 299, 300)] != [4, 3, 3, 2, 2, 1, 1, 0]:
         errors.append("Canonical Randleman RSB policy is invalid")

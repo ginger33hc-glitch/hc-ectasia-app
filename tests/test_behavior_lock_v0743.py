@@ -46,8 +46,8 @@ def test_canonical_age_boundaries():
 
 
 def test_canonical_pachymetry_boundaries():
-    assert [(p, erss_pachymetry_points(p)) for p in (479, 480, 481, 499, 500, 509, 510, 511)] == [
-        (479, None), (480, 2), (481, 2), (499, 2), (500, 1), (509, 1), (510, 0), (511, 0)
+    assert [(p, erss_pachymetry_points(p)) for p in (449, 450, 451, 480, 481, 510, 511)] == [
+        (449, 4), (450, 4), (451, 3), (480, 3), (481, 2), (510, 2), (511, 0)
     ]
 
 

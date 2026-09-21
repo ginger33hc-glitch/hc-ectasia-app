@@ -257,25 +257,10 @@ def assert_complete_report_payload(payload: Mapping[str, Any]) -> list[dict[str,
         procedure = str(report.get("procedure") or "").upper()
         randleman = report.get("randleman")
         randleman_rows = (randleman or {}).get("rows") or {}
-        known_no_clearance_score = (
-            isinstance(randleman, Mapping)
-            and randleman.get("no_clearance_score_reason") == "PREOP_THICKNESS_HARD_STOP"
-            and not randleman.get("missing")
-            and randleman_rows.get("pachymetry") is None
-            and all(
-                randleman_rows.get(key) is not None
-                for key in ("topography", "RSB", "age", "MRSE")
-            )
-        )
         if procedure in {"LASIK", "PRK"} and (
             not isinstance(randleman, Mapping)
-            or (
-                not known_no_clearance_score
-                and (
-                    randleman.get("total") is None
-                    or any(value is None for value in randleman_rows.values())
-                )
-            )
+            or randleman.get("total") is None
+            or any(value is None for value in randleman_rows.values())
         ):
             errors.append(f"{eye}: Randleman/ERSS is incomplete")
         nice = report.get("nice") or {}
@@ -307,23 +292,11 @@ def _report_sections(report: Mapping[str, Any]) -> list[tuple[str, list[list[str
     procedure = str(report.get("procedure") or "")
     randleman = report.get("randleman")
     if isinstance(randleman, Mapping):
-        no_clearance_score = (
-            randleman.get("no_clearance_score_reason")
-            == "PREOP_THICKNESS_HARD_STOP"
-        )
         rows = [["Component", "Points / disposition", "Exact finding"]]
         for key in ("topography", "RSB", "age", "pachymetry", "MRSE"):
-            value = (randleman.get("rows") or {}).get(key)
-            if key == "pachymetry" and no_clearance_score:
-                value = "Hard stop; no clearance score"
-            rows.append([ERSS_LABELS[key], _text(value), ""])
+            rows.append([ERSS_LABELS[key], _text((randleman.get("rows") or {}).get(key)), ""])
         rows.extend([
-            [
-                "Total",
-                "Not calculated — independent hard stop"
-                if no_clearance_score else _text(randleman.get("total")),
-                "",
-            ],
+            ["Total", _text(randleman.get("total")), ""],
             ["Topography category", _text(randleman.get("category")), ""],
             ["Disposition", _text(randleman.get("status")), ""],
         ])

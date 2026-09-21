@@ -107,32 +107,13 @@ def erss_total(
         missing.append("RSB")
     if rows["age"] is None:
         missing.append("age")
-    # A finite value below 480 µm is intentionally unscored by ERSS because it
-    # is already an independent tissue hard stop. It is known, not missing,
-    # and must never send the completion workflow back to the surgeon.
-    if not _finite(thinnest_um):
+    if rows["pachymetry"] is None:
         missing.append("pachymetry")
     if rows["MRSE"] is None:
         missing.append("MRSE")
     missing = list(dict.fromkeys(missing))
     total = None if missing or any(value is None for value in rows.values()) else int(sum(rows.values()))
-    # A finite pachymetry value below the CER-AI clearance boundary is known
-    # clinical evidence, not an unanswered ERSS input.  Preserve the absence of
-    # a clearance score explicitly so readiness and every report renderer can
-    # distinguish it from genuinely incomplete data without duplicating the
-    # pachymetry threshold outside the canonical rule owner.
-    no_clearance_score_reason = (
-        "PREOP_THICKNESS_HARD_STOP"
-        if _finite(thinnest_um) and rows["pachymetry"] is None and "pachymetry" not in missing
-        else None
-    )
-    return {
-        "category": category,
-        "rows": rows,
-        "total": total,
-        "missing": missing,
-        "no_clearance_score_reason": no_clearance_score_reason,
-    }
+    return {"category": category, "rows": rows, "total": total, "missing": missing}
 
 
 def erss_disposition(total) -> str:

@@ -100,7 +100,6 @@ def build_report_payload(
             "category": erss.get("category"),
             "status": assessment.get("erss_status"),
             "missing": _plain(erss.get("missing") or []),
-            "no_clearance_score_reason": erss.get("no_clearance_score_reason"),
         }
 
     ps3_payload = None

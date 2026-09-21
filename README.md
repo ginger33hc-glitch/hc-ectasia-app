@@ -133,7 +133,7 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
 - Morphology-first override gate for definite KC/FFKC/PMD or unequivocal ectatic morphology.
 - Published ERSS Placido thresholds are enforced when numeric evidence is available: SRAX `≥20°`; the alternative category requires `≥1.0 D` inferior-versus-opposite steepening with `I-S <1.4 D`. A clearly visible `HIGH`-confidence SRA/inferior-steepening map pattern may also supply the category without inventing an angle; lower-confidence visual labels remain unscorable.
 - CER-AI operational hard stops: preoperative thinnest pachymetry `<480 µm`, LASIK RSB `<300 µm`, PRK RST `<310 µm`, intended sphere `<−10.00 D`, and intended sphere `>+6.00 D`. Exact boundaries do not trigger those rules.
-- CER-AI-modified LASIK pachymetry scoring: `480–499 µm` = +2, `500–509 µm` = +1, and `>=510 µm` = +0.
+- Published ERSS pachymetry scoring remains available independently of the CER-AI hard stop: `<=450 µm` = +4, `451–480 µm` = +3, `481–510 µm` = +2, and `>510 µm` = +0. Exact 450 µm uses the conservative adjacent band.
 - Standard CER-AI PRK calculation: `RST = pachymetry - 50 µm epithelium - maximum stromal ablation`.
 - Zone-specific CER-AI ablation estimates for explicitly documented Alcon EX500 plans: `12 µm/D` at 6.0 mm, `15 µm/D` at 6.5 mm, and `16.33 µm/D` at 7.0 mm; the actual treatment-plan maximum remains preferred.
 - Optical-zone selection is limited to `6.0`, `6.5`, or `7.0 mm`; transition-zone selection is limited to `8.0`, `8.5`, or `9.0 mm`.

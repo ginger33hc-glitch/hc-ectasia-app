@@ -192,12 +192,13 @@ def test_erss_ectatic_stop_is_explained_and_highlighted_in_owning_section():
     assert reports._cell_palette(trigger, 2) == (reports.RED, reports.RED_FILL)
 
 
-def test_sub_480_hard_stop_generates_complete_reports_without_inventing_erss_points():
+def test_sub_480_hard_stop_generates_complete_report_with_independent_erss_score():
     payload = _payload(pachy_thinnest_um=472.0)
     model = reports.canonical_report_model(payload)
     rows = _section(model, "OD", "Randleman / ERSS")
-    assert ["Preoperative pachymetry", "Hard stop; no clearance score", ""] in rows
-    assert ["Total", "Not calculated — independent hard stop", ""] in rows
+    assert ["Preoperative pachymetry", "3", ""] in rows
+    assert ["Total", "3", ""] in rows
+    assert payload["decision"]["status"] == "STOP-DEFER"
     assert reports.build_pdf(payload).startswith(b"%PDF")
     assert Document(BytesIO(reports.build_docx(payload)))
 

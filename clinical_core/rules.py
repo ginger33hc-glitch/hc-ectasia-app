@@ -38,16 +38,22 @@ def erss_age_points(age_years) -> Optional[int]:
 
 
 def erss_pachymetry_points(thinnest_um) -> Optional[int]:
-    """<480 µm is an independent hard stop and leaves this score row unscored."""
+    """Return the published ERSS corneal-thickness component.
+
+    CER-AI's independent preoperative-thickness hard stop is owned by
+    ``clinical_core.safety`` and must not suppress this score.  Exact 450 µm
+    is assigned to the most conservative adjacent band so the integer-micron
+    table remains continuous.
+    """
     if not _finite(thinnest_um):
         return None
     value = float(thinnest_um)
-    if value < 480:
-        return None
-    if value < 500:
+    if value <= 450:
+        return 4
+    if value <= 480:
+        return 3
+    if value <= 510:
         return 2
-    if value < 510:
-        return 1
     return 0
 
 

@@ -124,12 +124,14 @@ def test_independent_bad_d_abnormal_outranks_reassuring_erss():
     assert {driver.key for driver in result["final_disposition"].stop_drivers} == {"bad_d"}
 
 
-def test_tissue_hard_stop_outranks_incomplete_randleman_row():
+def test_tissue_hard_stop_outranks_completed_randleman_caution_score():
     result = evaluate_normalized_case(normal_lasik(
         thinnest_um=479,
         ps3_eye=complete_ps3_eye(thinnest_um=479),
     ))
-    assert result["erss_status"] == ASSESSMENT_INCOMPLETE
+    assert result["erss"]["rows"]["pachymetry"] == 3
+    assert result["erss"]["total"] == 3
+    assert result["erss_status"] == CAUTION
     assert result["procedural_safety"]["hard_stops"]["preop_thickness"] is True
     assert result["procedural_safety"]["status"] == STOP_DEFER
     assert result["status"] == STOP_DEFER

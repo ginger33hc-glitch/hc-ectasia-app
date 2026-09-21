@@ -103,10 +103,13 @@ ERSS uses this evidence within its single topography component only when signed 
 
 ### Thinnest pachymetry — CER-AI modification
 
-- <480 µm → hard stop; no clearance score
-- 480–499 µm → 2 points
-- 500–509 µm → 1 point
-- >=510 µm → 0 points
+- <=450 µm → 4 points
+- 451–480 µm → 3 points
+- 481–510 µm → 2 points
+- >510 µm → 0 points
+
+The independent CER-AI `<480 µm` hard stop remains controlling and does not suppress
+the ERSS component or total. Exact 450 µm uses the conservative adjacent band.
 
 ### Overall ERSS disposition
 

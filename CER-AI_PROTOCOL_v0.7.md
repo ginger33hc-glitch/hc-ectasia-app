@@ -95,8 +95,9 @@ as separate layers. No rule in one layer is silently presented as a validated ru
 ## CER-AI operational hard stops
 
 - Thinnest preoperative pachymetry `<480 µm`; exactly 480 is not stopped by this rule alone.
-- CER-AI-modified LASIK pachymetry bands: `480–499 µm` = +2 points, `500–509 µm` = +1 point,
-  and `>=510 µm` = +0 points.
+- Published ERSS pachymetry scoring is calculated independently of the operational hard stop:
+  `<=450 µm` = +4 points, `451–480 µm` = +3 points, `481–510 µm` = +2 points,
+  and `>510 µm` = +0 points. Exact 450 µm uses the conservative adjacent band.
 - LASIK RSB `<300 µm`; exactly 300 is allowed by this rule.
 - PRK RST `<310 µm`; exactly 310 is allowed by this rule.
 - Intended sphere `<−10.00 D`; exactly −10.00 is allowed by this rule.

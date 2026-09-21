@@ -47,12 +47,11 @@ def test_negative_i_s_does_not_require_srax_to_complete_erss():
     assert result["missing"] == []
 
 
-def test_finite_sub_480_pachymetry_is_unscored_hard_stop_input_not_missing_data():
+def test_finite_sub_480_pachymetry_remains_scored_despite_independent_hard_stop():
     result = erss_total(35, 472, 0.58, 10.0, 300, -2.5)
-    assert result["rows"]["pachymetry"] is None
-    assert result["total"] is None
-    assert "pachymetry" not in result["missing"]
-    assert result["no_clearance_score_reason"] == "PREOP_THICKNESS_HARD_STOP"
+    assert result["rows"]["pachymetry"] == 3
+    assert result["total"] == 4
+    assert result["missing"] == []
 
 
 def test_i_s_inferior_steepening_band_scores_three():
