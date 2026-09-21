@@ -158,6 +158,26 @@ def test_entered_thinnest_location_pachymetry_is_accepted_and_not_requested_agai
     assert od["field_provenance"]["pachy_thinnest_um"] == [{"source": "SURGEON_CONFIRMED"}]
 
 
+def test_entered_sub_480_thinnest_is_known_hard_stop_not_repeated_missing_input():
+    session = _session(od=_eye("OD", pachy_thinnest_um=None))
+    first = _respond(session)
+    assert any(
+        item.get("eye") == "OD" and item.get("key") == "pachy_thinnest_um"
+        for item in first["input_requests"]
+    )
+
+    completed = _respond(session, overrides={"OD": {"pachy_thinnest_um": 472}})
+    assert completed["workflow_status"] == "READY"
+    assert completed["decision"]["status"] == "STOP-DEFER"
+    assert not any(
+        item.get("eye") == "OD" and item.get("key") == "pachy_thinnest_um"
+        for item in completed["input_requests"]
+    )
+    od = next(item for item in completed["decision"]["eyes"] if item["eye"] == "OD")
+    assert "preop_thickness" in od["hard_stops"]
+    assert "Randleman: pachymetry" not in od["missing"]
+
+
 def test_missing_ps3_ppi_average_blocks_report_with_one_canonical_ppi_request():
     result = _respond(_session(od=_eye("OD", PPI_avg=None)), procedure="PRK")
     assert result["workflow_status"] == "NEEDS_INPUT"

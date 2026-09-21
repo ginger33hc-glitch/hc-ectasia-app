@@ -47,6 +47,13 @@ def test_negative_i_s_does_not_require_srax_to_complete_erss():
     assert result["missing"] == []
 
 
+def test_finite_sub_480_pachymetry_is_unscored_hard_stop_input_not_missing_data():
+    result = erss_total(35, 472, 0.58, 10.0, 300, -2.5)
+    assert result["rows"]["pachymetry"] is None
+    assert result["total"] is None
+    assert "pachymetry" not in result["missing"]
+
+
 def test_i_s_inferior_steepening_band_scores_three():
     assert signed_i_s_category(1.2) == INFERIOR_STEEPENING_SRA
     assert erss_topography_points(INFERIOR_STEEPENING_SRA) == 3

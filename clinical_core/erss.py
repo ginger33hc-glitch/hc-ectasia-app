@@ -107,12 +107,15 @@ def erss_total(
         missing.append("RSB")
     if rows["age"] is None:
         missing.append("age")
-    if rows["pachymetry"] is None:
+    # A finite value below 480 µm is intentionally unscored by ERSS because it
+    # is already an independent tissue hard stop. It is known, not missing,
+    # and must never send the completion workflow back to the surgeon.
+    if not _finite(thinnest_um):
         missing.append("pachymetry")
     if rows["MRSE"] is None:
         missing.append("MRSE")
     missing = list(dict.fromkeys(missing))
-    total = None if missing else int(sum(rows.values()))
+    total = None if missing or any(value is None for value in rows.values()) else int(sum(rows.values()))
     return {"category": category, "rows": rows, "total": total, "missing": missing}
 
 
