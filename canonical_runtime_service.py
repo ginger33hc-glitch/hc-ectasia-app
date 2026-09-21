@@ -124,10 +124,6 @@ def _values(core_result: Mapping[str, Any]) -> dict[str, Any]:
         "LASIK_PTA_percent": safety.get("LASIK_PTA_percent"),
         "PRK_PTA_percent": safety.get("PRK_PTA_percent"),
         "estimated_final_Kmean_D": safety.get("estimated_final_Kmean_D"),
-        "predicted_final_K_flat_D": safety.get("predicted_final_K_flat_D"),
-        "predicted_final_K_steep_D": safety.get("predicted_final_K_steep_D"),
-        "predicted_final_K_flat_axis_deg": safety.get("predicted_final_K_flat_axis_deg"),
-        "predicted_final_K_steep_axis_deg": safety.get("predicted_final_K_steep_axis_deg"),
         "intended_refractive_group": core_result.get("intended_refractive_group"),
     }
     if bad_result is not None:

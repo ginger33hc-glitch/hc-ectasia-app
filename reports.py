@@ -355,16 +355,7 @@ def _report_sections(report: Mapping[str, Any]) -> list[tuple[str, list[list[str
     sections.append(("Belin/Ambrósio BAD-D", bad_rows))
 
     safety = report.get("tissue_safety") or {}
-    safety_labels = {
-        "predicted_final_K_flat_D": "Predicted postoperative flat K (D)",
-        "predicted_final_K_steep_D": "Predicted postoperative steep K (D)",
-        "predicted_final_K_flat_axis_deg": "Predicted postoperative flat-K axis (degrees)",
-        "predicted_final_K_steep_axis_deg": "Predicted postoperative steep-K axis (degrees)",
-        "predicted_final_K_method": "Postoperative keratometry method",
-    }
-    safety_rows = [["Parameter", "Canonical result", "Exact finding"]] + [
-        [safety_labels.get(key, key), _text(value), ""] for key, value in safety.items()
-    ]
+    safety_rows = [["Parameter", "Canonical result", "Exact finding"]] + [[key, _text(value), ""] for key, value in safety.items()]
     add_triggers(safety_rows, "tissue_safety")
     sections.append(("Procedural safety", safety_rows))
     planning = report.get("planning") or {}
@@ -497,20 +488,12 @@ def _conclusion_eye_rows(report: Mapping[str, Any]) -> list[list[str]]:
     ])
 
     safety_values = []
-    safety_labels = {
-        "predicted_final_K_flat_D": "Predicted postoperative flat K (D)",
-        "predicted_final_K_steep_D": "Predicted postoperative steep K (D)",
-        "predicted_final_K_flat_axis_deg": "Predicted postoperative flat-K axis (degrees)",
-        "predicted_final_K_steep_axis_deg": "Predicted postoperative steep-K axis (degrees)",
-    }
     for key in (
         "LASIK_RSB_um", "LASIK_PTA_percent", "PRK_RST_um", "PRK_PTA_percent",
         "estimated_final_Kmean_D",
-        "predicted_final_K_flat_D", "predicted_final_K_steep_D",
-        "predicted_final_K_flat_axis_deg", "predicted_final_K_steep_axis_deg",
     ):
         if safety.get(key) is not None:
-            safety_values.append(f"{safety_labels.get(key, key)}: {_text(safety.get(key))}")
+            safety_values.append(f"{key}: {_text(safety.get(key))}")
     rows.append([
         "Procedural safety",
         _text(safety.get("status")),

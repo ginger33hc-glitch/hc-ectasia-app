@@ -56,8 +56,7 @@ def test_name_source_prefers_od_and_uses_os_only_if_od_absent():
 
 def _eye(name="OD", **overrides):
     values = {
-        "eye": name, "K1_D": 42.0, "K1_axis_deg": 180.0,
-        "Kmean_D": 43.0, "K2_D": 44.0,
+        "eye": name, "K1_D": 42.0, "Kmean_D": 43.0, "K2_D": 44.0,
         "corneal_diameter_mm": 11.8,
         "table_verified_numeric_fields": ["corneal_diameter_mm"],
         "central_pachy_um": 550.0, "pachy_thinnest_um": 545.0,
@@ -343,27 +342,6 @@ def test_canonical_eligibility_missing_keys_map_back_to_editable_eye_controls(
     assert request["kind"] == "form"
     assert request["key"] == plan_key
     assert request["form_id"] == form_id
-
-
-def test_mixed_final_k_is_automatic_and_reaches_ready_without_laser_plan_entry():
-    mixed = _plan(
-        intended_entered_sphere_D=1.0,
-        intended_cylinder_signed_D=-3.0,
-        intended_axis_deg=90.0,
-    )
-    completed = _respond(plans={"OD": mixed, "OS": _plan()})
-    assert completed["workflow_status"] == "READY"
-    od = next(eye for eye in completed["decision"]["eyes"] if eye["eye"] == "OD")
-    assert od["values"]["predicted_final_K_flat_D"] == pytest.approx(40.4)
-    assert od["values"]["predicted_final_K_steep_D"] == pytest.approx(44.8)
-
-
-def test_missing_mixed_final_k_source_axis_routes_to_canonical_measurement_control():
-    request = workflow._request("OD", "Safety: K1_axis_deg", {"eyes": []})
-    assert request["kind"] == "number"
-    assert request["key"] == "K1_axis_deg"
-    assert request["destination"] == "measurement"
-    assert "Topometric Cornea Front" in request["label"]
 
 
 def test_workflow_trace_redacts_unlisted_blocker_text_and_never_logs_values(caplog):
