@@ -1,3 +1,4 @@
+import logging
 from types import SimpleNamespace
 
 from fastapi import FastAPI
@@ -198,6 +199,29 @@ def test_archive_operational_routes_require_authentication():
     client, _core = make_client("OWNER")
     assert client.get("/archive/operational-status").status_code == 401
     assert client.post("/archive/operational-canary").status_code == 401
+
+
+def test_archive_canary_failure_logs_phi_free_storage_stage(monkeypatch, caplog):
+    owner_client, core = make_client("OWNER")
+    owner_client.cookies.set("cer_ai_session", "valid")
+    archive = case_archive.EncryptedArchive(
+        case_archive.MemoryObjectStore(), bytes(range(32))
+    )
+    core._cerai_case_archive_runtime = case_archive.CaseArchiveRuntime(archive, required=True)
+
+    def fail_canary(_archive):
+        raise RuntimeError("sensitive detail")
+
+    monkeypatch.setattr(case_archive, "verify_storage_canary", fail_canary)
+    with caplog.at_level(logging.ERROR, logger="uvicorn.error"):
+        response = owner_client.post("/archive/operational-canary")
+
+    assert response.status_code == 503
+    message = caplog.messages[-1]
+    assert "operation=operational_canary" in message
+    assert "stage=write_read_list" in message
+    assert "error_type=RuntimeError" in message
+    assert "sensitive detail" not in message
 
 
 def test_archive_page_hides_archive_until_retrospective_capability_is_confirmed():

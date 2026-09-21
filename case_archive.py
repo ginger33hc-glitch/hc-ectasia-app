@@ -20,6 +20,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
+import logging
 import mimetypes
 import os
 import re
@@ -30,6 +31,9 @@ from uuid import uuid4
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fastapi import HTTPException
+
+
+_logger = logging.getLogger("uvicorn.error")
 
 
 ARCHIVE_FORMAT = "CER-AI-ARCHIVE-v1"
@@ -712,6 +716,26 @@ class CaseArchiveRuntime:
                 "retry after archive service recovery.",
             ) from exc
 
+    @staticmethod
+    def _log_failure(operation: str, stage: str, exc: Exception) -> None:
+        """Record a PHI-free archive failure before required mode masks it as HTTP 503."""
+        error_code = None
+        http_status = None
+        response = getattr(exc, "response", None)
+        if isinstance(response, dict):
+            error = response.get("Error") or {}
+            metadata = response.get("ResponseMetadata") or {}
+            error_code = error.get("Code")
+            http_status = metadata.get("HTTPStatusCode")
+        _logger.exception(
+            "CER-AI archive failure operation=%s stage=%s error_type=%s error_code=%s http_status=%s",
+            operation,
+            stage,
+            type(exc).__name__,
+            error_code or "UNKNOWN",
+            http_status if http_status is not None else "UNKNOWN",
+        )
+
     def begin_case(
         self,
         token: str,
@@ -732,6 +756,7 @@ class CaseArchiveRuntime:
                 extracted=extracted,
             )
         except Exception as exc:
+            self._log_failure("begin_case", "archive_sources", exc)
             self.fail_or_continue(exc)
             return {"status": "UNAVAILABLE"}
         self._remember(self._token_case, token, case_id)
@@ -761,6 +786,7 @@ class CaseArchiveRuntime:
                 "catalog_status": "INDEXED",
             }
             return response
+        stage = "archive_ready"
         try:
             revision = self.archive.archive_ready(
                 case_id,
@@ -768,6 +794,7 @@ class CaseArchiveRuntime:
                 pdf_builder=core.build_pdf,
                 docx_builder=core.build_docx,
             )
+            stage = "catalog_write"
             import case_catalog
 
             current_principal = getattr(core, "_cerai_current_principal", None)
@@ -778,6 +805,7 @@ class CaseArchiveRuntime:
                 ready,
                 actor=actor,
             )
+            stage = "remember_revision"
             self._remember(self._token_revision, token, revision.revision_id)
             response["archive"] = {
                 "status": "ARCHIVED",
@@ -786,6 +814,7 @@ class CaseArchiveRuntime:
                 "catalog_status": "INDEXED",
                 "catalog_sha256": catalog_ref.sha256,
             }
+            stage = "audit_event"
             audit = getattr(core, "_cerai_audit_event", None)
             if audit is not None:
                 audit(
@@ -799,6 +828,7 @@ class CaseArchiveRuntime:
                     },
                 )
         except Exception as exc:
+            self._log_failure("finalize_ready", stage, exc)
             self.fail_or_continue(exc)
             response["archive"] = {"status": "UNAVAILABLE"}
         return response

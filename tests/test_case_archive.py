@@ -3,6 +3,8 @@ from copy import deepcopy
 import hashlib
 from io import BytesIO
 import json
+import logging
+from types import SimpleNamespace
 
 import pytest
 from botocore.exceptions import ClientError
@@ -464,6 +466,51 @@ def test_required_runtime_converts_archive_failure_to_service_unavailable():
 def test_optional_runtime_does_not_block_on_archive_failure():
     runtime = case_archive.CaseArchiveRuntime(None, required=False)
     assert runtime.fail_or_continue(RuntimeError("storage down")) is None
+
+
+def test_finalize_logs_phi_free_stage_and_s3_status_before_required_503(caplog):
+    class FailingArchive:
+        @staticmethod
+        def revision_id_for(ready):
+            return "a" * 24
+
+        @staticmethod
+        def archive_ready(*args, **kwargs):
+            raise ClientError(
+                {
+                    "Error": {"Code": "AccessDenied", "Message": "patient must not be logged"},
+                    "ResponseMetadata": {"HTTPStatusCode": 403},
+                },
+                "PutObject",
+            )
+
+    runtime = case_archive.CaseArchiveRuntime(FailingArchive(), required=True)
+    runtime._remember(runtime._token_case, "assessment-token", "b" * 32)
+    core = SimpleNamespace(build_pdf=lambda payload: b"pdf", build_docx=lambda payload: b"docx")
+    response = {
+        "assessment_token": "assessment-token",
+        "report_token": "report-token",
+        "workflow_status": "READY",
+    }
+    ready = {
+        "report_token": "report-token",
+        "patient": {"name": "Sensitive Patient"},
+        "decision": {"status": "PASS"},
+    }
+
+    with caplog.at_level(logging.ERROR, logger="uvicorn.error"):
+        with pytest.raises(HTTPException) as exc:
+            runtime.finalize_ready(core, response, ready)
+
+    assert exc.value.status_code == 503
+    message = caplog.messages[-1]
+    assert "operation=finalize_ready" in message
+    assert "stage=archive_ready" in message
+    assert "error_type=ClientError" in message
+    assert "error_code=AccessDenied" in message
+    assert "http_status=403" in message
+    assert "Sensitive Patient" not in message
+    assert "patient must not be logged" not in message
 
 
 def test_runtime_token_mapping_is_bounded(monkeypatch):

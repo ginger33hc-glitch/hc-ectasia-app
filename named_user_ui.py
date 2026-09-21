@@ -208,6 +208,9 @@ def install(core: Any) -> None:
             try:
                 result = case_archive.verify_storage_canary(archive_runtime.archive)
             except Exception as exc:
+                archive_runtime._log_failure(
+                    "operational_canary", "write_read_list", exc
+                )
                 raise HTTPException(503, "CER-AI archive storage verification failed.") from exc
             audit = getattr(core, "_cerai_audit_event", None)
             if audit is not None:
