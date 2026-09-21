@@ -442,20 +442,40 @@ def _completion_request_keys(requests):
 
 
 def _validate_current_overrides(session, overrides):
-    """Reject retained/forged answers that were not requested on the current screen."""
+    """Return new answers and reject unrequested values that are not safe retries.
+
+    A mobile client can lose the response after a completion was committed.  Its
+    still-visible form then submits the same value again even though the server
+    has advanced to the next screen.  Treat an exact, previously recorded
+    surgeon correction as an idempotent replay; a different value remains a
+    stale/forged submission and is rejected.
+    """
     allowed = session.get("completion_requests", set())
-    submitted = {
-        (eye_id, key)
-        for eye_id, values in overrides.items()
-        for key in values
+    current_eyes = {
+        eye.get("eye"): eye for eye in (session.get("extracted") or {}).get("eyes") or []
     }
-    stale = sorted(submitted - allowed, key=lambda item: (str(item[0]), str(item[1])))
+    accepted = {}
+    stale = []
+    for eye_id, values in overrides.items():
+        for key, value in values.items():
+            if (eye_id, key) in allowed:
+                accepted.setdefault(eye_id, {})[key] = value
+                continue
+            corrections = (current_eyes.get(eye_id) or {}).get("surgeon_corrections") or []
+            replayed = any(
+                correction.get("field") == key and correction.get("value") == value
+                for correction in corrections
+            )
+            if not replayed:
+                stale.append((eye_id, key))
+    stale.sort(key=lambda item: (str(item[0]), str(item[1])))
     if stale:
         fields = ", ".join(f"{eye} {key}" for eye, key in stale)
         raise HTTPException(
             409,
             f"Stale or unrequested clinical confirmation rejected: {fields}. Review the current required-information screen.",
         )
+    return accepted
 
 
 def _overrides(extracted, overrides):
@@ -611,7 +631,7 @@ def _respond(core, token, session, age, plans, modifiers, metadata, overrides, s
     if set(overrides) - {"OD", "OS"}:
         raise HTTPException(422, "Invalid eye-specific completion inputs.")
     if overrides:
-        _validate_current_overrides(session, overrides)
+        overrides = _validate_current_overrides(session, overrides)
 
     readiness = evaluate_precore_readiness(
         age_years=age,
@@ -768,7 +788,6 @@ def complete(core, payload):
     with _lock:
         token = payload.get("assessment_token")
         session = _session(token)
-        session["ready"] = None
         submitted_measurements = {
             (eye, key)
             for eye, values in (payload.get("clinical_overrides") or {}).items()

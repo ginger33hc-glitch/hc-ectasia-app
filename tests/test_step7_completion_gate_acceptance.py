@@ -1,6 +1,8 @@
 """Official Step 7 acceptance for pre-report completion and missing-data workflow."""
 from types import SimpleNamespace
 
+import pytest
+
 import assessment_workflow as workflow
 
 
@@ -136,6 +138,32 @@ def test_missing_final_bad_d_blocks_report_and_requests_only_canonical_d_box():
     assert od["field_provenance"]["BAD_D"] == [{"source": "SURGEON_CONFIRMED"}]
     corrections = second["decision"]["eyes"][0]["report_payload"]["manual_corrections"]
     assert {"field": "BAD_D", "original": None, "value": 1.2, "label": "SURGEON_CONFIRMED"} in corrections
+
+
+def test_identical_b_ele_completion_retry_is_idempotent_but_changed_stale_value_is_rejected():
+    session = _session(od=_eye("OD", B_Ele_Th_um=None))
+    first = _respond(session)
+    assert ("OD", "B_Ele_Th_um") in session["completion_requests"]
+    assert any(
+        item.get("eye") == "OD" and item.get("key") == "B_Ele_Th_um"
+        for item in first["input_requests"]
+    )
+
+    completed = _respond(session, overrides={"OD": {"B_Ele_Th_um": 14}})
+    assert completed["workflow_status"] == "READY"
+
+    retry = _respond(session, overrides={"OD": {"B_Ele_Th_um": 14}})
+    assert retry["workflow_status"] == "READY"
+    od = next(item for item in retry["extracted"]["eyes"] if item["eye"] == "OD")
+    corrections = [
+        item for item in od["surgeon_corrections"]
+        if item["field"] == "B_Ele_Th_um"
+    ]
+    assert corrections == [{"field": "B_Ele_Th_um", "original": None, "value": 14}]
+
+    with pytest.raises(workflow.HTTPException, match="Stale or unrequested"):
+        _respond(session, overrides={"OD": {"B_Ele_Th_um": 15}})
+    assert session["ready"] is not None
 
 
 def test_entered_thinnest_location_pachymetry_is_accepted_and_not_requested_again():
