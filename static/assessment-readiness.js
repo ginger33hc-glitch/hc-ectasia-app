@@ -200,7 +200,7 @@ window.HCReadiness = class {
         const original=document.getElementById(item.form_id);
         if(original){
           input=original.cloneNode(true);input.removeAttribute('id');input.removeAttribute('name');input.removeAttribute('required');
-          input.readOnly=false;input.value=original.value;input.dataset.sourceForm=item.form_id;
+          input.readOnly=false;input.value=original.value;input.dataset.sourceForm=item.form_id;input.required=true;
           if(item.form_id==='age'){
             const originalRow=original.closest('.row');if(originalRow)originalRow.hidden=true;
             original.required=false;input.required=true;
@@ -222,7 +222,7 @@ window.HCReadiness = class {
           input.value=this.overrides[item.eye]?.[item.key]??'';
         }
       }
-      if(input){this.hasCompletableInputs=true;input.id=`completion_${seen.size}`;label.htmlFor=input.id;row.append(input);}
+      if(input){this.hasCompletableInputs=true;input.required=true;input.id=`completion_${seen.size}`;label.htmlFor=input.id;row.append(input);}
       else {
         row.classList.add('completion-blocker');
         const help=document.createElement('span');help.textContent=tr(item.help);row.append(help);

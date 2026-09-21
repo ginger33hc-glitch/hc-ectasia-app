@@ -133,7 +133,7 @@
 <footer class="app-legal-footer">Developed by Hüseyin Cengiz, MD. All rights reserved. Final responsibility rests with the surgeon at all times and under all circumstances.</footer>
 
 <script src="/static/i18n.js?v=10"></script>
-<script src="/static/assessment-readiness.js?v=7"></script>
+<script src="/static/assessment-readiness.js?v=8"></script>
 <script>
 const i18n=window.CERAI_I18N;
 async function ceraiFetch(url,options={}){
@@ -788,6 +788,14 @@ f.addEventListener("submit", async (e) => {
   e.preventDefault();
   document.querySelector('#procedureTransitionWarning').hidden=true;
   reportCard.hidden=true;lastReport=null;
+  // The required-information panel uses editable copies of the canonical form
+  // controls. Synchronize those copies before validation and before plans,
+  // modifiers, or patient metadata are serialized for /assessment/complete.
+  let clinicalOverrides,sourceConfirmations;
+  try{
+    clinicalOverrides=readiness.collect();
+    sourceConfirmations=readiness.collectSourceConfirmations();
+  }catch(error){showFormMessage(error.message||String(error));return}
   const invalidRefraction=validateRefractionInputs();
   if(invalidRefraction){
     showFormMessage(invalidRefraction.validationMessage);
@@ -846,8 +854,6 @@ f.addEventListener("submit", async (e) => {
       fd.set("assessment_request_id",requestId);
       return fd;
     };
-    const clinicalOverrides=readiness.collect();
-    const sourceConfirmations=readiness.collectSourceConfirmations();
     let r;
     if(readiness.token){
       r=await ceraiFetch('/assessment/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({assessment_token:readiness.token,age:numberOrNull('age'),eye_plans:{OD:plan('od'),OS:plan('os')},patient_modifiers:modifiers,patient_metadata:patientPayload(),clinical_overrides:clinicalOverrides,source_confirmations:sourceConfirmations})});

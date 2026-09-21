@@ -61,6 +61,23 @@ def test_hidden_reports_stay_hidden_when_printing_and_after_edits():
     assert "f.addEventListener('change',()=>{reportCard.hidden=true;lastReport=null;})" in html
 
 
+def test_completion_answers_sync_before_validation_and_payload_serialization():
+    html = (ROOT / 'static/index.html').read_text()
+    readiness = (ROOT / 'static/assessment-readiness.js').read_text()
+    submit_start = html.index('f.addEventListener("submit"')
+    submit_end = html.index('if("serviceWorker" in navigator)', submit_start)
+    submit = html[submit_start:submit_end]
+
+    collect = submit.index('clinicalOverrides=readiness.collect()')
+    form_validation = submit.index('validateRefractionInputs()')
+    modifiers = submit.index('modifiers=patientModifiers()')
+    completion_request = submit.index("ceraiFetch('/assessment/complete'")
+    assert collect < form_validation < modifiers < completion_request
+    assert submit.count('readiness.collect()') == 1
+    assert 'input.dataset.sourceForm=item.form_id;input.required=true' in readiness
+    assert 'if(input){this.hasCompletableInputs=true;input.required=true;' in readiness
+
+
 def test_ablation_field_rejects_negative_typing_and_paste_but_accepts_zero():
     if not shutil.which("node"):
         pytest.skip("Node is not available")
@@ -173,7 +190,7 @@ def test_patient_age_completion_uses_one_shared_field():
     html = (ROOT / 'static/index.html').read_text()
     translations = (ROOT / 'static/i18n.js').read_text()
     assert '<label>Patient age (years)</label>' in html
-    assert '/static/assessment-readiness.js?v=7' in html
+    assert '/static/assessment-readiness.js?v=8' in html
     assert 'Pentacam age unreadable; enter years' not in html
     assert 'Pentacam yaşı okunamadı; yıl olarak girin' not in translations
     assert item == {
