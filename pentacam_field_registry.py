@@ -28,7 +28,7 @@ REPORT_CONTEXT_REREAD_FIELDS = (
 # only after a favorable LASIK assessment when ML7 ring planning needs them.
 # They must not cause automatic image rereads before the clinical decision.
 CONDITIONAL_REPORT_FIELDS = (
-    "K1_D", "corneal_diameter_mm",
+    "K1_D", "K1_axis_deg", "corneal_diameter_mm",
 )
 
 # Retain these canonical values when their printed label/value is clear on the
@@ -86,7 +86,8 @@ COMPLETION_NUMERIC_FIELDS = {
     "central_pachy_um": "Pupil Center (+) pachymetry (µm; 4 Maps Refractive)",
     "BAD_D": "Final BAD-D",
     "PPI_avg": "PPI average",
-    "K1_D": "K1 (D)", "K2_D": "K2 (D; not Kmax)", "Kmean_D": "Preoperative Kmean (D)",
+    "K1_D": "K1 (D)", "K1_axis_deg": "K1 flat-meridian axis (degrees; Topometric Cornea Front)",
+    "K2_D": "K2 (D; not Kmax)", "Kmean_D": "Preoperative Kmean (D)",
     "corneal_diameter_mm": "HWTW (mm; 4 Maps Refractive lower-left labeled box)",
     "I_S": "Signed I-S (D; not ISV/IVA)",
     "posterior_Kmean_D": "Posterior Km (D; Cornea Back)",

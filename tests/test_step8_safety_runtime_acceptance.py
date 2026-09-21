@@ -1,10 +1,15 @@
 """Official Step 8 runtime acceptance for hard stops and tissue safety."""
+import pytest
+
 from canonical_runtime_service import evaluate_case
+from clinical_core.safety import predicted_postop_keratometry
 
 
 def _eye(name="OD", **overrides):
     values = {
         "eye": name,
+        "K1_D": 42.0,
+        "K1_axis_deg": 180.0,
         "Kmean_D": 43.0,
         "K2_D": 44.0,
         "central_pachy_um": 550.0,
@@ -189,15 +194,69 @@ def test_final_k_36_and_48_allowed_while_35_99_and_48_01_stop():
     assert "final_kmean" in above_48["OD"]["hard_stops"]
 
 
-def test_mixed_astigmatism_never_uses_scalar_final_k_clearance():
+def test_mixed_astigmatism_automatically_calculates_both_final_k_meridians():
     result, by_eye = _evaluate(
         od_plan=_plan("PRK", intended_entered_sphere_D=1.0, intended_cylinder_signed_D=-3.0, intended_axis_deg=90.0),
     )
     od = by_eye["OD"]
     assert od["values"]["intended_refractive_group"] == "MIXED"
-    assert od["values"]["estimated_final_Kmean_D"] is None
-    assert "Safety: mixed_astigmatism_meridional_final_k_assessment" in od["missing"]
-    assert od["status"] == "ASSESSMENT INCOMPLETE"
+    assert od["values"]["estimated_final_Kmean_D"] == pytest.approx(42.6)
+    assert od["values"]["predicted_final_K_flat_D"] == pytest.approx(40.4)
+    assert od["values"]["predicted_final_K_steep_D"] == pytest.approx(44.8)
+    assert od["values"]["predicted_final_K_flat_axis_deg"] == pytest.approx(0.0)
+    assert od["values"]["predicted_final_K_steep_axis_deg"] == pytest.approx(90.0)
+    assert od["status"] == "PASS"
+    assert result["status"] == "PASS"
+
+
+def test_mixed_astigmatism_checks_each_laser_plan_meridian_at_inclusive_36_to_48_boundaries():
+    mixed = {
+        "intended_entered_sphere_D": 1.0,
+        "intended_cylinder_signed_D": -3.0,
+        "intended_axis_deg": 90.0,
+    }
+    _, allowed = _evaluate(
+        od_eye=_eye("OD", K1_D=37.6, K2_D=47.2, Kmean_D=42.4),
+        od_plan=_plan("PRK", **mixed),
+    )
+    od = allowed["OD"]
+    assert od["values"]["estimated_final_Kmean_D"] == pytest.approx(42.0)
+    assert od["values"]["predicted_final_K_flat_D"] == pytest.approx(36.0)
+    assert od["values"]["predicted_final_K_steep_D"] == pytest.approx(48.0)
+    assert "final_k_meridians" not in od["hard_stops"]
+    assert od["status"] == "PASS"
+
+    for eye in (
+        _eye("OD", K1_D=37.59, K2_D=47.2, Kmean_D=42.395),
+        _eye("OD", K1_D=37.6, K2_D=47.21, Kmean_D=42.405),
+    ):
+        result, stopped = _evaluate(od_eye=eye, od_plan=_plan("PRK", **mixed))
+        assert "final_k_meridians" in stopped["OD"]["hard_stops"]
+        assert stopped["OD"]["status"] == "STOP-DEFER"
+        assert result["status"] == "STOP-DEFER"
+
+
+def test_mixed_final_k_power_vector_is_axis_aware_when_axes_do_not_align():
+    predicted = predicted_postop_keratometry(
+        42.0, 44.0, 43.0, 0.0, 1.0, -3.0, 45.0,
+    )
+    assert predicted["mean_D"] == pytest.approx(42.6)
+    assert predicted["flat_D"] == pytest.approx(41.0379500648)
+    assert predicted["steep_D"] == pytest.approx(44.1620499352)
+    assert predicted["flat_axis_deg"] == pytest.approx(154.9027855461)
+    assert predicted["steep_axis_deg"] == pytest.approx(64.9027855461)
+
+
+def test_mixed_final_k_requests_only_missing_canonical_keratometry_source_values():
+    result, by_eye = _evaluate(
+        od_eye=_eye("OD", K1_axis_deg=None),
+        od_plan=_plan(
+            "PRK", intended_entered_sphere_D=1.0,
+            intended_cylinder_signed_D=-3.0, intended_axis_deg=90.0,
+        ),
+    )
+    assert "Safety: K1_axis_deg" in by_eye["OD"]["missing"]
+    assert by_eye["OD"]["status"] == "ASSESSMENT INCOMPLETE"
     assert result["status"] == "ASSESSMENT INCOMPLETE"
 
 

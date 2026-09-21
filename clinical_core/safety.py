@@ -5,7 +5,7 @@ LASIK and PRK PTA at or above 40.0% fail the evaluated plan.
 """
 from __future__ import annotations
 
-from math import isfinite
+from math import atan2, cos, degrees, isfinite, radians, sin, sqrt
 
 PRK_EPITHELIUM_UM = 50.0
 LASIK_RSB_MIN_UM = 300.0
@@ -55,6 +55,79 @@ def estimated_final_kmean_d(preop_kmean_d, intended_mrse_d):
     if not all(_finite(x) for x in (preop_kmean_d, intended_mrse_d)):
         return None
     return float(preop_kmean_d) + CORNEAL_EFFECT_PER_INTENDED_MRSE_D * float(intended_mrse_d)
+
+
+def predicted_postop_keratometry(
+    preop_k1_d,
+    preop_k2_d,
+    preop_kmean_d,
+    preop_flat_axis_deg,
+    intended_sphere_d,
+    intended_cylinder_d,
+    intended_axis_deg,
+):
+    """Predict postoperative principal K values with one canonical power-vector model.
+
+    The preoperative cornea and intended spherocylindrical treatment are added in
+    Thibos M/J0/J45 space.  CER-AI's approved 0.8 corneal-effect factor is applied
+    to the complete intended treatment vector, so the result reduces exactly to
+    the existing Kmean + 0.8 * MRSE rule while remaining axis-aware.
+
+    Basis: Thibos et al., Optom Vis Sci 1997;74:367-375; Thibos et al.,
+    J Cataract Refract Surg 2001;27:80-85; Moshirfar et al., Clin Ophthalmol
+    2023;17:2563-2573 (doi:10.2147/OPTH.S423087).
+    """
+    values = (
+        preop_k1_d, preop_k2_d, preop_kmean_d, preop_flat_axis_deg,
+        intended_sphere_d, intended_cylinder_d, intended_axis_deg,
+    )
+    if not all(_finite(value) for value in values):
+        return None
+
+    k1 = float(preop_k1_d)
+    k2 = float(preop_k2_d)
+    if k2 < k1:
+        return None
+
+    flat_axis = float(preop_flat_axis_deg) % 180.0
+    treatment_axis = float(intended_axis_deg) % 180.0
+    cylinder = float(intended_cylinder_d)
+    k_astigmatism = k2 - k1
+
+    corneal_j0 = -(k_astigmatism / 2.0) * cos(radians(2.0 * flat_axis))
+    corneal_j45 = -(k_astigmatism / 2.0) * sin(radians(2.0 * flat_axis))
+    treatment_m = CORNEAL_EFFECT_PER_INTENDED_MRSE_D * (
+        float(intended_sphere_d) + cylinder / 2.0
+    )
+    treatment_j0 = CORNEAL_EFFECT_PER_INTENDED_MRSE_D * (
+        -(cylinder / 2.0) * cos(radians(2.0 * treatment_axis))
+    )
+    treatment_j45 = CORNEAL_EFFECT_PER_INTENDED_MRSE_D * (
+        -(cylinder / 2.0) * sin(radians(2.0 * treatment_axis))
+    )
+
+    final_mean = float(preop_kmean_d) + treatment_m
+    final_j0 = corneal_j0 + treatment_j0
+    final_j45 = corneal_j45 + treatment_j45
+    final_astigmatism_half = sqrt(final_j0 ** 2 + final_j45 ** 2)
+
+    if final_astigmatism_half <= 1e-12:
+        final_flat_axis = None
+        final_steep_axis = None
+    else:
+        final_flat_axis = (0.5 * degrees(atan2(-final_j45, -final_j0))) % 180.0
+        if abs(final_flat_axis - 180.0) <= 1e-10:
+            final_flat_axis = 0.0
+        final_steep_axis = (final_flat_axis + 90.0) % 180.0
+
+    return {
+        "flat_D": final_mean - final_astigmatism_half,
+        "steep_D": final_mean + final_astigmatism_half,
+        "mean_D": final_mean,
+        "flat_axis_deg": final_flat_axis,
+        "steep_axis_deg": final_steep_axis,
+        "method": "THIBOS_POWER_VECTOR_0.8_INTENDED_TREATMENT",
+    }
 
 
 def preop_thickness_hard_stop(thinnest_um) -> bool:

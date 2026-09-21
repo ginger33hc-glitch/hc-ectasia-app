@@ -80,6 +80,12 @@ def test_completion_answers_sync_before_validation_and_payload_serialization():
     assert 'if(input){this.hasCompletableInputs=true;input.required=true;' in readiness
 
 
+def test_mixed_astigmatism_does_not_require_manual_laser_plan_final_k_fields():
+    html = (ROOT / 'static/index.html').read_text()
+    assert 'final_k_meridian' not in html
+    assert 'actual laser treatment plan' not in html
+
+
 def test_ablation_field_rejects_negative_typing_and_paste_but_accepts_zero():
     if not shutil.which("node"):
         pytest.skip("Node is not available")

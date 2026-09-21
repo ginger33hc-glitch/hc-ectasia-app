@@ -99,6 +99,26 @@ def test_model_contains_every_canonical_clinical_report_section_without_recalcul
     )
 
 
+def test_mixed_final_k_meridians_are_visible_in_full_and_conclusion_reports():
+    payload = _payload()
+    report = payload["decision"]["eyes"][0]["report_payload"]
+    report["tissue_safety"]["predicted_final_K_flat_D"] = 41.25
+    report["tissue_safety"]["predicted_final_K_steep_D"] = 44.75
+    report["tissue_safety"]["predicted_final_K_flat_axis_deg"] = 12.0
+    report["tissue_safety"]["predicted_final_K_steep_axis_deg"] = 102.0
+
+    safety_rows = _section(reports.canonical_report_model(payload), "OD", "Procedural safety")
+    assert ["Predicted postoperative flat K (D)", "41.25", ""] in safety_rows
+    assert ["Predicted postoperative steep K (D)", "44.75", ""] in safety_rows
+
+    conclusion = reports._conclusion_eye_rows(report)
+    procedural = next(row for row in conclusion if row[0] == "Procedural safety")
+    assert "Predicted postoperative flat K (D): 41.25" in procedural[2]
+    assert "Predicted postoperative steep K (D): 44.75" in procedural[2]
+    assert "Predicted postoperative flat-K axis (degrees): 12" in procedural[2]
+    assert "Predicted postoperative steep-K axis (degrees): 102" in procedural[2]
+
+
 def test_safe_plan_and_ml7_hinge_vacuum_ring_are_green_without_highlighting_blade():
     rows = _section(
         reports.canonical_report_model(_payload(K1_D=40, K2_D=45)),

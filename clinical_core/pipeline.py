@@ -37,6 +37,7 @@ from .safety import (
     final_kmean_hard_stop,
     pta_hard_stop,
     pta_percent,
+    predicted_postop_keratometry,
     lasik_rsb_hard_stop,
     lasik_rsb_um,
     preop_thickness_hard_stop,
@@ -71,6 +72,9 @@ class ClinicalCoreInput:
     flap_um: Optional[float] = None
     ablation_um: Optional[float] = None
     preop_kmean_d: Optional[float] = None
+    preop_k1_d: Optional[float] = None
+    preop_k2_d: Optional[float] = None
+    preop_k1_axis_deg: Optional[float] = None
     intended_mrse_d: Optional[float] = None
     final_bad_d: Optional[float] = None
     bad_df: Optional[float] = None
@@ -224,6 +228,7 @@ def _safety_status(
     rst,
     pta,
     final_k,
+    final_keratometry,
     intended_group,
 ) -> tuple[str, dict, list[str]]:
     hard_stops = {
@@ -233,7 +238,15 @@ def _safety_status(
         "lasik_pta": procedure == "LASIK" and pta_hard_stop(pta),
         "prk_rst": procedure == "PRK" and prk_rst_hard_stop(rst),
         "prk_pta": procedure == "PRK" and pta_hard_stop(pta),
-        "final_kmean": final_kmean_hard_stop(final_k),
+        "final_kmean": intended_group != MIXED and final_kmean_hard_stop(final_k),
+        "final_k_meridians": (
+            intended_group == MIXED
+            and final_keratometry is not None
+            and (
+                final_kmean_hard_stop(final_keratometry["flat_D"])
+                or final_kmean_hard_stop(final_keratometry["steep_D"])
+            )
+        ),
     }
 
     missing: list[str] = []
@@ -258,7 +271,17 @@ def _safety_status(
     if procedure == "PRK" and rst is None and "ablation_um" not in missing:
         missing.append("PRK_RST_um")
     if intended_group == MIXED:
-        missing.append("mixed_astigmatism_meridional_final_k_assessment")
+        for key, value in (
+            ("K1_D", inp.preop_k1_d),
+            ("K2_D", inp.preop_k2_d),
+            ("K1_axis_deg", inp.preop_k1_axis_deg),
+        ):
+            if not _finite(value):
+                missing.append(key)
+        if final_keratometry is None and not any(
+            key in missing for key in ("K1_D", "K2_D", "K1_axis_deg")
+        ):
+            missing.append("predicted_postoperative_keratometry")
     elif intended_group is None:
         missing.append("intended_refractive_group")
     elif final_k is None:
@@ -288,7 +311,21 @@ def evaluate_normalized_case(
     pta = pta_percent(inp.thinnest_um, anterior_tissue, inp.ablation_um) if procedure in {"LASIK", "PRK"} else None
 
     scalar_final_k_valid = intended_refraction is not None and scalar_final_k_is_valid(intended_refraction)
-    final_k = estimated_final_kmean_d(inp.preop_kmean_d, inp.intended_mrse_d) if scalar_final_k_valid else None
+    final_k = (
+        estimated_final_kmean_d(inp.preop_kmean_d, inp.intended_mrse_d)
+        if intended_refraction is not None else None
+    )
+    final_keratometry = None
+    if intended_group == MIXED:
+        final_keratometry = predicted_postop_keratometry(
+            inp.preop_k1_d,
+            inp.preop_k2_d,
+            inp.preop_kmean_d,
+            inp.preop_k1_axis_deg,
+            intended_refraction.sphere_d,
+            intended_refraction.cylinder_d,
+            intended_refraction.axis_deg,
+        )
 
     erss = None
     erss_status = PASS
@@ -340,7 +377,7 @@ def evaluate_normalized_case(
     ps3_status = str(ps3_decision["status"])
 
     safety_status, safety_stops, safety_missing = _safety_status(
-        procedure, inp, rsb, rst, pta, final_k, intended_group
+        procedure, inp, rsb, rst, pta, final_k, final_keratometry, intended_group
     )
 
     active_safety_stops = [key for key, stopped in safety_stops.items() if stopped]
@@ -350,7 +387,7 @@ def evaluate_normalized_case(
     if safety_missing:
         safety_detail += "; missing: " + ", ".join(safety_missing)
     if intended_group == MIXED:
-        safety_detail += "; scalar MRSE/Kmean final-K model prohibited for mixed astigmatism"
+        safety_detail += "; mixed astigmatism assessed by the canonical axis-aware M/J0/J45 postoperative keratometry model"
 
     core_findings = (
         DecisionFinding("randleman_erss", erss_status, _erss_finding_detail(erss, inp.i_s_d, procedure)),
@@ -384,6 +421,11 @@ def evaluate_normalized_case(
             "PRK_PTA_percent": pta if procedure == "PRK" else None,
             "estimated_final_Kmean_D": final_k,
             "scalar_final_Kmean_model_valid": scalar_final_k_valid,
+            "predicted_final_K_flat_D": final_keratometry.get("flat_D") if final_keratometry else None,
+            "predicted_final_K_steep_D": final_keratometry.get("steep_D") if final_keratometry else None,
+            "predicted_final_K_flat_axis_deg": final_keratometry.get("flat_axis_deg") if final_keratometry else None,
+            "predicted_final_K_steep_axis_deg": final_keratometry.get("steep_axis_deg") if final_keratometry else None,
+            "predicted_final_K_method": final_keratometry.get("method") if final_keratometry else None,
             "hard_stops": safety_stops,
             "missing": safety_missing,
             "status": safety_status,
