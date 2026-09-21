@@ -149,7 +149,7 @@ def test_hyperopic_sphere_plus_6_allowed_but_plus_6_01_hard_stops():
         od_plan=_plan("PRK", intended_entered_sphere_D=6.0, intended_cylinder_signed_D=0.0, intended_axis_deg=0.0),
     )
     assert "sphere_magnitude" not in at_limit["OD"]["hard_stops"]
-    assert at_limit["OD"]["status"] == "PASS"
+    assert at_limit["OD"]["status"] == "CAUTION"
 
     result, over_limit = _evaluate(
         od_plan=_plan("PRK", intended_entered_sphere_D=6.01, intended_cylinder_signed_D=0.0, intended_axis_deg=0.0),
@@ -159,7 +159,7 @@ def test_hyperopic_sphere_plus_6_allowed_but_plus_6_01_hard_stops():
     assert result["status"] == "STOP-DEFER"
 
 
-def test_final_k_36_and_48_allowed_while_35_99_and_48_01_stop():
+def test_myopic_final_k_bound_and_hyperopic_review_policy():
     _, at_36 = _evaluate(
         od_eye=_eye("OD", Kmean_D=44.0),
         od_plan=_plan("PRK", intended_entered_sphere_D=-10.0, intended_cylinder_signed_D=0.0, intended_axis_deg=0.0),
@@ -174,19 +174,39 @@ def test_final_k_36_and_48_allowed_while_35_99_and_48_01_stop():
     assert round(below_36["OD"]["values"]["estimated_final_Kmean_D"], 2) == 35.99
     assert "final_kmean" in below_36["OD"]["hard_stops"]
 
-    _, at_48 = _evaluate(
-        od_eye=_eye("OD", Kmean_D=43.2),
-        od_plan=_plan("PRK", intended_entered_sphere_D=6.0, intended_cylinder_signed_D=0.0, intended_axis_deg=0.0),
+    _, hyperopic_below_review = _evaluate(
+        od_eye=_eye("OD", Kmean_D=44.0),
+        od_plan=_plan("PRK", intended_entered_sphere_D=3.99, intended_cylinder_signed_D=0.0, intended_axis_deg=0.0),
     )
-    assert at_48["OD"]["values"]["estimated_final_Kmean_D"] == 48.0
-    assert "final_kmean" not in at_48["OD"]["hard_stops"]
+    assert hyperopic_below_review["OD"]["values"]["estimated_final_Kmean_D"] == 47.99
+    assert hyperopic_below_review["OD"]["status"] == "PASS"
 
-    _, above_48 = _evaluate(
-        od_eye=_eye("OD", Kmean_D=43.21),
-        od_plan=_plan("PRK", intended_entered_sphere_D=6.0, intended_cylinder_signed_D=0.0, intended_axis_deg=0.0),
+    _, hyperopic_review = _evaluate(
+        od_eye=_eye("OD", Kmean_D=44.0),
+        od_plan=_plan("PRK", intended_entered_sphere_D=4.0, intended_cylinder_signed_D=0.0, intended_axis_deg=0.0),
     )
-    assert round(above_48["OD"]["values"]["estimated_final_Kmean_D"], 2) == 48.01
-    assert "final_kmean" in above_48["OD"]["hard_stops"]
+    assert hyperopic_review["OD"]["values"]["estimated_final_Kmean_D"] == 48.0
+    assert "final_kmean" not in hyperopic_review["OD"]["hard_stops"]
+    assert hyperopic_review["OD"]["values"]["hyperopic_review_level"] == "PLATFORM_VERIFICATION"
+    assert hyperopic_review["OD"]["status"] == "CAUTION"
+
+
+def test_hyperopic_astigmatism_uses_kmean_screening_without_meridional_claim():
+    _, by_eye = _evaluate(
+        od_eye=_eye("OD", Kmean_D=44.0),
+        od_plan=_plan(
+            "PRK",
+            intended_entered_sphere_D=4.0,
+            intended_cylinder_signed_D=-2.0,
+            intended_axis_deg=90.0,
+        ),
+    )
+    od = by_eye["OD"]
+    assert od["values"]["intended_refractive_group"] == "HYPEROPIC"
+    assert od["values"]["estimated_final_Kmean_D"] == 47.0
+    assert od["values"]["final_Kmean_model"] == "HYPEROPIC_1.0_D_PER_D_SCREENING"
+    assert od["values"]["hyperopic_treatment_component_D"] == 4.0
+    assert od["status"] == "PASS"
 
 
 def test_mixed_astigmatism_never_uses_scalar_final_k_clearance():
@@ -196,9 +216,11 @@ def test_mixed_astigmatism_never_uses_scalar_final_k_clearance():
     od = by_eye["OD"]
     assert od["values"]["intended_refractive_group"] == "MIXED"
     assert od["values"]["estimated_final_Kmean_D"] is None
-    assert "Safety: mixed_astigmatism_meridional_final_k_assessment" in od["missing"]
-    assert od["status"] == "ASSESSMENT INCOMPLETE"
-    assert result["status"] == "ASSESSMENT INCOMPLETE"
+    assert od["values"]["final_Kmean_model"] == "NOT_VALID_FOR_MIXED_ASTIGMATISM"
+    assert od["missing"] == []
+    assert od["status"] == "CAUTION"
+    assert result["status"] == "CAUTION"
+    assert any("platform-specific prediction or surgeon confirmation required" in warning for warning in od["warnings"])
 
 
 def test_pta_at_or_over_40_percent_is_a_lasik_hard_stop():

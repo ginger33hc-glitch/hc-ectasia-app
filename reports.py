@@ -490,7 +490,8 @@ def _conclusion_eye_rows(report: Mapping[str, Any]) -> list[list[str]]:
     safety_values = []
     for key in (
         "LASIK_RSB_um", "LASIK_PTA_percent", "PRK_RST_um", "PRK_PTA_percent",
-        "estimated_final_Kmean_D",
+        "estimated_final_Kmean_D", "final_Kmean_model", "hyperopic_review_level",
+        "hyperopic_treatment_component_D",
     ):
         if safety.get(key) is not None:
             safety_values.append(f"{key}: {_text(safety.get(key))}")

@@ -175,7 +175,12 @@ Independent hard-stop / safety rules include at least:
 - PRK RST <310 µm → STOP-DEFER
 - intended myopic sphere beyond -10.00 D → STOP-DEFER
 - intended hyperopic sphere beyond +6.00 D → STOP-DEFER
-- estimated postoperative Kmean outside 36–48 D → STOP-DEFER
+- myopic estimated postoperative Kmean outside 36–48 D → STOP-DEFER
+- hyperopic Kmean uses a conservative 1.0 D/D screening estimate only; 48.00–48.99 D requires
+  platform verification and >=49.00 D requires platform/surgeon confirmation, without an
+  isolated K-based STOP-DEFER
+- mixed astigmatism has no scalar final-K estimate and completes with mandatory
+  platform/surgeon review rather than an incomplete-data loop
 - LASIK PTA >=40.0% fails the evaluated candidate; evaluate A→B→C and retain the first candidate satisfying every applicable requirement
 - PRK PTA >=40.0% → STOP-DEFER for both direct PRK and automatic LASIK→PRK; no separate 35.28% flag
 - PRK epithelium convention = 50 µm

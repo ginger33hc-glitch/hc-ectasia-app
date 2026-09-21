@@ -69,8 +69,14 @@ as separate layers. No rule in one layer is silently presented as a validated ru
   structural calculations, missing plan data, and known hard stops remain visible.
 - Actual laser-plan maximum stromal ablation is mandatory. The CER-AI linear myopic EX500 µm/D
   convention is not applied to hyperopic annular or mixed bitoric profiles.
-- Hyperopic/mixed cases receive `CAUTION` because the supplied procedure-specific
-  ectasia scoring evidence is predominantly myopic. No new weighted ectasia score is invented.
+- Hyperopic cases use a conservative 1.0 D/D Kmean screening estimate. This is explicitly
+  labelled as a screening estimate, not a laser-platform prediction, and does not independently
+  create a hard stop. Screening Kmean 48.00-48.99 D requires platform verification; 49.00 D or
+  greater requires platform or surgeon confirmation. A hyperopic treatment component above
+  +4.00 D also requires enhanced review.
+- Mixed cases receive `CAUTION` because no validated scalar final-K formula exists. No new
+  weighted ectasia score is invented, and the unavailable calculation is not treated as missing
+  data or used to return the surgeon to the completion questionnaire.
 - Mixed astigmatism is present when the two intended principal meridians have opposite signs.
   Near-zero MRSE is not treated as low surgical load.
 - The CER-AI Kmean estimate is not applied to mixed astigmatism. The report instructs the surgeon to

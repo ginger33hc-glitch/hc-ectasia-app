@@ -20,6 +20,8 @@ from clinical_core.rules import erss_age_points, erss_pachymetry_points
 from clinical_core.safety import (
     FINAL_KMEAN_MAX_D,
     FINAL_KMEAN_MIN_D,
+    HYPEROPIC_SCREENING_EFFECT_PER_INTENDED_MRSE_D,
+    MYOPIC_CORNEAL_EFFECT_PER_INTENDED_MRSE_D,
     PTA_LIMIT_PERCENT,
     LASIK_RSB_MIN_UM,
     PREOP_THINNEST_HARD_STOP_UM,
@@ -67,7 +69,12 @@ def runtime_invariants():
     if PREOP_THINNEST_HARD_STOP_UM != 480.0:
         errors.append("Canonical preoperative thickness hard stop is invalid")
     if FINAL_KMEAN_MIN_D != 36.0 or FINAL_KMEAN_MAX_D != 48.0:
-        errors.append("Canonical final keratometry bounds are invalid")
+        errors.append("Canonical myopic final keratometry bounds are invalid")
+    if (
+        MYOPIC_CORNEAL_EFFECT_PER_INTENDED_MRSE_D != 0.8
+        or HYPEROPIC_SCREENING_EFFECT_PER_INTENDED_MRSE_D != 1.0
+    ):
+        errors.append("Canonical refractive-group keratometry coefficients are invalid")
 
     # Canonical source registry, not legacy module naming, owns source truth.
     if CANONICAL_FIELD_SOURCES.get("Rmin_mm", (None,))[0] != SHOW_2_CORNEA_BACK:

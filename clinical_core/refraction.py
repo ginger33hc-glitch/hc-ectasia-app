@@ -75,5 +75,5 @@ def refractive_group(refraction: Optional[Refraction]) -> str:
 
 
 def scalar_final_k_is_valid(refraction: Optional[Refraction]) -> bool:
-    """Mixed astigmatism must not use a scalar MRSE/Kmean final-K model."""
+    """Return whether a scalar Kmean estimate exists; hyperopic output is screening only."""
     return refractive_group(refraction) in {MYOPIC, HYPEROPIC, PLANO}

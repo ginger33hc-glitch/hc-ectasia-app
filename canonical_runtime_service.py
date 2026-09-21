@@ -124,6 +124,9 @@ def _values(core_result: Mapping[str, Any]) -> dict[str, Any]:
         "LASIK_PTA_percent": safety.get("LASIK_PTA_percent"),
         "PRK_PTA_percent": safety.get("PRK_PTA_percent"),
         "estimated_final_Kmean_D": safety.get("estimated_final_Kmean_D"),
+        "final_Kmean_model": safety.get("final_Kmean_model"),
+        "hyperopic_review_level": safety.get("hyperopic_review_level"),
+        "hyperopic_treatment_component_D": safety.get("hyperopic_treatment_component_D"),
         "intended_refractive_group": core_result.get("intended_refractive_group"),
     }
     if bad_result is not None:
@@ -219,6 +222,10 @@ def _virgin_eye_payload(
     }
     if microkeratome_planning:
         payload["microkeratome_planning"] = _plain(microkeratome_planning)
+    if safety.get("status") == CAUTION:
+        for finding in getattr(core_result.get("final_disposition"), "caution_drivers", ()):
+            if getattr(finding, "key", None) == "procedural_safety" and finding.detail:
+                payload["warnings"].append(finding.detail)
     if (
         isinstance(astigmatic_disparity, Mapping)
         and astigmatic_disparity.get("status") == "VALIDATION_REQUIRED"

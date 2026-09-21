@@ -29,12 +29,14 @@ from .disposition import (
 from .erss import erss_disposition, erss_total
 from .nice import nice_disposition, score_nice
 from .ps3 import ALLOWED, DEFER, PS3EyeInput, PS3InterEyeInput, evaluate_ps3
-from .refraction import MIXED, normalize_minus_cylinder, refractive_group, scalar_final_k_is_valid
+from .refraction import HYPEROPIC, MIXED, normalize_minus_cylinder, refractive_group, scalar_final_k_is_valid
 from .safety import (
+    HYPEROPIC_TREATMENT_ENHANCED_REVIEW_D,
     PRK_EPITHELIUM_UM,
     ablation_um_is_valid,
     estimated_final_kmean_d,
     final_kmean_hard_stop,
+    hyperopic_final_k_review_level,
     pta_hard_stop,
     pta_percent,
     lasik_rsb_hard_stop,
@@ -225,6 +227,7 @@ def _safety_status(
     pta,
     final_k,
     intended_group,
+    hyperopic_treatment_component_d,
 ) -> tuple[str, dict, list[str]]:
     hard_stops = {
         "preop_thickness": preop_thickness_hard_stop(inp.thinnest_um),
@@ -233,7 +236,7 @@ def _safety_status(
         "lasik_pta": procedure == "LASIK" and pta_hard_stop(pta),
         "prk_rst": procedure == "PRK" and prk_rst_hard_stop(rst),
         "prk_pta": procedure == "PRK" and pta_hard_stop(pta),
-        "final_kmean": final_kmean_hard_stop(final_k),
+        "final_kmean": final_kmean_hard_stop(final_k, intended_group),
     }
 
     missing: list[str] = []
@@ -257,11 +260,9 @@ def _safety_status(
         missing.append("LASIK_RSB_um")
     if procedure == "PRK" and rst is None and "ablation_um" not in missing:
         missing.append("PRK_RST_um")
-    if intended_group == MIXED:
-        missing.append("mixed_astigmatism_meridional_final_k_assessment")
-    elif intended_group is None:
+    if intended_group is None:
         missing.append("intended_refractive_group")
-    elif final_k is None:
+    elif intended_group != MIXED and final_k is None:
         missing.append("estimated_final_Kmean_D")
 
     missing = list(dict.fromkeys(missing))
@@ -269,6 +270,16 @@ def _safety_status(
         return STOP_DEFER, hard_stops, missing
     if missing:
         return ASSESSMENT_INCOMPLETE, hard_stops, missing
+    if intended_group == MIXED:
+        return CAUTION, hard_stops, []
+    if hyperopic_final_k_review_level(final_k, intended_group) is not None:
+        return CAUTION, hard_stops, []
+    if (
+        intended_group == HYPEROPIC
+        and _finite(hyperopic_treatment_component_d)
+        and float(hyperopic_treatment_component_d) > HYPEROPIC_TREATMENT_ENHANCED_REVIEW_D
+    ):
+        return CAUTION, hard_stops, []
     return PASS, hard_stops, []
 
 
@@ -288,7 +299,13 @@ def evaluate_normalized_case(
     pta = pta_percent(inp.thinnest_um, anterior_tissue, inp.ablation_um) if procedure in {"LASIK", "PRK"} else None
 
     scalar_final_k_valid = intended_refraction is not None and scalar_final_k_is_valid(intended_refraction)
-    final_k = estimated_final_kmean_d(inp.preop_kmean_d, inp.intended_mrse_d) if scalar_final_k_valid else None
+    final_k = (
+        estimated_final_kmean_d(inp.preop_kmean_d, inp.intended_mrse_d, intended_group)
+        if scalar_final_k_valid else None
+    )
+    principal_meridians = intended_refraction.principal_meridians_d if intended_refraction is not None else ()
+    hyperopic_treatment_component = max(principal_meridians) if principal_meridians else None
+    hyperopic_review_level = hyperopic_final_k_review_level(final_k, intended_group)
 
     erss = None
     erss_status = PASS
@@ -340,7 +357,8 @@ def evaluate_normalized_case(
     ps3_status = str(ps3_decision["status"])
 
     safety_status, safety_stops, safety_missing = _safety_status(
-        procedure, inp, rsb, rst, pta, final_k, intended_group
+        procedure, inp, rsb, rst, pta, final_k, intended_group,
+        hyperopic_treatment_component,
     )
 
     active_safety_stops = [key for key, stopped in safety_stops.items() if stopped]
@@ -350,7 +368,21 @@ def evaluate_normalized_case(
     if safety_missing:
         safety_detail += "; missing: " + ", ".join(safety_missing)
     if intended_group == MIXED:
-        safety_detail += "; scalar MRSE/Kmean final-K model prohibited for mixed astigmatism"
+        safety_detail += (
+            "; mixed astigmatism has no validated scalar final-K model; "
+            "platform-specific prediction or surgeon confirmation required"
+        )
+    elif intended_group == HYPEROPIC:
+        safety_detail += "; hyperopic Kmean is a conservative 1.0 D/D screening estimate, not a platform prediction"
+        if hyperopic_review_level == "PLATFORM_VERIFICATION":
+            safety_detail += "; screening Kmean 48.00-48.99 D requires platform verification"
+        elif hyperopic_review_level == "MANDATORY_PLATFORM_OR_SURGEON_CONFIRMATION":
+            safety_detail += "; screening Kmean >=49.00 D requires platform or surgeon confirmation"
+        if (
+            _finite(hyperopic_treatment_component)
+            and float(hyperopic_treatment_component) > HYPEROPIC_TREATMENT_ENHANCED_REVIEW_D
+        ):
+            safety_detail += "; hyperopic treatment component >+4.00 D requires enhanced review"
 
     core_findings = (
         DecisionFinding("randleman_erss", erss_status, _erss_finding_detail(erss, inp.i_s_d, procedure)),
@@ -384,6 +416,14 @@ def evaluate_normalized_case(
             "PRK_PTA_percent": pta if procedure == "PRK" else None,
             "estimated_final_Kmean_D": final_k,
             "scalar_final_Kmean_model_valid": scalar_final_k_valid,
+            "final_Kmean_model": (
+                "MYOPIC_0.8_D_PER_D_ESTIMATE" if intended_group == "MYOPIC"
+                else "HYPEROPIC_1.0_D_PER_D_SCREENING" if intended_group == HYPEROPIC
+                else "NOT_VALID_FOR_MIXED_ASTIGMATISM" if intended_group == MIXED
+                else "PLANO"
+            ),
+            "hyperopic_review_level": hyperopic_review_level,
+            "hyperopic_treatment_component_D": hyperopic_treatment_component,
             "hard_stops": safety_stops,
             "missing": safety_missing,
             "status": safety_status,

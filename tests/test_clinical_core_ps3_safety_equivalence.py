@@ -5,13 +5,15 @@ from dataclasses import asdict
 import ps3_policy
 from clinical_core.ps3 import PS3EyeInput, PS3InterEyeInput, evaluate_ps3
 from clinical_core.safety import (
-    CORNEAL_EFFECT_PER_INTENDED_MRSE_D,
     FINAL_KMEAN_MAX_D,
     FINAL_KMEAN_MIN_D,
+    HYPEROPIC_SCREENING_EFFECT_PER_INTENDED_MRSE_D,
+    MYOPIC_CORNEAL_EFFECT_PER_INTENDED_MRSE_D,
     PRK_EPITHELIUM_UM,
     ablation_um_is_valid,
     estimated_final_kmean_d,
     final_kmean_hard_stop,
+    hyperopic_final_k_review_level,
     pta_hard_stop,
     pta_percent,
     lasik_rsb_hard_stop,
@@ -54,7 +56,8 @@ def complete_inter_eye():
 
 def test_safety_constants_match_accepted_values():
     assert PRK_EPITHELIUM_UM == 50.0
-    assert CORNEAL_EFFECT_PER_INTENDED_MRSE_D == 0.8
+    assert MYOPIC_CORNEAL_EFFECT_PER_INTENDED_MRSE_D == 0.8
+    assert HYPEROPIC_SCREENING_EFFECT_PER_INTENDED_MRSE_D == 1.0
     assert FINAL_KMEAN_MIN_D == 36.0
     assert FINAL_KMEAN_MAX_D == 48.0
 
@@ -65,8 +68,9 @@ def test_structural_calculations_match_matrix_examples():
     assert prk_rst_um(520, 160) == 310
     assert prk_rst_um(520, 161) == 309
     assert pta_percent(500, 100, 100) == 40.0
-    assert estimated_final_kmean_d(44.0, -10.0) == 36.0
-    assert estimated_final_kmean_d(43.2, 6.0) == 48.0
+    assert estimated_final_kmean_d(44.0, -10.0, "MYOPIC") == 36.0
+    assert estimated_final_kmean_d(43.2, 6.0, "HYPEROPIC") == 49.2
+    assert estimated_final_kmean_d(44.0, 0.0, "MIXED") is None
 
 
 def test_negative_ablation_is_rejected_by_every_tissue_equation_but_zero_is_valid():
@@ -87,10 +91,14 @@ def test_procedural_hard_stop_boundaries_are_exact():
     assert lasik_rsb_hard_stop(299)
     assert not prk_rst_hard_stop(310)
     assert prk_rst_hard_stop(309)
-    assert not final_kmean_hard_stop(36.0)
-    assert not final_kmean_hard_stop(48.0)
-    assert final_kmean_hard_stop(35.99)
-    assert final_kmean_hard_stop(48.01)
+    assert not final_kmean_hard_stop(36.0, "MYOPIC")
+    assert not final_kmean_hard_stop(48.0, "MYOPIC")
+    assert final_kmean_hard_stop(35.99, "MYOPIC")
+    assert final_kmean_hard_stop(48.01, "MYOPIC")
+    assert not final_kmean_hard_stop(49.2, "HYPEROPIC")
+    assert hyperopic_final_k_review_level(47.99, "HYPEROPIC") is None
+    assert hyperopic_final_k_review_level(48.0, "HYPEROPIC") == "PLATFORM_VERIFICATION"
+    assert hyperopic_final_k_review_level(49.0, "HYPEROPIC") == "MANDATORY_PLATFORM_OR_SURGEON_CONFIRMATION"
     assert not sphere_magnitude_hard_stop(-10.0)
     assert sphere_magnitude_hard_stop(-10.01)
     assert not sphere_magnitude_hard_stop(6.0)

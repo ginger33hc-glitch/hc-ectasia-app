@@ -69,6 +69,9 @@ RESEARCH_FIELDS = (
     "flap_thickness_um",
     "preoperative_Kmean_D",
     "estimated_final_Kmean_D",
+    "final_Kmean_model",
+    "hyperopic_review_level",
+    "hyperopic_treatment_component_D",
     "pentacam_qs",
 )
 
@@ -257,6 +260,9 @@ def _row_for_eye(
         "flap_thickness_um": values.get("flap_thickness_um"),
         "preoperative_Kmean_D": values.get("preoperative_Kmean_D"),
         "estimated_final_Kmean_D": values.get("estimated_final_Kmean_D"),
+        "final_Kmean_model": values.get("final_Kmean_model"),
+        "hyperopic_review_level": values.get("hyperopic_review_level"),
+        "hyperopic_treatment_component_D": values.get("hyperopic_treatment_component_D"),
         "pentacam_qs": values.get("pentacam_qs"),
     }
 
