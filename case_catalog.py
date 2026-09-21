@@ -1,8 +1,9 @@
 """Encrypted case catalog and role-scoped archive retrieval for CER-AI.
 
 Catalog entries live inside the same encrypted S3-compatible case archive. Searchable PHI is never
-placed in object keys or S3 metadata. Identifiable archive access belongs only to the DOCTOR account
-that created the case. OWNER may review every case only through de-identified derivatives.
+placed in object keys or S3 metadata. Identifiable archive access belongs to the authenticated
+account that created the case, whether that account is a DOCTOR or OWNER. OWNER may review cases
+created by other accounts only through de-identified derivatives.
 """
 
 from __future__ import annotations
@@ -226,6 +227,29 @@ def _principal_can_review(principal: Any, entry: Dict[str, Any]) -> bool:
     )
 
 
+def _principal_created_entry(principal: Any, entry: Dict[str, Any]) -> bool:
+    creator = entry.get("created_by") or {}
+    return (
+        principal.role in {"DOCTOR", "OWNER"}
+        and bool(creator.get("user_id"))
+        and creator.get("user_id") == principal.user_id
+    )
+
+
+def _present_entry(principal: Any, entry: Dict[str, Any]) -> Dict[str, Any]:
+    """Return the canonical role-and-ownership-scoped catalog representation."""
+    identifiable = _principal_created_entry(principal, entry)
+    presented = (
+        archive_privacy.owner_catalog(entry)
+        if principal.role == "OWNER" and not identifiable
+        else deepcopy(entry)
+    )
+    presented["owner_deidentified"] = bool(principal.role == "OWNER" and not identifiable)
+    presented["identifiable_access"] = identifiable
+    presented["original_source_access"] = identifiable
+    return presented
+
+
 def _authorized_review_entry(
     archive: EncryptedArchive, principal: Any, case_id: str, revision_id: str
 ):
@@ -262,11 +286,11 @@ def _source_inventory_record(source: Any) -> Dict[str, Any]:
     }
 
 
-def _require_original_source_access(principal: Any) -> None:
-    if principal.role != "DOCTOR":
+def _require_original_source_access(principal: Any, entry: Dict[str, Any]) -> None:
+    if not _principal_created_entry(principal, entry):
         raise HTTPException(
             403,
-            "Only the doctor who created this case may access its original source images.",
+            "Only the account that created this case may access its original source images.",
         )
 
 
@@ -301,21 +325,23 @@ def install(core: Any, archive_runtime: Any) -> None:
             unknown = set(payload) - allowed
             if unknown:
                 raise HTTPException(422, "Unsupported archive search field(s): " + ", ".join(sorted(unknown)))
-            if principal.role == "OWNER" and payload.get("patient_name"):
-                raise HTTPException(422, "OWNER cannot search by patient name.")
             filters = {key: payload.get(key) for key in allowed if key in payload}
-            if principal.role == "DOCTOR":
+            if principal.role == "DOCTOR" or (
+                principal.role == "OWNER" and payload.get("patient_name")
+            ):
                 filters["created_by_user_id"] = principal.user_id
             results = search_entries(archive_runtime.archive, **filters)
-            if principal.role == "OWNER":
-                results = [archive_privacy.owner_catalog(entry) for entry in results]
+            results = [_present_entry(principal, entry) for entry in results]
             audit(
                 "ARCHIVE_SEARCH",
                 actor=principal,
                 details={
                     "filters": {key: payload.get(key) for key in allowed if key in payload},
                     "result_count": len(results),
-                    "scope": "ALL_DEIDENTIFIED" if principal.role == "OWNER" else "OWN_CASES",
+                    "scope": (
+                        "OWN_IDENTIFIABLE_AND_OTHERS_DEIDENTIFIED"
+                        if principal.role == "OWNER" else "OWN_CASES"
+                    ),
                 },
             )
             return {"results": results, "count": len(results)}
@@ -325,11 +351,16 @@ def install(core: Any, archive_runtime: Any) -> None:
             principal = user_access.require_current_principal()
             if not archive_runtime.enabled:
                 raise HTTPException(503, "CER-AI secure archive is not enabled.")
-            _authorized_review_entry(archive_runtime.archive, principal, case_id, revision_id)
+            entry = _authorized_review_entry(
+                archive_runtime.archive, principal, case_id, revision_id
+            )
             if kind not in {"pdf", "docx"}:
                 raise HTTPException(404, "Unsupported archived report type.")
             locale = "tr" if str(locale).lower().startswith("tr") else "en"
-            if principal.role == "OWNER":
+            owner_deidentified = principal.role == "OWNER" and not _principal_created_entry(
+                principal, entry
+            )
+            if owner_deidentified:
                 from reports import build_docx, build_pdf
 
                 assessment = archive_runtime.archive.load_assessment(case_id, revision_id)
@@ -354,14 +385,14 @@ def install(core: Any, archive_runtime: Any) -> None:
                 media_type = "application/pdf"
                 filename = (
                     "CER-AI_Deidentified_Report.pdf"
-                    if principal.role == "OWNER" else "CER-AI_Report.pdf"
+                    if owner_deidentified else "CER-AI_Report.pdf"
                 )
                 disposition = "inline"
             else:
                 media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 filename = (
                     "CER-AI_Deidentified_Report.docx"
-                    if principal.role == "OWNER" else "CER-AI_Report.docx"
+                    if owner_deidentified else "CER-AI_Report.docx"
                 )
                 disposition = "attachment"
             return StreamingResponse(
@@ -372,7 +403,7 @@ def install(core: Any, archive_runtime: Any) -> None:
                     "Cache-Control": "no-store",
                     "X-CER-AI-Report-Source": (
                         "owner-deidentified-canonical"
-                        if principal.role == "OWNER" else "archived-original"
+                        if owner_deidentified else "archived-original"
                     ),
                 },
             )
@@ -394,18 +425,19 @@ def install(core: Any, archive_runtime: Any) -> None:
                 case_id=case_id,
                 revision_id=revision_id,
             )
-            if principal.role == "OWNER":
-                entry = archive_privacy.owner_catalog(entry)
+            if principal.role == "OWNER" and not _principal_created_entry(principal, entry):
                 assessment = archive_privacy.owner_assessment(assessment)
-            return {"catalog": entry, "assessment": assessment}
+            return {"catalog": _present_entry(principal, entry), "assessment": assessment}
 
         @core.app.get("/archive/cases/{case_id}/revisions/{revision_id}/sources")
         def archived_sources(case_id: str, revision_id: str):
             principal = user_access.require_current_principal()
             if not archive_runtime.enabled:
                 raise HTTPException(503, "CER-AI secure archive is not enabled.")
-            _require_original_source_access(principal)
-            _authorized_review_entry(archive_runtime.archive, principal, case_id, revision_id)
+            entry = _authorized_review_entry(
+                archive_runtime.archive, principal, case_id, revision_id
+            )
+            _require_original_source_access(principal, entry)
             sources = archive_runtime.archive.list_sources(case_id)
             audit(
                 "SOURCE_LIST",
@@ -423,8 +455,10 @@ def install(core: Any, archive_runtime: Any) -> None:
             principal = user_access.require_current_principal()
             if not archive_runtime.enabled:
                 raise HTTPException(503, "CER-AI secure archive is not enabled.")
-            _require_original_source_access(principal)
-            _authorized_review_entry(archive_runtime.archive, principal, case_id, revision_id)
+            entry = _authorized_review_entry(
+                archive_runtime.archive, principal, case_id, revision_id
+            )
+            _require_original_source_access(principal, entry)
             source = archive_runtime.archive.find_source(case_id, ordinal)
             if source is None:
                 raise HTTPException(404, "Archived Pentacam source image not found.")
@@ -463,8 +497,10 @@ def install(core: Any, archive_runtime: Any) -> None:
             principal = user_access.require_current_principal()
             if not archive_runtime.enabled:
                 raise HTTPException(503, "CER-AI secure archive is not enabled.")
-            _require_original_source_access(principal)
-            _authorized_review_entry(archive_runtime.archive, principal, case_id, revision_id)
+            entry = _authorized_review_entry(
+                archive_runtime.archive, principal, case_id, revision_id
+            )
+            _require_original_source_access(principal, entry)
             sources = archive_runtime.archive.list_sources(case_id)
             if not sources:
                 raise HTTPException(404, "No archived Pentacam source images were found.")

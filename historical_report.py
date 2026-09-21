@@ -59,8 +59,11 @@ def install(core: Any, archive_runtime: Any) -> None:
             principal = user_access.require_current_principal()
             if not archive_runtime.enabled:
                 raise HTTPException(503, "CER-AI secure archive is not enabled.")
-            case_catalog._authorized_review_entry(
+            entry = case_catalog._authorized_review_entry(
                 archive_runtime.archive, principal, case_id, revision_id
+            )
+            owner_deidentified = principal.role == "OWNER" and not (
+                case_catalog._principal_created_entry(principal, entry)
             )
             normalized_locale = "tr" if str(locale).lower().startswith("tr") else "en"
             content = regenerate_bytes(
@@ -71,7 +74,7 @@ def install(core: Any, archive_runtime: Any) -> None:
                 locale=normalized_locale,
                 pdf_builder=build_pdf,
                 docx_builder=build_docx,
-                owner_deidentified=principal.role == "OWNER",
+                owner_deidentified=owner_deidentified,
             )
             callback = getattr(core, "_cerai_audit_event", None)
             if callback is not None:
@@ -86,14 +89,14 @@ def install(core: Any, archive_runtime: Any) -> None:
                 media_type = "application/pdf"
                 filename = (
                     "CER-AI_Deidentified_Report_Regenerated.pdf"
-                    if principal.role == "OWNER" else "CER-AI_Report_Regenerated.pdf"
+                    if owner_deidentified else "CER-AI_Report_Regenerated.pdf"
                 )
                 disposition = "inline"
             else:
                 media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 filename = (
                     "CER-AI_Deidentified_Report_Regenerated.docx"
-                    if principal.role == "OWNER" else "CER-AI_Report_Regenerated.docx"
+                    if owner_deidentified else "CER-AI_Report_Regenerated.docx"
                 )
                 disposition = "attachment"
             return StreamingResponse(
@@ -104,7 +107,7 @@ def install(core: Any, archive_runtime: Any) -> None:
                     "Cache-Control": "no-store",
                     "X-CER-AI-Report-Source": (
                         "owner-deidentified-canonical-current-template"
-                        if principal.role == "OWNER"
+                        if owner_deidentified
                         else "archived-canonical-current-template"
                     ),
                 },

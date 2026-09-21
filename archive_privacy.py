@@ -1,8 +1,9 @@
 """Canonical de-identification boundary for OWNER retrospective archive access.
 
-Doctors may retrieve original material only for cases they created. OWNER archive
-routes must pass every catalog entry, assessment, and report through this module.
-OWNER accounts must never receive source-image bytes or immutable original reports.
+DOCTOR and OWNER accounts may retrieve original material for cases created by their
+own stable user identity. OWNER access to cases created by any other account must pass
+every catalog entry, assessment, and report through this module and must never return
+source-image bytes or immutable original reports.
 """
 
 from __future__ import annotations

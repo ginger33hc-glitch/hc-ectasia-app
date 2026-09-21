@@ -92,7 +92,7 @@
   const reportLinks = entry => {
     const c = encodeURIComponent(entry.case_id), r = encodeURIComponent(entry.revision_id);
     const base = `/archive/cases/${c}/revisions/${r}`;
-    const reportLabel = capabilities?.owner_deidentified_access ? "De-identified" : "Original";
+    const reportLabel = entry.owner_deidentified ? "De-identified" : "Original";
     const original = `<a href="${base}/report/pdf?locale=en" target="_blank" rel="noopener">Open ${reportLabel} PDF EN</a><a href="${base}/report/pdf?locale=tr" target="_blank" rel="noopener">Open ${reportLabel} PDF TR</a><a href="${base}/report/docx?locale=en">Download ${reportLabel} DOCX EN</a><a href="${base}/report/docx?locale=tr">Download ${reportLabel} DOCX TR</a>`;
     const regenerated = capabilities?.historical_report_enabled ? `<a href="${base}/regenerate/pdf?locale=en" target="_blank" rel="noopener">Regenerate PDF EN</a><a href="${base}/regenerate/pdf?locale=tr" target="_blank" rel="noopener">Regenerate PDF TR</a><a href="${base}/regenerate/docx?locale=en">Regenerate DOCX EN</a><a href="${base}/regenerate/docx?locale=tr">Regenerate DOCX TR</a>` : "";
     return `<div class="links">${original}${regenerated}</div>`;
@@ -111,7 +111,7 @@
       const data=await response.json(),entry=data.catalog||{},assessment=data.assessment||{},patient=entry.patient||{},creator=entry.created_by||{},decision=assessment.decision||entry.decision||{};
       const eyes=(decision.eyes||[]).map(eye=>`${escapeHtml(eye.eye||"")}: <span class="decision ${decisionClass(eye.status)}">${escapeHtml(eye.status||"")}</span>`).join(" · ")||"Not documented";
       detail.innerHTML=`<div class="case-summary"><div><strong>Patient</strong>${escapeHtml(patient.name||"Not documented")}</div><div><strong>Report date</strong>${escapeHtml(entry.report_date||"Not documented")}</div><div><strong>Surgeon / reviewer</strong>${escapeHtml(entry.reviewer||"Not documented")}</div><div><strong>Archived by</strong>${escapeHtml(creator.display_name||"Legacy / unassigned")}</div><div><strong>Overall decision</strong><span class="decision ${decisionClass(decision.status)}">${escapeHtml(decision.status||"Not documented")}</span></div><div><strong>Eye decisions</strong>${eyes}</div><div><strong>Revision</strong><span class="mono">${escapeHtml(entry.revision_id||revisionId)}</span></div></div>${reportLinks(entry)}`;
-      status.textContent=capabilities?.owner_deidentified_access ? "De-identified archived assessment reopened. Patient identity and source filenames are masked; no clinical score was recalculated." : "Archived canonical assessment reopened. Values are displayed from the saved snapshot; no clinical score was recalculated.";
+      status.textContent=entry.owner_deidentified ? "De-identified archived assessment reopened. Patient identity and source filenames are masked; no clinical score was recalculated." : "Archived canonical assessment reopened. Values are displayed from the saved snapshot; no clinical score was recalculated.";
     } catch(exc){status.className="status error";status.textContent=exc.message||"Unable to reopen archived case.";}
   };
   const showSources = async (caseId, revisionId) => {
@@ -121,7 +121,7 @@
       const response=await request(`${base}/sources`); if(!response.ok) throw new Error(await readError(response));
       const data=await response.json(), sources=data.sources||[];
       if(!sources.length){status.textContent="No source images are archived for this case.";return;}
-      status.textContent=`${sources.length} source image(s). Original filenames are shown only to the doctor who created this case.`;
+      status.textContent=`${sources.length} source image(s). Original filenames are shown only to the account that created this case.`;
       actions.innerHTML=`<a href="${base}/sources.zip">Download all source images (ZIP)</a>`;
       gallery.innerHTML=sources.map(source=>{
         const itemBase=`${base}/sources/${encodeURIComponent(source.ordinal)}`;
@@ -145,7 +145,7 @@
         <td>${escapeHtml(creator.display_name || (creator.user_id ? creator.user_id : "Legacy / unassigned"))}</td>
         <td><button class="case-button" type="button" data-case-id="${escapeHtml(entry.case_id||"")}" data-revision-id="${escapeHtml(entry.revision_id||"")}">Open case</button><div class="mono">${escapeHtml(entry.revision_id || "")}</div></td>
         <td>${reportLinks(entry)}</td>
-        <td>${capabilities?.original_source_access ? `<button class="source-button" type="button" data-case-id="${escapeHtml(entry.case_id||"")}" data-revision-id="${escapeHtml(entry.revision_id||"")}">View source images</button>` : "Restricted to case doctor"}</td>
+        <td>${entry.original_source_access ? `<button class="source-button" type="button" data-case-id="${escapeHtml(entry.case_id||"")}" data-revision-id="${escapeHtml(entry.revision_id||"")}">View source images</button>` : "Restricted to case creator"}</td>
       </tr>`;
     }).join("");
   };
@@ -155,7 +155,7 @@
     status.className = "status"; status.textContent = "Searching…";
     $("searchButton").disabled = true;
     const payload = {};
-    ["patient_name","report_date","decision","reviewer"].forEach(id => { const value = $(id).value.trim(); if (value && !(capabilities?.owner_deidentified_access && id === "patient_name")) payload[id] = value; });
+    ["patient_name","report_date","decision","reviewer"].forEach(id => { const value = $(id).value.trim(); if (value) payload[id] = value; });
     payload.limit = Number($("limit").value);
     try {
       const response = await request("/archive/search", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
@@ -237,9 +237,9 @@
     currentUser=(await responses[0].json()).user;
     capabilities=await responses[1].json();
     $("userLabel").textContent=`${currentUser.display_name} · ${currentUser.role}`;
-    $("scopeNote").textContent=currentUser.role==="OWNER" ? "OWNER retrospective scope: patient names are masked, reports are regenerated from de-identified data, and all original source images are inaccessible." : "DOCTOR scope: only cases created under your account, with original identity and source material.";
+    $("scopeNote").textContent=currentUser.role==="OWNER" ? "OWNER scope: cases created under your account retain original identity, reports, and source images; other doctors’ cases remain masked and de-identified." : "DOCTOR scope: only cases created under your account, with original identity and source material.";
     if(currentUser.role==="OWNER") {
-      $("patient_name").disabled=true; $("patient_name").placeholder="Masked in OWNER view";
+      $("patient_name").placeholder="Search your own identifiable cases";
       $("ownerTools").hidden=false;
       $("researchControls").hidden=!capabilities.research_export_enabled;
       $("auditControls").hidden=!capabilities.audit_enabled;

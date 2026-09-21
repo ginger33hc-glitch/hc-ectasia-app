@@ -109,11 +109,11 @@ def test_archive_page_requires_session_and_contains_role_aware_tools():
     assert "/archive/capabilities" in allowed.text
     assert "/archive/research/export.csv" in allowed.text
     assert "/archive/audit/search" in allowed.text
-    assert 'const reportLabel = capabilities?.owner_deidentified_access ? "De-identified" : "Original"' in allowed.text
+    assert 'const reportLabel = entry.owner_deidentified ? "De-identified" : "Original"' in allowed.text
     assert "Regenerate PDF EN" in allowed.text
     assert "Pentacam sources" in allowed.text
     assert "View source images" in allowed.text
-    assert "Restricted to case doctor" in allowed.text
+    assert "Restricted to case creator" in allowed.text
     assert allowed.headers["cache-control"] == "no-store"
 
 
@@ -204,10 +204,10 @@ def test_archive_page_hides_archive_until_retrospective_capability_is_confirmed(
     text = named_user_ui.ARCHIVE_HTML.read_text(encoding="utf-8")
     assert 'id="archiveSearch" class="card capability" hidden' in text
     assert 'id="archiveResults" class="card capability" hidden' in text
-    assert "OWNER retrospective scope: patient names are masked" in text
+    assert "cases created under your account retain original identity" in text
     assert 'id="patient_id"' not in text
     assert "if(capabilities.retrospective_archive_access)" in text
-    assert "Masked in OWNER view" in text
+    assert "Search your own identifiable cases" in text
     assert 'id="operationalControls" class="capability" hidden' in text
     assert 'id="archiveStatusButton"' in text
     assert 'id="archiveCanaryButton"' in text

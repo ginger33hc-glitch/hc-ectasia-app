@@ -155,11 +155,45 @@ def test_owner_source_routes_fail_before_any_source_bytes_are_decrypted(monkeypa
     client = TestClient(core.app)
     base = f"/archive/cases/{CASE_ID}/revisions/{REVISION_ID}"
 
-    def fail_if_decrypted(_artifact):
-        raise AssertionError("OWNER source request reached encrypted archive retrieval")
+    original_get_bytes = archive.get_bytes
 
-    monkeypatch.setattr(archive, "get_bytes", fail_if_decrypted)
+    def fail_if_source_decrypted(artifact):
+        if not isinstance(artifact, str):
+            raise AssertionError("OWNER source request reached encrypted source retrieval")
+        return original_get_bytes(artifact)
+
+    monkeypatch.setattr(archive, "get_bytes", fail_if_source_decrypted)
     assert client.get(f"{base}/sources").status_code == 403
     assert client.get(f"{base}/sources/1/preview").status_code == 403
     assert client.get(f"{base}/sources/1/download").status_code == 403
     assert client.get(f"{base}/sources.zip").status_code == 403
+
+
+def test_owner_can_retrieve_original_sources_for_owner_created_case(monkeypatch):
+    archive = case_archive.EncryptedArchive(case_archive.MemoryObjectStore(), KEY)
+    archive.archive_sources(
+        CASE_ID,
+        [(b"owner-image", "Owner Patient OD.png")],
+        patient_metadata={"patient_name": "Owner Patient", "patient_id": "OWNER-1"},
+        extracted={},
+    )
+    owner = principal("owner-1", "OWNER")
+    case_catalog.write_entry(
+        archive,
+        case_archive.RevisionRef(CASE_ID, REVISION_ID, tuple()),
+        ready_payload(),
+        actor=owner,
+    )
+    monkeypatch.setattr(user_access, "require_current_principal", lambda: owner)
+    core = SimpleNamespace(app=FastAPI(), _cerai_named_users_enabled=True)
+    case_catalog.install(core, case_archive.CaseArchiveRuntime(archive, required=False))
+    client = TestClient(core.app)
+    base = f"/archive/cases/{CASE_ID}/revisions/{REVISION_ID}"
+
+    inventory = client.get(f"{base}/sources")
+    assert inventory.status_code == 200
+    assert inventory.json()["sources"][0]["original_filename"] == "Owner Patient OD.png"
+    preview = client.get(f"{base}/sources/1/preview")
+    assert preview.status_code == 200
+    assert preview.content == b"owner-image"
+    assert client.get(f"{base}/sources.zip").status_code == 200

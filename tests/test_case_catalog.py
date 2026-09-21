@@ -181,3 +181,34 @@ def test_owner_can_route_to_all_cases_but_doctors_only_to_their_own():
     assert case_catalog._principal_can_review(doctor("doctor-1"), own_entry)
     assert not case_catalog._principal_can_review(doctor("doctor-1"), other_entry)
     assert not case_catalog._principal_can_review(doctor("doctor-1"), legacy_entry)
+
+
+def test_identifiable_access_is_bound_to_stable_creator_identity_for_owner_and_doctor():
+    owner_entry = case_catalog.build_entry(
+        ready_payload(),
+        case_id="4" * 32,
+        revision_id="5" * 24,
+        actor=owner(),
+    )
+    doctor_entry = case_catalog.build_entry(
+        ready_payload(),
+        case_id="6" * 32,
+        revision_id="7" * 24,
+        actor=doctor("doctor-1"),
+    )
+
+    assert case_catalog._principal_created_entry(owner(), owner_entry)
+    assert not case_catalog._principal_created_entry(owner(), doctor_entry)
+    assert case_catalog._principal_created_entry(doctor("doctor-1"), doctor_entry)
+
+    owner_view = case_catalog._present_entry(owner(), owner_entry)
+    assert owner_view["patient"]["name"] == "Şule Işık"
+    assert owner_view["owner_deidentified"] is False
+    assert owner_view["identifiable_access"] is True
+    assert owner_view["original_source_access"] is True
+
+    other_case_view = case_catalog._present_entry(owner(), doctor_entry)
+    assert other_case_view["patient"]["name"] == "Masked for owner"
+    assert other_case_view["owner_deidentified"] is True
+    assert other_case_view["identifiable_access"] is False
+    assert other_case_view["original_source_access"] is False

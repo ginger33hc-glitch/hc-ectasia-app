@@ -140,9 +140,9 @@ def test_one_archive_runtime_persists_sources_snapshot_reports_catalog_and_attri
     assert [name for name, _details in audit_events] == ["CASE_ARCHIVED", "CASE_ARCHIVED"]
 
 
-def _route_client(monkeypatch):
+def _route_client(monkeypatch, actor=None):
     archive = _archive()
-    actor = _principal()
+    actor = actor or _principal()
     current = {"principal": actor}
     monkeypatch.setattr(user_access, "require_current_principal", lambda: current["principal"])
     revision = archive.archive_ready(
@@ -216,7 +216,9 @@ def test_other_doctor_is_denied_while_owner_receives_only_deidentified_case(monk
     assert search.json()["results"][0]["patient"] == {
         "name": "Masked for owner", "id": "Masked for owner", "age": 44,
     }
-    assert client.post("/archive/search", json={"patient_name": "Archive Patient"}).status_code == 422
+    name_search = client.post("/archive/search", json={"patient_name": "Archive Patient"})
+    assert name_search.status_code == 200
+    assert name_search.json()["results"] == []
     reopened = client.get(base)
     assert reopened.status_code == 200
     assert reopened.json()["assessment"]["patient"]["name"] == "Masked for owner"
@@ -236,6 +238,40 @@ def test_other_doctor_is_denied_while_owner_receives_only_deidentified_case(monk
     assert regenerated.status_code == 200
     assert regenerated.headers["x-cer-ai-report-source"] == (
         "owner-deidentified-canonical-current-template"
+    )
+
+
+def test_owner_created_case_retains_identity_original_reports_and_name_search(monkeypatch):
+    owner = _principal("owner-1", "Owner", "OWNER")
+    client, _current, revision, _events = _route_client(monkeypatch, actor=owner)
+    base = f"/archive/cases/{CASE_ID}/revisions/{revision.revision_id}"
+
+    search = client.post("/archive/search", json={})
+    entry = search.json()["results"][0]
+    assert entry["patient"]["name"] == "Archive Patient"
+    assert entry["owner_deidentified"] is False
+    assert entry["identifiable_access"] is True
+    assert entry["original_source_access"] is True
+
+    by_name = client.post("/archive/search", json={"patient_name": "Archive Patient"})
+    assert by_name.status_code == 200
+    assert by_name.json()["count"] == 1
+
+    reopened = client.get(base)
+    assert reopened.status_code == 200
+    assert reopened.json()["assessment"]["patient"]["name"] == "Archive Patient"
+    assert reopened.json()["catalog"]["owner_deidentified"] is False
+
+    original = client.get(f"{base}/report/pdf?locale=en")
+    assert original.status_code == 200
+    assert original.content == b"ORIGINAL-PDF:en"
+    assert original.headers["x-cer-ai-report-source"] == "archived-original"
+
+    regenerated = client.get(f"{base}/regenerate/pdf?locale=en")
+    assert regenerated.status_code == 200
+    assert regenerated.content == b"REGENERATED-PDF:en"
+    assert regenerated.headers["x-cer-ai-report-source"] == (
+        "archived-canonical-current-template"
     )
 
 

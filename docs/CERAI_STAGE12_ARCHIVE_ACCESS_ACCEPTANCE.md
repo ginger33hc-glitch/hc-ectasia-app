@@ -46,7 +46,11 @@ installer-order-dependent archive handoff are no longer necessary.
 - The authenticated reviewer field is visible and read-only in the clinical UI.
 - DOCTOR can search, reopen, download, and regenerate only cases attributed to that stable user
   id.
-- OWNER can retrospectively review every case only through a de-identified view. Patient name, patient ID, date of birth, original filenames, report identity cells, and the source-image demographics header are masked. Original unmasked reports and source bytes are never returned to OWNER.
+- OWNER-created cases retain the same identifiable access bound to the OWNER's stable user id:
+  original patient identity, immutable reports, regenerated reports, and Pentacam sources.
+- Cases created by any other account remain de-identified in OWNER retrospective review. Patient
+  name, patient ID, date of birth, original filenames, report identity cells, and source images
+  remain unavailable; original unmasked reports and source bytes are never returned.
 - Archive search, case open, report access, regeneration, and source access remain audited.
 - Background analysis-job creation and polling are protected and bound to the doctor who
   created the job.
@@ -72,6 +76,7 @@ PDF opening as a generic attachment-only action.
 - Critical Ruff checks, Python compilation, canonical startup invariants, and production
   dependency audit: passed.
 - Wrapper-retirement, archive cycle, immutable original, regeneration, attribution, DOCTOR
-  isolation, OWNER de-identified retrospective access, and background-job ownership regressions: passed.
+  isolation, OWNER-owned identifiable access, other-doctor de-identification, and background-job
+  ownership regressions: passed.
 
 No push, merge, deployment, or production action is authorized by this document.
