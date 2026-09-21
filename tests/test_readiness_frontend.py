@@ -38,8 +38,15 @@ const panel={hidden:false,replaceChildren(){},querySelectorAll(){return this.inp
 const readiness=new ctx.window.HCReadiness(panel);
 panel.inputs=[{value:'−0,61',tagName:'INPUT',dataset:{eye:'OD',measurement:'I_S'}}];
 assert.equal(readiness.collect().OD.I_S,-.61);
+panel.inputs=[{value:'YES',tagName:'SELECT',dataset:{eye:'OS',measurement:'srax'}}];
+assert.equal(readiness.collect().OS.srax,'YES');
+panel.inputs=[];assert.deepEqual(readiness.collect(),{});assert.deepEqual(readiness.overrides,{});
+panel.inputs=[{value:'NO',tagName:'SELECT',dataset:{eye:'OS',measurement:'srax'}}];
+assert.equal(readiness.collect().OS.srax,'NO');
 panel.inputs=[{value:'APPROVE_CONTINUE',dataset:{sourceConfirmation:'pentacam_exam_date_conflict'}}];
 assert.equal(readiness.collectSourceConfirmations().pentacam_exam_date_conflict,'APPROVE_CONTINUE');
+panel.inputs=[];assert.deepEqual(readiness.collectSourceConfirmations(),{});
+panel.inputs=[{value:'APPROVE_CONTINUE',dataset:{sourceConfirmation:'pentacam_exam_date_conflict'}}];
 panel.inputs[0].value='wrong';assert.throws(()=>readiness.collect());
 readiness.reset();assert.equal(readiness.token,null);assert.equal(panel.hidden,true);
 '''
@@ -166,7 +173,7 @@ def test_patient_age_completion_uses_one_shared_field():
     html = (ROOT / 'static/index.html').read_text()
     translations = (ROOT / 'static/i18n.js').read_text()
     assert '<label>Patient age (years)</label>' in html
-    assert '/static/assessment-readiness.js?v=6' in html
+    assert '/static/assessment-readiness.js?v=7' in html
     assert 'Pentacam age unreadable; enter years' not in html
     assert 'Pentacam yaşı okunamadı; yıl olarak girin' not in translations
     assert item == {

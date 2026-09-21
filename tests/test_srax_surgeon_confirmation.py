@@ -1,9 +1,11 @@
 """Surgeon confirmation must gate both scoring and report issuance."""
 import pytest
+from fastapi import HTTPException
+from types import SimpleNamespace
 
-from assessment_workflow import _overrides
+from assessment_workflow import _overrides, _respond as workflow_respond
 from srax_policy import srax_positive
-from tests.test_step11_analyze_completion_workflow import _eye, _respond
+from tests.test_step11_analyze_completion_workflow import _eye, _modifiers, _plan, _respond
 from tests.test_step6_ps3_runtime_acceptance import _evaluate
 
 
@@ -64,3 +66,56 @@ def test_ps3_can_be_imported_before_clinical_core():
         capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_latest_report_regression_i_s_058_and_explicit_no_cannot_stop_surgery():
+    """A measured >20° angle is evidence to ask; the surgeon's NO is the decision."""
+    extracted = {'eyes': [
+        _eye('OD'),
+        _eye(
+            'OS', I_S=0.58, srax_deg=52.3, srax='YES',
+            table_verified_numeric_fields=[
+                'pachy_thinnest_um', 'BAD_D', 'Df', 'Db', 'Dp', 'Dt', 'Da',
+                'ARTmax_um', 'PPI_max', 'corneal_diameter_mm',
+            ],
+            field_provenance={'srax': [{'source': 'GEOMETRIC_FRONT_MAP'}]},
+        ),
+    ], 'critical_input_issues': []}
+    session = {
+        'extracted': extracted, 'ready': None, 'source_images': [],
+        'completion_requests': set(),
+    }
+    core = SimpleNamespace(APP_VERSION='srax-regression')
+    plans = {'OD': _plan(), 'OS': _plan()}
+    modifiers = _modifiers()
+    metadata = {'name': 'Regression Patient'}
+
+    first = workflow_respond(core, 'token', session, 35, plans, modifiers, metadata, {})
+    assert ('OS', 'srax') in session['completion_requests']
+    assert any(item.get('eye') == 'OS' and item.get('key') == 'srax'
+               for item in first['input_requests'])
+
+    completed = workflow_respond(
+        core, 'token', session, 35, plans, modifiers, metadata,
+        {'OS': {'srax': 'NO'}},
+    )
+    os_eye = next(item for item in completed['decision']['eyes'] if item['eye'] == 'OS')
+    assert completed['workflow_status'] == 'READY'
+    assert os_eye['score']['rows']['topography'] == 1
+    assert os_eye['score']['category'] == 'ASYMMETRIC_BOWTIE'
+    srax = next(item for item in os_eye['ps3']['findings'] if item['key'] == 'srax')
+    assert srax['status'] == 'NORMAL'
+    assert 'not >20°' in srax['detail']
+    assert os_eye['status'] != 'STOP-DEFER'
+    corrected = next(item for item in completed['extracted']['eyes'] if item['eye'] == 'OS')
+    assert corrected['I_S'] == 0.58
+    assert corrected['srax_deg'] == 52.3
+    assert corrected['srax'] == 'NO'
+    assert corrected['surgeon_corrections'][-1]['value'] == 'NO'
+
+    with pytest.raises(HTTPException, match='Stale or unrequested') as exc:
+        workflow_respond(
+            core, 'token', session, 35, plans, modifiers, metadata,
+            {'OS': {'srax': 'YES'}},
+        )
+    assert exc.value.status_code == 409

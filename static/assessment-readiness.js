@@ -136,6 +136,7 @@ window.HCReadiness = class {
     }catch(error){status.textContent=tr('The unread source region could not be displayed. Enter the value from the original Pentacam/topography image.');}
   }
   collect() {
+    const current={};
     for(const input of this.panel.querySelectorAll('[data-source-form]')) {
       if(!input.dataset.sourceForm)continue;
       const original=document.getElementById(input.dataset.sourceForm);
@@ -150,15 +151,18 @@ window.HCReadiness = class {
           throw new Error((window.CERAI_I18N?.locale==='tr'?'Geçerli bir sayı girin':'Enter a valid number for')+` ${input.dataset.eye} ${input.dataset.measurement}.`);
         value=Number(raw);
       }
-      (this.overrides[input.dataset.eye]??={})[input.dataset.measurement]=value;
+      (current[input.dataset.eye]??={})[input.dataset.measurement]=value;
     }
-    return this.overrides;
+    this.overrides=current;
+    return current;
   }
   collectSourceConfirmations() {
+    const current={};
     for(const input of this.panel.querySelectorAll('[data-source-confirmation]')) {
-      if(input.value)this.sourceConfirmations[input.dataset.sourceConfirmation]=input.value;
+      if(input.value)current[input.dataset.sourceConfirmation]=input.value;
     }
-    return this.sourceConfirmations;
+    this.sourceConfirmations=current;
+    return current;
   }
   show(response) {
     for(const url of this.regionUrls||[])URL.revokeObjectURL(url);
@@ -174,6 +178,8 @@ window.HCReadiness = class {
     this.panel.append(heading);
     const note=document.createElement('p');note.textContent=tr('Complete all items below, then continue. Existing inputs and image readings are retained. No calculation is required from the surgeon.');this.panel.append(note);
     const seen=new Set();
+    const activeMeasurements=new Set();
+    const activeSourceConfirmations=new Set();
     for(const item of response.input_requests||[]) {
       const identity=[item.eye,item.form_id||item.key,item.kind].join(':');
       if(seen.has(identity))continue;seen.add(identity);
@@ -207,9 +213,11 @@ window.HCReadiness = class {
         if(item.kind!=='number')for(const value of ['',...(item.options||[])]){const option=document.createElement('option');option.value=value;option.textContent=tr(value||'Select');input.append(option);}
         else {input.type='text';input.inputMode='decimal';input.autocomplete='off';}
         if(item.destination==='source_confirmation'){
+          activeSourceConfirmations.add(item.key);
           input.dataset.sourceConfirmation=item.key;
           input.value=this.sourceConfirmations[item.key]??'';
         }else{
+          activeMeasurements.add(`${item.eye}:${item.key}`);
           input.dataset.measurement=item.key;input.dataset.eye=item.eye;
           input.value=this.overrides[item.eye]?.[item.key]??'';
         }
@@ -236,6 +244,11 @@ window.HCReadiness = class {
       }
       this.panel.append(row);
     }
+    for(const [eye,values] of Object.entries(this.overrides)){
+      for(const key of Object.keys(values))if(!activeMeasurements.has(`${eye}:${key}`))delete values[key];
+      if(!Object.keys(values).length)delete this.overrides[eye];
+    }
+    for(const key of Object.keys(this.sourceConfirmations))if(!activeSourceConfirmations.has(key))delete this.sourceConfirmations[key];
     this.panel.scrollIntoView({behavior:'smooth',block:'start'});
     return true;
   }

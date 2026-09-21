@@ -379,6 +379,34 @@ def _dedupe_requests(requests):
     return result
 
 
+def _completion_request_keys(requests):
+    """Return the exact surgeon measurement fields visible in this response."""
+    return {
+        (item.get("eye"), item.get("key"))
+        for item in requests or []
+        if item.get("destination") == "measurement"
+        and item.get("kind") in {"number", "select"}
+        and item.get("eye") in {"OD", "OS"}
+    }
+
+
+def _validate_current_overrides(session, overrides):
+    """Reject retained/forged answers that were not requested on the current screen."""
+    allowed = session.get("completion_requests", set())
+    submitted = {
+        (eye_id, key)
+        for eye_id, values in overrides.items()
+        for key in values
+    }
+    stale = sorted(submitted - allowed, key=lambda item: (str(item[0]), str(item[1])))
+    if stale:
+        fields = ", ".join(f"{eye} {key}" for eye, key in stale)
+        raise HTTPException(
+            409,
+            f"Stale or unrequested clinical confirmation rejected: {fields}. Review the current required-information screen.",
+        )
+
+
 def _overrides(extracted, overrides):
     """Apply explicit surgeon confirmations while preserving original audit history."""
     from extraction_guard import _audit_eye
@@ -476,6 +504,7 @@ def _precore_response(token, session, readiness, plans):
     session["region_requests"] = {
         (item.get("eye"), item.get("key")) for item in requests if item.get("source_region")
     }
+    session["completion_requests"] = _completion_request_keys(requests)
     session["expires"] = monotonic() + TTL_SECONDS
     return response
 
@@ -528,6 +557,10 @@ def _respond(core, token, session, age, plans, modifiers, metadata, overrides, s
     overrides = deepcopy(overrides)
     if not isinstance(overrides, dict) or any(not isinstance(value, dict) for value in overrides.values()):
         raise HTTPException(422, "Clinical overrides must be an object.")
+    if set(overrides) - {"OD", "OS"}:
+        raise HTTPException(422, "Invalid eye-specific completion inputs.")
+    if overrides:
+        _validate_current_overrides(session, overrides)
 
     readiness = evaluate_precore_readiness(
         age_years=age,
@@ -621,6 +654,7 @@ def _respond(core, token, session, age, plans, modifiers, metadata, overrides, s
         for item in response["input_requests"]
         if item.get("source_region")
     }
+    session["completion_requests"] = _completion_request_keys(response["input_requests"])
     session["extracted"] = extracted
     session["expires"] = monotonic() + TTL_SECONDS
     return response
@@ -659,6 +693,7 @@ def begin(core, extracted, age, plans, modifiers, metadata, source_images=None):
             "expires": monotonic() + TTL_SECONDS,
             "ready": None,
             "source_images": list(source_images or []),
+            "completion_requests": set(),
         }
         _sessions[token] = session
         response = _respond(core, token, session, age, plans, modifiers, metadata, {})

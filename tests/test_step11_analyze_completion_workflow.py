@@ -101,6 +101,11 @@ def _respond(*, od=None, plans=None, modifiers=None, overrides=None, extracted_o
     session = {
         "extracted": extracted,
         "ready": None, "expires": 0, "source_images": [],
+        "completion_requests": {
+            (eye_id, key)
+            for eye_id, values in (overrides or {}).items()
+            for key in values
+        },
     }
     return workflow._respond(
         SimpleNamespace(APP_VERSION="stage11-test"), "token", session, 35,
