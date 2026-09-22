@@ -74,8 +74,22 @@ def test_toric_threshold_uses_tcrp_and_regular_astigmatism():
     })
     assert non_toric.toric_modifier == "NON_TORIC"
     assert toric.formatted_recommendation == "Toric Multifocal"
-    assert irregular.main_category == "MONOFOCAL"
+    assert irregular.main_category == "EDOF"
+    assert irregular.eligible_categories == ["EDOF", "MONOFOCAL"]
+    assert "MF_EXCL_IRREGULAR_ASTIG" in irregular.decisive_reason_codes
+    assert "WARN_IRREGULAR_ASTIGMATISM" in irregular.warning_codes
     assert irregular.toric_modifier == "NON_TORIC"
+
+
+def test_irregular_astigmatism_does_not_override_an_independent_monofocal_preference():
+    recommendation = result({
+        "near_demand": "LOW",
+        "tcrp_astigmatism_d": 1.0,
+        "tcrp_steep_axis_deg": 92,
+        "astigmatism_type": "IRREGULAR",
+    })
+    assert recommendation.main_category == "MONOFOCAL"
+    assert recommendation.toric_modifier == "NON_TORIC"
 
 
 def test_macular_pathology_and_definite_glaucoma_stop_multifocal_but_allow_edof():

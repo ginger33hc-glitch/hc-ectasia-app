@@ -12,7 +12,7 @@ from .models import (
     RetinaStatus,
 )
 
-ENGINE_VERSION = "IOL_CANONICAL_3.3"
+ENGINE_VERSION = "IOL_CANONICAL_3.4"
 LEGAL_NOTICE = (
     "This application provides clinical decision support only. "
     "Final responsibility rests with the surgeon at all times and under all circumstances."
@@ -100,8 +100,6 @@ def evaluate_case(case: IOLCaseInput) -> IOLRecommendation:
         priority_one.append("MONO_RETINA_SIGNIFICANT")
     if hoa_high:
         priority_one.append("MONO_HOA_HIGH")
-    if irregular:
-        priority_one.append("MONO_IRREGULAR_ASTIGMATISM")
     preference_only_mono = False
     if case.near_demand == Demand.LOW:
         priority_one.append("MONO_LOW_NEAR_DEMAND")
@@ -116,7 +114,7 @@ def evaluate_case(case: IOLCaseInput) -> IOLRecommendation:
         decisive.extend(priority_one)
         eligible = ["MONOFOCAL"]
         if preference_only_mono and not any(code.startswith("MONO_RETINA") or code in {
-            "MONO_HOA_HIGH", "MONO_IRREGULAR_ASTIGMATISM"
+            "MONO_HOA_HIGH"
         } for code in priority_one):
             eligible.insert(0, "EDOF")
         alternative = "EDOF" if eligible[0] == "EDOF" else None
