@@ -1,4 +1,4 @@
-"""Source-locked image transcription for Pentacam and biometry documents."""
+"""Source-locked image transcription for Pentacam Cataract Pre-Op documents."""
 
 from __future__ import annotations
 
@@ -11,12 +11,12 @@ EXTRACTION_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
     "required": [
         "document_type", "eye", "patient_name", "patient_age_years",
-        "pentacam", "biometry", "unreadable_fields",
+        "pentacam", "unreadable_fields",
     ],
     "properties": {
         "document_type": {
             "type": "string",
-            "enum": ["PENTACAM_CATARACT_PREOP", "BIOMETRY", "OTHER"],
+            "enum": ["PENTACAM_CATARACT_PREOP", "OTHER"],
         },
         "eye": {"type": "string", "enum": ["OD", "OS", "UNKNOWN"]},
         "patient_name": {"type": ["string", "null"]},
@@ -39,20 +39,6 @@ EXTRACTION_SCHEMA: dict[str, Any] = {
                 "tcrp_k2_axis_deg": {"type": ["number", "null"]},
             },
         },
-        "biometry": {
-            "type": "object",
-            "additionalProperties": False,
-            "required": [
-                "axial_length_mm", "anterior_chamber_depth_mm",
-                "lens_thickness_mm", "white_to_white_mm",
-            ],
-            "properties": {
-                "axial_length_mm": {"type": ["number", "null"]},
-                "anterior_chamber_depth_mm": {"type": ["number", "null"]},
-                "lens_thickness_mm": {"type": ["number", "null"]},
-                "white_to_white_mm": {"type": ["number", "null"]},
-            },
-        },
         "unreadable_fields": {"type": "array", "items": {"type": "string"}},
     },
 }
@@ -63,7 +49,7 @@ You are transcribing one ophthalmic source image for the independent CER-AI IOL 
 Return only values explicitly printed and readable in this image. Never estimate, calculate,
 average, copy from the fellow eye, or substitute a visually similar field.
 
-Classify the image as PENTACAM_CATARACT_PREOP, BIOMETRY, or OTHER. Preserve explicit OD/right
+Classify the image as PENTACAM_CATARACT_PREOP or OTHER. Preserve explicit OD/right
 or OS/left laterality; otherwise return UNKNOWN.
 
 For a Pentacam Cataract Pre-Op image, use these source locks only:
@@ -77,12 +63,8 @@ Do not use SimK or Diff. as a candidate, cross-check, fallback, or substitute.
 - q_value: transcribe only an explicitly labeled corneal Q/asphericity value. If the approved
   Q field is not shown or unreadable, return null.
 
-For a biometry printout or screen, transcribe explicitly labeled AL/axial length, ACD/anterior
-chamber depth, LT/lens thickness, and WTW/white-to-white. Do not perform IOL power calculations.
-
 For every required field that belongs to the recognized document but cannot be read with high
-confidence, return null and add its canonical key to unreadable_fields. Fields belonging to the
-other document type must be null but need not be listed as unreadable.
+confidence, return null and add its canonical key to unreadable_fields.
 """
 
 

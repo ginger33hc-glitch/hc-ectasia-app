@@ -49,20 +49,6 @@ class OcularSurfaceStatus(str, Enum):
     RESOLVED_AFTER_TREATMENT = "RESOLVED_AFTER_TREATMENT"
 
 
-class BiometryRecord(StrictModel):
-    source_confirmed: bool = False
-    axial_length_mm: float | None = Field(default=None, gt=15, lt=40)
-    anterior_chamber_depth_mm: float | None = Field(default=None, gt=0, lt=10)
-    lens_thickness_mm: float | None = Field(default=None, gt=0, lt=10)
-    white_to_white_mm: float | None = Field(default=None, gt=5, lt=20)
-
-    @model_validator(mode="after")
-    def require_core_biometry(self):
-        if self.source_confirmed and self.axial_length_mm is None:
-            raise ValueError("Confirmed biometry requires an axial-length measurement.")
-        return self
-
-
 class IOLCaseInput(StrictModel):
     patient_name: str = Field(min_length=1, max_length=200)
     patient_age_years: int = Field(ge=18, le=120)
@@ -88,9 +74,6 @@ class IOLCaseInput(StrictModel):
     ocular_surface_status: OcularSurfaceStatus
     post_treatment_measurements_stable: bool | None = None
 
-    pentacam_source_confirmed: bool
-    biometry: BiometryRecord
-
     @model_validator(mode="after")
     def validate_conditional_fields(self):
         if self.tcrp_astigmatism_d >= 1.0:
@@ -103,10 +86,6 @@ class IOLCaseInput(StrictModel):
                 raise ValueError(
                     "Resolved ocular-surface disease requires surgeon-confirmed stable repeat measurements."
                 )
-        if not self.pentacam_source_confirmed:
-            raise ValueError("The Pentacam source values must be confirmed by the surgeon.")
-        if not self.biometry.source_confirmed:
-            raise ValueError("The biometry source must be confirmed by the surgeon.")
         return self
 
 

@@ -30,14 +30,6 @@ def base_payload():
         "glaucoma_status": "NONE",
         "ocular_surface_status": "NONE",
         "post_treatment_measurements_stable": None,
-        "pentacam_source_confirmed": True,
-        "biometry": {
-            "source_confirmed": True,
-            "axial_length_mm": 23.7,
-            "anterior_chamber_depth_mm": 3.1,
-            "lens_thickness_mm": 4.4,
-            "white_to_white_mm": 11.8,
-        },
     }
 
 
@@ -122,13 +114,17 @@ def test_over_70_soft_prefers_edof_without_removing_multifocal():
     assert recommendation.multifocal_eligible is True
 
 
-def test_unconfirmed_sources_and_missing_toric_fields_fail_closed():
-    payload = base_payload()
-    payload["pentacam_source_confirmed"] = False
-    with pytest.raises(ValidationError):
-        IOLCaseInput.model_validate(payload)
+def test_missing_toric_fields_fail_closed():
     payload = deepcopy(base_payload())
     payload["tcrp_astigmatism_d"] = 1.0
+    with pytest.raises(ValidationError):
+        IOLCaseInput.model_validate(payload)
+
+
+@pytest.mark.parametrize("retired_field", ["pentacam_source_confirmed", "biometry"])
+def test_retired_confirmation_and_biometry_contracts_are_rejected(retired_field):
+    payload = base_payload()
+    payload[retired_field] = True if retired_field.endswith("confirmed") else {}
     with pytest.raises(ValidationError):
         IOLCaseInput.model_validate(payload)
 
@@ -149,8 +145,17 @@ def test_iol_mobile_ui_contains_required_sources_and_no_browser_credential_stora
     script = Path("static/iol.js").read_text(encoding="utf-8")
     assert 'name="viewport"' in html
     assert "Pentacam Cataract Pre-Op" in html
-    assert "IOLMaster 500 or approved biometry image" in html
     assert "Pupil Dia (3D)" in html
     assert "TCRP only" in html
+    assert "Final responsibility rests with the surgeon at all times and under all circumstances." in html
+    assert "biometr" not in (html + script).lower()
+    assert "Confirmed" not in html
     assert "localStorage" not in script
     assert "sessionStorage" not in script
+
+
+def test_iol_extraction_contract_is_pentacam_only():
+    source = Path("iol_module/extraction.py").read_text(encoding="utf-8")
+    models = Path("iol_module/models.py").read_text(encoding="utf-8")
+    assert "BIOMETRY" not in source
+    assert "biometr" not in (source + models).lower()

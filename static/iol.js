@@ -16,16 +16,15 @@
 
   $("extractButton").addEventListener("click", async () => {
     const pentacam = [...$("pentacamImages").files];
-    const biometry = [...$("biometryImages").files];
     const status = $("extractStatus");
     status.className = "status";
-    if (!pentacam.length || !biometry.length) {
-      status.textContent = "Upload at least one Pentacam image and one biometry image.";
+    if (!pentacam.length) {
+      status.textContent = "Upload at least one Pentacam Cataract Pre-Op image.";
       status.classList.add("error");
       return;
     }
     const data = new FormData();
-    [...pentacam, ...biometry].forEach(file => data.append("images", file));
+    pentacam.forEach(file => data.append("images", file));
     $("extractButton").disabled = true;
     status.textContent = "Transcribing approved fields…";
     try {
@@ -45,16 +44,11 @@
           setIfPresent("pupil3d", p.pupil_dia_3d_mm); setIfPresent("tcrpAstig", p.tcrp_astigmatism_d);
           setIfPresent("tcrpAxis", p.tcrp_k2_axis_deg);
         }
-        if (item.document_type === "BIOMETRY") {
-          const b = item.biometry || {};
-          setIfPresent("al", b.axial_length_mm); setIfPresent("acd", b.anterior_chamber_depth_mm);
-          setIfPresent("lt", b.lens_thickness_mm); setIfPresent("wtw", b.white_to_white_mm);
-        }
         (item.unreadable_fields || []).forEach(field => unreadable.push(`${source.filename}: ${field}`));
       }
       status.textContent = unreadable.length
-        ? `Transcription completed. Surgeon confirmation required for: ${unreadable.join(", ")}.`
-        : "Transcription completed. Review every value and confirm both sources before evaluation.";
+        ? `Transcription completed. Enter unreadable required values manually: ${unreadable.join(", ")}.`
+        : "Pentacam transcription completed. Review the extracted values before evaluation.";
       $("tcrpAstig").dispatchEvent(new Event("input"));
     } catch (error) {
       status.textContent = error.message || "Image transcription failed.";
@@ -79,9 +73,7 @@
       tcrp_steep_axis_deg: numberOrNull("tcrpAxis"), astigmatism_type: $("astigType").value || null,
       retina_status: $("retina").value, macular_pathology_present: $("macular").value === "true",
       glaucoma_status: $("glaucoma").value, ocular_surface_status: $("surface").value,
-      post_treatment_measurements_stable: $("surface").value === "RESOLVED_AFTER_TREATMENT" ? $("stable").value === "true" : null,
-      pentacam_source_confirmed: $("pentacamConfirmed").checked,
-      biometry: {source_confirmed: $("biometryConfirmed").checked, axial_length_mm:numberOrNull("al"), anterior_chamber_depth_mm:numberOrNull("acd"), lens_thickness_mm:numberOrNull("lt"), white_to_white_mm:numberOrNull("wtw")}
+      post_treatment_measurements_stable: $("surface").value === "RESOLVED_AFTER_TREATMENT" ? $("stable").value === "true" : null
     };
     $("evaluateButton").disabled = true; status.textContent = "Applying canonical IOL rules…";
     try {

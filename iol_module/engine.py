@@ -12,11 +12,10 @@ from .models import (
     RetinaStatus,
 )
 
-ENGINE_VERSION = "IOL_CANONICAL_3.1"
+ENGINE_VERSION = "IOL_CANONICAL_3.2"
 LEGAL_NOTICE = (
-    "This application is designed solely for clinical decision support. "
-    "The recommendations presented do not constitute a definitive medical decision. "
-    "Final treatment and lens selection must be determined by the physician who evaluates the patient."
+    "This application provides clinical decision support only. "
+    "Final responsibility rests with the surgeon at all times and under all circumstances."
 )
 
 

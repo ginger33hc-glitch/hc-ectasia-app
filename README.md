@@ -92,10 +92,10 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
   Calculation Surgery share the password-backed authentication, session, storage, and audit
   boundary while retaining independent input models, extraction contracts, and clinical engines.
 - The IOL module accepts surgeon-defined patient and ocular parameters plus Pentacam Cataract
-  Pre-Op and biometry images. It source-locks Pupil Dia (3D), Total Corneal HOA (4 mm), angle,
-  Q, and TCRP fields, requires surgeon confirmation of unreadable values, and returns a canonical
-  monofocal/EDOF/multifocal category with a toric modifier. It does not calculate dioptric IOL
-  power until a separate formula, lens-constant, and biometry-source contract is approved.
+  Pre-Op images. It source-locks Pupil Dia (3D), Total Corneal HOA (4 mm), angle, Q, and TCRP
+  fields and returns a canonical monofocal/EDOF/multifocal category with a toric modifier.
+  Unreadable required values must be entered manually. The module does not calculate dioptric
+  IOL power until a separate formula and lens-constant contract is approved.
 - Clinical login is username/password only. The former name-only supervised trial entry is retired.
 
 - A focused Pentacam numeric reread now runs only for still-empty labeled fields. It keeps the
