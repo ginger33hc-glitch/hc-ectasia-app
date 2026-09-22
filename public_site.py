@@ -194,9 +194,9 @@ def _apply_pwa_identity(html: str, request: Request) -> str:
     staging = _is_staging_environment(request)
     title = "CER-AI Staging" if staging else "CER-AI"
     manifest = (
-        "/static/manifest.staging.webmanifest?v=14"
+        "/static/manifest.staging.webmanifest?v=15"
         if staging
-        else "/static/manifest.webmanifest?v=14"
+        else "/static/manifest.webmanifest?v=15"
     )
     html = re.sub(
         r'<link\s+rel="manifest"\s+href="[^"]+">',

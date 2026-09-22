@@ -37,10 +37,6 @@
   const button = document.getElementById("submitButton");
   const error = document.getElementById("error");
 
-  fetch("/auth/me", {credentials:"same-origin", cache:"no-store"}).then(response => {
-    if (response.ok) window.location.replace(next);
-  }).catch(() => {});
-
   form.addEventListener("submit", async event => {
     event.preventDefault();
     error.textContent = "";

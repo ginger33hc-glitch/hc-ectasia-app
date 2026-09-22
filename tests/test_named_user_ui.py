@@ -70,6 +70,15 @@ def test_login_page_exists_and_does_not_store_password_in_browser_storage():
     assert response.headers["cache-control"] == "no-store"
 
 
+def test_login_uses_module_selection_as_canonical_default_without_session_bypass():
+    client, _core = make_client()
+    response = client.get("/auth/login-page?next=/clinical-modules")
+    assert response.status_code == 200
+    assert 'const requested = params.get("next") || "/clinical-modules"' in response.text
+    assert 'fetch("/auth/me"' not in response.text
+    assert 'params.get("reauth")' not in response.text
+
+
 def test_login_page_remains_username_and_password_when_legacy_trial_flag_is_set():
     client, core = make_client()
     core._cerai_trial_name_login_enabled = True

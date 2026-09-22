@@ -6,8 +6,8 @@
   function ensurePwaMetadata() {
     const staging = window.location.hostname.toLowerCase().includes("staging");
     const manifestHref = staging
-      ? "/static/manifest.staging.webmanifest?v=14"
-      : "/static/manifest.webmanifest?v=14";
+      ? "/static/manifest.staging.webmanifest?v=15"
+      : "/static/manifest.webmanifest?v=15";
     let manifest = document.querySelector('link[rel="manifest"]');
     if (!manifest) {
       manifest = document.createElement("link");
