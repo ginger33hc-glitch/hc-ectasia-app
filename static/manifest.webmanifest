@@ -2,7 +2,7 @@
   "name": "CER-AI",
   "short_name": "CER-AI",
   "id": "/cer-ai-production",
-  "start_url": "/app",
+  "start_url": "/auth/login-page?next=/clinical-modules",
   "scope": "/",
   "display": "standalone",
   "background_color": "#05090d",

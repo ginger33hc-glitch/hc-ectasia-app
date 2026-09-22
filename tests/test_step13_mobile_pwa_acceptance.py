@@ -40,11 +40,11 @@ def test_production_and_staging_manifests_have_distinct_install_identities():
     assert staging["id"] == "/cer-ai-staging"
     for key in ("start_url", "scope", "display", "icons", "share_target"):
         assert production[key] == staging[key]
-    assert production["start_url"] == "/app"
+    assert production["start_url"] == "/auth/login-page?next=/clinical-modules"
     assert production["scope"] == "/"
     assert production["display"] == "standalone"
     page = (STATIC / "index.html").read_text(encoding="utf-8")
-    assert '/static/manifest.webmanifest?v=13' in page
+    assert '/static/manifest.webmanifest?v=14' in page
     assert '<meta name="apple-mobile-web-app-title" content="CER-AI">' in page
     target = production["share_target"]
     assert target == {
@@ -72,7 +72,7 @@ def test_public_and_clinical_pages_select_the_environment_manifest(monkeypatch):
     with TestClient(app, base_url="https://cer-ai.com") as client:
         for path in ("/", "/app"):
             page = client.get(path)
-            assert '/static/manifest.webmanifest?v=13' in page.text
+            assert '/static/manifest.webmanifest?v=14' in page.text
             assert 'content="CER-AI"' in page.text
             assert "CER-AI Staging" not in page.text
         retired = client.get("/testing-app", follow_redirects=False)
@@ -86,7 +86,7 @@ def test_public_and_clinical_pages_select_the_environment_manifest(monkeypatch):
     ) as client:
         for path in ("/", "/app"):
             page = client.get(path)
-            assert '/static/manifest.staging.webmanifest?v=13' in page.text
+            assert '/static/manifest.staging.webmanifest?v=14' in page.text
             assert 'content="CER-AI Staging"' in page.text
 
 
@@ -252,7 +252,7 @@ def test_public_renderer_directly_owns_mobile_install_content_without_wrapper():
     assert page.status_code == 200
     assert page.text.count('id="mobile-install"') == 1
     assert "Install CER-AI on your phone" in page.text
-    assert '/static/manifest.webmanifest?v=13' in page.text
+    assert '/static/manifest.webmanifest?v=14' in page.text
     assert '<meta name="apple-mobile-web-app-title" content="CER-AI">' in page.text
 
 

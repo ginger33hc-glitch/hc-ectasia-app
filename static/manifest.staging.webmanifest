@@ -2,7 +2,7 @@
   "name": "CER-AI Staging",
   "short_name": "CER-AI Staging",
   "id": "/cer-ai-staging",
-  "start_url": "/app",
+  "start_url": "/auth/login-page?next=/clinical-modules",
   "scope": "/",
   "display": "standalone",
   "background_color": "#05090d",

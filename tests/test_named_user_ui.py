@@ -91,8 +91,8 @@ def test_module_selector_precedes_login_and_preserves_module_destination():
     assert response.status_code == 200
     assert "Refractive Surgery" in response.text
     assert "IOL Calculation Surgery" in response.text
-    assert 'href="/auth/login-page?next=/app"' in response.text
-    assert 'href="/auth/login-page?next=/iol"' in response.text
+    assert 'href="/app"' in response.text
+    assert 'href="/iol"' in response.text
     assert response.headers["cache-control"] == "no-store"
 
 
@@ -108,6 +108,7 @@ def test_unauthenticated_iol_redirects_to_login_and_authenticated_iol_is_separat
     assert "IOL Calculation Surgery" in allowed.text
     assert "Doctor &lt;One&gt;" in allowed.text
     assert "/static/iol.js?v=1" in allowed.text
+    assert 'href="/clinical-modules"' in allowed.text
 
 
 def test_authenticated_clinical_app_injects_archive_navigation_and_escapes_display_name():
@@ -116,6 +117,7 @@ def test_authenticated_clinical_app_injects_archive_navigation_and_escapes_displ
     response = client.get("/app")
     assert response.status_code == 200
     assert "Case Archive" in response.text
+    assert 'href="/clinical-modules"' in response.text
     assert "Doctor &lt;One&gt;" in response.text
     assert "Doctor <One>" not in response.text
     assert 'cerAiReviewerField.readOnly = true' in response.text

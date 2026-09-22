@@ -29,11 +29,11 @@
   </main>
 <script>
 (() => {
-  const allowedNext = new Set(["/", "/app", "/iol", "/clinical-app", "/archive-ui"]);
+  const allowedNext = new Set(["/", "/clinical-modules", "/app", "/iol", "/clinical-app", "/archive-ui"]);
   const params = new URLSearchParams(window.location.search);
-  const requested = params.get("next") || "/app";
+  const requested = params.get("next") || "/clinical-modules";
   const safeSharedApp = /^\/app\?(?:share_token=[A-Za-z0-9-]{1,128}|share_error=(?:no_images|too_many_images|image_too_large|images_too_large))$/.test(requested);
-  const next = allowedNext.has(requested) || safeSharedApp ? requested : "/app";
+  const next = allowedNext.has(requested) || safeSharedApp ? requested : "/clinical-modules";
   const selectedModule = document.getElementById("selectedModule");
   if (next === "/iol") selectedModule.textContent = "IOL Calculation Surgery · Secure sign-in";
   else if (next.startsWith("/app")) selectedModule.textContent = "Refractive Surgery · Secure sign-in";
