@@ -102,7 +102,7 @@
       <button id="pdfBtn" type="button">Open / Download PDF</button>
       <button id="wordBtn" type="button" class="secondary">Download Word</button>
       <button id="conclusionPdfBtn" type="button" class="secondary">Open / Print one-page conclusion</button>
-      <button id="shareConclusionBtn" type="button" class="secondary">Share one-page conclusion</button>
+      <button id="shareConclusionBtn" type="button" class="secondary">Share one-page PDF file</button>
       <button id="printBtn" type="button" class="secondary">Print report</button>
     </div>
     <article id="reportSheet" class="report-sheet">
@@ -751,21 +751,20 @@ async function shareConclusionReport(){
   try{
     const response=await ceraiFetch("/report/conclusion/pdf",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(lastReport)});
     if(!response.ok)throw new Error(`Report export failed (${response.status})`);
-    const blob=await response.blob();
+    const bytes=await response.arrayBuffer();
     const id=(lastReport.patient.name||"Report").replace(/[^a-z0-9_-]+/gi,"_");
     const filename=`CER-AI_${id}_Conclusion.pdf`;
-    const file=new File([blob],filename,{type:"application/pdf"});
+    const file=new File([bytes],filename,{type:"application/pdf"});
     if(typeof navigator.share==="function"&&typeof navigator.canShare==="function"&&navigator.canShare({files:[file]})){
       try{
-        await navigator.share({files:[file],title:"CER-AI one-page conclusion"});
+        // Files-only is deliberate: a share target must receive the PDF attachment and
+        // cannot silently fall back to the browser-local page/blob address.
+        await navigator.share({files:[file]});
       }catch(error){
         if(error?.name!=="AbortError")throw error;
       }
     }else{
-      const url=URL.createObjectURL(blob),a=document.createElement("a");
-      a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
-      setTimeout(()=>URL.revokeObjectURL(url),60000);
-      alert(i18n.translate("The PDF was downloaded. Attach the downloaded file in WhatsApp."));
+      alert(i18n.translate("This browser cannot share PDF files directly. Open the one-page conclusion, download the PDF, and attach that file in WhatsApp."));
     }
   }catch(error){alert(String(error))}finally{shareConclusionBtn.disabled=false;shareConclusionBtn.textContent=original}
 }

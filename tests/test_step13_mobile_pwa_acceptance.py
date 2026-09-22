@@ -230,9 +230,15 @@ def test_mobile_report_and_archive_actions_are_touch_and_popup_safe():
     assert "/report/conclusion/pdf" in app
     assert 'id="shareConclusionBtn"' in app
     assert "navigator.canShare({files:[file]})" in app
-    assert "await navigator.share({files:[file]" in app
+    assert "Share one-page PDF file" in app
+    assert "await navigator.share({files:[file]});" in app
     assert "CER-AI_${id}_Conclusion.pdf" in app
-    assert "Attach the downloaded file in WhatsApp" in app
+    assert "cannot share PDF files directly" in app
+    share_source = app.split("async function shareConclusionReport(){", 1)[1].split(
+        'pdfBtn.addEventListener("click"', 1
+    )[0]
+    assert "URL.createObjectURL" not in share_source
+    assert "response.arrayBuffer()" in share_source
     assert "lastReport.patient.id" not in app
     assert ".report-toolbar button{flex:1 1 145px;min-height:44px}" in app
     assert ".links a,.source-button,.case-button{font-size:12px;min-height:40px" in archive
