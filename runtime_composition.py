@@ -23,14 +23,18 @@ import case_catalog  # noqa: E402
 import historical_report  # noqa: E402
 import research_export  # noqa: E402
 import named_user_ui  # noqa: E402
+import clinical_entry  # noqa: E402
+from iol_module import web as iol_web  # noqa: E402
 
 app = core.app
 
 COMPOSITION_PHASES = {
     "canonical_reporting": ("reports",),
     "canonical_workflow": ("assessment_workflow",),
+    "clinical_modules": ("iol_module",),
     "access_and_persistence": (
-        "user_access", "operational_security", "public_site", "analysis_job_service",
+        "user_access", "operational_security", "public_site", "clinical_entry",
+        "analysis_job_service",
         "case_archive", "audit_log", "case_catalog",
         "historical_report", "research_export", "named_user_ui",
     ),
@@ -57,6 +61,8 @@ def compose(version: str):
     user_access.install(core)
     operational_security.install(core)
     public_site.install(core)
+    clinical_entry.install(core)
+    iol_web.install(core)
     analysis_job_service.install(core)
 
     archive_required = os.getenv("CERAI_ARCHIVE_REQUIRED", "0").strip() == "1"

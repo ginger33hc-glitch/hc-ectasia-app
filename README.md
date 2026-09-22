@@ -88,10 +88,15 @@ FastAPI application for source-restricted preoperative ectasia risk assessment u
   surgeon-resolvable clinical conflict. The dedicated anterior-curvature source owns the final
   confidence value, preventing an instruction-only readiness blocker with no field to complete.
 
-- Supervised trial access can temporarily accept only a doctor's displayed name while retaining
-  secure session cookies, a stable per-name DOCTOR identity, archive ownership, and audit records.
-  Password hashes and the normal named-account flow remain intact and are restored with
-  `CERAI_TRIAL_NAME_LOGIN_ENABLED=0`.
+- Clinical access now begins with a two-button module selector. Refractive Surgery and IOL
+  Calculation Surgery share the password-backed authentication, session, storage, and audit
+  boundary while retaining independent input models, extraction contracts, and clinical engines.
+- The IOL module accepts surgeon-defined patient and ocular parameters plus Pentacam Cataract
+  Pre-Op and biometry images. It source-locks Pupil Dia (3D), Total Corneal HOA (4 mm), angle,
+  Q, and TCRP fields, requires surgeon confirmation of unreadable values, and returns a canonical
+  monofocal/EDOF/multifocal category with a toric modifier. It does not calculate dioptric IOL
+  power until a separate formula, lens-constant, and biometry-source contract is approved.
+- Clinical login is username/password only. The former name-only supervised trial entry is retired.
 
 - A focused Pentacam numeric reread now runs only for still-empty labeled fields. It keeps the
   complete screen for eye/screen context and supplies four overlapping original-detail crops so

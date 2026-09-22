@@ -118,25 +118,24 @@ def test_named_users_require_hashed_owner_registry_and_reject_raw_password_field
     assert preflight.validate_environment(values)["named_users_enabled"] is True
 
 
-def test_supervised_trial_name_login_does_not_require_password_registry():
+def test_retired_trial_name_login_is_rejected():
     values = env()
     values["CERAI_NAMED_USERS_ENABLED"] = "1"
     values["CERAI_TRIAL_NAME_LOGIN_ENABLED"] = "1"
     values.pop("CERAI_USERS_JSON", None)
 
-    result = preflight.validate_environment(values)
-
-    assert result["named_users_enabled"] is True
-    assert result["trial_name_login_enabled"] is True
+    with pytest.raises(preflight.PreflightError, match="retired"):
+        preflight.validate_environment(values)
 
 
-def test_named_user_trial_default_matches_runtime_default():
+def test_named_user_default_requires_password_registry():
     values = env()
     values["CERAI_NAMED_USERS_ENABLED"] = "1"
     values.pop("CERAI_TRIAL_NAME_LOGIN_ENABLED", None)
     values.pop("CERAI_USERS_JSON", None)
 
-    assert preflight.validate_environment(values)["trial_name_login_enabled"] is True
+    with pytest.raises(preflight.PreflightError, match="CERAI_USERS_JSON"):
+        preflight.validate_environment(values)
 
 
 def test_required_mode_implies_archive_enabled_in_preflight_result():

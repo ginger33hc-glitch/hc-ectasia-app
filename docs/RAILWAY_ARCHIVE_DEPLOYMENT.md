@@ -93,17 +93,9 @@ Do not proceed if this step fails.
 
 ## 6. Configure named users
 
-During the temporary supervised name-only trial, set:
-
-`CERAI_NAMED_USERS_ENABLED=1`
-
-`CERAI_TRIAL_NAME_LOGIN_ENABLED=1`
-
-The runtime and configuration preflight then accept a doctor's displayed name without requiring
-`CERAI_USERS_JSON`. Every name-only trial identity has the `DOCTOR` role; no trial identity receives
-OWNER access. This mode is temporary and must not be treated as authenticated production access.
-
-Before ending the trial, generate each account password hash without putting the password in shell history:
+Clinical access is username/password only. Set `CERAI_NAMED_USERS_ENABLED=1`, keep
+`CERAI_TRIAL_NAME_LOGIN_ENABLED=0`, and generate each account password hash without putting the
+password in shell history:
 
 ```bash
 python scripts/generate_user_password_hash.py

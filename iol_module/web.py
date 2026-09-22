@@ -1,0 +1,55 @@
+"""HTTP boundary for the independent IOL module."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+from pathlib import Path
+from typing import Any
+
+from fastapi import Body, File, HTTPException, UploadFile
+from fastapi.responses import HTMLResponse
+from pydantic import ValidationError
+
+import operational_security
+
+from .engine import evaluate_case
+from .extraction import extract_image
+from .models import IOLCaseInput
+
+
+IOL_HTML = Path("static/iol.html")
+
+
+def install(core: Any) -> None:
+    if getattr(core, "_cerai_iol_module_installed", False):
+        return
+
+    @core.app.get("/iol", include_in_schema=False)
+    def iol_page():
+        return HTMLResponse(
+            IOL_HTML.read_text(encoding="utf-8"),
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @core.app.post("/iol/extract")
+    async def iol_extract(images: list[UploadFile] = File(...)):
+        payloads = await operational_security.read_uploads(images)
+        results = []
+        for raw, filename in payloads:
+            try:
+                result = await asyncio.to_thread(extract_image, core, raw, filename)
+            except Exception as exc:
+                raise HTTPException(502, f"Unable to transcribe {filename}.") from exc
+            results.append({"filename": filename, "extraction": result})
+        return {"sources": results}
+
+    @core.app.post("/iol/evaluate")
+    def iol_evaluate(payload: dict[str, Any] = Body(...)):
+        try:
+            case = IOLCaseInput.model_validate(payload)
+        except ValidationError as exc:
+            raise HTTPException(422, detail=json.loads(exc.json(include_url=False))) from exc
+        return evaluate_case(case).model_dump(mode="json")
+
+    core._cerai_iol_module_installed = True

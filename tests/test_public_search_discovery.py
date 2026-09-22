@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import public_site
+import clinical_entry
 
 
 class PageStructure(HTMLParser):
@@ -30,6 +31,7 @@ def public_app():
     # Install the actual public route owner, not a copied route or scorer.
     core = SimpleNamespace(app=FastAPI())
     public_site.install(core)
+    clinical_entry.install(core)
     return core.app
 
 

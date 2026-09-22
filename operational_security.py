@@ -54,6 +54,8 @@ PROTECTED_PATHS = frozenset({
     "/report/pdf",
     "/report/word",
     "/report/conclusion/pdf",
+    "/iol/extract",
+    "/iol/evaluate",
 })
 PROTECTED_PREFIXES = ("/archive/", "/analysis/jobs")
 

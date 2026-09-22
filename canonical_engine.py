@@ -149,6 +149,8 @@ def runtime_invariants():
         ("_cerai_historical_report_installed", "Historical report boundary is not active"),
         ("_cerai_research_export_installed", "Research export boundary is not active"),
         ("_cerai_named_user_ui_installed", "Named-user UI boundary is not active"),
+        ("_cerai_clinical_entry_installed", "Clinical module selector is not active"),
+        ("_cerai_iol_module_installed", "Independent IOL module is not active"),
     ):
         if not getattr(core, marker, False):
             errors.append(message)

@@ -89,17 +89,12 @@ def validate_environment(env: dict[str, str] | None = None) -> dict[str, object]
             )
 
     named_users_enabled = _value(env, "CERAI_NAMED_USERS_ENABLED") == "1"
-    trial_name_login_enabled = (
-        str(
-            env.get(
-                "CERAI_TRIAL_NAME_LOGIN_ENABLED",
-                "1" if named_users_enabled else "0",
-            )
-            or ""
-        ).strip()
-        == "1"
-    )
-    if named_users_enabled and not trial_name_login_enabled:
+    trial_name_login_enabled = _value(env, "CERAI_TRIAL_NAME_LOGIN_ENABLED") == "1"
+    if trial_name_login_enabled:
+        raise PreflightError(
+            "CERAI_TRIAL_NAME_LOGIN_ENABLED is retired; clinical access requires username and password."
+        )
+    if named_users_enabled:
         users_raw = _value(env, "CERAI_USERS_JSON")
         if not users_raw:
             raise PreflightError(

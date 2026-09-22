@@ -195,7 +195,9 @@ def test_named_session_can_replace_shared_access_key_and_login_logout_are_audite
         user_access._reset_for_tests()
 
 
-def test_trial_login_accepts_only_doctor_name_and_keeps_secure_session(monkeypatch):
+def test_retired_trial_flag_does_not_bypass_password_authentication(monkeypatch):
+    owner = account_payload()
+    monkeypatch.setenv("CERAI_USERS_JSON", json.dumps([owner]))
     user_access._reset_for_tests()
     monkeypatch.setattr(user_access, "NAMED_USERS_ENABLED", True)
     monkeypatch.setattr(user_access, "TRIAL_NAME_LOGIN_ENABLED", True)
@@ -216,19 +218,13 @@ def test_trial_login_accepts_only_doctor_name_and_keeps_secure_session(monkeypat
             return principal.public() if principal else None
 
         client = TestClient(app, base_url="https://testserver")
-        login = client.post("/auth/login", json={"display_name": "Dr. İdil Göksel"})
-
+        denied = client.post("/auth/login", json={"display_name": "Dr. İdil Göksel"})
+        assert denied.status_code == 401
+        login = client.post(
+            "/auth/login",
+            json={"username": "owner", "password": "long-owner-password"},
+        )
         assert login.status_code == 200
-        assert login.json()["user"]["display_name"] == "Dr. İdil Göksel"
-        assert login.json()["user"]["role"] == "DOCTOR"
-        assert "password" not in login.request.content.decode("utf-8")
-        cookie = login.headers.get("set-cookie", "")
-        assert "HttpOnly" in cookie
-        assert "Secure" in cookie
-        assert "SameSite=strict" in cookie
-        admitted = client.post("/assessment/complete", json={})
-        assert admitted.status_code == 200
-        assert admitted.json()["user_id"].startswith("trial-")
-        assert events[0][1]["details"]["authentication_mode"] == "TRIAL_NAME"
+        assert events[-1][1]["details"]["authentication_mode"] == "PASSWORD"
     finally:
         user_access._reset_for_tests()

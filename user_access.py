@@ -29,13 +29,10 @@ ROLE_DOCTOR = "DOCTOR"
 ALLOWED_ROLES = frozenset({ROLE_OWNER, ROLE_DOCTOR})
 SESSION_COOKIE = "cer_ai_session"
 NAMED_USERS_ENABLED = os.getenv("CERAI_NAMED_USERS_ENABLED", "0").strip() == "1"
-# Temporary supervised trial mode. Existing named-user deployments enter the trial flow unless
-# they explicitly opt out; deployments without named users remain unchanged. Set this to 0 to
-# restore the password-backed registry without changing or deleting the stored account hashes.
-TRIAL_NAME_LOGIN_ENABLED = os.getenv(
-    "CERAI_TRIAL_NAME_LOGIN_ENABLED",
-    "1" if NAMED_USERS_ENABLED else "0",
-).strip() == "1"
+# Clinical module access is username/password only. The former supervised
+# name-only trial mode is retained only as a retired data-migration helper and
+# cannot be enabled at the web authentication boundary.
+TRIAL_NAME_LOGIN_ENABLED = False
 SESSION_TTL_SECONDS = max(
     900,
     min(int(os.getenv("CERAI_SESSION_TTL_SECONDS", "43200")), 86400),
@@ -203,9 +200,6 @@ def configure_from_environment() -> None:
     if not NAMED_USERS_ENABLED:
         _users_by_username = {}
         return
-    if TRIAL_NAME_LOGIN_ENABLED:
-        _users_by_username = {}
-        return
     raw = os.getenv("CERAI_USERS_JSON", "").strip()
     if not raw:
         raise UserConfigurationError(
@@ -359,14 +353,8 @@ def install(core: Any) -> None:
     if NAMED_USERS_ENABLED:
         @core.app.post("/auth/login")
         def login(payload: Dict[str, Any] = Body(...)):
-            if TRIAL_NAME_LOGIN_ENABLED:
-                principal = authenticate_trial_name(
-                    payload.get("display_name", payload.get("username"))
-                )
-                auth_mode = "TRIAL_NAME"
-            else:
-                principal = authenticate_credentials(payload.get("username"), payload.get("password"))
-                auth_mode = "PASSWORD"
+            principal = authenticate_credentials(payload.get("username"), payload.get("password"))
+            auth_mode = "PASSWORD"
             token = create_session(principal)
             try:
                 audit(

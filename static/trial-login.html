@@ -28,7 +28,7 @@
   </main>
 <script>
 (() => {
-  const allowedNext = new Set(["/", "/app", "/clinical-app", "/archive-ui"]);
+  const allowedNext = new Set(["/", "/app", "/iol", "/clinical-app", "/archive-ui"]);
   const params = new URLSearchParams(window.location.search);
   const requested = params.get("next") || "/app";
   const safeSharedApp = /^\/app\?(?:share_token=[A-Za-z0-9-]{1,128}|share_error=(?:no_images|too_many_images|image_too_large|images_too_large))$/.test(requested);

@@ -419,7 +419,7 @@ def test_project_guidance_matches_current_dispositions_and_named_sign_in():
     assert "four-category contract" in readme
     assert "`PASS WITH CAUTION`" in readme
     assert "three-category contract" not in readme
-    current_login = "Select Access CER-AI and sign in with your authorized username and password."
+    current_login = "Select Refractive Surgery or IOL Calculation Surgery, then sign in with your authorized username and password."
     assert current_login in homepage
     assert current_login in translations
     assert "current supervised trial login flow" not in homepage

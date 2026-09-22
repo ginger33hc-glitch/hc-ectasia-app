@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CER-AI IOL Calculation Surgery</title>
+  <meta name="theme-color" content="#07131d">
+  <style>
+    :root{--navy:#173b57;--blue:#1f5e8c;--orange:#ef7f1a;--ink:#17212b;--muted:#66717d;--line:#d9e0e6;--bg:#eef3f6;--red:#a31212;--green:#1e6a45;--amber:#8a5a00}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,sans-serif}.wrap{width:min(1180px,calc(100% - 28px));margin:auto}
+    header{background:#07131d;color:#fff;padding:18px 0;box-shadow:0 4px 18px rgba(0,0,0,.18)}header .row{display:flex;align-items:center;justify-content:space-between;gap:16px}.brand{font-size:25px;font-weight:800}.accent{color:var(--orange)}header a{color:#dbe9f2;text-decoration:none;font-size:13px}
+    h1{font-size:clamp(24px,5vw,36px);margin:26px 0 6px;color:var(--navy)}.lead{margin:0 0 22px;color:var(--muted);line-height:1.5}
+    .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;margin:16px 0;box-shadow:0 5px 18px rgba(23,59,87,.06)}.card h2{font-size:19px;color:var(--navy);margin:0 0 16px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+    label{display:block;font-weight:700;color:var(--navy);font-size:13px;margin-bottom:5px}input,select{width:100%;padding:10px;border:1px solid #b7c4ce;border-radius:7px;background:#fff;font-size:15px}input:focus,select:focus{outline:2px solid #8ab6d3;outline-offset:1px}.hint{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.35}
+    .upload{border:1px dashed #8ca9bb;border-radius:10px;padding:14px;background:#f8fbfd}.check{display:flex;gap:8px;align-items:flex-start;margin-top:12px}.check input{width:auto;margin-top:2px}.check label{font-weight:500;color:var(--ink)}
+    button{border:0;border-radius:8px;background:var(--navy);color:#fff;padding:12px 18px;font-weight:800;font-size:14px;cursor:pointer}button.secondary{background:var(--blue)}button:disabled{opacity:.55;cursor:wait}.actions{display:flex;gap:12px;flex-wrap:wrap;margin:18px 0}.status{min-height:22px;color:var(--muted);font-weight:700;font-size:13px}.status.error{color:var(--red)}
+    #result[hidden]{display:none}.recommendation{font-size:clamp(25px,5vw,38px);font-weight:900;color:var(--green);margin:6px 0 14px}.pills{display:flex;flex-wrap:wrap;gap:8px}.pill{background:#e7f0f6;color:var(--navy);border-radius:999px;padding:6px 10px;font-size:12px;font-weight:800}.warning{background:#fff5df;border-left:4px solid #d89400;padding:10px 12px;margin:8px 0;color:#654200}.reason{margin:7px 0;line-height:1.5}.legal{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:14px;margin-top:16px}
+    @media(max-width:820px){.grid,.grid.two{grid-template-columns:1fr 1fr}}@media(max-width:560px){.wrap{width:min(100% - 18px,1180px)}.grid,.grid.two{grid-template-columns:1fr}.card{padding:16px}header .row{align-items:flex-start;flex-direction:column}.actions button{width:100%}}
+  </style>
+</head>
+<body>
+<header><div class="wrap row"><div class="brand">CER-<span class="accent">AI</span> · IOL Calculation Surgery</div><a href="/clinical-modules">Change clinical module</a></div></header>
+<main class="wrap">
+  <h1>IOL Decision Assistant — Advanced Mode</h1>
+  <p class="lead">Upload the approved Pentacam Cataract Pre-Op and biometry sources, confirm extracted values, and receive a rule-based lens-category recommendation. This workflow does not calculate dioptric IOL power.</p>
+
+  <form id="iolForm">
+    <section class="card"><h2>1. Patient and eye</h2><div class="grid">
+      <div><label for="patientName">Patient name</label><input id="patientName" required maxlength="200"></div>
+      <div><label for="patientAge">Age</label><input id="patientAge" type="number" min="18" max="120" required></div>
+      <div><label for="eye">Eye</label><select id="eye" required><option value="">Select</option><option value="OD">OD — Right</option><option value="OS">OS — Left</option></select></div>
+    </div></section>
+
+    <section class="card"><h2>2. Source images and measurements</h2><div class="grid two">
+      <div class="upload"><label for="pentacamImages">Pentacam Cataract Pre-Op image</label><input id="pentacamImages" type="file" accept="image/*" multiple required><p class="hint">Pupil Dia (3D), Total Corneal HOA (4mm), approved angle fields, Q, and TCRP are source-locked.</p></div>
+      <div class="upload"><label for="biometryImages">IOLMaster 500 or approved biometry image</label><input id="biometryImages" type="file" accept="image/*" multiple required><p class="hint">AL, ACD, LT, and WTW are transcribed for the case record. No power formula is run in this module.</p></div>
+    </div><div class="actions"><button id="extractButton" class="secondary" type="button">Extract approved fields</button></div><div id="extractStatus" class="status" aria-live="polite"></div></section>
+
+    <section class="card"><h2>3. Lifestyle and visual goals</h2><div class="grid">
+      <div><label for="nearDemand">Near-vision demand</label><select id="nearDemand" required><option value="LOW">Low</option><option value="MODERATE" selected>Moderate</option><option value="HIGH">High</option></select></div>
+      <div><label for="nightDriving">Night driving</label><select id="nightDriving" required><option value="NONE">None</option><option value="OCCASIONAL">Occasional</option><option value="FREQUENT">Frequent</option></select></div>
+      <div><label for="haloTolerance">Halo/glare tolerance</label><select id="haloTolerance" required><option value="LOW">Low</option><option value="MODERATE" selected>Moderate</option><option value="HIGH">High</option></select></div>
+    </div></section>
+
+    <section class="card"><h2>4. Pentacam optical values</h2><div class="grid">
+      <div><label for="hoa">Total Corneal HOA (4 mm), µm</label><input id="hoa" type="number" min="0" max="5" step="0.001" required></div>
+      <div><label for="qValue">Corneal Q</label><input id="qValue" type="number" min="-3" max="3" step="0.01" required></div>
+      <div><label for="kappa">Angle kappa / approved chord, mm</label><input id="kappa" type="number" min="0" max="3" step="0.01" required></div>
+      <div><label for="alpha">Angle alpha / approved chord, mm</label><input id="alpha" type="number" min="0" max="3" step="0.01" required></div>
+      <div><label for="pupil3d">Pupil Dia (3D), mm</label><input id="pupil3d" type="number" min="0.01" max="12" step="0.01" required><p class="hint">Pupil Dia (virt) is never used.</p></div>
+      <div><label for="tcrpAstig">TCRP Astig, D</label><input id="tcrpAstig" type="number" min="0" max="15" step="0.01" required><p class="hint">TCRP only; SimK and Diff. are disregarded.</p></div>
+      <div><label for="tcrpAxis">TCRP K2 axis, degrees</label><input id="tcrpAxis" type="number" min="0" max="180" step="0.1"></div>
+      <div><label for="astigType">Astigmatism regularity</label><select id="astigType"><option value="">Not required below 1.00 D</option><option value="REGULAR">Regular</option><option value="IRREGULAR">Irregular</option></select></div>
+    </div><div class="check"><input id="pentacamConfirmed" type="checkbox" required><label for="pentacamConfirmed">I have reviewed and confirmed the Pentacam values and laterality. Unreadable values were entered by the surgeon.</label></div></section>
+
+    <section class="card"><h2>5. Biometry record</h2><div class="grid">
+      <div><label for="al">Axial length, mm</label><input id="al" type="number" min="15.01" max="39.99" step="0.01" required></div>
+      <div><label for="acd">Anterior chamber depth, mm</label><input id="acd" type="number" min="0.01" max="9.99" step="0.01"></div>
+      <div><label for="lt">Lens thickness, mm</label><input id="lt" type="number" min="0.01" max="9.99" step="0.01"></div>
+      <div><label for="wtw">White-to-white, mm</label><input id="wtw" type="number" min="5.01" max="19.99" step="0.01"></div>
+    </div><div class="check"><input id="biometryConfirmed" type="checkbox" required><label for="biometryConfirmed">I have reviewed and confirmed the uploaded biometry source and eye.</label></div></section>
+
+    <section class="card"><h2>6. Surgeon-defined ocular findings</h2><div class="grid">
+      <div><label for="retina">Retinal disease</label><select id="retina" required><option value="NONE">None</option><option value="MILD">Mild</option><option value="SIGNIFICANT">Significant</option></select></div>
+      <div><label for="macular">Macular pathology</label><select id="macular" required><option value="false">Absent</option><option value="true">Present</option></select></div>
+      <div><label for="glaucoma">Glaucoma</label><select id="glaucoma" required><option value="NONE">None</option><option value="SUSPECT">Suspect</option><option value="PRESENT">Definite glaucoma</option></select></div>
+      <div><label for="surface">Ocular surface / dry eye</label><select id="surface" required><option value="NONE">None</option><option value="MILD">Mild</option><option value="MODERATE">Moderate</option><option value="SIGNIFICANT">Significant</option><option value="RESOLVED_AFTER_TREATMENT">Resolved after treatment</option></select></div>
+      <div id="stableField" hidden><label for="stable">Stable repeat measurements</label><select id="stable"><option value="false">Not confirmed</option><option value="true">Surgeon confirmed</option></select></div>
+    </div></section>
+
+    <div class="actions"><button id="evaluateButton" type="submit">Generate IOL recommendation</button></div><div id="evaluationStatus" class="status" aria-live="polite"></div>
+  </form>
+
+  <section id="result" class="card" hidden aria-live="polite"><h2>Clinical decision-support result</h2><div id="recommendation" class="recommendation"></div><div id="eligible" class="pills"></div><div id="warnings"></div><div id="reasons"></div><p id="legal" class="legal"></p></section>
+</main>
+<script src="/static/iol.js?v=1"></script>
+</body>
+</html>

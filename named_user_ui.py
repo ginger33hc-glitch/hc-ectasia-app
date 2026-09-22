@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 
 ROOT_HTML = Path("static/index.html")
+IOL_HTML = Path("static/iol.html")
 LOGIN_HTML = Path("static/login.html")
 TRIAL_LOGIN_HTML = Path("static/trial-login.html")
 ARCHIVE_HTML = Path("static/archive.html")
@@ -39,14 +40,7 @@ def _authenticated_destination(request) -> str:
     return path
 
 
-def _authenticated_root_html(display_name: str) -> str:
-    html = ROOT_HTML.read_text(encoding="utf-8")
-    # Authentication must preserve the canonical mobile transport. Without
-    # this client, the browser posts directly to /analyze and the proxy closes
-    # long-running assessments at five minutes.
-    from analysis_job_service import inject_client
-
-    html = inject_client(html)
+def _authenticated_module_html(html: str, display_name: str) -> str:
     # Make the visual CER-AI logo itself a native link back to the public website.
     # A real anchor is used instead of JavaScript so the navigation works reliably
     # across browsers, touch devices, cached pages, and CSP/security wrappers.
@@ -76,7 +70,7 @@ if (cerAiLogoutButton) {{
     try {{
       const response = await fetch("/auth/logout", {{method: "POST"}});
       if (!response.ok) throw new Error("Logout failed");
-      window.location.replace("/auth/login-page");
+      window.location.replace("/clinical-modules");
     }} catch (_error) {{
       cerAiLogoutButton.disabled = false;
       window.alert("Could not log out. Please try again.");
@@ -104,6 +98,20 @@ if (typeof ceraiFetch === "function") {{
     return html.replace("</body>", injection + "\n</body>")
 
 
+def _authenticated_root_html(display_name: str) -> str:
+    html = ROOT_HTML.read_text(encoding="utf-8")
+    # Authentication must preserve the canonical mobile transport. Without
+    # this client, the browser posts directly to /analyze and the proxy closes
+    # long-running assessments at five minutes.
+    from analysis_job_service import inject_client
+
+    return _authenticated_module_html(inject_client(html), display_name)
+
+
+def _authenticated_iol_html(display_name: str) -> str:
+    return _authenticated_module_html(IOL_HTML.read_text(encoding="utf-8"), display_name)
+
+
 def install(core: Any) -> None:
     if getattr(core, "_cerai_named_user_ui_installed", False):
         return
@@ -116,9 +124,7 @@ def install(core: Any) -> None:
         @core.app.get("/auth/login-page", include_in_schema=False)
         def login_page():
             return FileResponse(
-                TRIAL_LOGIN_HTML
-                if bool(getattr(core, "_cerai_trial_name_login_enabled", False))
-                else LOGIN_HTML,
+                LOGIN_HTML,
                 media_type="text/html",
                 headers={"Cache-Control": "no-store"},
             )
@@ -228,7 +234,7 @@ def install(core: Any) -> None:
         @core.app.middleware("http")
         async def named_user_page_gate(request, call_next):
             path = request.url.path
-            if request.method == "GET" and path in {"/app", "/archive-ui"}:
+            if request.method == "GET" and path in {"/app", "/iol", "/archive-ui"}:
                 principal = core._cerai_authenticate_request(request)
                 if principal is None:
                     destination = "/auth/login-page?next=" + quote(
@@ -241,6 +247,12 @@ def install(core: Any) -> None:
                 if path == "/app":
                     response = HTMLResponse(
                         _authenticated_root_html(principal.display_name),
+                        headers={"Cache-Control": "no-store"},
+                    )
+                    return operational_security._secure_response(response, path)
+                if path == "/iol":
+                    response = HTMLResponse(
+                        _authenticated_iol_html(principal.display_name),
                         headers={"Cache-Control": "no-store"},
                     )
                     return operational_security._secure_response(response, path)

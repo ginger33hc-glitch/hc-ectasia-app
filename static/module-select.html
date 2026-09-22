@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CER-AI Clinical Modules</title>
+  <meta name="theme-color" content="#07131d">
+  <style>
+    :root{--navy:#173b57;--blue:#1f5e8c;--orange:#ef7f1a;--ink:#17212b;--muted:#66717d;--line:#d9e0e6;--bg:#eef3f6}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(145deg,#eef3f6,#dce8ef);color:var(--ink);font-family:Arial,sans-serif;display:grid;place-items:center;padding:20px}
+    main{width:min(100%,780px);background:#fff;border:1px solid var(--line);border-radius:18px;padding:clamp(24px,5vw,46px);box-shadow:0 18px 50px rgba(23,59,87,.14)}
+    .brand{font-size:30px;font-weight:800;color:var(--navy);letter-spacing:.02em}.accent{color:var(--orange)}
+    h1{margin:18px 0 8px;font-size:clamp(24px,5vw,36px);color:var(--navy)}p{color:var(--muted);line-height:1.5;margin:0}
+    .modules{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:30px}
+    .module{min-height:168px;border:2px solid #cbd8e1;border-radius:15px;padding:24px;text-decoration:none;color:var(--ink);display:flex;flex-direction:column;justify-content:space-between;background:#fff;transition:.16s ease}
+    .module:hover,.module:focus-visible{border-color:var(--blue);transform:translateY(-2px);box-shadow:0 10px 24px rgba(31,94,140,.13);outline:none}
+    .module strong{font-size:22px;color:var(--navy)}.module span{color:var(--muted);line-height:1.45}.go{font-weight:800;color:var(--blue)!important}
+    .notice{margin-top:24px;padding-top:18px;border-top:1px solid var(--line);font-size:12px}
+    @media(max-width:620px){.modules{grid-template-columns:1fr}.module{min-height:140px}}
+  </style>
+</head>
+<body>
+  <main aria-labelledby="moduleTitle">
+    <div class="brand">CER-<span class="accent">AI</span></div>
+    <h1 id="moduleTitle">Choose a clinical module</h1>
+    <p>Select the surgical workflow first. Secure sign-in opens after your selection.</p>
+    <div class="modules">
+      <a class="module" id="refractiveModule" href="/auth/login-page?next=/app">
+        <strong>Refractive Surgery</strong>
+        <span>Corneal ectasia risk assessment and refractive-surgery planning.</span>
+        <span class="go">Continue to secure sign-in →</span>
+      </a>
+      <a class="module" id="iolModule" href="/auth/login-page?next=/iol">
+        <strong>IOL Calculation Surgery</strong>
+        <span>Pentacam, biometry, surgeon-defined parameters, and IOL category recommendation.</span>
+        <span class="go">Continue to secure sign-in →</span>
+      </a>
+    </div>
+    <p class="notice">CER-AI provides clinical decision support only. Final treatment and lens selection remain the evaluating surgeon’s responsibility.</p>
+  </main>
+</body>
+</html>

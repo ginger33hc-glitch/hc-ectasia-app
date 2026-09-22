@@ -18,7 +18,7 @@
 <body>
   <main class="panel" aria-labelledby="title">
     <h1 id="title">CER-AI</h1>
-    <p class="sub">Secure clinical workspace</p>
+    <p id="selectedModule" class="sub">Secure clinical workspace</p>
     <form id="loginForm" autocomplete="on">
       <div class="field"><label for="username">Username</label><input id="username" name="username" autocomplete="username" required maxlength="128"></div>
       <div class="field"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required></div>
@@ -29,11 +29,14 @@
   </main>
 <script>
 (() => {
-  const allowedNext = new Set(["/", "/app", "/clinical-app", "/archive-ui"]);
+  const allowedNext = new Set(["/", "/app", "/iol", "/clinical-app", "/archive-ui"]);
   const params = new URLSearchParams(window.location.search);
   const requested = params.get("next") || "/app";
   const safeSharedApp = /^\/app\?(?:share_token=[A-Za-z0-9-]{1,128}|share_error=(?:no_images|too_many_images|image_too_large|images_too_large))$/.test(requested);
   const next = allowedNext.has(requested) || safeSharedApp ? requested : "/app";
+  const selectedModule = document.getElementById("selectedModule");
+  if (next === "/iol") selectedModule.textContent = "IOL Calculation Surgery · Secure sign-in";
+  else if (next.startsWith("/app")) selectedModule.textContent = "Refractive Surgery · Secure sign-in";
   const form = document.getElementById("loginForm");
   const button = document.getElementById("submitButton");
   const error = document.getElementById("error");

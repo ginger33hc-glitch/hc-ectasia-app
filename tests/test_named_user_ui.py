@@ -8,6 +8,8 @@ import named_user_ui
 import operational_security
 import user_access
 import case_archive
+import clinical_entry
+from iol_module import web as iol_web
 
 
 def make_client(role="DOCTOR"):
@@ -35,6 +37,8 @@ def make_client(role="DOCTOR"):
         _cerai_historical_report_installed=True,
         _cerai_research_export_enabled=False,
     )
+    clinical_entry.install(core)
+    iol_web.install(core)
     operational_security.install(core)
     named_user_ui.install(core)
     return TestClient(app, base_url="https://testserver", follow_redirects=False), core
@@ -66,7 +70,7 @@ def test_login_page_exists_and_does_not_store_password_in_browser_storage():
     assert response.headers["cache-control"] == "no-store"
 
 
-def test_trial_login_page_requests_doctor_name_without_password():
+def test_login_page_remains_username_and_password_when_legacy_trial_flag_is_set():
     client, core = make_client()
     core._cerai_trial_name_login_enabled = True
 
@@ -74,11 +78,36 @@ def test_trial_login_page_requests_doctor_name_without_password():
     text = response.text
 
     assert response.status_code == 200
-    assert "Doktor adı / Doctor name" in text
-    assert 'type="password"' not in text
-    assert "display_name" in text
+    assert "Username" in text
+    assert 'type="password"' in text
+    assert "display_name" not in text
     assert "sessionStorage" not in text
     assert "localStorage" not in text
+
+
+def test_module_selector_precedes_login_and_preserves_module_destination():
+    client, _core = make_client()
+    response = client.get("/clinical-modules")
+    assert response.status_code == 200
+    assert "Refractive Surgery" in response.text
+    assert "IOL Calculation Surgery" in response.text
+    assert 'href="/auth/login-page?next=/app"' in response.text
+    assert 'href="/auth/login-page?next=/iol"' in response.text
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_unauthenticated_iol_redirects_to_login_and_authenticated_iol_is_separate():
+    client, _core = make_client()
+    denied = client.get("/iol")
+    assert denied.status_code == 303
+    assert denied.headers["location"] == "/auth/login-page?next=/iol"
+    client.cookies.set("cer_ai_session", "valid")
+    allowed = client.get("/iol")
+    assert allowed.status_code == 200
+    assert "IOL Decision Assistant" in allowed.text
+    assert "IOL Calculation Surgery" in allowed.text
+    assert "Doctor &lt;One&gt;" in allowed.text
+    assert "/static/iol.js?v=1" in allowed.text
 
 
 def test_authenticated_clinical_app_injects_archive_navigation_and_escapes_display_name():

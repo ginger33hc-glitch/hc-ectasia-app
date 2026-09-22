@@ -133,6 +133,8 @@ _MOBILE_INSTALL_SECTION = """
 """
 _PRIVATE_CRAWL_PATHS = (
     "/app",
+    "/iol",
+    "/clinical-modules",
     "/testing-app",
     "/api/",
     "/analyze",
