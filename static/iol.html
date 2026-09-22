@@ -33,7 +33,7 @@
     </div></section>
 
     <section class="card"><h2>2. Pentacam source image</h2><div class="grid">
-      <div class="upload"><label for="pentacamImages">Pentacam Cataract Pre-Op image</label><input id="pentacamImages" type="file" accept="image/*" multiple required><p class="hint">Pupil Dia (3D), Total Corneal HOA (4mm), approved angle fields, Q, and TCRP are source-locked.</p></div>
+      <div class="upload"><label for="pentacamImages">Pentacam Cataract Pre-Op image</label><input id="pentacamImages" type="file" accept="image/*" multiple required><p class="hint">Pupil Dia (3D), Total Corneal HOA (4mm), approved angle fields, and TCRP are source-locked.</p></div>
     </div><div class="actions"><button id="extractButton" class="secondary" type="button">Extract approved fields</button></div><div id="extractStatus" class="status" aria-live="polite"></div></section>
 
     <section class="card"><h2>3. Lifestyle and visual goals</h2><div class="grid">
@@ -44,7 +44,6 @@
 
     <section class="card"><h2>4. Pentacam optical values</h2><div class="grid">
       <div><label for="hoa">Total Corneal HOA (4 mm), µm</label><input id="hoa" type="number" min="0" max="5" step="0.001" required></div>
-      <div><label for="qValue">Corneal Q</label><input id="qValue" type="number" min="-3" max="3" step="0.01" required></div>
       <div><label for="kappa">Angle kappa / approved chord, mm</label><input id="kappa" type="number" min="0" max="3" step="0.01" required></div>
       <div><label for="alpha">Angle alpha / approved chord, mm</label><input id="alpha" type="number" min="0" max="3" step="0.01" required></div>
       <div><label for="pupil3d">Pupil Dia (3D), mm</label><input id="pupil3d" type="number" min="0.01" max="12" step="0.01" required><p class="hint">Pupil Dia (virt) is never used.</p></div>
@@ -67,6 +66,6 @@
   <section id="result" class="card" hidden aria-live="polite"><h2>Clinical decision-support result</h2><div id="recommendation" class="recommendation"></div><div id="eligible" class="pills"></div><div id="warnings"></div><div id="reasons"></div><p id="legal" class="legal"></p></section>
 </main>
 <footer class="app-legal-footer">Developed by Hüseyin Cengiz, MD. All rights reserved. Final responsibility rests with the surgeon at all times and under all circumstances.</footer>
-<script src="/static/iol.js?v=2"></script>
+<script src="/static/iol.js?v=3"></script>
 </body>
 </html>

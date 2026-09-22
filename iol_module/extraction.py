@@ -25,13 +25,12 @@ EXTRACTION_SCHEMA: dict[str, Any] = {
             "type": "object",
             "additionalProperties": False,
             "required": [
-                "total_corneal_hoa_4mm_um", "q_value", "angle_kappa_mm",
+                "total_corneal_hoa_4mm_um", "angle_kappa_mm",
                 "angle_alpha_mm", "pupil_dia_3d_mm", "tcrp_astigmatism_d",
                 "tcrp_k2_axis_deg",
             ],
             "properties": {
                 "total_corneal_hoa_4mm_um": {"type": ["number", "null"]},
-                "q_value": {"type": ["number", "null"]},
                 "angle_kappa_mm": {"type": ["number", "null"]},
                 "angle_alpha_mm": {"type": ["number", "null"]},
                 "pupil_dia_3d_mm": {"type": ["number", "null"]},
@@ -60,8 +59,6 @@ For a Pentacam Cataract Pre-Op image, use these source locks only:
 - tcrp_astigmatism_d: “Astig” in the “TCRP 3.0mm, zone, pupil” column only.
 - tcrp_k2_axis_deg: axis printed with K2 in that same TCRP column only.
 Do not use SimK or Diff. as a candidate, cross-check, fallback, or substitute.
-- q_value: transcribe only an explicitly labeled corneal Q/asphericity value. If the approved
-  Q field is not shown or unreadable, return null.
 
 For every required field that belongs to the recognized document but cannot be read with high
 confidence, return null and add its canonical key to unreadable_fields.

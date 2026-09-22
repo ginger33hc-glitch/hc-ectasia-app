@@ -18,7 +18,6 @@ def base_payload():
         "night_driving": "OCCASIONAL",
         "halo_tolerance": "HIGH",
         "total_corneal_hoa_4mm_um": 0.299,
-        "q_value": -0.1,
         "angle_kappa_mm": 0.2,
         "angle_alpha_mm": 0.2,
         "pentacam_pupil_3d_mm": 3.0,
@@ -121,10 +120,12 @@ def test_missing_toric_fields_fail_closed():
         IOLCaseInput.model_validate(payload)
 
 
-@pytest.mark.parametrize("retired_field", ["pentacam_source_confirmed", "biometry"])
+@pytest.mark.parametrize("retired_field", ["pentacam_source_confirmed", "biometry", "q_value"])
 def test_retired_confirmation_and_biometry_contracts_are_rejected(retired_field):
     payload = base_payload()
-    payload[retired_field] = True if retired_field.endswith("confirmed") else {}
+    payload[retired_field] = True if retired_field.endswith("confirmed") else (
+        0.1 if retired_field == "q_value" else {}
+    )
     with pytest.raises(ValidationError):
         IOLCaseInput.model_validate(payload)
 
@@ -147,6 +148,8 @@ def test_iol_mobile_ui_contains_required_sources_and_no_browser_credential_stora
     assert "Pentacam Cataract Pre-Op" in html
     assert "Pupil Dia (3D)" in html
     assert "TCRP only" in html
+    assert "Corneal Q" not in html
+    assert "q_value" not in script
     assert "Final responsibility rests with the surgeon at all times and under all circumstances." in html
     assert "biometr" not in (html + script).lower()
     assert "Confirmed" not in html
@@ -159,3 +162,4 @@ def test_iol_extraction_contract_is_pentacam_only():
     models = Path("iol_module/models.py").read_text(encoding="utf-8")
     assert "BIOMETRY" not in source
     assert "biometr" not in (source + models).lower()
+    assert "q_value" not in (source + models)

@@ -12,7 +12,7 @@ from .models import (
     RetinaStatus,
 )
 
-ENGINE_VERSION = "IOL_CANONICAL_3.2"
+ENGINE_VERSION = "IOL_CANONICAL_3.3"
 LEGAL_NOTICE = (
     "This application provides clinical decision support only. "
     "Final responsibility rests with the surgeon at all times and under all circumstances."
@@ -39,7 +39,6 @@ def evaluate_case(case: IOLCaseInput) -> IOLRecommendation:
     hoa_low = case.total_corneal_hoa_4mm_um < 0.300
     hoa_moderate = 0.300 <= case.total_corneal_hoa_4mm_um < 0.510
     hoa_high = case.total_corneal_hoa_4mm_um >= 0.510
-    q_oblate = case.q_value > 0.25
     kappa_high = case.angle_kappa_mm > 0.50
     alpha_high = case.angle_alpha_mm > 0.50
     pupil_small = case.pentacam_pupil_3d_mm < 2.00
@@ -93,11 +92,6 @@ def evaluate_case(case: IOLCaseInput) -> IOLRecommendation:
     if irregular:
         exclusions.append("MF_EXCL_IRREGULAR_ASTIG")
         warnings.append("WARN_IRREGULAR_ASTIGMATISM")
-    if q_oblate:
-        warnings.append("WARN_Q_OBLATE")
-        if hoa_high:
-            exclusions.append("MF_EXCL_OBLATE_HIGH_HOA")
-
     exclusions = list(dict.fromkeys(exclusions))
     warnings = list(dict.fromkeys(warnings))
     multifocal_eligible = not exclusions
@@ -108,9 +102,6 @@ def evaluate_case(case: IOLCaseInput) -> IOLRecommendation:
         priority_one.append("MONO_HOA_HIGH")
     if irregular:
         priority_one.append("MONO_IRREGULAR_ASTIGMATISM")
-    if q_oblate and hoa_high:
-        priority_one.append("MONO_OBLATE_HIGH_HOA")
-
     preference_only_mono = False
     if case.near_demand == Demand.LOW:
         priority_one.append("MONO_LOW_NEAR_DEMAND")
@@ -125,7 +116,7 @@ def evaluate_case(case: IOLCaseInput) -> IOLRecommendation:
         decisive.extend(priority_one)
         eligible = ["MONOFOCAL"]
         if preference_only_mono and not any(code.startswith("MONO_RETINA") or code in {
-            "MONO_HOA_HIGH", "MONO_IRREGULAR_ASTIGMATISM", "MONO_OBLATE_HIGH_HOA"
+            "MONO_HOA_HIGH", "MONO_IRREGULAR_ASTIGMATISM"
         } for code in priority_one):
             eligible.insert(0, "EDOF")
         alternative = "EDOF" if eligible[0] == "EDOF" else None
@@ -172,7 +163,6 @@ def evaluate_case(case: IOLCaseInput) -> IOLRecommendation:
     explanation.append(
         f"Angle kappa is {case.angle_kappa_mm:.2f} mm and angle alpha is {case.angle_alpha_mm:.2f} mm."
     )
-    explanation.append(f"Corneal Q is {case.q_value:+.2f}.")
     explanation.append(
         f"Retinal status is {case.retina_status.value.lower()}; macular pathology is {'present' if case.macular_pathology_present else 'absent'}; glaucoma status is {case.glaucoma_status.value.lower()}."
     )

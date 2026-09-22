@@ -59,7 +59,6 @@ class IOLCaseInput(StrictModel):
     halo_tolerance: Demand
 
     total_corneal_hoa_4mm_um: float = Field(ge=0, le=5)
-    q_value: float = Field(ge=-3, le=3)
     angle_kappa_mm: float = Field(ge=0, le=3)
     angle_alpha_mm: float = Field(ge=0, le=3)
     pentacam_pupil_3d_mm: float = Field(gt=0, le=12)

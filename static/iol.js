@@ -39,7 +39,7 @@
         setIfPresent("eye", item.eye === "UNKNOWN" ? null : item.eye);
         if (item.document_type === "PENTACAM_CATARACT_PREOP") {
           const p = item.pentacam || {};
-          setIfPresent("hoa", p.total_corneal_hoa_4mm_um); setIfPresent("qValue", p.q_value);
+          setIfPresent("hoa", p.total_corneal_hoa_4mm_um);
           setIfPresent("kappa", p.angle_kappa_mm); setIfPresent("alpha", p.angle_alpha_mm);
           setIfPresent("pupil3d", p.pupil_dia_3d_mm); setIfPresent("tcrpAstig", p.tcrp_astigmatism_d);
           setIfPresent("tcrpAxis", p.tcrp_k2_axis_deg);
@@ -66,7 +66,7 @@
       patient_age_years: Number($("patientAge").value), eye: $("eye").value,
       near_demand: $("nearDemand").value, night_driving: $("nightDriving").value,
       halo_tolerance: $("haloTolerance").value,
-      total_corneal_hoa_4mm_um: Number($("hoa").value), q_value: Number($("qValue").value),
+      total_corneal_hoa_4mm_um: Number($("hoa").value),
       angle_kappa_mm: Number($("kappa").value), angle_alpha_mm: Number($("alpha").value),
       pentacam_pupil_3d_mm: Number($("pupil3d").value),
       tcrp_astigmatism_d: Number($("tcrpAstig").value),
