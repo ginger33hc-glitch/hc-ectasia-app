@@ -190,8 +190,8 @@ def parse_registry(raw: str) -> Dict[str, UserAccount]:
         if enabled and role == ROLE_OWNER:
             owner_count += 1
 
-    if owner_count < 1:
-        raise UserConfigurationError("At least one enabled OWNER account is required.")
+    if owner_count != 1:
+        raise UserConfigurationError("Exactly one enabled OWNER account is required.")
     return result
 
 

@@ -212,3 +212,48 @@ def test_identifiable_access_is_bound_to_stable_creator_identity_for_owner_and_d
     assert other_case_view["owner_deidentified"] is True
     assert other_case_view["identifiable_access"] is False
     assert other_case_view["original_source_access"] is False
+
+
+def test_sole_owner_role_preserves_historical_ownership_across_account_rename():
+    historical_owner = user_access.Principal(
+        "huseyin-cengiz", "huseyin.cengiz", "Hüseyin Cengiz", "OWNER"
+    )
+    current_owner = user_access.Principal("owner", "owner", "Hüseyin Cengiz", "OWNER")
+    historical_entry = case_catalog.build_entry(
+        ready_payload(),
+        case_id="8" * 32,
+        revision_id="9" * 24,
+        actor=historical_owner,
+    )
+    doctor_entry = case_catalog.build_entry(
+        ready_payload(),
+        case_id="a" * 32,
+        revision_id="b" * 24,
+        actor=doctor("doctor-1"),
+    )
+
+    assert case_catalog._principal_created_entry(current_owner, historical_entry)
+    assert not case_catalog._principal_created_entry(current_owner, doctor_entry)
+    assert case_catalog._present_entry(current_owner, historical_entry)["owner_deidentified"] is False
+    assert case_catalog._present_entry(current_owner, doctor_entry)["owner_deidentified"] is True
+
+
+def test_owner_search_scope_accepts_current_id_or_historical_owner_role():
+    archive = make_archive()
+    current_owner = user_access.Principal("owner", "owner", "Owner", "OWNER")
+    historical_owner = user_access.Principal("old-owner", "old", "Old Owner", "OWNER")
+    case_catalog.write_entry(
+        archive, revision("c" * 32, "d" * 24), ready_payload(), actor=historical_owner
+    )
+    case_catalog.write_entry(
+        archive, revision("e" * 32, "f" * 24), ready_payload(), actor=doctor("doctor-1")
+    )
+
+    matches = case_catalog.search_entries(
+        archive,
+        patient_name="sule isik",
+        created_by_user_id=current_owner.user_id,
+        created_by_role="OWNER",
+    )
+    assert len(matches) == 1
+    assert matches[0]["created_by"]["role"] == "OWNER"

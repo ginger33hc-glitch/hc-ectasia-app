@@ -38,6 +38,17 @@ def test_registry_requires_an_enabled_owner():
         user_access.parse_registry(json.dumps([doctor]))
 
 
+def test_registry_requires_exactly_one_enabled_owner():
+    first = account_payload()
+    second = account_payload(
+        username="second-owner",
+        user_id="owner-2",
+        password="second-owner-password",
+    )
+    with pytest.raises(user_access.UserConfigurationError):
+        user_access.parse_registry(json.dumps([first, second]))
+
+
 def test_registry_rejects_duplicate_usernames_and_ids():
     owner = account_payload()
     duplicate_username = account_payload(

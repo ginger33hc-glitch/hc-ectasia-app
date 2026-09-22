@@ -93,9 +93,23 @@
     const c = encodeURIComponent(entry.case_id), r = encodeURIComponent(entry.revision_id);
     const base = `/archive/cases/${c}/revisions/${r}`;
     const reportLabel = entry.owner_deidentified ? "De-identified" : "Original";
-    const original = `<a href="${base}/report/pdf?locale=en" target="_blank" rel="noopener">Open ${reportLabel} PDF EN</a><a href="${base}/report/pdf?locale=tr" target="_blank" rel="noopener">Open ${reportLabel} PDF TR</a><a href="${base}/report/docx?locale=en">Download ${reportLabel} DOCX EN</a><a href="${base}/report/docx?locale=tr">Download ${reportLabel} DOCX TR</a>`;
-    const regenerated = capabilities?.historical_report_enabled ? `<a href="${base}/regenerate/pdf?locale=en" target="_blank" rel="noopener">Regenerate PDF EN</a><a href="${base}/regenerate/pdf?locale=tr" target="_blank" rel="noopener">Regenerate PDF TR</a><a href="${base}/regenerate/docx?locale=en">Regenerate DOCX EN</a><a href="${base}/regenerate/docx?locale=tr">Regenerate DOCX TR</a>` : "";
+    const original = `<a href="#" class="archive-file" data-url="${base}/report/pdf?locale=en" data-mode="open" data-filename="CER-AI_Report_EN.pdf">Open ${reportLabel} PDF EN</a><a href="#" class="archive-file" data-url="${base}/report/pdf?locale=tr" data-mode="open" data-filename="CER-AI_Report_TR.pdf">Open ${reportLabel} PDF TR</a><a href="#" class="archive-file" data-url="${base}/report/docx?locale=en" data-mode="download" data-filename="CER-AI_Report_EN.docx">Download ${reportLabel} DOCX EN</a><a href="#" class="archive-file" data-url="${base}/report/docx?locale=tr" data-mode="download" data-filename="CER-AI_Report_TR.docx">Download ${reportLabel} DOCX TR</a>`;
+    const regenerated = capabilities?.historical_report_enabled ? `<a href="#" class="archive-file" data-url="${base}/regenerate/pdf?locale=en" data-mode="open" data-filename="CER-AI_Regenerated_Report_EN.pdf">Regenerate PDF EN</a><a href="#" class="archive-file" data-url="${base}/regenerate/pdf?locale=tr" data-mode="open" data-filename="CER-AI_Regenerated_Report_TR.pdf">Regenerate PDF TR</a><a href="#" class="archive-file" data-url="${base}/regenerate/docx?locale=en" data-mode="download" data-filename="CER-AI_Regenerated_Report_EN.docx">Regenerate DOCX EN</a><a href="#" class="archive-file" data-url="${base}/regenerate/docx?locale=tr" data-mode="download" data-filename="CER-AI_Regenerated_Report_TR.docx">Regenerate DOCX TR</a>` : "";
     return `<div class="links">${original}${regenerated}</div>`;
+  };
+  const retrieveArchiveFile = async link => {
+    const status=$("searchStatus"),mode=link.dataset.mode||"download",url=link.dataset.url,filename=link.dataset.filename||"CER-AI_Archive_File";
+    const previewWindow=mode==="open" ? window.open("about:blank","_blank") : null;
+    if(previewWindow) previewWindow.opener=null;
+    link.setAttribute("aria-disabled","true");status.className="status";status.textContent="Retrieving authenticated archive file…";
+    try {
+      const response=await request(url);if(!response.ok)throw new Error(await readError(response));
+      const blob=await response.blob(),blobUrl=URL.createObjectURL(blob);
+      if(mode==="open"&&previewWindow){previewWindow.location.replace(blobUrl);}
+      else {if(previewWindow)previewWindow.close();const a=document.createElement("a");a.href=blobUrl;a.download=filename;document.body.appendChild(a);a.click();a.remove();}
+      window.setTimeout(()=>URL.revokeObjectURL(blobUrl),60000);status.textContent="Archive file retrieved.";
+    } catch(exc){if(previewWindow)previewWindow.close();status.className="status error";status.textContent=exc.message||"Unable to retrieve archive file.";}
+    finally{link.removeAttribute("aria-disabled");}
   };
   const sourceBase = (caseId, revisionId) => `/archive/cases/${encodeURIComponent(caseId)}/revisions/${encodeURIComponent(revisionId)}`;
   const sourceSize = value => {
@@ -219,7 +233,7 @@
 
   $("searchForm").addEventListener("submit", e => { e.preventDefault(); search(); });
   $("clearButton").addEventListener("click", () => { ["patient_name","report_date","decision","reviewer"].forEach(id => $(id).value=""); $("limit").value="100"; renderResults([]); $("searchStatus").textContent=""; });
-  $("resultsBody").addEventListener("click", event => { const sourceButton=event.target.closest(".source-button"),caseButton=event.target.closest(".case-button"); if(sourceButton)showSources(sourceButton.dataset.caseId,sourceButton.dataset.revisionId);if(caseButton)showCase(caseButton.dataset.caseId,caseButton.dataset.revisionId); });
+  document.addEventListener("click", event => { const fileLink=event.target.closest(".archive-file");if(fileLink){event.preventDefault();if(!fileLink.hasAttribute("aria-disabled"))retrieveArchiveFile(fileLink);return;}const sourceButton=event.target.closest(".source-button"),caseButton=event.target.closest(".case-button");if(sourceButton)showSources(sourceButton.dataset.caseId,sourceButton.dataset.revisionId);if(caseButton)showCase(caseButton.dataset.caseId,caseButton.dataset.revisionId); });
   $("sourceClose").addEventListener("click", closeSources);
   $("sourceModal").addEventListener("click", event => { if(event.target===$("sourceModal")) closeSources(); });
   $("caseClose").addEventListener("click", closeCase);

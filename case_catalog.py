@@ -190,6 +190,7 @@ def search_entries(
     decision: Optional[str] = None,
     reviewer: Optional[str] = None,
     created_by_user_id: Optional[str] = None,
+    created_by_role: Optional[str] = None,
     limit: int = 100,
 ) -> list[Dict[str, Any]]:
     limit = max(1, min(int(limit), 500))
@@ -198,13 +199,17 @@ def search_entries(
     decision_q = _search_text(decision)
     reviewer_q = _search_text(reviewer)
     creator_q = str(created_by_user_id or "").strip()
+    creator_role_q = str(created_by_role or "").strip().upper()
 
     matches: list[Dict[str, Any]] = []
     for entry in list_entries(archive):
         patient = entry.get("patient") or {}
         disposition = entry.get("decision") or {}
         creator = entry.get("created_by") or {}
-        if creator_q and str(creator.get("user_id") or "") != creator_q:
+        if (creator_q or creator_role_q) and not (
+            (creator_q and str(creator.get("user_id") or "") == creator_q)
+            or (creator_role_q and str(creator.get("role") or "").upper() == creator_role_q)
+        ):
             continue
         if name_q and name_q not in _search_text(patient.get("name")):
             continue
@@ -232,7 +237,13 @@ def _principal_created_entry(principal: Any, entry: Dict[str, Any]) -> bool:
     return (
         principal.role in {"DOCTOR", "OWNER"}
         and bool(creator.get("user_id"))
-        and creator.get("user_id") == principal.user_id
+        and (
+            creator.get("user_id") == principal.user_id
+            or (
+                principal.role == "OWNER"
+                and str(creator.get("role") or "").upper() == "OWNER"
+            )
+        )
     )
 
 
@@ -326,10 +337,11 @@ def install(core: Any, archive_runtime: Any) -> None:
             if unknown:
                 raise HTTPException(422, "Unsupported archive search field(s): " + ", ".join(sorted(unknown)))
             filters = {key: payload.get(key) for key in allowed if key in payload}
-            if principal.role == "DOCTOR" or (
-                principal.role == "OWNER" and payload.get("patient_name")
-            ):
+            if principal.role == "DOCTOR":
                 filters["created_by_user_id"] = principal.user_id
+            elif principal.role == "OWNER" and payload.get("patient_name"):
+                filters["created_by_user_id"] = principal.user_id
+                filters["created_by_role"] = "OWNER"
             results = search_entries(archive_runtime.archive, **filters)
             results = [_present_entry(principal, entry) for entry in results]
             audit(

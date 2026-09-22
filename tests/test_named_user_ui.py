@@ -152,6 +152,8 @@ def test_archive_page_requires_session_and_contains_role_aware_tools():
     assert "/archive/audit/search" in allowed.text
     assert 'const reportLabel = entry.owner_deidentified ? "De-identified" : "Original"' in allowed.text
     assert "Regenerate PDF EN" in allowed.text
+    assert 'class="archive-file"' in allowed.text
+    assert "Retrieving authenticated archive file" in allowed.text
     assert "Pentacam sources" in allowed.text
     assert "View source images" in allowed.text
     assert "Restricted to case creator" in allowed.text
@@ -180,16 +182,16 @@ def test_archive_capabilities_are_session_protected_and_role_aware():
     assert user_access.current_principal() is None
 
 
-def test_owner_capabilities_allow_only_deidentified_retrospective_archive():
+def test_owner_capabilities_allow_own_identifiable_and_other_deidentified_archive():
     client, _core = make_client("OWNER")
     client.cookies.set("cer_ai_session", "valid")
 
     payload = client.get("/archive/capabilities").json()
 
-    assert payload["identifiable_archive_access"] is False
+    assert payload["identifiable_archive_access"] is True
     assert payload["retrospective_archive_access"] is True
     assert payload["owner_deidentified_access"] is True
-    assert payload["original_source_access"] is False
+    assert payload["original_source_access"] is True
 
 
 def test_archive_operational_status_is_owner_only_and_contains_no_storage_credentials(monkeypatch):

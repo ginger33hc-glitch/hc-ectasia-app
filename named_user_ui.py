@@ -146,7 +146,9 @@ def install(core: Any) -> None:
                 "role": principal.role,
                 "archive_enabled": bool(archive_runtime and archive_runtime.enabled),
                 "identifiable_archive_access": bool(
-                    archive_runtime and archive_runtime.enabled and principal.role == "DOCTOR"
+                    archive_runtime
+                    and archive_runtime.enabled
+                    and principal.role in {"DOCTOR", "OWNER"}
                 ),
                 "retrospective_archive_access": bool(
                     archive_runtime
@@ -157,7 +159,9 @@ def install(core: Any) -> None:
                     archive_runtime and archive_runtime.enabled and principal.role == "OWNER"
                 ),
                 "original_source_access": bool(
-                    archive_runtime and archive_runtime.enabled and principal.role == "DOCTOR"
+                    archive_runtime
+                    and archive_runtime.enabled
+                    and principal.role in {"DOCTOR", "OWNER"}
                 ),
                 "audit_enabled": bool(getattr(core, "_cerai_audit_log_installed", False)),
                 "historical_report_enabled": bool(
