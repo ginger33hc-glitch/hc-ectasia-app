@@ -548,6 +548,23 @@ def test_worked_cases_are_bilingual_indexable_and_clearly_synthetic():
             assert "Tüm hakları saklıdır" in turkish.text
 
 
+def test_case_3_inferior_steepening_uses_canonical_signed_i_s_band():
+    with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
+        english = client.get("/learning/cases/srax-ps3-stop")
+        turkish = client.get("/tr/learning/cases/srax-ps3-stop")
+
+    assert english.status_code == turkish.status_code == 200
+    for response in (english, turkish):
+        assert "+1.20 D" in response.text
+        assert "+0.20 D" not in response.text
+        assert "<strong>CAUTION</strong>" in response.text
+        assert "<strong>STOP-DEFER</strong>" in response.text
+    assert "Signed I-S +1.20 D establishes inferior steepening = 3" in english.text
+    assert "NICE</th><td>5</td><td><strong>CAUTION</strong>" in english.text
+    assert "İşaretli I-S +1.20 D inferior dikleşmeyi belirler = 3" in turkish.text
+    assert "NICE</th><td>5</td><td><strong>CAUTION</strong>" in turkish.text
+
+
 def test_turkish_clinical_case_language_is_clear_and_clinically_natural():
     with TestClient(canonical_engine.app, base_url="https://cer-ai.com") as client:
         response = client.get("/tr/learning/clinical-cases")
