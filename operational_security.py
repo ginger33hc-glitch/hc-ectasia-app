@@ -58,6 +58,7 @@ PROTECTED_PATHS = frozenset({
     "/iol/evaluate",
     "/iol/lenses",
     "/iol/power/plan",
+    "/iol/escrs-transfer",
 })
 PROTECTED_PREFIXES = ("/archive/", "/analysis/jobs")
 

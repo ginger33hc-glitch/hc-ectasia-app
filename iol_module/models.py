@@ -186,6 +186,20 @@ class IOLPowerPlanInput(StrictModel):
         return self
 
 
+class EscrsTransferInput(StrictModel):
+    """De-identified biometry accepted by the ESCRS BiomPIN handoff."""
+
+    biological_sex: Literal["Male", "Female"]
+    eye: Literal["OD", "OS"]
+    axial_length_mm: float = Field(ge=12, le=38)
+    acd_internal_mm: float = Field(gt=0, le=10)
+    k1_d: float = Field(ge=30, le=60)
+    k2_d: float = Field(ge=30, le=60)
+    cct_um: float | None = Field(default=None, ge=300, le=900)
+    lens_thickness_mm: float | None = Field(default=None, ge=2.5, le=7)
+    wtw_mm: float | None = Field(default=None, ge=8, le=16)
+
+
 class IOLPowerPlan(StrictModel):
     route: Literal[
         "COOKE_K6",

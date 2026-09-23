@@ -16,7 +16,8 @@ import operational_security
 from .engine import evaluate_case
 from .extraction import extract_image
 from .lens_catalog import public_catalog
-from .models import IOLCaseInput, IOLPowerPlanInput
+from .escrs_transfer import create_escrs_transfer
+from .models import EscrsTransferInput, IOLCaseInput, IOLPowerPlanInput
 from .power import plan_iol_power
 
 IOL_HTML = Path("static/iol.html")
@@ -66,5 +67,15 @@ def install(core: Any) -> None:
             raise HTTPException(422, detail=json.loads(exc.json(include_url=False))) from exc
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
+
+    @core.app.post("/iol/escrs-transfer")
+    def iol_escrs_transfer(payload: dict[str, Any] = Body(...)):
+        try:
+            case = EscrsTransferInput.model_validate(payload)
+            return create_escrs_transfer(case)
+        except ValidationError as exc:
+            raise HTTPException(422, detail=json.loads(exc.json(include_url=False))) from exc
+        except RuntimeError as exc:
+            raise HTTPException(502, str(exc)) from exc
 
     core._cerai_iol_module_installed = True

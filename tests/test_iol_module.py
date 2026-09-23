@@ -9,7 +9,8 @@ from pydantic import ValidationError
 import operational_security
 from iol_module.engine import evaluate_case
 from iol_module.lens_catalog import LENSES, get_lens
-from iol_module.models import IOLCaseInput, IOLPowerPlanInput
+from iol_module.escrs_transfer import build_biomdirect, create_escrs_transfer
+from iol_module.models import EscrsTransferInput, IOLCaseInput, IOLPowerPlanInput
 from iol_module.power import plan_iol_power
 
 
@@ -155,7 +156,7 @@ def test_iol_module_is_first_class_and_routes_are_protected():
     sources = "\n".join(path.read_text(encoding="utf-8") for path in Path("iol_module").glob("*.py"))
     assert "clinical_core" not in sources
     assert "monkey" not in sources.lower()
-    for path in ("/iol/extract", "/iol/evaluate", "/iol/lenses", "/iol/power/plan"):
+    for path in ("/iol/extract", "/iol/evaluate", "/iol/lenses", "/iol/power/plan", "/iol/escrs-transfer"):
         assert path in operational_security.PROTECTED_PATHS
 
 
@@ -172,12 +173,36 @@ def test_escrs_transfer_is_deidentified_and_kane_is_removed():
     html = Path("static/iol.html").read_text(encoding="utf-8")
     script = Path("static/iol.js").read_text(encoding="utf-8")
     power = Path("iol_module/power.py").read_text(encoding="utf-8")
-    transfer = script[script.index("function downloadEscrsBiometry"):script.index('$("iolForm").addEventListener')]
+    transfer = script[script.index("function escrsTransferPayload"):script.index('$("iolForm").addEventListener')]
     assert '<select id="biologicalSex" required>' in html
-    assert 'patient:{gender:data.inputs.biological_sex}' in transfer
-    assert 'right_eye:data.inputs.eye === "OD" ? eyeData : {}' in transfer
     assert "patient_name" not in transfer and "patient_id" not in transfer
+    assert 'fetch("/iol/escrs-transfer"' in script
+    assert "downloadEscrsBiometry" not in script and "createObjectURL" not in script
     assert "Kane" not in html and "Kane" not in script and "KANE_URL" not in power
+
+
+def test_escrs_biompin_handoff_uses_deidentified_biomdirect_and_query_parameter():
+    case = EscrsTransferInput.model_validate({
+        "biological_sex": "Female", "eye": "OD", "axial_length_mm": 23.5,
+        "acd_internal_mm": 2.21, "k1_d": 42.6, "k2_d": 42.8,
+        "cct_um": 573, "lens_thickness_mm": 4.5, "wtw_mm": 11.7,
+    })
+    document = build_biomdirect(case)
+    assert document["data"]["patient"] == {"gender": "Female"}
+    assert document["data"]["right_eye"]["ACD"] == 2.21
+    assert document["data"]["left_eye"] == {}
+    assert "name" not in document["data"]["patient"] and "id" not in document["data"]["patient"]
+
+    response = BytesIO(b'{"biompin":{"pin":"lunar-rocket-731904","expires_at":"2026-10-24T00:00:00Z"}}')
+    response.__enter__ = lambda value: value
+    response.__exit__ = lambda *args: None
+    with patch("iol_module.escrs_transfer.urlopen", return_value=response) as mocked:
+        result = create_escrs_transfer(case)
+    request = mocked.call_args.args[0]
+    assert b'name="biompin"\r\n\r\ntrue' in request.data
+    assert b'"patient":{"gender":"Female"}' in request.data
+    assert b"Test Patient" not in request.data
+    assert result["escrs_url"] == "https://iolcalculator.escrs.org/?biompin=lunar-rocket-731904"
 
 
 def test_pentacam_is_the_only_operative_eye_source():
