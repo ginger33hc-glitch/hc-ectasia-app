@@ -12,7 +12,7 @@ from .models import (
     RetinaStatus,
 )
 
-ENGINE_VERSION = "IOL_CANONICAL_3.4"
+ENGINE_VERSION = "IOL_CANONICAL_3.5"
 LEGAL_NOTICE = (
     "This application provides clinical decision support only. "
     "Final responsibility rests with the surgeon at all times and under all circumstances."
@@ -44,7 +44,7 @@ def evaluate_case(case: IOLCaseInput) -> IOLRecommendation:
     pupil_small = case.pentacam_pupil_3d_mm < 2.00
     pupil_large = case.pentacam_pupil_3d_mm > 4.00
     irregular = (
-        case.tcrp_astigmatism_d >= 1.0
+        case.active_astigmatism_d >= 1.0
         and case.astigmatism_type == AstigmatismType.IRREGULAR
     )
     ocular_active = case.ocular_surface_status in {
@@ -137,7 +137,7 @@ def evaluate_case(case: IOLCaseInput) -> IOLRecommendation:
 
     toric = (
         "TORIC"
-        if case.tcrp_astigmatism_d >= 1.0
+        if case.active_astigmatism_d >= 1.0
         and case.astigmatism_type == AstigmatismType.REGULAR
         else "NON_TORIC"
     )
@@ -169,7 +169,8 @@ def evaluate_case(case: IOLCaseInput) -> IOLRecommendation:
     )
     astig_type = case.astigmatism_type.value.lower() if case.astigmatism_type else "not required below threshold"
     explanation.append(
-        f"TCRP astigmatism is {case.tcrp_astigmatism_d:.2f} D ({astig_type}); toric threshold is 1.00 D inclusive."
+        f"Active IOLMaster 500 K difference is {case.active_astigmatism_d:.2f} D "
+        f"({astig_type}); the toric-evaluation threshold is 1.00 D inclusive."
     )
 
     return IOLRecommendation(
@@ -185,6 +186,15 @@ def evaluate_case(case: IOLCaseInput) -> IOLRecommendation:
         decisive_reason_codes=decisive,
         warning_codes=warnings,
         information_codes=list(dict.fromkeys(information)),
+        active_k1_d=case.active_k1_d,
+        active_k2_d=case.active_k2_d,
+        k1_axis_deg=case.iolm500_k1_axis_deg,
+        k2_axis_deg=case.iolm500_k2_axis_deg,
+        active_astigmatism_d=case.active_astigmatism_d,
+        toric_evaluation_required=(
+            case.active_astigmatism_d >= 1.0
+            and case.astigmatism_type == AstigmatismType.REGULAR
+        ),
         clinical_explanation=explanation,
         legal_notice=LEGAL_NOTICE,
     )

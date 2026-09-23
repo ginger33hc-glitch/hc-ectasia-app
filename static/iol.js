@@ -3,91 +3,132 @@
   const $ = id => document.getElementById(id);
   const numberOrNull = id => $(id).value === "" ? null : Number($(id).value);
   const setIfPresent = (id, value) => { if (value !== null && value !== undefined) $(id).value = value; };
+  const originals = {OD:null, OS:null};
+  const pentacamByEye = {OD:null, OS:null};
+  let recommendation = null;
+  let lensCatalog = [];
 
-  $("surface").addEventListener("change", () => {
-    $("stableField").hidden = $("surface").value !== "RESOLVED_AFTER_TREATMENT";
-  });
+  const errorMessage = data => typeof data.detail === "string" ? data.detail : "Required information is incomplete or invalid.";
+  const kDifference = () => Math.abs(Number($("k2").value) - Number($("k1").value));
 
-  $("tcrpAstig").addEventListener("input", () => {
-    const required = Number($("tcrpAstig").value) >= 1;
-    $("tcrpAxis").required = required;
+  function updateAstigmatism() {
+    const difference = kDifference();
+    $("kDifference").value = Number.isFinite(difference) ? `${difference.toFixed(2)} D` : "";
+    const required = difference >= 1;
     $("astigType").required = required;
-  });
+    $("incisionField").hidden = !required;
+    $("siaField").hidden = !required;
+    $("siaAxisField").hidden = !required;
+    $("incisionAxis").required = required;
+    $("sia").required = required;
+  }
+
+  function populateEye() {
+    const eye = $("eye").value;
+    const bio = originals[eye];
+    const pentacam = pentacamByEye[eye];
+    if (bio) {
+      setIfPresent("al", bio.axial_length_mm); setIfPresent("k1", bio.k1_d);
+      setIfPresent("k1Axis", bio.k1_axis_deg); setIfPresent("k2", bio.k2_d);
+      setIfPresent("k2Axis", bio.k2_axis_deg); setIfPresent("lensThickness", bio.lens_thickness_mm);
+      if (!pentacam) setIfPresent("acd", bio.acd_mm);
+      $("alMarker").textContent = bio.axial_length_edited_marker ? "IOLMaster printed an edited-value (*) marker; retained for visibility." : "";
+      $("al").readOnly = bio.axial_length_mm !== null; $("k1Axis").readOnly = bio.k1_axis_deg !== null; $("k2Axis").readOnly = bio.k2_axis_deg !== null;
+    }
+    if (pentacam) {
+      setIfPresent("hoa", pentacam.total_corneal_hoa_4mm_um); setIfPresent("kappa", pentacam.angle_kappa_mm);
+      setIfPresent("alpha", pentacam.angle_alpha_mm); setIfPresent("pupil3d", pentacam.pupil_dia_3d_mm);
+      setIfPresent("cct", pentacam.cct_pachy_vertex_um); setIfPresent("wtw", pentacam.hwtw_mm);
+      setIfPresent("acd", pentacam.acd_internal_mm);
+      $("cct").readOnly = pentacam.cct_pachy_vertex_um !== null; $("wtw").readOnly = pentacam.hwtw_mm !== null;
+      $("acd").readOnly = pentacam.acd_internal_mm !== null;
+    }
+    updateAstigmatism();
+  }
+
+  $("surface").addEventListener("change", () => { $("stableField").hidden = $("surface").value !== "RESOLVED_AFTER_TREATMENT"; });
+  $("priorSurgery").addEventListener("change", () => { $("historyField").hidden = !["MYOPIC_LASIK_PRK","HYPEROPIC_LASIK_PRK"].includes($("priorSurgery").value); });
+  $("eye").addEventListener("change", populateEye); $("k1").addEventListener("input", updateAstigmatism); $("k2").addEventListener("input", updateAstigmatism);
 
   $("extractButton").addEventListener("click", async () => {
-    const pentacam = [...$("pentacamImages").files];
-    const status = $("extractStatus");
-    status.className = "status";
-    if (!pentacam.length) {
-      status.textContent = "Upload at least one Pentacam Cataract Pre-Op image.";
-      status.classList.add("error");
-      return;
-    }
-    const data = new FormData();
-    pentacam.forEach(file => data.append("images", file));
-    $("extractButton").disabled = true;
-    status.textContent = "Transcribing approved fields…";
+    const files = [...$("pentacamImages").files, ...$("iolmasterImages").files];
+    const status = $("extractStatus"); status.className = "status";
+    if (!files.length) { status.textContent = "Upload the Pentacam and IOLMaster 500 reports."; status.classList.add("error"); return; }
+    const form = new FormData(); files.forEach(file => form.append("images", file));
+    $("extractButton").disabled = true; status.textContent = "Transcribing source-locked fields…";
     try {
-      const response = await fetch("/iol/extract", {method:"POST", body:data, credentials:"same-origin"});
-      if (!response.ok) throw new Error((await response.json()).detail || "Image transcription failed.");
-      const payload = await response.json();
+      const response = await fetch("/iol/extract", {method:"POST", body:form, credentials:"same-origin"});
+      const data = await response.json(); if (!response.ok) throw new Error(errorMessage(data));
       const unreadable = [];
-      for (const source of payload.sources || []) {
-        const item = source.extraction || {};
-        setIfPresent("patientName", item.patient_name);
-        setIfPresent("patientAge", item.patient_age_years);
-        setIfPresent("eye", item.eye === "UNKNOWN" ? null : item.eye);
-        if (item.document_type === "PENTACAM_CATARACT_PREOP") {
-          const p = item.pentacam || {};
-          setIfPresent("hoa", p.total_corneal_hoa_4mm_um);
-          setIfPresent("kappa", p.angle_kappa_mm); setIfPresent("alpha", p.angle_alpha_mm);
-          setIfPresent("pupil3d", p.pupil_dia_3d_mm); setIfPresent("tcrpAstig", p.tcrp_astigmatism_d);
-          setIfPresent("tcrpAxis", p.tcrp_k2_axis_deg);
+      for (const source of data.sources || []) {
+        const item = source.extraction || {}; setIfPresent("patientName", item.patient_name); setIfPresent("patientAge", item.patient_age_years);
+        if (item.document_type === "PENTACAM_CATARACT_PREOP" && ["OD","OS"].includes(item.eye)) pentacamByEye[item.eye] = item.pentacam;
+        if (item.document_type === "IOLMASTER_500_BIOMETRY") {
+          const report = item.iolmaster500 || {}; ["OD","OS"].forEach(eye => { if (report[eye] && report[eye].axial_length_mm !== null) originals[eye] = report[eye]; });
+          setIfPresent("targetRx", report.printed_target_refraction_d);
         }
         (item.unreadable_fields || []).forEach(field => unreadable.push(`${source.filename}: ${field}`));
       }
-      status.textContent = unreadable.length
-        ? `Transcription completed. Enter unreadable required values manually: ${unreadable.join(", ")}.`
-        : "Pentacam transcription completed. Review the extracted values before evaluation.";
-      $("tcrpAstig").dispatchEvent(new Event("input"));
-    } catch (error) {
-      status.textContent = error.message || "Image transcription failed.";
-      status.classList.add("error");
-    } finally { $("extractButton").disabled = false; }
+      if (!$("eye").value) $("eye").value = originals.OD ? "OD" : (originals.OS ? "OS" : "");
+      populateEye();
+      status.textContent = unreadable.length ? `Extraction completed. Surgeon entry is required only for unreadable fields: ${unreadable.join(", ")}.` : "Both reports extracted. Review values before evaluation.";
+    } catch (error) { status.textContent = error.message || "Image transcription failed."; status.classList.add("error"); }
+    finally { $("extractButton").disabled = false; }
   });
 
+  function populateLenses() {
+    const eligible = new Set(recommendation.eligible_categories || []);
+    const options = lensCatalog.filter(lens => eligible.has(lens.category));
+    $("selectedLens").innerHTML = `<option value="">Select an eligible lens</option>` + options.map(lens => `<option value="${lens.id}">${lens.name} — ${lens.category} — A ${lens.a_constant.toFixed(1)}</option>`).join("");
+  }
+
   $("iolForm").addEventListener("submit", async event => {
-    event.preventDefault();
-    const status = $("evaluationStatus");
-    status.className = "status";
+    event.preventDefault(); const status = $("evaluationStatus"); status.className = "status";
     if (!event.currentTarget.reportValidity()) return;
+    const eye = $("eye").value; const source = originals[eye];
+    const originalK1 = source?.k1_d ?? Number($("k1").value); const originalK2 = source?.k2_d ?? Number($("k2").value);
     const payload = {
-      patient_name: $("patientName").value,
-      patient_age_years: Number($("patientAge").value), eye: $("eye").value,
-      near_demand: $("nearDemand").value, night_driving: $("nightDriving").value,
-      halo_tolerance: $("haloTolerance").value,
-      total_corneal_hoa_4mm_um: Number($("hoa").value),
-      angle_kappa_mm: Number($("kappa").value), angle_alpha_mm: Number($("alpha").value),
-      pentacam_pupil_3d_mm: Number($("pupil3d").value),
-      tcrp_astigmatism_d: Number($("tcrpAstig").value),
-      tcrp_steep_axis_deg: numberOrNull("tcrpAxis"), astigmatism_type: $("astigType").value || null,
-      retina_status: $("retina").value, macular_pathology_present: $("macular").value === "true",
-      glaucoma_status: $("glaucoma").value, ocular_surface_status: $("surface").value,
+      patient_name: $("patientName").value, patient_age_years: Number($("patientAge").value), eye,
+      near_demand: $("nearDemand").value, night_driving: $("nightDriving").value, halo_tolerance: $("haloTolerance").value,
+      total_corneal_hoa_4mm_um: Number($("hoa").value), angle_kappa_mm: Number($("kappa").value), angle_alpha_mm: Number($("alpha").value), pentacam_pupil_3d_mm: Number($("pupil3d").value),
+      iolm500_k1_d: originalK1, iolm500_k1_axis_deg: Number($("k1Axis").value), iolm500_k2_d: originalK2, iolm500_k2_axis_deg: Number($("k2Axis").value),
+      iolm500_measurement_source: source ? "IOLMASTER_500_EXTRACTED" : "SURGEON_ENTERED_UNREADABLE",
+      surgeon_k1_d: Number($("k1").value) === originalK1 ? null : Number($("k1").value), surgeon_k2_d: Number($("k2").value) === originalK2 ? null : Number($("k2").value),
+      astigmatism_type: $("astigType").value || null, retina_status: $("retina").value, macular_pathology_present: $("macular").value === "true", glaucoma_status: $("glaucoma").value, ocular_surface_status: $("surface").value,
       post_treatment_measurements_stable: $("surface").value === "RESOLVED_AFTER_TREATMENT" ? $("stable").value === "true" : null
     };
     $("evaluateButton").disabled = true; status.textContent = "Applying canonical IOL rules…";
     try {
       const response = await fetch("/iol/evaluate", {method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
-      const data = await response.json();
-      if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Required information is incomplete or invalid.");
+      const data = await response.json(); if (!response.ok) throw new Error(errorMessage(data)); recommendation = data;
       $("recommendation").textContent = `Recommended IOL: ${data.formatted_recommendation}`;
-      $("eligible").innerHTML = (data.eligible_categories || []).map(value => `<span class="pill">Eligible: ${value}</span>`).join("");
-      $("warnings").innerHTML = (data.warning_codes || []).map(value => `<div class="warning">${value}</div>`).join("");
-      $("reasons").innerHTML = (data.clinical_explanation || []).map(value => `<p class="reason"></p>`).join("");
-      [...$("reasons").children].forEach((node, index) => { node.textContent = data.clinical_explanation[index]; });
+      $("eligible").innerHTML = (data.eligible_categories || []).map(v => `<span class="pill">Eligible: ${v}</span>`).join("");
+      $("warnings").innerHTML = (data.warning_codes || []).map(v => `<div class="warning">${v}</div>`).join("");
+      $("reasons").replaceChildren(...(data.clinical_explanation || []).map(value => { const p=document.createElement("p"); p.className="reason"; p.textContent=value; return p; }));
       $("legal").textContent = data.legal_notice; $("result").hidden = false;
-      $("result").scrollIntoView({behavior:"smooth", block:"start"}); status.textContent = "Recommendation generated.";
+      if (!lensCatalog.length) { const lenses = await fetch("/iol/lenses", {credentials:"same-origin"}); const body = await lenses.json(); if (!lenses.ok) throw new Error(errorMessage(body)); lensCatalog = body.lenses || []; }
+      populateLenses(); $("powerSection").hidden = false; updateAstigmatism(); status.textContent = "Recommendation generated. Select the lens for Stage 2."; $("result").scrollIntoView({behavior:"smooth"});
     } catch (error) { status.textContent = error.message || "Recommendation could not be generated."; status.classList.add("error"); }
     finally { $("evaluateButton").disabled = false; }
   });
+
+  $("powerButton").addEventListener("click", async () => {
+    const status = $("powerStatus"); status.className="status"; const difference = kDifference();
+    const payload = {patient_name:$("patientName").value, eye:$("eye").value, selected_lens_id:$("selectedLens").value,
+      axial_length_mm:Number($("al").value), acd_mm:Number($("acd").value), k1_d:Number($("k1").value), k1_axis_deg:Number($("k1Axis").value), k2_d:Number($("k2").value), k2_axis_deg:Number($("k2Axis").value), astigmatism_type:$("astigType").value || null,
+      target_refraction_d:Number($("targetRx").value), prior_corneal_surgery:$("priorSurgery").value, historical_data_available:$("historicalData").value === "true", incision_axis_deg:difference>=1?numberOrNull("incisionAxis"):null, sia_d:difference>=1?numberOrNull("sia"):null, sia_axis_deg:difference>=1?numberOrNull("siaAxis"):null,
+      cct_um:numberOrNull("cct"), lens_thickness_mm:numberOrNull("lensThickness"), wtw_mm:numberOrNull("wtw")};
+    if (!payload.selected_lens_id) { status.textContent="Select a clinic lens."; status.classList.add("error"); return; }
+    $("powerButton").disabled=true; status.textContent="Determining the canonical calculation route…";
+    try {
+      const response=await fetch("/iol/power/plan",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); const data=await response.json(); if(!response.ok) throw new Error(errorMessage(data));
+      let html=`<div class="warning"><strong>${data.calculator_name}</strong><br>${data.message}</div>`;
+      if(data.calculator_url) html+=`<a class="external" target="_blank" rel="noopener noreferrer" href="${data.calculator_url}">Open ${data.calculator_name}</a>`;
+      if(data.kane_url) html+=`<a class="external" target="_blank" rel="noopener noreferrer" href="${data.kane_url}">Verify externally with Kane</a>`;
+      if(data.predictions?.length){html+=`<table class="table"><thead><tr><th>IOL power</th><th>Predicted refraction</th><th>Selection</th></tr></thead><tbody>${data.predictions.map(p=>`<tr><td>${p.IOL ?? p.iol_power ?? "—"}</td><td>${p.Rx ?? p.predicted_refraction ?? "—"}</td><td>${p.IsBestOption ? "Best option" : ""}</td></tr>`).join("")}</tbody></table>`;}
+      $("powerResult").innerHTML=html; status.textContent=data.calculation_status.replaceAll("_"," ");
+    } catch(error){status.textContent=error.message||"Power route could not be completed.";status.classList.add("error");}
+    finally{$("powerButton").disabled=false;}
+  });
+  updateAstigmatism();
 })();

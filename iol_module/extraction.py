@@ -1,95 +1,93 @@
-"""Source-locked image transcription for Pentacam Cataract Pre-Op documents."""
+"""Source-locked transcription for IOLMaster 500 and Pentacam reports."""
 
 from __future__ import annotations
 
 import json
 from typing import Any
 
+EYE_SCHEMA: dict[str, Any] = {
+    "type": "object", "additionalProperties": False,
+    "required": ["axial_length_mm", "axial_length_edited_marker", "k1_d", "k1_axis_deg", "k2_d", "k2_axis_deg", "acd_mm", "lens_thickness_mm"],
+    "properties": {
+        "axial_length_mm": {"type": ["number", "null"]},
+        "axial_length_edited_marker": {"type": "boolean"},
+        "k1_d": {"type": ["number", "null"]}, "k1_axis_deg": {"type": ["number", "null"]},
+        "k2_d": {"type": ["number", "null"]}, "k2_axis_deg": {"type": ["number", "null"]},
+        "acd_mm": {"type": ["number", "null"]},
+        "lens_thickness_mm": {"type": ["number", "null"]},
+    },
+}
 
 EXTRACTION_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "additionalProperties": False,
-    "required": [
-        "document_type", "eye", "patient_name", "patient_age_years",
-        "pentacam", "unreadable_fields",
-    ],
+    "type": "object", "additionalProperties": False,
+    "required": ["document_type", "eye", "patient_name", "patient_age_years", "pentacam", "iolmaster500", "unreadable_fields"],
     "properties": {
-        "document_type": {
-            "type": "string",
-            "enum": ["PENTACAM_CATARACT_PREOP", "OTHER"],
-        },
-        "eye": {"type": "string", "enum": ["OD", "OS", "UNKNOWN"]},
+        "document_type": {"type": "string", "enum": ["PENTACAM_CATARACT_PREOP", "IOLMASTER_500_BIOMETRY", "OTHER"]},
+        "eye": {"type": "string", "enum": ["OD", "OS", "BOTH", "UNKNOWN"]},
         "patient_name": {"type": ["string", "null"]},
         "patient_age_years": {"type": ["integer", "null"]},
         "pentacam": {
-            "type": "object",
-            "additionalProperties": False,
-            "required": [
-                "total_corneal_hoa_4mm_um", "angle_kappa_mm",
-                "angle_alpha_mm", "pupil_dia_3d_mm", "tcrp_astigmatism_d",
-                "tcrp_k2_axis_deg",
-            ],
+            "type": "object", "additionalProperties": False,
+            "required": ["total_corneal_hoa_4mm_um", "angle_kappa_mm", "angle_alpha_mm", "pupil_dia_3d_mm", "cct_pachy_vertex_um", "hwtw_mm", "acd_internal_mm"],
             "properties": {
                 "total_corneal_hoa_4mm_um": {"type": ["number", "null"]},
                 "angle_kappa_mm": {"type": ["number", "null"]},
                 "angle_alpha_mm": {"type": ["number", "null"]},
                 "pupil_dia_3d_mm": {"type": ["number", "null"]},
-                "tcrp_astigmatism_d": {"type": ["number", "null"]},
-                "tcrp_k2_axis_deg": {"type": ["number", "null"]},
+                "cct_pachy_vertex_um": {"type": ["number", "null"]},
+                "hwtw_mm": {"type": ["number", "null"]},
+                "acd_internal_mm": {"type": ["number", "null"]},
+            },
+        },
+        "iolmaster500": {
+            "type": "object", "additionalProperties": False,
+            "required": ["device_version", "printed_formula", "printed_target_refraction_d", "OD", "OS"],
+            "properties": {
+                "device_version": {"type": ["string", "null"]},
+                "printed_formula": {"type": ["string", "null"]},
+                "printed_target_refraction_d": {"type": ["number", "null"]},
+                "OD": EYE_SCHEMA, "OS": EYE_SCHEMA,
             },
         },
         "unreadable_fields": {"type": "array", "items": {"type": "string"}},
     },
 }
 
-
 PROMPT = """
 You are transcribing one ophthalmic source image for the independent CER-AI IOL module.
-Return only values explicitly printed and readable in this image. Never estimate, calculate,
-average, copy from the fellow eye, or substitute a visually similar field.
+Return only explicitly printed, readable values. Never estimate, calculate, average, copy
+from the fellow eye, or substitute a similar field. Nonmatching document objects use nulls.
 
-Classify the image as PENTACAM_CATARACT_PREOP or OTHER. Preserve explicit OD/right
-or OS/left laterality; otherwise return UNKNOWN.
+Classify as PENTACAM_CATARACT_PREOP, IOLMASTER_500_BIOMETRY, or OTHER. Preserve
+OD/right or OS/left; use BOTH for a bilateral IOLMaster page.
 
-For a Pentacam Cataract Pre-Op image, use these source locks only:
-- total_corneal_hoa_4mm_um: lower-right field exactly labeled “Total Corneal HOA (4mm)”.
-- angle_kappa_mm: lower-right Chord mu/kappa field used by the approved screen mapping.
-- angle_alpha_mm: lower-right Chord alpha field.
-- pupil_dia_3d_mm: lower-right “Pupil Dia (3D)” only. Ignore “Pupil Dia (virt)” completely.
-- tcrp_astigmatism_d: “Astig” in the “TCRP 3.0mm, zone, pupil” column only.
-- tcrp_k2_axis_deg: axis printed with K2 in that same TCRP column only.
-Do not use SimK or Diff. as a candidate, cross-check, fallback, or substitute.
+Pentacam Cataract Pre-Op source locks:
+- Total Corneal HOA (4mm), Chord µ (approved kappa mapping), Chord α, Pupil Dia (3D).
+- cct_pachy_vertex_um is Pachy Vertex, never Thinnest.
+- hwtw_mm is HWTW.
+- acd_internal_mm is ACD (Int.), the true internal ACD excluding corneal thickness.
+  Never substitute ACD (Ext.).
+TCRP, SimK and Diff. are not authoritative and must not be extracted.
 
-For every required field that belongs to the recognized document but cannot be read with high
-confidence, return null and add its canonical key to unreadable_fields.
+IOLMaster 500 source locks: use only the upper biometry block, never lower IOL tables.
+Transcribe AL, K1 and axis, K2 and axis, and ACD separately for OD and OS. Set the AL
+edited marker only when an asterisk is printed. Transcribe lens thickness only if explicitly
+printed. Preserve device version, printed formula and target when readable. IOLMaster K1/K2
+and axes are the sole source for the toric trigger.
+
+For unreadable recognized-document fields return null and add the fully qualified key to
+unreadable_fields.
 """
 
 
 def extract_image(core: Any, raw: bytes, filename: str) -> dict[str, Any]:
     response = core.openai_client().responses.create(
-        model=core.MODEL,
-        store=False,
-        reasoning={"effort": "low"},
-        input=[{
-            "role": "user",
-            "content": [
-                {"type": "input_text", "text": PROMPT},
-                {
-                    "type": "input_image",
-                    "image_url": core.data_url(raw, filename),
-                    "detail": "original",
-                },
-            ],
-        }],
-        text={
-            "verbosity": "low",
-            "format": {
-                "type": "json_schema",
-                "name": "cerai_iol_source_extraction",
-                "strict": True,
-                "schema": EXTRACTION_SCHEMA,
-            },
-        },
+        model=core.MODEL, store=False, reasoning={"effort": "low"},
+        input=[{"role": "user", "content": [
+            {"type": "input_text", "text": PROMPT},
+            {"type": "input_image", "image_url": core.data_url(raw, filename), "detail": "original"},
+        ]}],
+        text={"verbosity": "low", "format": {"type": "json_schema", "name": "cerai_iol_source_extraction", "strict": True, "schema": EXTRACTION_SCHEMA}},
     )
     if not response.output_text or not response.output_text.strip():
         raise RuntimeError("IOL source extraction returned empty output")

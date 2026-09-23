@@ -5,6 +5,7 @@ routes. It does not import or modify the refractive-surgery clinical engine.
 """
 
 from .engine import evaluate_case
-from .models import IOLCaseInput
+from .models import IOLCaseInput, IOLPowerPlanInput
+from .power import plan_iol_power
 
-__all__ = ["IOLCaseInput", "evaluate_case"]
+__all__ = ["IOLCaseInput", "IOLPowerPlanInput", "evaluate_case", "plan_iol_power"]

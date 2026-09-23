@@ -15,8 +15,9 @@ import operational_security
 
 from .engine import evaluate_case
 from .extraction import extract_image
-from .models import IOLCaseInput
-
+from .lens_catalog import public_catalog
+from .models import IOLCaseInput, IOLPowerPlanInput
+from .power import plan_iol_power
 
 IOL_HTML = Path("static/iol.html")
 
@@ -51,5 +52,19 @@ def install(core: Any) -> None:
         except ValidationError as exc:
             raise HTTPException(422, detail=json.loads(exc.json(include_url=False))) from exc
         return evaluate_case(case).model_dump(mode="json")
+
+    @core.app.get("/iol/lenses")
+    def iol_lenses():
+        return {"lenses": public_catalog()}
+
+    @core.app.post("/iol/power/plan")
+    def iol_power_plan(payload: dict[str, Any] = Body(...)):
+        try:
+            case = IOLPowerPlanInput.model_validate(payload)
+            return plan_iol_power(case).model_dump(mode="json")
+        except ValidationError as exc:
+            raise HTTPException(422, detail=json.loads(exc.json(include_url=False))) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
 
     core._cerai_iol_module_installed = True

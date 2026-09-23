@@ -49,6 +49,18 @@ class OcularSurfaceStatus(str, Enum):
     RESOLVED_AFTER_TREATMENT = "RESOLVED_AFTER_TREATMENT"
 
 
+class BiometrySource(str, Enum):
+    IOLMASTER_500_EXTRACTED = "IOLMASTER_500_EXTRACTED"
+    SURGEON_ENTERED_UNREADABLE = "SURGEON_ENTERED_UNREADABLE"
+
+
+class PriorCornealSurgery(str, Enum):
+    NONE = "NONE"
+    MYOPIC_LASIK_PRK = "MYOPIC_LASIK_PRK"
+    HYPEROPIC_LASIK_PRK = "HYPEROPIC_LASIK_PRK"
+    RK = "RK"
+
+
 class IOLCaseInput(StrictModel):
     patient_name: str = Field(min_length=1, max_length=200)
     patient_age_years: int = Field(ge=18, le=120)
@@ -63,8 +75,13 @@ class IOLCaseInput(StrictModel):
     angle_alpha_mm: float = Field(ge=0, le=3)
     pentacam_pupil_3d_mm: float = Field(gt=0, le=12)
 
-    tcrp_astigmatism_d: float = Field(ge=0, le=15)
-    tcrp_steep_axis_deg: float | None = Field(default=None, ge=0, le=180)
+    iolm500_k1_d: float = Field(ge=30, le=60)
+    iolm500_k1_axis_deg: float = Field(ge=0, le=180)
+    iolm500_k2_d: float = Field(ge=30, le=60)
+    iolm500_k2_axis_deg: float = Field(ge=0, le=180)
+    iolm500_measurement_source: BiometrySource
+    surgeon_k1_d: float | None = Field(default=None, ge=30, le=60)
+    surgeon_k2_d: float | None = Field(default=None, ge=30, le=60)
     astigmatism_type: AstigmatismType | None = None
 
     retina_status: RetinaStatus
@@ -75,17 +92,31 @@ class IOLCaseInput(StrictModel):
 
     @model_validator(mode="after")
     def validate_conditional_fields(self):
-        if self.tcrp_astigmatism_d >= 1.0:
-            if self.tcrp_steep_axis_deg is None or self.astigmatism_type is None:
-                raise ValueError(
-                    "TCRP K2 axis and surgeon-classified regularity are required at 1.00 D or more."
-                )
-        if self.ocular_surface_status == OcularSurfaceStatus.RESOLVED_AFTER_TREATMENT:
-            if self.post_treatment_measurements_stable is not True:
-                raise ValueError(
-                    "Resolved ocular-surface disease requires surgeon-confirmed stable repeat measurements."
-                )
+        if self.active_astigmatism_d >= 1.0 and self.astigmatism_type is None:
+            raise ValueError(
+                "Surgeon-classified regularity is required when the active IOLMaster K difference is 1.00 D or more."
+            )
+        if (
+            self.ocular_surface_status
+            == OcularSurfaceStatus.RESOLVED_AFTER_TREATMENT
+            and self.post_treatment_measurements_stable is not True
+        ):
+            raise ValueError(
+                "Resolved ocular-surface disease requires surgeon-confirmed stable repeat measurements."
+            )
         return self
+
+    @property
+    def active_k1_d(self) -> float:
+        return self.surgeon_k1_d if self.surgeon_k1_d is not None else self.iolm500_k1_d
+
+    @property
+    def active_k2_d(self) -> float:
+        return self.surgeon_k2_d if self.surgeon_k2_d is not None else self.iolm500_k2_d
+
+    @property
+    def active_astigmatism_d(self) -> float:
+        return abs(self.active_k2_d - self.active_k1_d)
 
 
 class IOLRecommendation(StrictModel):
@@ -101,5 +132,77 @@ class IOLRecommendation(StrictModel):
     decisive_reason_codes: list[str]
     warning_codes: list[str]
     information_codes: list[str]
+    active_k1_d: float
+    active_k2_d: float
+    k1_axis_deg: float
+    k2_axis_deg: float
+    active_astigmatism_d: float
+    toric_evaluation_required: bool
     clinical_explanation: list[str]
     legal_notice: str
+
+
+class IOLPowerPlanInput(StrictModel):
+    patient_name: str = Field(min_length=1, max_length=200)
+    eye: Literal["OD", "OS"]
+    selected_lens_id: str = Field(min_length=1, max_length=100)
+    axial_length_mm: float = Field(ge=12, le=38)
+    acd_mm: float = Field(gt=0, le=10)
+    k1_d: float = Field(ge=30, le=60)
+    k1_axis_deg: float = Field(ge=0, le=180)
+    k2_d: float = Field(ge=30, le=60)
+    k2_axis_deg: float = Field(ge=0, le=180)
+    astigmatism_type: AstigmatismType | None = None
+    target_refraction_d: float = Field(default=0.0, ge=-5, le=5)
+    prior_corneal_surgery: PriorCornealSurgery = PriorCornealSurgery.NONE
+    historical_data_available: bool = False
+    incision_axis_deg: float | None = Field(default=None, ge=0, le=180)
+    sia_d: float | None = Field(default=None, ge=0, le=5)
+    sia_axis_deg: float | None = Field(default=None, ge=0, le=180)
+    cct_um: float | None = Field(default=None, ge=300, le=900)
+    lens_thickness_mm: float | None = Field(default=None, ge=2.5, le=7)
+    wtw_mm: float | None = Field(default=None, ge=8, le=16)
+
+    @property
+    def astigmatism_d(self) -> float:
+        return abs(self.k2_d - self.k1_d)
+
+    @model_validator(mode="after")
+    def validate_power_route(self):
+        if self.astigmatism_d >= 1.0 and self.astigmatism_type is None:
+            raise ValueError("Astigmatism regularity is required for toric routing.")
+        toric = self.astigmatism_d >= 1.0 and self.astigmatism_type == AstigmatismType.REGULAR
+        if toric and (self.incision_axis_deg is None or self.sia_d is None):
+            raise ValueError("Incision axis and surgeon-specific SIA are required for toric routing.")
+        if (
+            self.axial_length_mm < 22.0
+            and self.prior_corneal_surgery == PriorCornealSurgery.NONE
+            and (self.lens_thickness_mm is None or self.wtw_mm is None)
+        ):
+            raise ValueError(
+                "Cooke K6 requires lens thickness and WTW when axial length is below 22.00 mm."
+            )
+        return self
+
+
+class IOLPowerPlan(StrictModel):
+    route: Literal[
+        "COOKE_K6",
+        "MANUFACTURER_TORIC",
+        "BARRETT_TRUE_K_EXTERNAL",
+        "POST_RK_EXTERNAL",
+    ]
+    calculation_status: Literal["COMPLETED", "EXTERNAL_REQUIRED", "CALCULATION_UNAVAILABLE"]
+    selected_lens_id: str
+    selected_lens_name: str
+    lens_category: Literal["MULTIFOCAL", "EDOF", "MONOFOCAL"]
+    a_constant: float
+    target_refraction_d: float
+    target_locked: bool
+    target_warning: str | None
+    calculator_name: str
+    calculator_url: str | None
+    kane_url: str | None
+    inputs: dict[str, object]
+    predictions: list[dict[str, object]]
+    message: str
