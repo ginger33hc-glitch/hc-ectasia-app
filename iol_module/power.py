@@ -19,6 +19,7 @@ COOKE_K6_URL = os.getenv(
     "COOKE_K6_API_URL", "https://cookeformula.com/api/v1/k6/v2024.01/preop"
 )
 KANE_URL = "https://www.iolformula.com/"
+ESCRS_URL = "https://iolcalculator.escrs.org/"
 ASCRS_POST_REFRACTIVE_URL = "https://iolcalc.ascrs.org/"
 
 
@@ -62,6 +63,7 @@ def _external_plan(case: IOLPowerPlanInput, lens, *, route: str, name: str, url:
         calculator_name=name,
         calculator_url=url,
         kane_url=None,
+        escrs_url=None,
         inputs=_base_inputs(case),
         predictions=[],
         message=message,
@@ -159,7 +161,7 @@ def plan_iol_power(case: IOLPowerPlanInput) -> IOLPowerPlan:
             lens_category=lens.category, a_constant=lens.a_constant,
             target_refraction_d=case.target_refraction_d, target_locked=False,
             target_warning=None, calculator_name="Cooke K6", calculator_url=None,
-            kane_url=KANE_URL, inputs=inputs, predictions=[],
+            kane_url=KANE_URL, escrs_url=ESCRS_URL, inputs=inputs, predictions=[],
             message=f"Cooke K6 could not complete the calculation. No substitute was used ({type(exc).__name__}).",
         )
     return IOLPowerPlan(
@@ -168,6 +170,6 @@ def plan_iol_power(case: IOLPowerPlanInput) -> IOLPowerPlan:
         lens_category=lens.category, a_constant=lens.a_constant,
         target_refraction_d=case.target_refraction_d, target_locked=False,
         target_warning=None, calculator_name="Cooke K6", calculator_url=None,
-        kane_url=KANE_URL, inputs=inputs, predictions=predictions,
-        message="Cooke K6 calculation completed. Kane is provided as an external verification route.",
+        kane_url=KANE_URL, escrs_url=ESCRS_URL, inputs=inputs, predictions=predictions,
+        message="Cooke K6 calculation completed. Kane and the ESCRS calculator are provided as external verification routes.",
     )

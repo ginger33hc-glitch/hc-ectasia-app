@@ -203,6 +203,7 @@ class IOLPowerPlan(StrictModel):
     calculator_name: str
     calculator_url: str | None
     kane_url: str | None
+    escrs_url: str | None
     inputs: dict[str, object]
     predictions: list[dict[str, object]]
     message: str

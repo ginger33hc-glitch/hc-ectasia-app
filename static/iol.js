@@ -138,6 +138,7 @@
       let html=`<div class="warning"><strong>${data.calculator_name}</strong><br>${data.message}</div>`;
       if(data.calculator_url) html+=`<a class="external" target="_blank" rel="noopener noreferrer" href="${data.calculator_url}">Open ${data.calculator_name}</a>`;
       if(data.kane_url) html+=`<a class="external" target="_blank" rel="noopener noreferrer" href="${data.kane_url}">Verify externally with Kane</a>`;
+      if(data.escrs_url) html+=`<a class="external" target="_blank" rel="noopener noreferrer" href="${data.escrs_url}">Compare with ESCRS formulas</a>`;
       if(data.predictions?.length){html+=`<table class="table"><thead><tr><th>IOL power</th><th>Predicted refraction</th><th>Selection</th></tr></thead><tbody>${data.predictions.map(p=>`<tr><td>${p.IOL ?? p.iol_power ?? "—"}</td><td>${p.Rx ?? p.predicted_refraction ?? "—"}</td><td>${p.IsBestOption ? "Best option" : ""}</td></tr>`).join("")}</tbody></table>`;}
       $("powerResult").innerHTML=html; status.textContent=data.calculation_status.replaceAll("_"," ");
     } catch(error){status.textContent=error.message||"Power route could not be completed.";status.classList.add("error");}

@@ -119,7 +119,7 @@ def test_post_refractive_overrides_standard_and_toric_routes():
     assert plan.calculator_url == "https://iolcalc.ascrs.org/"
 
 
-def test_non_toric_standard_eye_uses_cooke_k6_and_exposes_kane_verification():
+def test_non_toric_standard_eye_uses_cooke_k6_and_exposes_external_verification():
     response = [{"IOLs": [{"Predictions": [{"IOL": 21.0, "Rx": 0.01, "IsBestOption": True}]}]}]
     fake = BytesIO(__import__("json").dumps(response).encode()); fake.__enter__ = lambda value: value; fake.__exit__ = lambda *args: None
     with patch("iol_module.power.urlopen", return_value=fake):
@@ -128,6 +128,7 @@ def test_non_toric_standard_eye_uses_cooke_k6_and_exposes_kane_verification():
     assert plan.calculation_status == "COMPLETED"
     assert plan.predictions[0]["IsBestOption"] is True
     assert plan.kane_url == "https://www.iolformula.com/"
+    assert plan.escrs_url == "https://iolcalculator.escrs.org/"
 
 
 def test_short_eye_requires_real_lens_thickness_and_wtw():
