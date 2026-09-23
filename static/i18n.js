@@ -143,6 +143,86 @@
     "Preop corneal thickness":"Preoperatif kornea kalınlığı","Residual stromal bed":"Rezidüel stromal yatak","MRSE":"MRSE",
     "yes":"evet","no":"hayır","unknown":"bilinmiyor","REASSURING":"RAHATLATICI","ADEQUATE":"YETERLİ","CONFIDENT":"GÜVENİLİR",
     "NORMAL_SYMMETRIC":"NORMAL_SİMETRİK","LOWER_FLAGGED_BURDEN":"DÜŞÜK UYARI YÜKÜ","MYOPIC":"MİYOPİK","HYPEROPIC":"HİPERMETROPİK","MIXED":"KARMA",
+    "CER-AI Sign in":"CER-AI Girişi","Secure clinical workspace":"Güvenli klinik çalışma alanı",
+    "Username":"Kullanıcı adı","Password":"Parola","Sign in":"Giriş yap","Sign-in failed.":"Giriş başarısız.",
+    "Credentials are sent only to this CER-AI server over the active HTTPS session. The password is not stored in browser storage.":"Kimlik bilgileri yalnızca etkin HTTPS oturumu üzerinden bu CER-AI sunucusuna gönderilir. Parola tarayıcı depolamasında saklanmaz.",
+    "IOL Calculation Surgery · Secure sign-in":"IOL Hesaplama Cerrahisi · Güvenli giriş",
+    "Refractive Surgery · Secure sign-in":"Refraktif Cerrahi · Güvenli giriş",
+    "CER-AI Clinical Modules":"CER-AI Klinik Modülleri","Choose a clinical module":"Bir klinik modül seçin",
+    "You are signed in. Choose the surgical workflow to continue.":"Giriş yaptınız. Devam etmek için cerrahi iş akışını seçin.",
+    "Refractive Surgery":"Refraktif Cerrahi","Corneal ectasia risk assessment and refractive-surgery planning.":"Korneal ektazi risk değerlendirmesi ve refraktif cerrahi planlaması.",
+    "IOL Calculation Surgery":"IOL Hesaplama Cerrahisi","Pentacam, surgeon-defined parameters, and IOL category recommendation.":"Pentacam, cerrah tarafından tanımlanan parametreler ve IOL kategori önerisi.",
+    "Open module →":"Modülü aç →","CER-AI provides clinical decision support only. Final treatment and lens selection remain the evaluating surgeon’s responsibility.":"CER-AI yalnızca klinik karar desteği sağlar. Nihai tedavi ve lens seçimi değerlendiren cerrahın sorumluluğundadır.",
+    "CER-AI IOL Calculation Surgery":"CER-AI IOL Hesaplama Cerrahisi","Change clinical module":"Klinik modülü değiştir",
+    "IOL Decision Assistant — Advanced Mode":"IOL Karar Asistanı — Gelişmiş Mod",
+    "Stage 1 selects the eligible lens category. Stage 2 calculates standard non-toric eyes with Cooke K6, provides external Kane verification, and sends toric eyes to the selected lens manufacturer’s official calculator.":"Aşama 1 uygun lens kategorisini seçer. Aşama 2 standart torik olmayan gözleri Cooke K6 ile hesaplar, harici Kane doğrulaması sağlar ve torik gözleri seçilen lens üreticisinin resmi hesaplayıcısına yönlendirir.",
+    "1. Patient and source reports":"1. Hasta ve kaynak raporları","Age":"Yaş","Eye":"Göz","OD — Right":"OD — Sağ","OS — Left":"OS — Sol",
+    "Pentacam Cataract Pre-Op":"Pentacam Katarakt Pre-Op","Optical-quality fields plus Pachy Vertex, HWTW, and ACD (Int.). TCRP is not used.":"Optik kalite alanlarına ek olarak Pachy Vertex, HWTW ve ACD (Int.) kullanılır. TCRP kullanılmaz.",
+    "IOLMaster 500 report":"IOLMaster 500 raporu","Upper biometry block only: AL, K1/K2 and axes. K difference ≥1.00 D triggers toric evaluation.":"Yalnızca üst biyometri bloğu: AL, K1/K2 ve aksları. K farkı ≥1,00 D ise torik değerlendirme tetiklenir.",
+    "Extract approved fields":"Onaylı alanları çıkar","2. Lifestyle and visual goals":"2. Yaşam tarzı ve görsel hedefler",
+    "Near-vision demand":"Yakın görme gereksinimi","Night driving":"Gece araç kullanımı","Halo/glare tolerance":"Halo/kamaşma toleransı",
+    "Low":"Düşük","Moderate":"Orta","High":"Yüksek","Occasional":"Ara sıra","Frequent":"Sık",
+    "3. Pentacam optical and complementary values":"3. Pentacam optik ve tamamlayıcı değerleri",
+    "Total Corneal HOA (4 mm), µm":"Total Korneal HOA (4 mm), µm","Chord µ / kappa, mm":"Chord µ / kappa, mm","Chord α, mm":"Chord α, mm",
+    "Pupil Dia (3D), mm":"Pupil Dia (3D), mm","Pachy Vertex / CCT, µm":"Pachy Vertex / CCT, µm","HWTW, mm":"HWTW, mm","ACD (Int.), mm":"ACD (Int.), mm",
+    "Internal ACD excludes corneal thickness; ACD (Ext.) is never substituted.":"İnternal ACD kornea kalınlığını içermez; ACD (Ext.) hiçbir zaman yerine kullanılmaz.",
+    "4. IOLMaster 500 biometry":"4. IOLMaster 500 biyometrisi","Axial length, mm":"Aksiyel uzunluk, mm","K1, D":"K1, D","K1 axis, degrees":"K1 aksı, derece","K2, D":"K2, D","K2 axis, degrees":"K2 aksı, derece",
+    "Surgeon-editable; extracted original retained.":"Cerrah tarafından düzenlenebilir; çıkarılan özgün değer korunur.",
+    "K difference":"K farkı","Toric trigger: ≥1.00 D and regular astigmatism.":"Torik tetikleyici: ≥1,00 D ve düzenli astigmatizma.",
+    "Lens thickness, mm (if printed)":"Lens kalınlığı, mm (basılıysa)","Never estimated. Required with WTW for Cooke K6 when AL <22.00 mm.":"Asla tahmin edilmez. AL <22,00 mm olduğunda Cooke K6 için WTW ile birlikte gereklidir.",
+    "Astigmatism regularity":"Astigmatizma düzenliliği","Not required below 1.00 D":"1,00 D altında gerekli değil","Regular":"Düzenli","Irregular":"Düzensiz",
+    "5. Surgeon-defined ocular findings":"5. Cerrah tarafından tanımlanan oküler bulgular","Retinal disease":"Retina hastalığı","Mild":"Hafif","Significant":"Belirgin",
+    "Macular pathology":"Maküler patoloji","Absent":"Yok","Present":"Var","Glaucoma":"Glokom","Suspect":"Şüpheli","Definite":"Kesin",
+    "Ocular surface":"Oküler yüzey","Resolved after treatment":"Tedavi sonrası düzeldi","Repeat measurements":"Tekrarlanan ölçümler","Not stable":"Stabil değil","Stable":"Stabil",
+    "Generate IOL recommendation":"IOL önerisi oluştur","Stage 1 — category decision":"Aşama 1 — kategori kararı",
+    "Stage 2 — lens and power route":"Aşama 2 — lens ve güç yolu","Clinic lens":"Klinik lensi","Select an eligible lens":"Uygun bir lens seçin",
+    "Target refraction, D":"Hedef refraksiyon, D","Prior corneal surgery":"Önceki korneal cerrahi","Myopic LASIK/PRK":"Miyopik LASIK/PRK","Hyperopic LASIK/PRK":"Hipermetropik LASIK/PRK","RK":"RK",
+    "Historical data":"Geçmiş veriler","Unavailable — no-history":"Mevcut değil — geçmiş verisiz","Available — history":"Mevcut — geçmiş verili",
+    "Incision axis, degrees":"İnsizyon aksı, derece","Surgeon-specific SIA, D":"Cerraha özgü SIA, D","SIA axis, degrees (optional)":"SIA aksı, derece (isteğe bağlı)",
+    "Continue to calculation":"Hesaplamaya devam et","Open Cooke K6":"Cooke K6'yı aç","Verify externally with Kane":"Kane ile harici doğrula",
+    "IOL power":"IOL gücü","Predicted refraction":"Tahmini refraksiyon","Selection":"Seçim","Best option":"En iyi seçenek",
+    "CER-AI · Case Archive":"CER-AI · Vaka Arşivi","Loading…":"Yükleniyor…","Clinical workspace":"Klinik çalışma alanı","Sign out":"Çıkış yap",
+    "Archived cases":"Arşivlenmiş vakalar","Search archived case revisions.":"Arşivlenmiş vaka revizyonlarını arayın.","Report date":"Rapor tarihi","Decision":"Karar","Reviewer":"Değerlendiren","Maximum results":"Azami sonuç sayısı",
+    "Search":"Ara","Clear":"Temizle","Results":"Sonuçlar","Created by":"Oluşturan","Revision":"Revizyon","Reports":"Raporlar","Pentacam sources":"Pentacam kaynakları",
+    "Run a search to list cases.":"Vakaları listelemek için arama yapın.","Owner tools":"Sahip araçları","Research export is pseudonymized and excludes direct identifiers. Audit records remain encrypted in the clinical archive.":"Araştırma dışa aktarımı takma adlıdır ve doğrudan tanımlayıcıları içermez. Denetim kayıtları klinik arşivde şifreli kalır.",
+    "Research CSV · latest revisions":"Araştırma CSV · son revizyonlar","Research CSV · all revisions":"Araştırma CSV · tüm revizyonlar","Load recent audit events":"Son denetim olaylarını yükle","Archive status":"Arşiv durumu","Verify archive storage":"Arşiv depolamasını doğrula",
+    "Archived Pentacam source images":"Arşivlenmiş Pentacam kaynak görüntüleri","Close":"Kapat","Archived CER-AI case":"Arşivlenmiş CER-AI vakası",
+    "Modules":"Modüller","Case Archive":"Vaka Arşivi","Log out":"Çıkış yap","Return to CER-AI website":"CER-AI web sitesine dön",
+    "Report attribution is bound to the authenticated CER-AI user.":"Rapor kaydı, kimliği doğrulanmış CER-AI kullanıcısına bağlıdır.",
+    "CER-AI session expired. Sign in again.":"CER-AI oturumu sona erdi. Yeniden giriş yapın.","Logout failed":"Çıkış başarısız","Could not log out. Please try again.":"Çıkış yapılamadı. Lütfen yeniden deneyin.",
+    "CER-AI Trial Access":"CER-AI Deneme Erişimi","Trial access":"Deneme erişimi","Doctor name":"Doktor adı","Continue":"Devam et",
+    "No password is required during the trial. The name you enter is used as the doctor attribution for assessments you create.":"Deneme süresince parola gerekmez. Girdiğiniz ad, oluşturduğunuz değerlendirmelerde doktor kaydı olarak kullanılır.",
+    "IOL Surgery":"IOL Cerrahisi","· IOL Surgery":"· IOL Cerrahisi","CER-AI Case Archive":"CER-AI Vaka Arşivi","Developed by Hüseyin Cengiz, MD. All rights reserved. Final responsibility rests with the surgeon at all times and under all circumstances.":"Hüseyin Cengiz, MD tarafından geliştirilmiştir. Tüm hakları saklıdır. Nihai sorumluluk her zaman ve her koşulda cerraha aittir.",
+    "Required information is incomplete or invalid.":"Gerekli bilgiler eksik veya geçersiz.","Upload the Pentacam and IOLMaster 500 reports.":"Pentacam ve IOLMaster 500 raporlarını yükleyin.",
+    "Transcribing source-locked fields…":"Kaynağa bağlı alanlar aktarılıyor…","Both reports extracted. Review values before evaluation.":"Her iki rapor çıkarıldı. Değerlendirme öncesinde değerleri gözden geçirin.",
+    "Image transcription failed.":"Görüntü aktarımı başarısız oldu.","Applying canonical IOL rules…":"Kanonik IOL kuralları uygulanıyor…","Recommendation generated. Select the lens for Stage 2.":"Öneri oluşturuldu. Aşama 2 için lensi seçin.",
+    "Recommendation could not be generated.":"Öneri oluşturulamadı.","Select a clinic lens.":"Bir klinik lensi seçin.","Determining the canonical calculation route…":"Kanonik hesaplama yolu belirleniyor…","Power route could not be completed.":"Güç hesaplama yolu tamamlanamadı.",
+    "IOLMaster printed an edited-value (*) marker; retained for visibility.":"IOLMaster düzenlenmiş değer (*) işareti yazdırdı; görünürlük için korundu.",
+    "MULTIFOCAL":"MULTİFOKAL","MONOFOCAL":"MONOFOKAL","TORIC":"TORİK","NON_TORIC":"TORİK OLMAYAN","EDOF":"EDOF","Best option":"En iyi seçenek",
+    "Session expired.":"Oturum sona erdi.","Date":"Tarih","De-identified":"Kimliksizleştirilmiş","Original":"Özgün",
+    "Open case":"Vakayı aç","View source images":"Kaynak görüntüleri göster","Restricted to case creator":"Yalnızca vakayı oluşturan kullanıcı erişebilir","No matching archived cases.":"Eşleşen arşivlenmiş vaka yok.",
+    "Searching…":"Aranıyor…","Secure archive is not enabled yet.":"Güvenli arşiv henüz etkin değil.","Archive search failed.":"Arşiv araması başarısız oldu.",
+    "Retrieving authenticated archive file…":"Kimliği doğrulanmış arşiv dosyası alınıyor…","Archive file retrieved.":"Arşiv dosyası alındı.","Unable to retrieve archive file.":"Arşiv dosyası alınamadı.",
+    "Opening authenticated archived case…":"Kimliği doğrulanmış arşiv vakası açılıyor…","Unable to reopen archived case.":"Arşivlenmiş vaka yeniden açılamadı.",
+    "Loading encrypted source inventory…":"Şifrelenmiş kaynak envanteri yükleniyor…","No source images are archived for this case.":"Bu vaka için arşivlenmiş kaynak görüntüsü yok.","Unable to load archived source images.":"Arşivlenmiş kaynak görüntüleri yüklenemedi.",
+    "Preview unavailable for this file type.":"Bu dosya türü için önizleme kullanılamıyor.","Open full size":"Tam boyutu aç","Download":"İndir","Download all source images (ZIP)":"Tüm kaynak görüntülerini indir (ZIP)",
+    "Surgeon / reviewer":"Cerrah / değerlendiren","Archived by":"Arşivleyen","Overall decision":"Genel karar","Eye decisions":"Göz kararları","Legacy / unassigned":"Eski kayıt / atanmamış",
+    "This application provides clinical decision support only. Final responsibility rests with the surgeon at all times and under all circumstances.":"Bu uygulama yalnızca klinik karar desteği sağlar. Nihai sorumluluk her zaman ve her koşulda cerraha aittir.",
+    "Prior RK requires the external post-RK calculation pathway.":"Önceki RK, harici post-RK hesaplama yolunu gerektirir.",
+    "Regular IOLMaster K difference is at least 1.00 D. Continue in the selected lens manufacturer's official toric calculator.":"Düzenli IOLMaster K farkı en az 1,00 D'dir. Seçilen lens üreticisinin resmi torik hesaplayıcısında devam edin.",
+    "No verified official toric calculator is configured for this manufacturer; calculation is unavailable.":"Bu üretici için doğrulanmış resmi torik hesaplayıcı yapılandırılmamıştır; hesaplama kullanılamıyor.",
+    "Cooke K6 calculation completed. Kane is provided as an external verification route.":"Cooke K6 hesaplaması tamamlandı. Kane, harici doğrulama yolu olarak sunulmuştur.",
+    "Selected lens is not in the clinic-approved catalog.":"Seçilen lens, klinik tarafından onaylanmış katalogda bulunmuyor.",
+    "Astigmatism regularity is required for toric routing.":"Torik yönlendirme için astigmatizma düzenliliği gereklidir.","Incision axis and surgeon-specific SIA are required for toric routing.":"Torik yönlendirme için insizyon aksı ve cerraha özgü SIA gereklidir.",
+    "Cooke K6 requires lens thickness and WTW when axial length is below 22.00 mm.":"Aksiyel uzunluk 22,00 mm'nin altındaysa Cooke K6 lens kalınlığı ve WTW gerektirir.",
+    "Research export is not enabled.":"Araştırma dışa aktarımı etkin değil.","Preparing research CSV…":"Araştırma CSV'si hazırlanıyor…","Research CSV generated.":"Araştırma CSV'si oluşturuldu.","Research export failed.":"Araştırma dışa aktarımı başarısız oldu.",
+    "Audit review is not enabled.":"Denetim incelemesi etkin değil.","Loading audit records…":"Denetim kayıtları yükleniyor…","No audit records.":"Denetim kaydı yok.","Audit search failed.":"Denetim araması başarısız oldu.",
+    "Loading protected archive status…":"Korunan arşiv durumu yükleniyor…","Protected archive status loaded.":"Korunan arşiv durumu yüklendi.","Unable to load archive status.":"Arşiv durumu yüklenemedi.",
+    "Run the encrypted non-patient archive storage verification now?":"Şifrelenmiş, hasta verisi içermeyen arşiv depolama doğrulaması şimdi çalıştırılsın mı?","Writing and reading the encrypted non-patient canary…":"Şifrelenmiş, hasta verisi içermeyen doğrulama kaydı yazılıyor ve okunuyor…",
+    "Archive storage verification passed. No patient data was used.":"Arşiv depolama doğrulaması başarılı. Hasta verisi kullanılmadı.","Archive storage verification failed.":"Arşiv depolama doğrulaması başarısız oldu.",
+    "OWNER scope: cases created under your account retain original identity, reports, and source images; other doctors’ cases remain masked and de-identified.":"SAHİP kapsamı: hesabınız altında oluşturulan vakalar özgün kimlik, rapor ve kaynak görüntülerini korur; diğer doktorların vakaları maskeli ve kimliksizleştirilmiş kalır.",
+    "DOCTOR scope: only cases created under your account, with original identity and source material.":"DOKTOR kapsamı: yalnızca hesabınız altında oluşturulan, özgün kimlik ve kaynak materyali içeren vakalar.",
+    "Search your own identifiable cases":"Kimliği görülebilen kendi vakalarınızda arayın","Secure archive is configured off. No patient data will be listed until archive activation is verified.":"Güvenli arşiv kapalı olarak yapılandırılmıştır. Arşiv etkinleştirmesi doğrulanana kadar hasta verileri listelenmez.","Unable to load archive workspace.":"Arşiv çalışma alanı yüklenemedi.",
   };
   const CLINICAL = {
     "Temporal hinge (default)":"Temporal menteşe (varsayılan)",
@@ -201,6 +281,27 @@
       .replace(/^ABSOLUTE PROBABILITY:/,"MUTLAK OLASILIK:")
       .replace(/^LIMITATION:/,"SINIRLAMA:")
       .replace(/^Inter-eye tomography concern:/,"Gözler arası tomografi değerlendirmesi:")
+      .replace(/^Recommended IOL:\s*/,"Önerilen IOL: ")
+      .replace(/^Eligible:\s*/,"Uygun: ")
+      .replace(/\bToric Multifocal\b/g,"Torik Multifokal")
+      .replace(/\bToric Monofocal\b/g,"Torik Monofokal")
+      .replace(/\bToric EDOF\b/g,"Torik EDOF")
+      .replace(/^Age: (\d+) years \(([^)]+)\)\.$/,"Yaş: $1 yıl ($2).")
+      .replace(/^Near-vision demand is (\w+) and halo\/glare tolerance is (\w+)\.$/,"Yakın görme gereksinimi $1 ve halo/kamaşma toleransı $2.")
+      .replace(/^Night-driving requirement is (\w+)\.$/,"Gece araç kullanma gereksinimi $1.")
+      .replace(/^Total Corneal HOA \(4 mm\) is ([\d.]+) µm \((\w+)\)\.$/,"Total Korneal HOA (4 mm) $1 µm ($2).")
+      .replace(/^Pentacam Pupil Dia \(3D\) is ([\d.]+) mm; the multifocal permitted range is 2\.00–4\.00 mm inclusive\.$/,"Pentacam Pupil Dia (3D) $1 mm'dir; izin verilen multifokal aralık 2,00–4,00 mm'dir (sınırlar dahil).")
+      .replace(/^Angle kappa is ([\d.]+) mm and angle alpha is ([\d.]+) mm\.$/,"Kappa açısı $1 mm ve alfa açısı $2 mm'dir.")
+      .replace(/^Retinal status is ([^;]+); macular pathology is ([^;]+); glaucoma status is ([^.]+)\.$/,"Retina durumu $1; maküler patoloji $2; glokom durumu $3.")
+      .replace(/^Ocular-surface status is ([^.]+)\.$/,"Oküler yüzey durumu $1.")
+      .replace(/^Active IOLMaster 500 K difference is ([\d.]+) D \(([^)]+)\); the toric-evaluation threshold is 1\.00 D inclusive\.$/,"Aktif IOLMaster 500 K farkı $1 D'dir ($2); torik değerlendirme eşiği 1,00 D'dir (dahil).")
+      .replace(/^Prior LASIK\/PRK overrides the standard route\. Use the Barrett True-K (history|no-history) pathway externally\.$/,"Önceki LASIK/PRK standart yolu geçersiz kılar. Barrett True-K $1 yolunu harici olarak kullanın.")
+      .replace(/^Cooke K6 could not complete the calculation\. No substitute was used \(([^)]+)\)\.$/,"Cooke K6 hesaplamayı tamamlayamadı. Yerine başka bir yöntem kullanılmadı ($1).")
+      .replace(/\b(not required below threshold|resolved after treatment|occasional|frequent|moderate|significant|suspect|definite|regular|irregular|present|absent|mild|high|low|none)\b/gi,word=>({"not required below threshold":"eşik altında gerekli değil","resolved after treatment":"tedavi sonrası düzeldi","occasional":"ara sıra","frequent":"sık","moderate":"orta","significant":"belirgin","suspect":"şüpheli","definite":"kesin","regular":"düzenli","irregular":"düzensiz","present":"var","absent":"yok","mild":"hafif","high":"yüksek","low":"düşük","none":"yok"})[word.toLowerCase()]||word)
+      .replace(/^Open (.+)$/,(_,name)=>`${name} aracını aç`)
+      .replace(/^(\d+) archived revision\(s\) found\.$/,"$1 arşivlenmiş revizyon bulundu.")
+      .replace(/^(\d+) source image\(s\)\./,"$1 kaynak görüntüsü.")
+      .replace(/^Extraction completed\. Surgeon entry is required only for unreadable fields: (.+)\.$/,"Çıkarma tamamlandı. Yalnızca okunamayan alanlar için cerrah girişi gereklidir: $1.")
       .replace(/NO MAJOR INTER-EYE DISCORDANCE DETECTED/g,"BELİRGİN GÖZLER ARASI UYUMSUZLUK SAPTANMADI")
       .replace(/No major categorical inter-eye tomography discordance detected\./g,"Belirgin kategorik gözler arası tomografi uyumsuzluğu saptanmadı.")
       .replace(/This is not a clearance criterion and does not change the CER-AI score or final disposition\./g,"Bu bir cerrahi onay ölçütü değildir ve CER-AI puanını veya nihai kararı değiştirmez.")
@@ -251,6 +352,13 @@
   };
   const translateDOM = root => {
     if (locale !== "tr" || !root) return;
+    if (root.nodeType === Node.TEXT_NODE) {
+      if (!root.parentElement?.closest("script,style,pre")) {
+        const raw=root.nodeValue, trimmed=raw.trim();
+        if(trimmed){const translated=translate(trimmed);if(translated!==trimmed)root.nodeValue=raw.replace(trimmed,translated);}
+      }
+      return;
+    }
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
     for(const node of nodes){
@@ -258,11 +366,42 @@
       const raw=node.nodeValue, trimmed=raw.trim(); if(!trimmed)continue;
       const translated=translate(trimmed); if(translated!==trimmed)node.nodeValue=raw.replace(trimmed,translated);
     }
-    root.querySelectorAll?.("[aria-label],[title],[placeholder]").forEach(el=>{
-      for(const attr of ["aria-label","title","placeholder"]){const raw=el.getAttribute(attr);if(raw)el.setAttribute(attr,translate(raw));}
+    const attributed=[...(root.matches?.("[aria-label],[title],[placeholder]")?[root]:[]),...(root.querySelectorAll?.("[aria-label],[title],[placeholder]")||[])];
+    attributed.forEach(el=>{
+      for(const attr of ["aria-label","title","placeholder"]){const raw=el.getAttribute(attr),translated=raw?translate(raw):raw;if(raw&&translated!==raw)el.setAttribute(attr,translated);}
     });
   };
   const setLocale = next => { localStorage.setItem("cerai-language", next === "tr" ? "tr" : "en"); location.reload(); };
   window.CERAI_I18N={locale,translate,clinical:translate,translateDOM,setLocale};
   document.documentElement.lang=locale;
+  const initialize = () => {
+    document.title=translate(document.title);
+    translateDOM(document.body);
+    if(!document.querySelector("[data-language]")){
+      const switcher=document.createElement("div");
+      switcher.id="cerai-language-switch";
+      switcher.setAttribute("aria-label",translate("Language"));
+      switcher.style.cssText="position:fixed;right:12px;bottom:12px;z-index:10000;display:flex;gap:4px;padding:4px;border:1px solid #8ca2b2;border-radius:8px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.16)";
+      for(const code of ["en","tr"]){
+        const button=document.createElement("button");
+        button.type="button";button.dataset.language=code;button.textContent=code.toUpperCase();
+        button.setAttribute("aria-pressed",String(locale===code));
+        button.style.cssText=`width:auto;margin:0;padding:6px 9px;border:0;border-radius:5px;cursor:pointer;font:700 12px Arial,sans-serif;color:${locale===code?"#fff":"#173b57"};background:${locale===code?"#173b57":"#eef3f6"}`;
+        button.addEventListener("click",()=>setLocale(code));switcher.appendChild(button);
+      }
+      document.body.appendChild(switcher);
+    }
+    document.querySelectorAll("[data-language]").forEach(button=>{
+      button.setAttribute("aria-pressed",String(button.dataset.language===locale));
+      if(!button.dataset.ceraiLanguageBound){button.addEventListener("click",()=>setLocale(button.dataset.language));button.dataset.ceraiLanguageBound="true";}
+    });
+    if(locale==="tr"){
+      const observer=new MutationObserver(records=>records.forEach(record=>{
+        record.addedNodes.forEach(node=>translateDOM(node));
+        if(record.type==="attributes")translateDOM(record.target);
+      }));
+      observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["aria-label","title","placeholder"]});
+    }
+  };
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",initialize,{once:true});else initialize();
 })();

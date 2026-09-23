@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>CER-AI Deneme Girişi</title>
+  <title>CER-AI Trial Access</title>
   <meta name="theme-color" content="#05090d">
   <style>
     :root{--navy:#173b57;--ink:#17212b;--muted:#66717d;--line:#d9e0e6;--bg:#f4f6f8;--red:#a31212}
@@ -18,14 +18,15 @@
 <body>
   <main class="panel" aria-labelledby="title">
     <h1 id="title">CER-AI</h1>
-    <p class="sub">Deneme erişimi / Trial access</p>
+    <p class="sub">Trial access</p>
     <form id="loginForm" autocomplete="on">
-      <div class="field"><label for="displayName">Doktor adı / Doctor name</label><input id="displayName" name="name" autocomplete="name" required minlength="2" maxlength="160" autofocus></div>
-      <button id="submitButton" type="submit">Devam / Continue</button>
+      <div class="field"><label for="displayName">Doctor name</label><input id="displayName" name="name" autocomplete="name" required minlength="2" maxlength="160" autofocus></div>
+      <button id="submitButton" type="submit">Continue</button>
       <div id="error" class="error" role="alert" aria-live="polite"></div>
     </form>
-    <div class="note">Deneme süresince parola istenmez. Yazdığınız ad, oluşturduğunuz değerlendirmelerin doktor kaydı olarak kullanılır.</div>
+    <div class="note">No password is required during the trial. The name you enter is used as the doctor attribution for assessments you create.</div>
   </main>
+<script src="/static/i18n.js?v=11"></script>
 <script>
 (() => {
   const allowedNext = new Set(["/", "/clinical-modules", "/app", "/iol", "/clinical-app", "/archive-ui"]);
@@ -50,13 +51,13 @@
         body:JSON.stringify({display_name:document.getElementById("displayName").value})
       });
       if (!response.ok) {
-        let message = "Giriş başarısız / Sign-in failed.";
+        let message = "Sign-in failed.";
         try { const data = await response.json(); message = data.detail || message; } catch (_) {}
         throw new Error(message);
       }
       window.location.replace(next);
     } catch (exc) {
-      error.textContent = exc.message || "Giriş başarısız / Sign-in failed.";
+      error.textContent = exc.message || "Sign-in failed.";
     } finally {
       button.disabled = false;
     }

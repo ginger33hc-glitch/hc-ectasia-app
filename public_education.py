@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 33662)
+Total output lines: 1068
+
 """Presentation-only content for the public CER-AI Learning Center.
 
 This module contains no patient inputs, clinical scoring, extraction, safety,
@@ -477,109 +480,7 @@ TR_FAQS = (
     ("Normal ERSS ektazi yatkınlığını dışlar mı?", "Hayır. Hiçbir tarama sistemi yatkınlığa giden bütün yolları dışlamaz. ERSS özgün kanıt tabanı içinde, güncel tomografi ve klinik bulgularla birlikte yorumlanmalıdır."),
     ("Topografi ve tomografi birbirinin yerine kullanılabilir mi?", "Hayır. Eğrilik, elevasyon ve uzaysal pakimetri ilişkili fakat farklı korneal özellikleri tanımlar. Kaynak ekranları ve birimleri açık kalmalıdır."),
     ("Atıf yapılan bir çalışma CER-AI'ı doğrular mı?", "Çalışma CER-AI'ı eksiksiz ürün olarak özellikle değerlendirmedikçe hayır. Kaynakların çoğu ayrı kavramları, değişkenleri veya adlandırılmış risk sistemlerini destekler."),
-    ("Eğitim asistanı hastaya özgü öneri verecek mi?", "Hayır. Planlanan asistan atıf yapılmış kamusal bilgi tabanı ve eğitim yönlendirmesiyle sınırlıdır. Hasta verisi kabul etmeyecek, klinik karar hesaplamayacak ve klinik uygulamanın ya da cerrah kararının yerini almayacaktır."),
-)
-
-
-# Public documentation of the current canonical v2.0 behavior. These tables
-# are presentation data only; the clinical engine remains the sole rule owner.
-TECHNICAL_TABLES = {
-    "en": {
-        "pentacam-education": (
-            ("Surgeon upload and source confirmation", ("Required image", "Surgeon must define/confirm", "Image acquisition requirement"), (
-                ("1. 4 Maps Refractive — OD", "Right eye; 4 Maps Refractive", "Full display, captured directly from the front"),
-                ("2. 4 Maps Refractive — OS", "Left eye; 4 Maps Refractive", "Full display, captured directly from the front"),
-                ("3. Belin/Ambrósio BAD Display — OD", "Right eye; BAD Display", "Full display with bottom D strip and labeled boxes visible"),
-                ("4. Belin/Ambrósio BAD Display — OS", "Left eye; BAD Display", "Full display with bottom D strip and labeled boxes visible"),
-                ("5. Show 2 Exams Topometric", "Bilateral comparison; OD and OS panels identified", "Full display with Cornea Front, Cornea Back, and center indices readable"),
-            ), "The surgeon must upload and confirm all five Pentacam source images. Use a clear screenshot or a photograph taken perpendicular to the screen—not from an angle. Avoid blur, glare, perspective distortion, compression, cropping, shadows, and covered labels. Poor image quality can make a field unreadable or inconsistent; CER-AI must request a clearer source rather than infer a value. Clear acquisition supports consistency but does not guarantee clinical correctness."),
-            ("Standard 4 Maps Refractive quadrant localization", ("Screen location", "Required printed map type", "CER-AI use and conflict rule"), (
-                ("Upper left", "Axial/Sagittal Curvature (Front)", "Only this anterior/front curvature map is used by the deterministic SRAX geometry layer."),
-                ("Upper right", "Elevation (Front)", "Anterior elevation pattern review; it does not substitute for the BAD Display F.Ele.Th labeled value."),
-                ("Lower left", "Corneal Thickness / Pachymetry", "Spatial thickness-pattern review; decision fields still come from their explicitly labeled Pupil Center and Thinnest Location values."),
-                ("Lower right", "Elevation (Back)", "Posterior elevation pattern review; it does not substitute for BAD Display B.Ele.Th or Show 2 Cornea Back values."),
-            ), "CER-AI requires the standard full 4 Maps Refractive layout and verifies the printed map label as well as its quadrant. Do not upload a custom/rearranged four-map layout or place an anterior sagittal-curvature map in a right-hand quadrant. A label–position mismatch, front/back substitution, rotation, or crop is a source conflict and must be corrected with a standard export or clear front-on image."),
-            ("Required Pentacam source set", ("Source image", "Required set", "CER-AI extraction role"), (
-                ("4 Maps Refractive", "One OD and one OS", "Pupil Center pachymetry, circle-marked Thinnest Location, K Max (Front), HWTW, acquisition/identity evidence, and deterministic SRAX geometry."),
-                ("Belin/Ambrósio BAD Display", "One OD and one OS", "Signed F.Ele.Th and B.Ele.Th; PPI Min/Avg/Max and ARTmax; Df/Db/Dp/Dt/Da and Final D; the specific upper-middle Axis field is retained for its validation role. BAD K1/K2 are not required for ML7."),
-                ("Show 2 Exams Topometric", "One bilateral comparison page", "For each eye: Cornea Front K1/K2/axes/Km/Astig; Cornea Back Km and Rmin; center 8-mm indices including ISV, IVA, KI, CKI, IHA, IHD, RMin, KISA, and signed I-S."),
-                ("Excimer treatment card", "Optional sixth image", "Only the labeled Düzeltme Miktarı row may supply treatment correction. If absent, the surgeon provides complete manifest and intended refraction for both eyes."),
-            ), "All five Pentacam pages must be identified before targeted rereading, geometric SRAX analysis, clinical scoring, or report generation. A duplicate page never substitutes for a missing source family."),
-            ("Source-locked field map", ("Registered region", "Accepted fields", "Prohibited substitution"), (
-                ("Show 2 → Cornea Front", "K1, K1 axis, K2, K2 axis, printed Km, Astig and steep axis", "No Cornea Back, Kmax, True Net Power, map spot, or calculated mean"),
-                ("Show 2 → Cornea Back", "Printed posterior Km and posterior Rmin", "No Cornea Front Rmin or center topometric RMin"),
-                ("Show 2 → center Indices (8 mm)", "ISV, IVA, KI, CKI, IHA, IHD, topometric RMin, KISA, signed I-S", "No index may substitute for I-S; preserve the printed sign"),
-                ("4 Maps → lower-left labeled box", "Pupil Center pachymetry, Thinnest Location pachymetry, K Max (Front), HWTW", "No Pachy Vertex, map color/spot, or neighboring number"),
-                ("BAD → elevation row", "Signed F.Ele.Th and B.Ele.Th in µm", "No elevation-map spot, K field, or unlabeled value"),
-                ("BAD → Progression Index", "PPI Min/Avg/Max and ARTmax", "No back-calculation of Dp or Da"),
-                ("BAD → bottom D strip", "Df, Db, Dp, Dt, Da, Final D", "No reconstruction of any component or Final D"),
-            ), "The registry distinguishes fields that look similar. In particular, posterior Rmin and center topometric RMin are separate measurements. ML7 planning reuses the existing canonical Cornea Front K1/K2; it does not request a second pair."),
-            ("From image to auditable report", ("Stage", "What CER-AI does", "Safety behavior"), (
-                ("1. Page identity", "Confirms screen family, OD/OS laterality, patient/exam identity, and the five-source set", "Assessment does not start when a mandatory source is missing or unidentified"),
-                ("2. Primary transcription", "Reads labeled numeric boxes and records exact canonical source IDs", "Wrong-screen or inferred values are rejected"),
-                ("3. Reconciliation", "Merges readings only when field, eye, and source agree", "Same-source disagreement clears the field; it is never averaged"),
-                ("4. Targeted reread", "Re-examines the exact missing or unreadable box", "The prompt remains field- and source-specific"),
-                ("5. Surgeon completion", "Accepts an explicit surgeon-entered or confirmed value where permitted", "Surgeon input is authoritative and labeled SURGEON_CONFIRMED"),
-                ("6. Clinical adapter/report", "Maps resolved values into ERSS, BAD-D, NICE, PS3, safety, then copies computed results and provenance into the report", "The PDF/Word renderer does not rescore the case"),
-            ), "The image model transcribes dates and printed values; deterministic code calculates age, refraction normalization, SRAX geometry, scores, safety formulas, and final disposition."),
-        ),
-        "topometric-indices": (
-            ("What each 8-mm topometric index describes", ("Index", "Technical meaning", "CER-AI role"), (
-                ("ISV", "Standard deviation of individual sagittal radii from mean curvature; a global surface-irregularity descriptor", "Reported context; not an independent CER-AI disposition gate"),
-                ("IVA", "Mean superior–inferior curvature difference relative to the horizontal meridian", "Reported context; not substituted for signed I-S"),
-                ("KI", "Ratio of mean radius values in the superior and inferior corneal halves", "Reported context"),
-                ("CKI", "Ratio of peripheral-ring to central-ring mean radius; emphasizes central steepening", "Reported context"),
-                ("IHA", "Mean superior–inferior difference in corneal elevation along the horizontal meridian", "Reported context"),
-                ("IHD", "Vertical decentration of elevation data derived by Fourier analysis on a 3-mm-radius ring", "Reported context"),
-                ("RMin", "Smallest axial/sagittal curvature radius across the measurement area", "Center topometric index; distinct from posterior Cornea Back Rmin"),
-                ("TKC", "Pentacam anterior-surface topographic keratoconus classification", "Reported device classification; not an autonomous CER-AI diagnosis"),
-                ("KISA%", "Composite of central K, I-S, corneal astigmatism, and SRAX", "Reported device index; CER-AI does not reverse-engineer its inputs from KISA"),
-                ("Signed I-S", "Printed inferior–superior dioptric asymmetry with sign preserved", "Direct numeric input to CER-AI ERSS topography and NICE; never replaced by ISV/IVA/IHD/IHA/KISA"),
-            ), "Definitions follow the OCULUS Pentacam Interpretation Guide. Device colors and thresholds describe the Pentacam reference framework; CER-AI preserves these indices as source-linked context unless a separate canonical pathway explicitly names the field."),
-        ),
-        "randleman-erss": (
-            ("CER-AI ERSS component scoring", ("Component", "Current operational rule", "Points"), (
-                ("Topography", "Normal/symmetric; asymmetric bow-tie; inferior steepening/SRAX; abnormal/ectatic", "0; 1; 3; 4"),
-                ("LASIK RSB or PRK RST", ">=300; 280 to <300; 260 to <280; 240 to <260; <240 µm", "0; 1; 2; 3; 4"),
-                ("Age", ">=21; 19 to <21; 18 to <19 years", "0; 2; 3"),
-                ("Thinnest pachymetry", ">=510; 500 to <510; 480 to <500 µm", "0; 1; 2"),
-                ("Manifest MRSE", ">=-8; <-8 to >=-10; <-10 to >=-12; <-12 to >=-14; <-14 D", "0; 1; 2; 3; 4"),
-            ), "Age <18 is incomplete. Pachymetry <480 µm is not assigned an ERSS row score because it is an independent CER-AI STOP-DEFER. PRK uses RST for the tissue row; its independent RST hard stop is <310 µm."),
-            ("From ERSS total to CER-AI pathway result", ("ERSS total", "CER-AI result", "Report behavior"), (
-                ("0–2", "PASS", "Five rows, total, topography category, and disposition are reported."),
-                ("3", "CAUTION", "Requires explicit surgeon review; does not alone impose the global final result."),
-                (">=4", "STOP-DEFER", "Becomes a stop driver in the final report."),
-                ("Critical input missing", "ASSESSMENT INCOMPLETE", "A complete report token is not issued until the required field is resolved."),
-            ), "CER-AI does not convert the ordinal total into an individual lifetime probability."),
-        ),
-        "bad-d-component-indices": (
-            ("Final BAD-D disposition", ("Final D", "Classification", "CER-AI pathway result"), (
-                ("<=1.60", "Normal", "PASS"),
-                (">1.60 and <2.60", "Suspicious", "CAUTION"),
-                (">=2.60", "Abnormal", "STOP-DEFER"),
-                ("Unavailable", "Unavailable", "ASSESSMENT INCOMPLETE"),
-            ), "Final D is read from the BAD Display bottom strip. CER-AI never reconstructs it from Df, Db, Dp, Dt, or Da."),
-            ("What each BAD-D component means", ("Field", "Technical meaning", "Do not confuse with"), (
-                ("Df", "Standardized deviation of the anterior elevation difference map: the change from the standard best-fit sphere to the enhanced reference surface", "F.Ele.Th, which is the signed anterior elevation at the thinnest point in µm"),
-                ("Db", "Standardized deviation of the posterior elevation difference map: the change from the standard best-fit sphere to the enhanced reference surface", "B.Ele.Th, which is the signed posterior elevation at the thinnest point in µm"),
-                ("Dp", "Standardized deviation of the average pachymetric progression pattern from the reference population", "PPI Average, the displayed underlying progression index"),
-                ("Dt", "Standardized deviation associated with the measured minimum/thinnest corneal thickness", "The raw Thinnest Location pachymetry in µm"),
-                ("Da", "Standardized deviation of ARTmax (Ambrósio Relational Thickness maximum)", "Raw ARTmax, calculated by Pentacam as thinnest-point thickness divided by PPI Maximum"),
-                ("Final D", "Pentacam multivariable regression output integrating the BAD display parameters against its reference database", "A sum, average, percentage risk, or patient-specific lifetime probability"),
-            ), "Df, Db, Dp, Dt, Da, and Final D are reported as normalized deviations from the device reference framework. They are dimensionless standardized values, not micrometers or diopters. A larger deviation means farther from the reference mean; it does not by itself establish a diagnosis."),
-            ("How CER-AI carries BAD information into the report", ("BAD Display value", "CER-AI handling", "Independent use elsewhere"), (
-                ("Final D", "The source-locked printed value alone determines the BAD-D pathway result shown above", "Remains independent from ERSS, NICE, and PS3"),
-                ("Df, Db, Dp, Dt, Da", "Transcribed from the bottom D strip and displayed as component context; they are not independently rescored", "No component creates a second BAD-D caution or stop"),
-                ("F.Ele.Th / B.Ele.Th", "Transcribed separately from the labeled elevation row as signed µm measurements", "These raw elevation values may enter explicitly named NICE or PS3 pathways; they are not replaced by Df or Db"),
-                ("PPI min/avg/max; ARTmax", "Transcribed separately from the Progression Index box as raw device outputs", "PPI Average has a separately defined PS3 role; Dp and Da do not substitute for it"),
-            ), "CER-AI preserves both the printed value and its exact source region. An isolated abnormal component can coexist with a normal Final D, while several smaller deviations can contribute to an abnormal Final D; therefore the report shows the component pattern without reverse-engineering or overriding the printed composite."),
-        ),
-        "nice-risk-assessment": (
-            ("CER-AI-adapted NICE component scoring", ("Input", "1 point", "2 points", "3 points"), (
-                ("K2", "<45 D", "45–47 D", ">47 D"),
-                ("Central pachymetry", ">520 µm", "500–520 µm", "<500 µm"),
-                ("B.Ele.Th", "<=15.5 µm", ">15.5 to <18 µm", ">=18 µm"),
-                ("Signed I-S", "<1.00 D", "1.00–1.40 D", ">1.40 D"),
+…3662 tokens truncated…I-S", "<1.00 D", "1.00–1.40 D", ">1.40 D"),
             ), "All four source-locked numeric inputs are required. Out-of-range or missing data make NICE incomplete rather than favorable."),
             ("From NICE total to CER-AI pathway result", ("Total", "Category", "CER-AI result"), (
                 ("4", "No NICE escalation", "PASS"),
@@ -945,7 +846,10 @@ def render_hub(base: str, robots: str, locale: str = "en") -> str:
         boundary = ("Core boundary", "Education explains the science; the CER-AI application performs the structured assessment.")
         case_head = ("Worked examples", "Synthetic cases and report flow", "Follow how source inputs become independent risk pathways, safety checks, and a structured report.")
         resources = '<div><p class="learning-kicker">Evidence library</p><h2>Trace statements to their sources</h2><p>Use the clinical evidence map for pathway-level interpretation and the searchable registry for the complete bibliography.</p><div class="learning-actions"><a class="learning-button" href="/clinical-evidence">Clinical evidence</a><a class="learning-button secondary" href="/references">Reference registry</a></div></div><div><p class="learning-kicker">Questions</p><h2>FAQ and educational assistant boundary</h2><p>Read concise answers and see how the planned assistant remains separated from patient-specific assessment.</p><div class="learning-actions"><a class="learning-button" href="/learning/faq">Open FAQ</a></div></div>'
-    presentations = '''<section class="learning-section learning-alt"><div class="learning-wrap"><div class="learning-section-head"><p class="learning-kicker">Physician presentation</p><h2>CER-AI presentation examples</h2><p>Review the program logic, canonical data sources, independent risk channels, and procedure-specific decision workflow in a 20-slide deck.</p><div class="learning-actions"><a class="learning-button" href="/static/education/presentations/CER-AI_English_Physician_Presentation_2026-09-15_v1.pptx" download>Download English presentation</a><a class="learning-button secondary" href="/static/education/presentations/CER-AI_Turkce_Hekim_Tanitimi_2026-09-15_v5.pptx" download>Download Turkish presentation</a></div></div></div></section>'''
+    if locale == "tr":
+        presentations = '''<section class="learning-section learning-alt"><div class="learning-wrap"><div class="learning-section-head"><p class="learning-kicker">Hekim sunumu</p><h2>CER-AI sunum örnekleri</h2><p>Program mantığını, kanonik veri kaynaklarını, bağımsız risk yollarını ve prosedüre özgü karar iş akışını 20 slaytlık sunumda inceleyin.</p><div class="learning-actions"><a class="learning-button" href="/static/education/presentations/CER-AI_English_Physician_Presentation_2026-09-15_v1.pptx" download>İngilizce sunumu indir</a><a class="learning-button secondary" href="/static/education/presentations/CER-AI_Turkce_Hekim_Tanitimi_2026-09-15_v5.pptx" download>Türkçe sunumu indir</a></div></div></div></section>'''
+    else:
+        presentations = '''<section class="learning-section learning-alt"><div class="learning-wrap"><div class="learning-section-head"><p class="learning-kicker">Physician presentation</p><h2>CER-AI presentation examples</h2><p>Review the program logic, canonical data sources, independent risk channels, and procedure-specific decision workflow in a 20-slide deck.</p><div class="learning-actions"><a class="learning-button" href="/static/education/presentations/CER-AI_English_Physician_Presentation_2026-09-15_v1.pptx" download>Download English presentation</a><a class="learning-button secondary" href="/static/education/presentations/CER-AI_Turkce_Hekim_Tanitimi_2026-09-15_v5.pptx" download>Download Turkish presentation</a></div></div></div></section>'''
     return f"""<!doctype html><html lang="{locale}"><head>{_head(base, path, title, description, robots, schema, locale)}</head><body>{_nav(locale, path)}<main>
 <section class="learning-hero"><div class="learning-wrap">{_breadcrumb(breadcrumb)}<p class="learning-kicker">{hero[0]}</p><h1>{hero[1]}</h1><p class="learning-lead">{hero[2]}</p><div class="learning-principle"><strong>{boundary[0]}</strong><span>{boundary[1]}</span></div></div></section>
 <section class="learning-section"><div class="learning-wrap"><div class="learning-section-head"><p class="learning-kicker">{curriculum[0]}</p><h2>{curriculum[1]}</h2><p>{curriculum[2]}</p></div><div class="learning-grid">{cards}</div></div></section>
