@@ -36,7 +36,7 @@ def result(overrides=None):
 
 def power_payload(**overrides):
     payload = {
-        "patient_name": "Test Patient", "eye": "OD",
+        "patient_name": "Test Patient", "biological_sex": "Female", "eye": "OD",
         "selected_lens_id": "clareon-mono-sy60wf", "axial_length_mm": 24.2,
         "acd_mm": 2.21, "k1_d": 42.0, "k1_axis_deg": 20,
         "k2_d": 42.5, "k2_axis_deg": 110, "astigmatism_type": None,
@@ -127,13 +127,20 @@ def test_non_toric_standard_eye_uses_cooke_k6_and_exposes_external_verification(
     assert plan.route == "COOKE_K6"
     assert plan.calculation_status == "COMPLETED"
     assert plan.predictions[0]["IsBestOption"] is True
-    assert plan.kane_url == "https://www.iolformula.com/"
     assert plan.escrs_url == "https://iolcalculator.escrs.org/"
+    assert plan.inputs["biological_sex"] == "Female"
 
 
 def test_short_eye_requires_real_lens_thickness_and_wtw():
     with pytest.raises(ValidationError):
         power_payload(axial_length_mm=21.9, lens_thickness_mm=None)
+
+
+def test_power_route_requires_surgeon_selected_biological_sex():
+    with pytest.raises(ValidationError):
+        power_payload(biological_sex="")
+    with pytest.raises(ValidationError):
+        power_payload(biological_sex="Unknown")
 
 
 def test_extraction_contract_encodes_pentacam_complement_and_no_tcrp_authority():
@@ -159,6 +166,18 @@ def test_mobile_ui_contains_both_sources_and_no_browser_credential_storage():
     assert "ACD (Int.)" in html and "TCRP is not used" in html
     assert "localStorage" not in script and "sessionStorage" not in script
     assert "Final responsibility rests with the surgeon at all times and under all circumstances." in html
+
+
+def test_escrs_transfer_is_deidentified_and_kane_is_removed():
+    html = Path("static/iol.html").read_text(encoding="utf-8")
+    script = Path("static/iol.js").read_text(encoding="utf-8")
+    power = Path("iol_module/power.py").read_text(encoding="utf-8")
+    transfer = script[script.index("function downloadEscrsBiometry"):script.index('$("iolForm").addEventListener')]
+    assert '<select id="biologicalSex" required>' in html
+    assert 'patient:{gender:data.inputs.biological_sex}' in transfer
+    assert 'right_eye:data.inputs.eye === "OD" ? eyeData : {}' in transfer
+    assert "patient_name" not in transfer and "patient_id" not in transfer
+    assert "Kane" not in html and "Kane" not in script and "KANE_URL" not in power
 
 
 def test_pentacam_is_the_only_operative_eye_source():

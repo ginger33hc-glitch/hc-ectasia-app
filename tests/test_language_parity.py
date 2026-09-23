@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_all_secure_interfaces_load_the_canonical_language_controller():
     for filename in ("index.html", "iol.html", "login.html", "module-select.html", "archive.html", "trial-login.html"):
         html = (ROOT / "static" / filename).read_text(encoding="utf-8")
-        expected_version = "13" if filename == "iol.html" else "11"
+        expected_version = "14" if filename == "iol.html" else "11"
         assert html.count(f'/static/i18n.js?v={expected_version}') == 1, filename
 
 
@@ -23,7 +23,8 @@ def test_secure_source_markup_is_english_only_and_turkish_is_canonicalized():
         ("IOL Decision Assistant — Advanced Mode", "IOL Karar Asistanı — Gelişmiş Mod"),
         ("Internal ACD excludes corneal thickness; ACD (Ext.) is never substituted.", "İnternal ACD kornea kalınlığını içermez"),
         ("Toric trigger: ≥1.00 D and regular astigmatism.", "Torik tetikleyici: ≥1,00 D ve düzenli astigmatizma."),
-        ("Compare with ESCRS formulas", "ESCRS formülleriyle karşılaştır"),
+        ("Transfer values to ESCRS", "Değerleri ESCRS'ye aktar"),
+        ("Biological sex", "Biyolojik cinsiyet"),
         ("Archived cases", "Arşivlenmiş vakalar"),
         ("No password is required during the trial.", "Deneme süresince parola gerekmez."),
     ):

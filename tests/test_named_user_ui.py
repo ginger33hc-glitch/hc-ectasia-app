@@ -116,7 +116,7 @@ def test_unauthenticated_iol_redirects_to_login_and_authenticated_iol_is_separat
     assert "IOL Decision Assistant" in allowed.text
     assert "IOL Calculation Surgery" in allowed.text
     assert "Doctor &lt;One&gt;" in allowed.text
-    assert "/static/iol.js?v=7" in allowed.text
+    assert "/static/iol.js?v=8" in allowed.text
     assert 'href="/clinical-modules"' in allowed.text
 
 

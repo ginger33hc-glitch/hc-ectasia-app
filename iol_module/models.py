@@ -144,6 +144,7 @@ class IOLRecommendation(StrictModel):
 
 class IOLPowerPlanInput(StrictModel):
     patient_name: str = Field(min_length=1, max_length=200)
+    biological_sex: Literal["Male", "Female"]
     eye: Literal["OD", "OS"]
     selected_lens_id: str = Field(min_length=1, max_length=100)
     axial_length_mm: float = Field(ge=12, le=38)
@@ -202,7 +203,6 @@ class IOLPowerPlan(StrictModel):
     target_warning: str | None
     calculator_name: str
     calculator_url: str | None
-    kane_url: str | None
     escrs_url: str | None
     inputs: dict[str, object]
     predictions: list[dict[str, object]]

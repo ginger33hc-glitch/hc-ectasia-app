@@ -94,6 +94,31 @@
     $("selectedLens").innerHTML = `<option value="">Select an eligible lens</option>` + options.map(lens => `<option value="${lens.id}">${lens.name} — ${lens.category} — A ${lens.a_constant.toFixed(1)}</option>`).join("");
   }
 
+  function downloadEscrsBiometry(data) {
+    const eyeData = {
+      lens_status: "Phakic",
+      AL: data.inputs.axial_length_mm,
+      ACD: data.inputs.acd_internal_mm,
+      K1_magnitude: data.inputs.k1_d,
+      K2_magnitude: data.inputs.k2_d,
+      keratometric_index: 1.3375
+    };
+    if (data.inputs.lens_thickness_mm != null) eyeData.LT = data.inputs.lens_thickness_mm;
+    if (data.inputs.cct_um != null) eyeData.CCT = data.inputs.cct_um;
+    if (data.inputs.wtw_mm != null) eyeData.WTW = data.inputs.wtw_mm;
+    const report = {data:{
+      biometer:{device_name:"Other",manufacturer:"Other"},
+      patient:{gender:data.inputs.biological_sex},
+      right_eye:data.inputs.eye === "OD" ? eyeData : {},
+      left_eye:data.inputs.eye === "OS" ? eyeData : {}
+    },extra_data:{notes:"CER-AI composite source: AL and K values from IOLMaster 500; ACD, CCT and WTW from Pentacam Cataract Pre-Op. ACD is Pentacam ACD (Int.), excluding CCT. Verify every imported value before calculation."}};
+    const url = URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:"application/json"}));
+    const link = document.createElement("a");
+    link.href = url; link.download = `cerai-escrs-${data.inputs.eye.toLowerCase()}.json`;
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   $("iolForm").addEventListener("submit", async event => {
     event.preventDefault(); const status = $("evaluationStatus"); status.className = "status";
     if (!pentacamEyeConfirmed) { status.textContent = "The operative eye must come from a readable Pentacam Cataract Pre-Op report."; status.classList.add("error"); return; }
@@ -127,7 +152,7 @@
 
   $("powerButton").addEventListener("click", async () => {
     const status = $("powerStatus"); status.className="status"; const difference = kDifference();
-    const payload = {patient_name:$("patientName").value, eye:$("eye").value, selected_lens_id:$("selectedLens").value,
+    const payload = {patient_name:$("patientName").value, biological_sex:$("biologicalSex").value, eye:$("eye").value, selected_lens_id:$("selectedLens").value,
       axial_length_mm:Number($("al").value), acd_mm:Number($("acd").value), k1_d:Number($("k1").value), k1_axis_deg:Number($("k1Axis").value), k2_d:Number($("k2").value), k2_axis_deg:Number($("k2Axis").value), astigmatism_type:$("astigType").value || null,
       target_refraction_d:Number($("targetRx").value), prior_corneal_surgery:$("priorSurgery").value, historical_data_available:$("historicalData").value === "true", incision_axis_deg:difference>=1?numberOrNull("incisionAxis"):null, sia_d:difference>=1?numberOrNull("sia"):null, sia_axis_deg:difference>=1?numberOrNull("siaAxis"):null,
       cct_um:numberOrNull("cct"), lens_thickness_mm:numberOrNull("lensThickness"), wtw_mm:numberOrNull("wtw")};
@@ -137,10 +162,13 @@
       const response=await fetch("/iol/power/plan",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); const data=await response.json(); if(!response.ok) throw new Error(errorMessage(data));
       let html=`<div class="warning"><strong>${data.calculator_name}</strong><br>${data.message}</div>`;
       if(data.calculator_url) html+=`<a class="external" target="_blank" rel="noopener noreferrer" href="${data.calculator_url}">Open ${data.calculator_name}</a>`;
-      if(data.kane_url) html+=`<a class="external" target="_blank" rel="noopener noreferrer" href="${data.kane_url}">Verify externally with Kane</a>`;
-      if(data.escrs_url) html+=`<a class="external" target="_blank" rel="noopener noreferrer" href="${data.escrs_url}">Compare with ESCRS formulas</a>`;
+      if(data.escrs_url) html+=`<a id="escrsTransfer" class="external" target="_blank" rel="noopener noreferrer" href="${data.escrs_url}">Transfer values to ESCRS</a>`;
       if(data.predictions?.length){html+=`<table class="table"><thead><tr><th>IOL power</th><th>Predicted refraction</th><th>Selection</th></tr></thead><tbody>${data.predictions.map(p=>`<tr><td>${p.IOL ?? p.iol_power ?? "—"}</td><td>${p.Rx ?? p.predicted_refraction ?? "—"}</td><td>${p.IsBestOption ? "Best option" : ""}</td></tr>`).join("")}</tbody></table>`;}
       $("powerResult").innerHTML=html; status.textContent=data.calculation_status.replaceAll("_"," ");
+      if(data.escrs_url) $("escrsTransfer").addEventListener("click", () => {
+        downloadEscrsBiometry(data);
+        status.textContent="ESCRS biometry file downloaded. In ESCRS choose Load Biometry, upload the JSON file, and verify every value.";
+      });
     } catch(error){status.textContent=error.message||"Power route could not be completed.";status.classList.add("error");}
     finally{$("powerButton").disabled=false;}
   });
