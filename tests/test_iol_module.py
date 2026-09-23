@@ -158,3 +158,15 @@ def test_mobile_ui_contains_both_sources_and_no_browser_credential_storage():
     assert "ACD (Int.)" in html and "TCRP is not used" in html
     assert "localStorage" not in script and "sessionStorage" not in script
     assert "Final responsibility rests with the surgeon at all times and under all circumstances." in html
+
+
+def test_pentacam_is_the_only_operative_eye_source():
+    html = Path("static/iol.html").read_text(encoding="utf-8")
+    script = Path("static/iol.js").read_text(encoding="utf-8")
+    assert '<select id="eye" required disabled>' in html
+    assert "IOLMaster is bilateral" in html
+    assert "const pentacamEyes = new Set()" in script
+    assert '$("eye").value = [...pentacamEyes][0]' in script
+    assert "originals.OD ? \"OD\"" not in script
+    assert "pentacamEyeConfirmed" in script
+    assert "Conflicting Pentacam laterality was detected" in script

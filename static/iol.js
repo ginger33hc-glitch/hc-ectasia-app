@@ -5,6 +5,7 @@
   const setIfPresent = (id, value) => { if (value !== null && value !== undefined) $(id).value = value; };
   const originals = {OD:null, OS:null};
   const pentacamByEye = {OD:null, OS:null};
+  let pentacamEyeConfirmed = false;
   let recommendation = null;
   let lensCatalog = [];
 
@@ -55,21 +56,32 @@
     const status = $("extractStatus"); status.className = "status";
     if (!files.length) { status.textContent = "Upload the Pentacam and IOLMaster 500 reports."; status.classList.add("error"); return; }
     const form = new FormData(); files.forEach(file => form.append("images", file));
+    originals.OD = null; originals.OS = null;
+    pentacamByEye.OD = null; pentacamByEye.OS = null;
+    pentacamEyeConfirmed = false; $("eye").value = "";
     $("extractButton").disabled = true; status.textContent = "Transcribing source-locked fields…";
     try {
       const response = await fetch("/iol/extract", {method:"POST", body:form, credentials:"same-origin"});
       const data = await response.json(); if (!response.ok) throw new Error(errorMessage(data));
       const unreadable = [];
+      const pentacamEyes = new Set();
+      let unreadablePentacamLaterality = false;
       for (const source of data.sources || []) {
         const item = source.extraction || {}; setIfPresent("patientName", item.patient_name); setIfPresent("patientAge", item.patient_age_years);
-        if (item.document_type === "PENTACAM_CATARACT_PREOP" && ["OD","OS"].includes(item.eye)) pentacamByEye[item.eye] = item.pentacam;
+        if (item.document_type === "PENTACAM_CATARACT_PREOP") {
+          if (["OD","OS"].includes(item.eye)) { pentacamByEye[item.eye] = item.pentacam; pentacamEyes.add(item.eye); }
+          else unreadablePentacamLaterality = true;
+        }
         if (item.document_type === "IOLMASTER_500_BIOMETRY") {
           const report = item.iolmaster500 || {}; ["OD","OS"].forEach(eye => { if (report[eye] && report[eye].axial_length_mm !== null) originals[eye] = report[eye]; });
           setIfPresent("targetRx", report.printed_target_refraction_d);
         }
         (item.unreadable_fields || []).forEach(field => unreadable.push(`${source.filename}: ${field}`));
       }
-      if (!$("eye").value) $("eye").value = originals.OD ? "OD" : (originals.OS ? "OS" : "");
+      if (unreadablePentacamLaterality || pentacamEyes.size === 0) throw new Error("Pentacam laterality was not read. Upload a readable Pentacam Cataract Pre-Op report showing OD or OS.");
+      if (pentacamEyes.size > 1) throw new Error("Conflicting Pentacam laterality was detected. Upload the Cataract Pre-Op report for one operative eye only.");
+      $("eye").value = [...pentacamEyes][0];
+      pentacamEyeConfirmed = true;
       populateEye();
       status.textContent = unreadable.length ? `Extraction completed. Surgeon entry is required only for unreadable fields: ${unreadable.join(", ")}.` : "Both reports extracted. Review values before evaluation.";
     } catch (error) { status.textContent = error.message || "Image transcription failed."; status.classList.add("error"); }
@@ -84,6 +96,7 @@
 
   $("iolForm").addEventListener("submit", async event => {
     event.preventDefault(); const status = $("evaluationStatus"); status.className = "status";
+    if (!pentacamEyeConfirmed) { status.textContent = "The operative eye must come from a readable Pentacam Cataract Pre-Op report."; status.classList.add("error"); return; }
     if (!event.currentTarget.reportValidity()) return;
     const eye = $("eye").value; const source = originals[eye];
     const originalK1 = source?.k1_d ?? Number($("k1").value); const originalK2 = source?.k2_d ?? Number($("k2").value);
