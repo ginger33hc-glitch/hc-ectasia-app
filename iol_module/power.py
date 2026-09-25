@@ -135,7 +135,7 @@ def _call_k6(case: IOLPowerPlanInput, a_constant: float) -> list[dict[str, objec
     return predictions
 
 
-def plan_iol_power(case: IOLPowerPlanInput, *, allow_toric_test: bool = False) -> IOLPowerPlan:
+def plan_iol_power(case: IOLPowerPlanInput) -> IOLPowerPlan:
     lens = get_lens(case.selected_lens_id)
     if lens is None:
         raise ValueError("Selected lens is not in the clinic-approved catalog.")
@@ -175,10 +175,7 @@ def plan_iol_power(case: IOLPowerPlanInput, *, allow_toric_test: bool = False) -
             )
         candidates: list[dict[str, object]] = []
         toric_status = "INPUTS_INCOMPLETE"
-        if not allow_toric_test:
-            toric_status = "TEST_RESTRICTED"
-            explanation = "Embedded toric prototype outputs are limited to the clinic OWNER test session. K6 spherical power and the manufacturer's calculator remain available."
-        elif lens.id not in VERIFIED_LENS_STEPS:
+        if lens.id not in VERIFIED_LENS_STEPS:
             toric_status = "UNSUPPORTED"
             explanation = "No verified cylinder model series exists for the selected lens family."
         elif case.posterior_cornea is None or case.cct_um is None:

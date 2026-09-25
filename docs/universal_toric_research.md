@@ -11,9 +11,8 @@ predicted residuals. The incision and SIA axis follow steep K2 at 0.25 D.
 The manufacturer's official calculator is a separate optional comparison.
 Missing, incompatible or unverified data prevent a model and axis result.
 
-Results are available only in the clinic OWNER session and prominently marked
-**TEST ONLY**. Other doctor sessions retain the K6 spherical result and
-manufacturer link without an embedded model or axis. The combined K6 / Holladay 1 /
+Results are available in authenticated doctor and OWNER sessions and are
+prominently marked **TEST ONLY**. The combined K6 / Holladay 1 /
 posterior-cornea optical method is our prototype, not an identical manufacturer
 implementation, and has no paired clinical validation. Its first-ranked
 model and axis are not implant recommendations. ENOVA lacks a verified

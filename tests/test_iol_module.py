@@ -111,7 +111,7 @@ def test_embedded_toric_calculation_precedes_optional_manufacturer_comparison():
     response = [{"IOLs": [{"Predictions": [{"IOL": 21.0, "Rx": 0.01, "IsBestOption": True}]}]}]
     fake = BytesIO(__import__("json").dumps(response).encode()); fake.__enter__ = lambda value: value; fake.__exit__ = lambda *args: None
     with patch("iol_module.power.urlopen", return_value=fake):
-        plan = plan_iol_power(case, allow_toric_test=True)
+        plan = plan_iol_power(case)
     assert plan.route == "MANUFACTURER_TORIC"
     assert plan.calculation_status == "TEST_ONLY"
     assert plan.toric_status == "TEST_ONLY"
@@ -131,22 +131,8 @@ def test_toric_missing_same_eye_posterior_preserves_sphere_but_has_no_axis():
     response = [{"IOLs": [{"Predictions": [{"IOL": 21.0, "Rx": 0.01, "IsBestOption": True}]}]}]
     fake = BytesIO(__import__("json").dumps(response).encode())
     with patch("iol_module.power.urlopen", return_value=fake):
-        plan = plan_iol_power(case, allow_toric_test=True)
-    assert plan.toric_status == "INPUTS_INCOMPLETE"
-    assert plan.toric_candidates == []
-    assert plan.predictions[0]["IOL"] == 21.0
-    assert plan.calculator_url == "https://www.myalcon-toriccalc.com/"
-
-
-def test_toric_prototype_is_disabled_by_default_for_doctor_sessions():
-    case = power_payload(selected_lens_id="clareon-panoptix-toric-cnwtt3", k2_d=43.0,
-                         astigmatism_type="REGULAR", incision_axis_deg=110, sia_d=0.25,
-                         posterior_cornea={"eye":"OD", "source":"PENTACAM_4_MAPS_REFRACTIVE_CORNEA_BACK",
-                                            "k1_d":-5.8, "k2_d":-6.1, "k1_axis_deg":20,
-                                            "k2_axis_deg":110, "rh_mm":6.7, "rv_mm":6.5})
-    with patch("iol_module.power._call_k6", return_value=[{"IOL":21.0, "Rx":0.01, "IsBestOption":True}]):
         plan = plan_iol_power(case)
-    assert plan.toric_status == "TEST_RESTRICTED"
+    assert plan.toric_status == "INPUTS_INCOMPLETE"
     assert plan.toric_candidates == []
     assert plan.predictions[0]["IOL"] == 21.0
     assert plan.calculator_url == "https://www.myalcon-toriccalc.com/"
@@ -166,7 +152,7 @@ def test_unverified_manufacturer_toric_route_fails_closed():
     response = [{"IOLs": [{"Predictions": [{"IOL": 20.5, "Rx": -0.1}]}]}]
     fake = BytesIO(__import__("json").dumps(response).encode()); fake.__enter__ = lambda value: value; fake.__exit__ = lambda *args: None
     with patch("iol_module.power.urlopen", return_value=fake):
-        plan = plan_iol_power(case, allow_toric_test=True)
+        plan = plan_iol_power(case)
     assert plan.calculation_status == "CALCULATION_UNAVAILABLE"
     assert plan.toric_status == "UNSUPPORTED"
     assert plan.calculator_url is None

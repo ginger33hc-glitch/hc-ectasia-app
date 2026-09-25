@@ -117,11 +117,11 @@ def test_unauthenticated_iol_redirects_to_login_and_authenticated_iol_is_separat
     assert "IOL Decision Assistant" in allowed.text
     assert "IOL Calculation Surgery" in allowed.text
     assert "Doctor &lt;One&gt;" in allowed.text
-    assert "/static/iol.js?v=12" in allowed.text
+    assert "/static/iol.js?v=13" in allowed.text
     assert 'href="/clinical-modules"' in allowed.text
 
 
-def test_toric_test_outputs_are_owner_only_at_http_boundary():
+def test_toric_test_outputs_available_to_authenticated_doctors_and_owner():
     payload = {
         "patient_name":"Synthetic", "biological_sex":"Female", "eye":"OD",
         "selected_lens_id":"clareon-panoptix-toric-cnwtt3", "axial_length_mm":24.2,
@@ -142,8 +142,8 @@ def test_toric_test_outputs_are_owner_only_at_http_boundary():
             response = client.post("/iol/power/plan", json=payload)
             assert response.status_code == 200
             result = response.json()
-            assert result["toric_status"] == ("TEST_ONLY" if role == "OWNER" else "TEST_RESTRICTED")
-            assert bool(result["toric_candidates"]) == (role == "OWNER")
+            assert result["toric_status"] == "TEST_ONLY"
+            assert result["toric_candidates"]
             assert result["calculator_url"] == "https://www.myalcon-toriccalc.com/"
 
 
