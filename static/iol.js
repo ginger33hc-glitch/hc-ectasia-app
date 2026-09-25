@@ -74,7 +74,6 @@
         }
         if (item.document_type === "IOLMASTER_500_BIOMETRY") {
           const report = item.iolmaster500 || {}; ["OD","OS"].forEach(eye => { if (report[eye] && report[eye].axial_length_mm !== null) originals[eye] = report[eye]; });
-          setIfPresent("targetRx", report.printed_target_refraction_d);
         }
         (item.unreadable_fields || []).forEach(field => unreadable.push(`${source.filename}: ${field}`));
       }
@@ -140,13 +139,15 @@
     const status = $("powerStatus"); status.className="status"; const difference = kDifference();
     const payload = {patient_name:$("patientName").value, biological_sex:$("biologicalSex").value, eye:$("eye").value, selected_lens_id:$("selectedLens").value,
       axial_length_mm:Number($("al").value), acd_mm:Number($("acd").value), k1_d:Number($("k1").value), k1_axis_deg:Number($("k1Axis").value), k2_d:Number($("k2").value), k2_axis_deg:Number($("k2Axis").value), astigmatism_type:$("astigType").value || null,
-      target_refraction_d:Number($("targetRx").value), prior_corneal_surgery:$("priorSurgery").value, historical_data_available:$("historicalData").value === "true", incision_axis_deg:difference>=1?numberOrNull("incisionAxis"):null, sia_d:difference>=1?numberOrNull("sia"):null, sia_axis_deg:difference>=1?numberOrNull("siaAxis"):null,
+      prior_corneal_surgery:$("priorSurgery").value, historical_data_available:$("historicalData").value === "true", incision_axis_deg:difference>=1?numberOrNull("incisionAxis"):null, sia_d:difference>=1?numberOrNull("sia"):null, sia_axis_deg:difference>=1?numberOrNull("siaAxis"):null,
       cct_um:numberOrNull("cct"), lens_thickness_mm:numberOrNull("lensThickness"), wtw_mm:numberOrNull("wtw")};
     if (!payload.selected_lens_id) { status.textContent="Select a clinic lens."; status.classList.add("error"); return; }
     $("powerButton").disabled=true; status.textContent="Determining the canonical calculation route…";
     try {
       const response=await fetch("/iol/power/plan",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); const data=await response.json(); if(!response.ok) throw new Error(errorMessage(data));
       let html=`<div class="warning"><strong>${data.calculator_name}</strong><br>${data.message}</div>`;
+      html+=`<p><span>ACD target</span>: ${Number(data.target_refraction_d).toFixed(2)} D (<span>locked</span>)</p>`;
+      if(data.second_formula_required) html+=`<div class="warning"><span>Second modern formula verification required</span> (AL ${Number(data.inputs.axial_length_mm).toFixed(2)} mm). <span>Use ESCRS where available and verify all values manually.</span></div>`;
       if(data.calculator_url) html+=`<a class="external" target="_blank" rel="noopener noreferrer" href="${data.calculator_url}">Open ${data.calculator_name}</a>`;
       if(data.escrs_url) html+=`<button id="escrsTransfer" class="external" type="button">Transfer values to ESCRS</button>`;
       if(data.predictions?.length){html+=`<table class="table"><thead><tr><th>IOL power</th><th>Predicted refraction</th><th>Selection</th></tr></thead><tbody>${data.predictions.map(p=>`<tr><td>${p.IOL ?? p.iol_power ?? "—"}</td><td>${p.Rx ?? p.predicted_refraction ?? "—"}</td><td>${p.IsBestOption ? "Best option" : ""}</td></tr>`).join("")}</tbody></table>`;}
