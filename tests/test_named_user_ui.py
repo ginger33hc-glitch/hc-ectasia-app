@@ -1,5 +1,6 @@
 import logging
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -116,8 +117,34 @@ def test_unauthenticated_iol_redirects_to_login_and_authenticated_iol_is_separat
     assert "IOL Decision Assistant" in allowed.text
     assert "IOL Calculation Surgery" in allowed.text
     assert "Doctor &lt;One&gt;" in allowed.text
-    assert "/static/iol.js?v=11" in allowed.text
+    assert "/static/iol.js?v=12" in allowed.text
     assert 'href="/clinical-modules"' in allowed.text
+
+
+def test_toric_test_outputs_are_owner_only_at_http_boundary():
+    payload = {
+        "patient_name":"Synthetic", "biological_sex":"Female", "eye":"OD",
+        "selected_lens_id":"clareon-panoptix-toric-cnwtt3", "axial_length_mm":24.2,
+        "acd_mm":2.21, "k1_d":42.0, "k1_axis_deg":20,
+        "k2_d":43.0, "k2_axis_deg":110, "astigmatism_type":"REGULAR",
+        "incision_axis_deg":110, "sia_d":0.25, "sia_axis_deg":110, "cct_um":573,
+        "posterior_cornea":{
+            "eye":"OD", "source":"PENTACAM_4_MAPS_REFRACTIVE_CORNEA_BACK",
+            "k1_d":-5.8, "k2_d":-6.1, "k1_axis_deg":20,
+            "k2_axis_deg":110, "rh_mm":6.7, "rv_mm":6.5,
+        },
+    }
+    with patch("iol_module.power._call_k6", return_value=[{"IOL":21.0, "Rx":0.01, "IsBestOption":True}]):
+        for role in ("DOCTOR", "OWNER"):
+            client, core = make_client(role)
+            core._cerai_current_principal = user_access.current_principal
+            client.cookies.set("cer_ai_session", "valid")
+            response = client.post("/iol/power/plan", json=payload)
+            assert response.status_code == 200
+            result = response.json()
+            assert result["toric_status"] == ("TEST_ONLY" if role == "OWNER" else "TEST_RESTRICTED")
+            assert bool(result["toric_candidates"]) == (role == "OWNER")
+            assert result["calculator_url"] == "https://www.myalcon-toriccalc.com/"
 
 
 def test_authenticated_clinical_app_injects_archive_navigation_and_escapes_display_name():

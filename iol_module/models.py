@@ -255,4 +255,4 @@ class IOLPowerPlan(StrictModel):
     predictions: list[dict[str, object]]
     message: str
     toric_candidates: list[dict[str, object]] = Field(default_factory=list)
-    toric_status: Literal["NOT_APPLICABLE", "TEST_ONLY", "INPUTS_INCOMPLETE", "UNSUPPORTED", "CALCULATION_UNAVAILABLE"] = "NOT_APPLICABLE"
+    toric_status: Literal["NOT_APPLICABLE", "TEST_ONLY", "TEST_RESTRICTED", "INPUTS_INCOMPLETE", "UNSUPPORTED", "CALCULATION_UNAVAILABLE"] = "NOT_APPLICABLE"
