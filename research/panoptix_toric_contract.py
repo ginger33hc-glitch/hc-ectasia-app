@@ -58,17 +58,20 @@ class IOLMaster500ToricInput:
 
 @dataclass(frozen=True)
 class PentacamPosteriorInput:
-    """Same-eye 4 Maps Refractive / Cornea Back printed K1, K2 and axis.
+    """Same-eye 4 Maps Refractive / Cornea Back numeric panel.
 
-    These are signed *posterior surface powers*, not IOLMaster anterior K,
-    Pentacam TCRP or the posterior radii required by Castrop. Optical index
-    and meridional convention must be verified before converting to radii.
+    Rh and Rv are measured horizontal and vertical radii, not necessarily the
+    flat and steep cardinal radii required by Castrop in an oblique cornea.
+    K1/K2 are signed posterior powers whose optical convention needs checking
+    before reconstructing the cardinal radii. No clinical conversion here.
     """
 
     eye: str
     posterior_k1_d: float
     posterior_k2_d: float
     posterior_k1_axis_deg: float
+    posterior_rh_mm: float
+    posterior_rv_mm: float
     source_screen: str = "4 Maps Refractive / Cornea Back"
 
     def __post_init__(self):
@@ -77,10 +80,14 @@ class PentacamPosteriorInput:
         if self.source_screen != "4 Maps Refractive / Cornea Back":
             raise ValueError("Posterior readings need their source-locked panel.")
         values = (self.posterior_k1_d, self.posterior_k2_d,
-                  self.posterior_k1_axis_deg)
+                  self.posterior_k1_axis_deg, self.posterior_rh_mm,
+                  self.posterior_rv_mm)
         if not all(isfinite(value) for value in values):
             raise ValueError("Posterior readings and axis must be finite.")
         if not (-12 <= self.posterior_k2_d <= self.posterior_k1_d < 0):
             raise ValueError("Posterior K powers must be signed negative values.")
         if not 0 <= self.posterior_k1_axis_deg <= 180:
             raise ValueError("Posterior K1 axis must be in the 0–180 range.")
+        if not all(3 <= radius <= 12 for radius in
+                   (self.posterior_rh_mm, self.posterior_rv_mm)):
+            raise ValueError("Posterior Rh and Rv must be physical millimeter radii.")
