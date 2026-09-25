@@ -6,19 +6,7 @@ documented in Alcon's product specifications and Australian device listing.
 
 from dataclasses import dataclass
 from math import isfinite
-
-
-# https://www.alcon.co.jp/media-release/20220413-clareon-panoptix
-# https://www.legislation.gov.au/F2024L01355/asmade/2024-10-24/text/original/pdf/2
-CNWTT_IOL_CYLINDER_D = {
-    "CNWTT2": 1.00,
-    "CNWTT3": 1.50,
-    "CNWTT4": 2.25,
-    "CNWTT5": 3.00,
-    "CNWTT6": 3.75,
-}
-
-SURGEON_SIA_D = 0.25
+from iol_module.toric_formula import SURGEON_SIA_D
 
 
 @dataclass(frozen=True)

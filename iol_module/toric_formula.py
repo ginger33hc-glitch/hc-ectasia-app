@@ -11,6 +11,7 @@ See https://doi.org/10.1007/s00417-021-05287-w (equations 1–4).
 from dataclasses import dataclass
 from math import atan2, cos, degrees, hypot, isfinite, radians, sin, sqrt
 
+SURGEON_SIA_D = 0.25
 
 # Nominal cylinder at the IOL plane. These are optical steps, not inventory
 # assertions. PanOptix regional availability must be verified before release.
@@ -202,7 +203,7 @@ class ToricBiometry:
     posterior_k1_axis_deg: float
     corneal_thickness_um: float
     optical_a_constant: float
-    sia_d: float = 0.25
+    sia_d: float = SURGEON_SIA_D
 
 
 @dataclass(frozen=True)
