@@ -11,7 +11,8 @@ constants are not optimized for CNWTT2–6 in IOL Con. Do not fill LT with a
 population value or transfer C/H/R from another lens.
 
 The next candidate is a documented **LT-free spherical power/ELP method**
-(for example SRK/T using the CNWTT2–6 manufacturer optical A-constant 119.1),
+(the existing Cooke K6 v2024.01 route using the manufacturer's optical
+A-constant for the selected lens),
 combined with a separately verified thick-cornea toric vector step using the
 same-eye Pentacam posterior measurements and the surgeon's SIA. This is an
 architecture for comparison, **not** a validated combined clinical formula:
@@ -20,6 +21,15 @@ CNWTT steps and resulting sphere and axis must be checked against paired
 manufacturer calculations and postoperative outcomes. If an independently
 specified and validated LT-free toric formula better fits these inputs, use it
 instead. Retain the current manufacturer comparison route meanwhile.
+
+The clinic's photographed optical A-constant list names TECNIS Eyhance Toric
+DIU525 (119.3), CLAREON Toric CNW0T8 (119.1), CLAREON PanOptix Toric CNWTT3
+(119.1), and ENOVA Advance Toric (118.0; exact model code not listed). These
+four entries are in the application catalog. The live K6 power service now
+runs for regular toric cases and labels its output **spherical only**; it
+does not compute toric cylinder, residual cylinder or implantation axis.
+Manufacturer toric calculator comparison remains required. The clinic list
+does not itself define the entire stock range or manufacturer cylinder steps.
 
 The prototype in `research/toric_vergence.py` is **not available in the clinical
 application**. It reproduces the continuous optical result of the published
