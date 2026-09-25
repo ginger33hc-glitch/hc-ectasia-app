@@ -92,25 +92,39 @@ def test_missing_regularity_at_inclusive_threshold_fails_closed():
         IOLCaseInput.model_validate(payload)
 
 
-def test_catalog_is_single_approved_16_lens_source():
-    assert len(LENSES) == 16
+def test_catalog_includes_surgeon_supplied_toric_models():
+    assert len(LENSES) == 20
     assert get_lens("tecnis-eyhance-gib00").name == "TECNIS Eyhance GIB00"
     assert get_lens("clareon-panoptix-cnwtt0").name.startswith("CLAREON")
+    assert {get_lens(lens_id).a_constant for lens_id in
+            ("clareon-panoptix-toric-cnwtt3", "clareon-toric-cnw0t8")} == {119.1}
+    assert get_lens("tecnis-eyhance-toric-diu525").a_constant == 119.3
+    assert get_lens("enova-advance-toric").a_constant == 118.0
 
 
 def test_regular_toric_routes_to_selected_manufacturer_calculator():
-    case = power_payload(k2_d=43.0, astigmatism_type="REGULAR", incision_axis_deg=120, sia_d=0.2)
-    plan = plan_iol_power(case)
+    case = power_payload(selected_lens_id="clareon-panoptix-toric-cnwtt3", k2_d=43.0,
+                         astigmatism_type="REGULAR", incision_axis_deg=120, sia_d=0.2)
+    response = [{"IOLs": [{"Predictions": [{"IOL": 21.0, "Rx": 0.01, "IsBestOption": True}]}]}]
+    fake = BytesIO(__import__("json").dumps(response).encode()); fake.__enter__ = lambda value: value; fake.__exit__ = lambda *args: None
+    with patch("iol_module.power.urlopen", return_value=fake):
+        plan = plan_iol_power(case)
     assert plan.route == "MANUFACTURER_TORIC"
     assert plan.calculation_status == "EXTERNAL_REQUIRED"
     assert plan.calculator_url == "https://www.myalcon-toriccalc.com/"
+    assert plan.predictions[0]["IOL"] == 21.0
+    assert "spherical only" in plan.message
 
 
 def test_unverified_manufacturer_toric_route_fails_closed():
     case = power_payload(selected_lens_id="enova-adc-advance", k2_d=43.0, astigmatism_type="REGULAR", incision_axis_deg=120, sia_d=0.2)
-    plan = plan_iol_power(case)
+    response = [{"IOLs": [{"Predictions": [{"IOL": 20.5, "Rx": -0.1}]}]}]
+    fake = BytesIO(__import__("json").dumps(response).encode()); fake.__enter__ = lambda value: value; fake.__exit__ = lambda *args: None
+    with patch("iol_module.power.urlopen", return_value=fake):
+        plan = plan_iol_power(case)
     assert plan.calculation_status == "CALCULATION_UNAVAILABLE"
     assert plan.calculator_url is None
+    assert plan.predictions[0]["IOL"] == 20.5
 
 
 def test_post_refractive_overrides_standard_and_toric_routes():
