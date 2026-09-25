@@ -142,6 +142,27 @@ class IOLRecommendation(StrictModel):
     legal_notice: str
 
 
+class PosteriorCorneaInput(StrictModel):
+    """One operative eye's Pentacam 4 Maps Refractive / Cornea Back panel."""
+
+    eye: Literal["OD", "OS"]
+    source: Literal["PENTACAM_4_MAPS_REFRACTIVE_CORNEA_BACK"]
+    k1_d: float = Field(ge=-12, lt=0)
+    k2_d: float = Field(ge=-12, lt=0)
+    k1_axis_deg: float = Field(ge=0, le=180)
+    k2_axis_deg: float = Field(ge=0, le=180)
+    rh_mm: float = Field(ge=3, le=12)
+    rv_mm: float = Field(ge=3, le=12)
+
+    @model_validator(mode="after")
+    def validate_posterior_axes(self):
+        if self.k1_d < self.k2_d:
+            raise ValueError("Cornea Back signed K1 must be no more negative than K2.")
+        if abs((self.k2_axis_deg - self.k1_axis_deg) % 180 - 90) > 5:
+            raise ValueError("Cornea Back K axes must be approximately orthogonal.")
+        return self
+
+
 class IOLPowerPlanInput(StrictModel):
     patient_name: str = Field(min_length=1, max_length=200)
     biological_sex: Literal["Male", "Female"]
@@ -162,6 +183,7 @@ class IOLPowerPlanInput(StrictModel):
     cct_um: float | None = Field(default=None, ge=300, le=900)
     lens_thickness_mm: float | None = Field(default=None, ge=2.5, le=7)
     wtw_mm: float | None = Field(default=None, ge=8, le=16)
+    posterior_cornea: PosteriorCorneaInput | None = None
 
     @property
     def astigmatism_d(self) -> float:
@@ -169,6 +191,8 @@ class IOLPowerPlanInput(StrictModel):
 
     @model_validator(mode="after")
     def validate_power_route(self):
+        if self.posterior_cornea is not None and self.posterior_cornea.eye != self.eye:
+            raise ValueError("Cornea Back laterality must match the operative eye.")
         if self.astigmatism_d >= 1.0 and self.astigmatism_type is None:
             raise ValueError("Astigmatism regularity is required for toric routing.")
         toric = self.astigmatism_d >= 1.0 and self.astigmatism_type == AstigmatismType.REGULAR

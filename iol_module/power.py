@@ -57,6 +57,8 @@ def _base_inputs(case: IOLPowerPlanInput) -> dict[str, object]:
     }.items():
         if value is not None:
             values[key] = value
+    if case.posterior_cornea is not None:
+        values["posterior_cornea"] = case.posterior_cornea.model_dump(mode="json")
     return values
 
 
@@ -174,12 +176,12 @@ def plan_iol_power(case: IOLPowerPlanInput) -> IOLPowerPlan:
             lens_category=lens.category, a_constant=lens.a_constant,
             target_refraction_d=_target_from_acd(case.acd_mm), target_locked=True,
             target_warning=None, second_formula_required=_second_formula_required(case.axial_length_mm),
-            calculator_name=f"{lens.manufacturer} toric calculator", calculator_url=lens.toric_calculator_url,
+            calculator_name="Cooke K6 spherical power", calculator_url=lens.toric_calculator_url,
             escrs_url=None, inputs=inputs, predictions=spherical_predictions,
             message=(
                 "Cooke K6 spherical power is shown below. Its predicted refraction is spherical only; "
-                "toric cylinder, residual cylinder and implantation axis require the official toric calculator. "
-                "Enter the selected spherical power and verify all biometry there."
+                "The embedded toric model and axis calculation is awaiting optical validation. "
+                "Use a verified toric calculation before planning implantation; the manufacturer calculator is available independently."
                 if lens.toric_calculator_url else
                 "Cooke K6 spherical power is shown below. No verified toric calculator is configured "
                 "for this manufacturer; toric cylinder and implantation axis are unavailable."

@@ -1,5 +1,66 @@
 # Universal toric IOL calculation: research status
 
+## Manufacturer methodology confirmed on 2026-09-25
+
+Johnson & Johnson's current TECNIS Toric Calculator FAQ (Rev. 08, April 2026)
+explicitly identifies **Holladay 1** for eye-specific cylinder calculations and
+accepts the spherical-equivalent IOL power calculated using the surgeon's
+preferred method. Its supplied posterior-corneal correction is a proprietary
+clinical-data algorithm, not a disclosed numerical formula, and it insists on
+anterior rather than total-corneal K inputs. The published Holladay 1 ELP
+uses AL, mean K, and a surgeon factor without crystalline LT; Alcon publishes
+the SF conversion `SF = 0.5663 × optical A − 65.6008`. This provides an
+LT-free, published optical-position method anchored to the clinic's A list.
+The `holladay1_elp_mm` function in `iol_module/toric_formula.py` implements
+that step, separately from the existing K6 spherical calculation. It does
+**not** make the combined K6/Holladay toric optical model clinically validated.
+
+Alcon's current online toric calculator advertises Barrett Toric and Holladay
+Total SIA Toric. Barrett's internal calculation and the Alcon implementations
+were not disclosed in the public sources inspected; do not label our code as
+an identical implementation. Alcon FDA P190018B confirms CNW0T3–9 powers,
+the plus-cylinder marker-axis convention and corneal-plane correction in an
+*average* eye, not a universal fixed ratio for every patient.
+
+Sources: https://www.tecnistoriccalc.com/pdfs/DHF1641B-3301-EN.pdf ;
+https://www.tecnistoriccalc.com/pdfs/DHF1641B-3300-EN.pdf ;
+https://link.springer.com/chapter/10.1007/978-3-031-50666-6_44 ;
+https://us.alconscience.com/sites/g/files/rbvwei1736/files/pdf/1906A277-US-ORA-19-E-1275-Lens-Constants-White-Paper.pdf ;
+https://www.myalcon-toriccalc.com/ ;
+https://www.accessdata.fda.gov/cdrh_docs/pdf19/P190018B.pdf .
+
+### Embedded K6-anchored optical prototype and validation boundary
+
+`iol_module/toric_formula.py` now calculates Holladay 1 ELP without LT,
+converts anterior IOLMaster K1/K2 to physical front-surface radii using
+`nK=1.3375`, adds the measured signed Pentacam Cornea Back powers, applies
+0.25 D SIA on the IOLMaster steep axis, and transforms the corneal vergence
+to the IOL plane. The **K6 selected spherical-equivalent power and its Rx**
+anchor the scalar retinal vergence; each published Alcon or TECNIS Eyhance
+IOL-cylinder step is rotated to minimize the predicted spectacle-plane
+residual. This is our own **hybrid optical prototype**, not the proprietary
+J&J/Alcon algorithm nor a validated unified clinical formula. It has no
+patient-facing model or axis output yet.
+
+Tests include Castrop's published Table 2 numerical example, 30-degree
+rotation invariance, posterior same-eye checks and an FDA Clareon Table 3
+*average-eye* optical plausibility check: a synthetic 24 mm AL, 43 D symmetric
+K and 20 D spherical IOL yields about 1.00 D corneal-plane effect for a
+1.50 D cylinder; FDA's representative-eye table gives 0.98 D. This
+approximately 0.02 D agreement **does not verify an individual toric
+recommendation**. The manufacturer's public sites require accepting a legal
+license before running paired synthetic inputs, and approval to accept that
+agreement was not obtained. No real patient data were sent to these sites.
+
+Clinical gating still needs paired eye-specific manufacturer outputs and/or
+retrospective verified cases including K1/K2 axes, measured posterior
+cornea, AL, selected SE and IOL model/axis, plus a checked cylinder-axis
+convention. Until then, the K6 result in the live route is spherical only.
+
+Eyhance DIU100/150/225/300/375/450/525 powers are documented by the
+Johnson & Johnson EMEA product catalogue:
+https://catalog.emeaassets.com/productsen/?page_id=1329 .
+
 ## 2026-09-25 workflow decision: no routine lens thickness
 
 The surgeon checked with the Pentacam manufacturer: crystalline lens thickness
@@ -31,8 +92,8 @@ does not compute toric cylinder, residual cylinder or implantation axis.
 Manufacturer toric calculator comparison remains required. The clinic list
 does not itself define the entire stock range or manufacturer cylinder steps.
 
-The prototype in `research/toric_vergence.py` is **not available in the clinical
-application**. It reproduces the continuous optical result of the published
+The Castrop calculation core now lives in `iol_module/toric_formula.py`, but is
+**not routed into patient-facing clinical results**. It reproduces the continuous optical result of the published
 Castrop example 1, but does not select an implant, predict a validated clinical
 outcome, or replace the manufacturer calculator. Do not route patients to it.
 

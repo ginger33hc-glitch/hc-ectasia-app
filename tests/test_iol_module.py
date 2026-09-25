@@ -183,6 +183,31 @@ def test_extraction_contract_encodes_pentacam_complement_and_no_tcrp_authority()
     assert "tcrp_astigmatism_d" not in source.lower()
 
 
+def test_toric_posterior_source_has_separate_same_eye_fields():
+    from iol_module.extraction import EXTRACTION_SCHEMA
+
+    fields = EXTRACTION_SCHEMA["properties"]
+    assert "PENTACAM_4_MAPS_REFRACTIVE" in fields["document_type"]["enum"]
+    assert set(fields["cornea_back"]["required"]) == {
+        "k1_d", "k2_d", "k1_axis_deg", "k2_axis_deg", "rh_mm", "rv_mm"
+    }
+    assert "cornea_back" not in fields["pentacam"]["properties"]
+
+
+def test_posterior_cornea_cannot_be_taken_from_fellow_eye():
+    posterior = {
+        "eye": "OS", "source": "PENTACAM_4_MAPS_REFRACTIVE_CORNEA_BACK",
+        "k1_d": -5.8, "k2_d": -6.1, "k1_axis_deg": 10,
+        "k2_axis_deg": 100, "rh_mm": 6.7, "rv_mm": 6.5,
+    }
+    with pytest.raises(ValidationError):
+        power_payload(posterior_cornea=posterior)
+    case = power_payload(eye="OS", posterior_cornea=posterior)
+    assert case.posterior_cornea.k1_d == -5.8
+    with pytest.raises(ValidationError):
+        power_payload(eye="OS", posterior_cornea={**posterior, "k2_axis_deg": 40})
+
+
 def test_iol_module_is_first_class_and_routes_are_protected():
     sources = "\n".join(path.read_text(encoding="utf-8") for path in Path("iol_module").glob("*.py"))
     assert "clinical_core" not in sources
