@@ -155,7 +155,7 @@
     "Open module →":"Modülü aç →","CER-AI provides clinical decision support only. Final treatment and lens selection remain the evaluating surgeon’s responsibility.":"CER-AI yalnızca klinik karar desteği sağlar. Nihai tedavi ve lens seçimi değerlendiren cerrahın sorumluluğundadır.",
     "CER-AI IOL Calculation Surgery":"CER-AI IOL Hesaplama Cerrahisi","Change clinical module":"Klinik modülü değiştir",
     "IOL Decision Assistant — Advanced Mode":"IOL Karar Asistanı — Gelişmiş Mod",
-    "Stage 1 selects the eligible lens category. Stage 2 calculates standard non-toric eyes with embedded Cooke K6, provides ESCRS as the external comparison route, and sends toric eyes to the selected lens manufacturer’s official calculator.":"Aşama 1 uygun lens kategorisini seçer. Aşama 2 standart torik olmayan gözleri gömülü Cooke K6 ile hesaplar, ESCRS'yi harici karşılaştırma yolu olarak sunar ve torik gözleri seçilen lens üreticisinin resmi hesaplayıcısına yönlendirir.",
+    "Stage 1 selects the eligible lens category. Stage 2 calculates spherical power with Cooke K6, then shows an embedded toric model and axis for surgeon testing when same-eye posterior corneal data are available. The manufacturer's toric calculator remains a separate optional comparison.":"Aşama 1 uygun lens kategorisini seçer. Aşama 2 sferik gücü Cooke K6 ile hesaplar; aynı göze ait arka kornea verileri varsa cerrahın test etmesi için uygulama içindeki torik modeli ve aksı gösterir. Üreticinin torik hesaplayıcısı ayrı bir karşılaştırma seçeneğidir.",
     "1. Patient and source reports":"1. Hasta ve kaynak raporları","Age":"Yaş","Biological sex":"Biyolojik cinsiyet","Select manually":"Manuel seçin","Male":"Erkek","Female":"Kadın","Selected by the surgeon; never inferred from the patient name.":"Cerrah tarafından seçilir; hasta adından asla çıkarılmaz.","Eye":"Göz","OD — Right":"OD — Sağ","OS — Left":"OS — Sol",
     "Pentacam Cataract Pre-Op":"Pentacam Katarakt Pre-Op","Optical-quality fields plus Pachy Vertex, HWTW, and ACD (Int.). TCRP is not used.":"Optik kalite alanlarına ek olarak Pachy Vertex, HWTW ve ACD (Int.) kullanılır. TCRP kullanılmaz.",
     "IOLMaster 500 report":"IOLMaster 500 raporu","Upper biometry block only: AL, K1/K2 and axes. K difference ≥1.00 D triggers toric evaluation.":"Yalnızca üst biyometri bloğu: AL, K1/K2 ve aksları. K farkı ≥1,00 D ise torik değerlendirme tetiklenir.",
@@ -179,7 +179,17 @@
     "Macular pathology":"Maküler patoloji","Absent":"Yok","Present":"Var","Glaucoma":"Glokom","Suspect":"Şüpheli","Definite":"Kesin",
     "Ocular surface":"Oküler yüzey","Resolved after treatment":"Tedavi sonrası düzeldi","Repeat measurements":"Tekrarlanan ölçümler","Not stable":"Stabil değil","Stable":"Stabil",
     "Generate IOL recommendation":"IOL önerisi oluştur","Stage 1 — category decision":"Aşama 1 — kategori kararı",
-    "Stage 2 — lens and power route":"Aşama 2 — lens ve güç yolu","Clinic lens":"Klinik lensi","Select an eligible lens":"Uygun bir lens seçin",
+    "Stage 2 — lens and power route":"Aşama 2 — lens ve güç yolu","Clinic lens":"Klinik lensi","Clinic lens family":"Klinik lens ailesi","Select an eligible lens":"Uygun bir lens seçin",
+    "Pentacam 4 Maps Refractive (toric)":"Pentacam 4 Maps Refractive (torik)","Same operative eye. Cornea Back K1/K2, axes, and Rh/Rv are transcribed. Embedded toric results are unvalidated and for surgeon testing only.":"Ameliyat edilecek aynı göze ait Cornea Back K1/K2, akslar ve Rh/Rv aktarılır. Uygulama içindeki torik sonuçlar doğrulanmamıştır; yalnızca cerrah testi içindir.",
+    "Incision axis, degrees (steep K2)":"İnsizyon aksı, derece (dik K2)","SIA axis, degrees (steep K2)":"SIA aksı, derece (dik K2)",
+    "TEST ONLY":"YALNIZCA TEST","TEST ONLY — unvalidated toric optical prototype.":"YALNIZCA TEST — doğrulanmamış torik optik prototip.",
+    "Independently check the source readings, model availability, implantation axis, and residual with the manufacturer's calculator before any clinical use.":"Herhangi bir klinik kullanımdan önce kaynak ölçümlerini, model bulunabilirliğini, yerleştirme aksını ve rezidüeli üreticinin hesaplayıcısıyla bağımsız olarak doğrulayın.",
+    "Model":"Model","IOL cylinder":"IOL silindiri","Marker axis":"İşaretleme aksı","Predicted residual cylinder":"Tahmini rezidüel silindir",
+    "No embedded toric model or axis available.":"Uygulama içinde torik model veya aks sonucu yok.","Upload the same-eye Pentacam 4 Maps Refractive image and verify Pachy Vertex.":"Aynı göze ait Pentacam 4 Maps Refractive görüntüsünü yükleyin ve Pachy Vertex değerini doğrulayın.","Review source measurements and the selected lens family.":"Kaynak ölçümlerini ve seçili lens ailesini gözden geçirin.",
+    "Stage 1 — Cooke K6 spherical power":"Aşama 1 — Cooke K6 sferik güç","Cooke K6 power":"Cooke K6 gücü","K6 best option":"K6 en uygun seçenek","Optional manufacturer toric calculator comparison":"İsteğe bağlı üretici torik hesaplayıcısı karşılaştırması",
+    "ACD target":"ACD hedefi","locked":"sabit","Second modern formula verification required":"İkinci bir modern formülle doğrulama gerekli","Use ESCRS where available and verify all values manually.":"Uygunsa ESCRS kullanın ve tüm değerleri elle doğrulayın.",
+    "Embedded toric model, marker axis and predicted residual are shown for surgeon testing. This hybrid optical model is not clinically validated.":"Torik model, işaretleme aksı ve tahmini rezidüel cerrah testi için gösterilir. Bu birleşik optik model klinik olarak doğrulanmamıştır.",
+    "Same-eye Pentacam 4 Maps Cornea Back K1/K2, axes, Rh/Rv and Pachy Vertex are required for the embedded toric calculation.":"Uygulama içindeki torik hesap için aynı göze ait Pentacam 4 Maps Cornea Back K1/K2, akslar, Rh/Rv ve Pachy Vertex gereklidir.",
     "Target refraction, D":"Hedef refraksiyon, D","Prior corneal surgery":"Önceki korneal cerrahi","Myopic LASIK/PRK":"Miyopik LASIK/PRK","Hyperopic LASIK/PRK":"Hipermetropik LASIK/PRK","RK":"RK",
     "Historical data":"Geçmiş veriler","Unavailable — no-history":"Mevcut değil — geçmiş verisiz","Available — history":"Mevcut — geçmiş verili",
     "Incision axis, degrees":"İnsizyon aksı, derece","Surgeon-specific SIA, D":"Cerraha özgü SIA, D","SIA axis, degrees (optional)":"SIA aksı, derece (isteğe bağlı)",
@@ -292,6 +302,9 @@
       .replace(/^LIMITATION:/,"SINIRLAMA:")
       .replace(/^Inter-eye tomography concern:/,"Gözler arası tomografi değerlendirmesi:")
       .replace(/^Recommended IOL:\s*/,"Önerilen IOL: ")
+      .replace(/^Embedded toric calculation — ([\d.]+) D K6 spherical equivalent$/,"Uygulama içi torik hesap — $1 D K6 sferik eşdeğer")
+      .replace(/^([A-Z0-9]+) · ([\d.]+)° marker axis$/,"$1 · $2° işaretleme aksı")
+      .replace(/^Predicted residual cylinder: ([\d.]+) D at ([\d.]+)° \(prototype estimate\)\.$/,"Tahmini rezidüel silindir: $1 D, $2° (prototip tahmini).")
       .replace(/^Eligible:\s*/,"Uygun: ")
       .replace(/\bToric Multifocal\b/g,"Torik Multifokal")
       .replace(/\bToric Monofocal\b/g,"Torik Monofokal")
