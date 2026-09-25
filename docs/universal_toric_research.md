@@ -29,8 +29,15 @@ manufacturer's Japanese launch specification lists T3–T6, while an Australian
 listing and other regional Alcon pages list T2–T6. Availability in Türkiye
 and specific inventory still need confirmation. These are IOL-plane powers;
 corneal-plane effect changes with eye geometry and cannot be substituted by a
-single fixed conversion. The standard IOLMaster 500 K printout alone does not
-provide a posterior corneal measurement or the Castrop model constants.
+single fixed conversion. The surgeon clarified that the Pentacam Cataract
+Pre-OP image in this workflow contains posterior corneal astigmatism data.
+Pair IOLMaster 500 anterior K1/K2 and axes with the same eye's Pentacam
+posterior data; do not silently replace a readable direct measurement with a
+population estimate. Verify the exact printed label, sign convention, optical
+zone, and posterior axis (or posterior meridional radii) on the actual image.
+A scalar posterior magnitude without an axis is insufficient for vector
+calculation. TCRP total-corneal astigmatism is not itself a separate posterior
+measurement. The Castrop model constants still need to be established.
 
 ## Why toric calculation differs from spherical IOL power
 
@@ -61,9 +68,11 @@ calculation identity; it does not establish surgical accuracy.
    external ACD = internal ACD + CCT/1000, using a confirmed same-eye CCT.
 4. The existing IOLMaster anterior K1/K2 and axes are authoritative for the
    current clinical toric trigger. Converting keratometric D to *physical*
-   anterior radii requires the device keratometric index. Posterior curvature
-   and axis require a separately source-locked Pentacam measurement; neither
-   should be fabricated from the current stage-1 optical fields.
+   anterior radii requires the device keratometric index. The surgeon reports
+   posterior astigmatism on the Pentacam Cataract Pre-OP images, but current
+   `iol_module/extraction.py` does not transcribe its magnitude or axis. The
+   actual posterior field and its convention need source verification; a
+   cylinder magnitude alone does not provide two physical posterior radii.
 5. The surgeon supplied SIA 0.25 D and incision on K2; these may be used as
    explicit planning assumptions and should be checked against postoperative
    vector data before a lens recommendation is enabled.
@@ -75,8 +84,9 @@ calculation identity; it does not establish surgical accuracy.
 - Confirm the *actual toric model IDs* stocked or offered in Türkiye, and
   manufacturer documentation for each sphere range and cylinder step.
 - Source current model-specific optimized constants and their provenance.
-- Add source-locked corneal front and back curvature/axis extraction or a
-  validated posterior cornea estimation pathway, with measurement conventions.
+- Source-lock the actual Pentacam posterior magnitude **and axis**, or both
+  posterior meridional radii and orientation, with measurement conventions.
+  Do not confuse TCRP total astigmatism with posterior astigmatism.
 - Record surgeon-specific incision location and SIA, including their axis
   convention. Validate left/right and 0/180-degree boundaries.
 - Compare the independent implementation against published examples and a
