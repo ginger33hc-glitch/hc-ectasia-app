@@ -5,6 +5,33 @@ application**. It reproduces the continuous optical result of the published
 Castrop example 1, but does not select an implant, predict a validated clinical
 outcome, or replace the manufacturer calculator. Do not route patients to it.
 
+## First lens and surgeon input contract (research only)
+
+`research/panoptix_toric_contract.py` records the surgeon's choice of Clareon
+PanOptix Toric and the standard IOLMaster 500 anterior K1/K2 and both axes.
+The incision is on the measured steep **K2 axis**, and the surgeon's stipulated
+SIA is **0.25 D**. The K2 axis is normalized modulo 180 degrees; implausible
+or inconsistent readings are rejected rather than silently repaired. These
+settings express a planning assumption, not a validated prediction.
+
+| Model | Cylinder at IOL plane (D) |
+| --- | ---: |
+| CNWTT2 | 1.00 |
+| CNWTT3 | 1.50 |
+| CNWTT4 | 2.25 |
+| CNWTT5 | 3.00 |
+| CNWTT6 | 3.75 |
+
+The digit after `CNWTT` is a model step, **not its diopter value**. CNWTT1
+was requested but could not be established in the manufacturer's product
+listings or the Australian device listing, so it is deliberately absent. The
+manufacturer's Japanese launch specification lists T3–T6, while an Australian
+listing and other regional Alcon pages list T2–T6. Availability in Türkiye
+and specific inventory still need confirmation. These are IOL-plane powers;
+corneal-plane effect changes with eye geometry and cannot be substituted by a
+single fixed conversion. The standard IOLMaster 500 K printout alone does not
+provide a posterior corneal measurement or the Castrop model constants.
+
 ## Why toric calculation differs from spherical IOL power
 
 A toric result needs a cylinder magnitude and implantation axis in addition to
@@ -37,8 +64,9 @@ calculation identity; it does not establish surgical accuracy.
    anterior radii requires the device keratometric index. Posterior curvature
    and axis require a separately source-locked Pentacam measurement; neither
    should be fabricated from the current stage-1 optical fields.
-5. Surgeon-specific SIA should come from postoperative vector data; an
-   unverified default must not silently produce a lens recommendation.
+5. The surgeon supplied SIA 0.25 D and incision on K2; these may be used as
+   explicit planning assumptions and should be checked against postoperative
+   vector data before a lens recommendation is enabled.
 6. Prior refractive surgery, irregular astigmatism, absent or discrepant
    biometry, and unavailable lens constants need explicit unsupported routes.
 
@@ -69,6 +97,8 @@ calculation identity; it does not establish surgical accuracy.
 - J&J toric calculator FAQ (anterior K only): https://tecnistoriccalc.com/pdfs/DHF1641B-3301-EN.pdf
 - J&J toric model availability: https://www.jnjvisionpro.com/en-us/products/tecnis-odyssey/
 - Alcon toric model information: https://www.myalcon.com/professional/cataract-surgery/iols/clareon-toric/
+- Alcon Clareon PanOptix model and cylinder specifications: https://www.alcon.co.jp/media-release/20220413-clareon-panoptix
+- Australian Clareon PanOptix Toric device listing (T2–T6): https://www.legislation.gov.au/F2024L01355/asmade/2024-10-24/text/original/pdf/2
 
 ESCRS already supports toric formula comparison and a biometry handoff, but its
 published toric route and model coverage must be checked in a live calculation
