@@ -154,7 +154,6 @@ class IOLPowerPlanInput(StrictModel):
     k2_d: float = Field(ge=30, le=60)
     k2_axis_deg: float = Field(ge=0, le=180)
     astigmatism_type: AstigmatismType | None = None
-    target_refraction_d: float = Field(default=0.0, ge=-5, le=5)
     prior_corneal_surgery: PriorCornealSurgery = PriorCornealSurgery.NONE
     historical_data_available: bool = False
     incision_axis_deg: float | None = Field(default=None, ge=0, le=180)
@@ -215,6 +214,7 @@ class IOLPowerPlan(StrictModel):
     target_refraction_d: float
     target_locked: bool
     target_warning: str | None
+    second_formula_required: bool
     calculator_name: str
     calculator_url: str | None
     escrs_url: str | None
