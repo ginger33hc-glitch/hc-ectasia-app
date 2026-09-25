@@ -39,6 +39,32 @@ A scalar posterior magnitude without an axis is insufficient for vector
 calculation. TCRP total-corneal astigmatism is not itself a separate posterior
 measurement. The Castrop model constants still need to be established.
 
+### Castrop Table 1: source mapping for this workflow
+
+Use the measured-data branch of the published formula only when its actual
+inputs are available. The Pentacam posterior *astigmatism* number by itself
+cannot be inserted as the formula's posterior *radii*.
+
+| Formula input | Proposed source | Requirement |
+| --- | --- | --- |
+| AL | IOLMaster 500 upper biometry | Confirm eye and printed/edited status. |
+| Anterior RCA1, RCA2 and axis ACA1 | IOLMaster 500 K1/K2 and axes | Confirm the device keratometric index before converting D to physical mm. |
+| Posterior RCP1, RCP2 and axis ACP1 | Same-eye Pentacam posterior-surface readout | Verify both meridional radii and their axis; posterior cylinder magnitude alone is insufficient. |
+| CCT | Pentacam Pachy Vertex | Check unit and same eye. |
+| External ACD | Pentacam ACD (Ext.), or ACD (Int.) + Pachy Vertex/1000 | Confirm which value is printed; do not add CCT twice. |
+| Crystalline lens thickness LT | Explicitly printed biometry | Current extractor allows null; absence blocks this formula. |
+| Target sphere, cylinder and axis | Surgeon target | Document the spherocylindrical target, including zero cylinder. |
+| SIA magnitude and axis | Surgeon: 0.25 D at measured K2 axis | Surgeon-defined assumption. |
+| C, H, R | Provenance-checked model-specific optimized constants | A-constant 119.1 does not substitute for these three values. |
+| Lens cylinder steps | Verified CNWTT2–6 catalog | Select a discrete product only after continuous calculation is validated. |
+
+The paper permits a fallback using assumed posterior radii and a statistical
+CPA when tomography is unavailable. For this workflow, direct Pentacam data
+have been reported, so this fallback is not the selected branch. If the
+standard uploaded screen shows only posterior astigmatism magnitude, obtain a
+posterior curvature readout that explicitly contains both radii and the axis;
+do not infer them from the magnitude or from TCRP.
+
 ## Why toric calculation differs from spherical IOL power
 
 A toric result needs a cylinder magnitude and implantation axis in addition to
