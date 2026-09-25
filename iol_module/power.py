@@ -153,13 +153,36 @@ def plan_iol_power(case: IOLPowerPlanInput) -> IOLPowerPlan:
             message="Prior RK requires the external post-RK calculation pathway.",
         )
     if toric:
-        return _external_plan(
-            case, lens, route="MANUFACTURER_TORIC", name=f"{lens.manufacturer} toric calculator",
-            url=lens.toric_calculator_url,
+        inputs = _base_inputs(case)
+        try:
+            spherical_predictions = _call_k6(case, lens.a_constant)
+        except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+            return IOLPowerPlan(
+                route="MANUFACTURER_TORIC", calculation_status="CALCULATION_UNAVAILABLE",
+                selected_lens_id=lens.id, selected_lens_name=lens.name,
+                lens_category=lens.category, a_constant=lens.a_constant,
+                target_refraction_d=_target_from_acd(case.acd_mm), target_locked=True,
+                target_warning=None, second_formula_required=_second_formula_required(case.axial_length_mm),
+                calculator_name="Cooke K6 spherical power", calculator_url=lens.toric_calculator_url,
+                escrs_url=None, inputs=inputs, predictions=[],
+                message=f"Cooke K6 spherical calculation was unavailable ({type(exc).__name__}). No toric power or axis was selected.",
+            )
+        return IOLPowerPlan(
+            route="MANUFACTURER_TORIC",
+            calculation_status="EXTERNAL_REQUIRED" if lens.toric_calculator_url else "CALCULATION_UNAVAILABLE",
+            selected_lens_id=lens.id, selected_lens_name=lens.name,
+            lens_category=lens.category, a_constant=lens.a_constant,
+            target_refraction_d=_target_from_acd(case.acd_mm), target_locked=True,
+            target_warning=None, second_formula_required=_second_formula_required(case.axial_length_mm),
+            calculator_name=f"{lens.manufacturer} toric calculator", calculator_url=lens.toric_calculator_url,
+            escrs_url=None, inputs=inputs, predictions=spherical_predictions,
             message=(
-                "Regular IOLMaster K difference is at least 1.00 D. Continue in the selected lens manufacturer's official toric calculator."
+                "Cooke K6 spherical power is shown below. Its predicted refraction is spherical only; "
+                "toric cylinder, residual cylinder and implantation axis require the official toric calculator. "
+                "Enter the selected spherical power and verify all biometry there."
                 if lens.toric_calculator_url else
-                "No verified official toric calculator is configured for this manufacturer; calculation is unavailable."
+                "Cooke K6 spherical power is shown below. No verified toric calculator is configured "
+                "for this manufacturer; toric cylinder and implantation axis are unavailable."
             ),
         )
 
