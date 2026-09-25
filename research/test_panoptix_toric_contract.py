@@ -33,9 +33,10 @@ def test_invalid_or_discrepant_keratometry_is_rejected(values):
 
 
 def test_posterior_power_is_source_locked_and_signed():
-    reading = PentacamPosteriorInput("OD", -6.4, -7.1, 14.8)
+    reading = PentacamPosteriorInput("OD", -6.4, -7.1, 14.8, 6.24, 5.61)
     assert reading.source_screen == "4 Maps Refractive / Cornea Back"
+    assert reading.posterior_rh_mm == 6.24
     for values in [("OD", 6.4, 7.1, 14.8), ("OS", -7.1, -6.4, 14.8),
                    ("OU", -6.4, -7.1, 14.8)]:
         with pytest.raises(ValueError):
-            PentacamPosteriorInput(*values)
+            PentacamPosteriorInput(*values, 6.24, 5.61)
