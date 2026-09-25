@@ -3,7 +3,7 @@
 import pytest
 
 from research.panoptix_toric_contract import (
-    CNWTT_IOL_CYLINDER_D, IOLMaster500ToricInput,
+    CNWTT_IOL_CYLINDER_D, IOLMaster500ToricInput, PentacamPosteriorInput,
 )
 
 
@@ -30,3 +30,12 @@ def test_180_degree_axis_wraps_to_zero():
 def test_invalid_or_discrepant_keratometry_is_rejected(values):
     with pytest.raises(ValueError):
         IOLMaster500ToricInput(*values)
+
+
+def test_posterior_power_is_source_locked_and_signed():
+    reading = PentacamPosteriorInput("OD", -6.4, -7.1, 14.8)
+    assert reading.source_screen == "4 Maps Refractive / Cornea Back"
+    for values in [("OD", 6.4, 7.1, 14.8), ("OS", -7.1, -6.4, 14.8),
+                   ("OU", -6.4, -7.1, 14.8)]:
+        with pytest.raises(ValueError):
+            PentacamPosteriorInput(*values)
