@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import asdict
+from math import isfinite
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -14,6 +16,7 @@ from .models import (
     IOLPowerPlanInput,
     PriorCornealSurgery,
 )
+from .toric_formula import ToricBiometry, VERIFIED_LENS_STEPS, research_toric_candidates
 
 COOKE_K6_URL = os.getenv(
     "COOKE_K6_API_URL", "https://cookeformula.com/api/v1/k6/v2024.01/preop"
@@ -167,25 +170,58 @@ def plan_iol_power(case: IOLPowerPlanInput) -> IOLPowerPlan:
                 target_warning=None, second_formula_required=_second_formula_required(case.axial_length_mm),
                 calculator_name="Cooke K6 spherical power", calculator_url=lens.toric_calculator_url,
                 escrs_url=None, inputs=inputs, predictions=[],
+                toric_status="CALCULATION_UNAVAILABLE",
                 message=f"Cooke K6 spherical calculation was unavailable ({type(exc).__name__}). No toric power or axis was selected.",
             )
+        candidates: list[dict[str, object]] = []
+        toric_status = "INPUTS_INCOMPLETE"
+        if lens.id not in VERIFIED_LENS_STEPS:
+            toric_status = "UNSUPPORTED"
+            explanation = "No verified cylinder model series exists for the selected lens family."
+        elif case.posterior_cornea is None or case.cct_um is None:
+            explanation = "Same-eye Pentacam 4 Maps Cornea Back K1/K2, axes, Rh/Rv and Pachy Vertex are required for the embedded toric calculation."
+        else:
+            best = [p for p in spherical_predictions if p.get("IsBestOption") is True]
+            if len(best) != 1 or any(type(best[0].get(key)) not in (int, float)
+                                     or not isfinite(best[0][key]) for key in ("IOL", "Rx")):
+                toric_status = "CALCULATION_UNAVAILABLE"
+                explanation = "Cooke K6 did not identify one finite best spherical-equivalent power and predicted refraction."
+            else:
+                posterior = case.posterior_cornea
+                try:
+                    optical = research_toric_candidates(
+                        ToricBiometry(
+                            axial_length_mm=case.axial_length_mm,
+                            anterior_k1_d=case.k1_d, anterior_k2_d=case.k2_d,
+                            anterior_k1_axis_deg=case.k1_axis_deg,
+                            posterior_k1_d=posterior.k1_d,
+                            posterior_k2_d=posterior.k2_d,
+                            posterior_k1_axis_deg=posterior.k1_axis_deg,
+                            corneal_thickness_um=case.cct_um,
+                            optical_a_constant=lens.a_constant,
+                            sia_d=case.sia_d,
+                        ), lens.id,
+                        k6_spherical_equivalent_iol_d=best[0]["IOL"],
+                        k6_predicted_refraction_d=best[0]["Rx"],
+                    )
+                except (ValueError, ZeroDivisionError, OverflowError) as exc:
+                    toric_status = "CALCULATION_UNAVAILABLE"
+                    explanation = f"Embedded toric calculation rejected these measurements ({type(exc).__name__})."
+                else:
+                    candidates = [asdict(candidate) for candidate in optical]
+                    toric_status = "TEST_ONLY"
+                    explanation = "Embedded toric model, marker axis and predicted residual are shown for surgeon testing. This hybrid optical model is not clinically validated."
         return IOLPowerPlan(
             route="MANUFACTURER_TORIC",
-            calculation_status="EXTERNAL_REQUIRED" if lens.toric_calculator_url else "CALCULATION_UNAVAILABLE",
+            calculation_status="TEST_ONLY" if candidates else "CALCULATION_UNAVAILABLE",
             selected_lens_id=lens.id, selected_lens_name=lens.name,
             lens_category=lens.category, a_constant=lens.a_constant,
             target_refraction_d=_target_from_acd(case.acd_mm), target_locked=True,
             target_warning=None, second_formula_required=_second_formula_required(case.axial_length_mm),
             calculator_name="Cooke K6 spherical power", calculator_url=lens.toric_calculator_url,
             escrs_url=None, inputs=inputs, predictions=spherical_predictions,
-            message=(
-                "Cooke K6 spherical power is shown below. Its predicted refraction is spherical only; "
-                "The embedded toric model and axis calculation is awaiting optical validation. "
-                "Use a verified toric calculation before planning implantation; the manufacturer calculator is available independently."
-                if lens.toric_calculator_url else
-                "Cooke K6 spherical power is shown below. No verified toric calculator is configured "
-                "for this manufacturer; toric cylinder and implantation axis are unavailable."
-            ),
+            toric_candidates=candidates, toric_status=toric_status,
+            message=explanation,
         )
 
     inputs = _base_inputs(case)

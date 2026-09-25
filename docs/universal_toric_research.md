@@ -1,5 +1,28 @@
 # Universal toric IOL calculation: research status
 
+## Current embedded test workflow (2026-09-25)
+
+When IOLMaster K2−K1 is at least 1.00 D and astigmatism is regular, the
+surgeon chooses a toric lens family. Cooke K6 calculates the spherical
+equivalent first. With the same-eye Pentacam 4 Maps Refractive Cornea Back
+K1/K2, axes and Rh/Rv and the Cataract Pre-Op Pachy Vertex, the embedded
+prototype computes ranked cylinder models, plus-cylinder marker axes, and
+predicted residuals. The incision and SIA axis follow steep K2 at 0.25 D.
+The manufacturer's official calculator is a separate optional comparison.
+Missing, incompatible or unverified data prevent a model and axis result.
+
+Results are prominently marked **TEST ONLY**. The combined K6 / Holladay 1 /
+posterior-cornea optical method is our prototype, not an identical manufacturer
+implementation, and has no paired clinical validation. Its first-ranked
+model and axis are not implant recommendations. ENOVA lacks a verified
+cylinder-step catalog and returns no toric model. Catalog entries name lens
+families; their historical IDs denote clinic-supplied examples, not mandatory
+cylinder steps. Stock and sphere/cylinder combination availability remain
+unverified. Crystalline lens thickness is never estimated.
+
+The older research notes below are retained for provenance. Descriptions of
+a spherical-only live route are superseded by this **test-only** workflow.
+
 ## Manufacturer methodology confirmed on 2026-09-25
 
 Johnson & Johnson's current TECNIS Toric Calculator FAQ (Rev. 08, April 2026)

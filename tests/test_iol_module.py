@@ -102,27 +102,59 @@ def test_catalog_includes_surgeon_supplied_toric_models():
     assert get_lens("enova-advance-toric").a_constant == 118.0
 
 
-def test_regular_toric_routes_to_selected_manufacturer_calculator():
+def test_embedded_toric_calculation_precedes_optional_manufacturer_comparison():
     case = power_payload(selected_lens_id="clareon-panoptix-toric-cnwtt3", k2_d=43.0,
-                         astigmatism_type="REGULAR", incision_axis_deg=120, sia_d=0.2)
+                         astigmatism_type="REGULAR", incision_axis_deg=110, sia_axis_deg=110, sia_d=0.25,
+                         posterior_cornea={"eye":"OD", "source":"PENTACAM_4_MAPS_REFRACTIVE_CORNEA_BACK",
+                                            "k1_d":-5.8, "k2_d":-6.1, "k1_axis_deg":20,
+                                            "k2_axis_deg":110, "rh_mm":6.7, "rv_mm":6.5})
     response = [{"IOLs": [{"Predictions": [{"IOL": 21.0, "Rx": 0.01, "IsBestOption": True}]}]}]
     fake = BytesIO(__import__("json").dumps(response).encode()); fake.__enter__ = lambda value: value; fake.__exit__ = lambda *args: None
     with patch("iol_module.power.urlopen", return_value=fake):
         plan = plan_iol_power(case)
     assert plan.route == "MANUFACTURER_TORIC"
-    assert plan.calculation_status == "EXTERNAL_REQUIRED"
+    assert plan.calculation_status == "TEST_ONLY"
+    assert plan.toric_status == "TEST_ONLY"
+    assert len(plan.toric_candidates) == 5
+    assert {candidate["model"] for candidate in plan.toric_candidates} == {
+        "CNWTT2", "CNWTT3", "CNWTT4", "CNWTT5", "CNWTT6"}
+    assert 0 <= plan.toric_candidates[0]["marker_axis_deg"] < 180
+    assert plan.toric_candidates[0]["residual_spectacle_cylinder_d"] >= 0
     assert plan.calculator_url == "https://www.myalcon-toriccalc.com/"
     assert plan.predictions[0]["IOL"] == 21.0
-    assert "spherical only" in plan.message
+    assert "not clinically validated" in plan.message
+
+
+def test_toric_missing_same_eye_posterior_preserves_sphere_but_has_no_axis():
+    case = power_payload(selected_lens_id="clareon-panoptix-toric-cnwtt3", k2_d=43.0,
+                         astigmatism_type="REGULAR", incision_axis_deg=110, sia_d=0.25)
+    response = [{"IOLs": [{"Predictions": [{"IOL": 21.0, "Rx": 0.01, "IsBestOption": True}]}]}]
+    fake = BytesIO(__import__("json").dumps(response).encode())
+    with patch("iol_module.power.urlopen", return_value=fake):
+        plan = plan_iol_power(case)
+    assert plan.toric_status == "INPUTS_INCOMPLETE"
+    assert plan.toric_candidates == []
+    assert plan.predictions[0]["IOL"] == 21.0
+    assert plan.calculator_url == "https://www.myalcon-toriccalc.com/"
+
+
+def test_toric_fixed_incision_and_sia_reject_inconsistent_user_inputs():
+    inputs = dict(selected_lens_id="clareon-panoptix-toric-cnwtt3", k2_d=43.0,
+                  astigmatism_type="REGULAR", incision_axis_deg=110, sia_d=0.25)
+    with pytest.raises(ValidationError):
+        power_payload(**{**inputs, "incision_axis_deg":120})
+    with pytest.raises(ValidationError):
+        power_payload(**{**inputs, "sia_d":0.2})
 
 
 def test_unverified_manufacturer_toric_route_fails_closed():
-    case = power_payload(selected_lens_id="enova-adc-advance", k2_d=43.0, astigmatism_type="REGULAR", incision_axis_deg=120, sia_d=0.2)
+    case = power_payload(selected_lens_id="enova-adc-advance", k2_d=43.0, astigmatism_type="REGULAR", incision_axis_deg=110, sia_d=0.25)
     response = [{"IOLs": [{"Predictions": [{"IOL": 20.5, "Rx": -0.1}]}]}]
     fake = BytesIO(__import__("json").dumps(response).encode()); fake.__enter__ = lambda value: value; fake.__exit__ = lambda *args: None
     with patch("iol_module.power.urlopen", return_value=fake):
         plan = plan_iol_power(case)
     assert plan.calculation_status == "CALCULATION_UNAVAILABLE"
+    assert plan.toric_status == "UNSUPPORTED"
     assert plan.calculator_url is None
     assert plan.predictions[0]["IOL"] == 20.5
 

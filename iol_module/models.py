@@ -198,6 +198,15 @@ class IOLPowerPlanInput(StrictModel):
         toric = self.astigmatism_d >= 1.0 and self.astigmatism_type == AstigmatismType.REGULAR
         if toric and (self.incision_axis_deg is None or self.sia_d is None):
             raise ValueError("Incision axis and surgeon-specific SIA are required for toric routing.")
+        if toric:
+            if self.k1_d > self.k2_d or abs((self.k2_axis_deg - self.k1_axis_deg) % 180 - 90) > 5:
+                raise ValueError("IOLMaster K1/K2 must identify approximately orthogonal flat/steep axes.")
+            if abs(self.sia_d - 0.25) > 1e-6:
+                raise ValueError("This surgeon's toric planning SIA is fixed at 0.25 D.")
+            if abs((self.incision_axis_deg - self.k2_axis_deg + 90) % 180 - 90) > 1:
+                raise ValueError("This surgeon's incision must coincide with the steep K2 axis.")
+            if self.sia_axis_deg is not None and abs((self.sia_axis_deg - self.k2_axis_deg + 90) % 180 - 90) > 1:
+                raise ValueError("SIA axis must coincide with the steep K2 axis.")
         if (
             self.axial_length_mm < 22.0
             and self.prior_corneal_surgery == PriorCornealSurgery.NONE
@@ -230,7 +239,7 @@ class IOLPowerPlan(StrictModel):
         "BARRETT_TRUE_K_EXTERNAL",
         "POST_RK_EXTERNAL",
     ]
-    calculation_status: Literal["COMPLETED", "EXTERNAL_REQUIRED", "CALCULATION_UNAVAILABLE"]
+    calculation_status: Literal["COMPLETED", "TEST_ONLY", "EXTERNAL_REQUIRED", "CALCULATION_UNAVAILABLE"]
     selected_lens_id: str
     selected_lens_name: str
     lens_category: Literal["MULTIFOCAL", "EDOF", "MONOFOCAL"]
@@ -245,3 +254,5 @@ class IOLPowerPlan(StrictModel):
     inputs: dict[str, object]
     predictions: list[dict[str, object]]
     message: str
+    toric_candidates: list[dict[str, object]] = Field(default_factory=list)
+    toric_status: Literal["NOT_APPLICABLE", "TEST_ONLY", "INPUTS_INCOMPLETE", "UNSUPPORTED", "CALCULATION_UNAVAILABLE"] = "NOT_APPLICABLE"
