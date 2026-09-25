@@ -10,8 +10,22 @@
   let recommendation = null;
   let lensCatalog = [];
 
+  function clearSourceCase() {
+    originals.OD = null; originals.OS = null;
+    pentacamByEye.OD = null; pentacamByEye.OS = null;
+    corneaBackByEye.OD = null; corneaBackByEye.OS = null;
+    pentacamEyeConfirmed = false; recommendation = null;
+    $("eye").value = "";
+    for (const id of ["patientName", "patientAge", "al", "k1", "k1Axis", "k2", "k2Axis", "lensThickness", "hoa", "kappa", "alpha", "pupil3d", "cct", "wtw", "acd"]) {
+      $(id).value = ""; $(id).readOnly = false;
+    }
+    $("result").hidden = true; $("powerSection").hidden = true;
+    $("powerResult").replaceChildren(); $("alMarker").textContent = "";
+    updateAstigmatism();
+  }
+
   const errorMessage = data => typeof data.detail === "string" ? data.detail : "Required information is incomplete or invalid.";
-  const kDifference = () => Math.abs(Number($("k2").value) - Number($("k1").value));
+  const kDifference = () => $("k1").value === "" || $("k2").value === "" ? NaN : Math.abs(Number($("k2").value) - Number($("k1").value));
 
   function updateAstigmatism() {
     const difference = kDifference();
@@ -57,25 +71,31 @@
   $("surface").addEventListener("change", () => { $("stableField").hidden = $("surface").value !== "RESOLVED_AFTER_TREATMENT"; });
   $("priorSurgery").addEventListener("change", () => { $("historyField").hidden = !["MYOPIC_LASIK_PRK","HYPEROPIC_LASIK_PRK"].includes($("priorSurgery").value); });
   $("eye").addEventListener("change", populateEye); $("k1").addEventListener("input", updateAstigmatism); $("k2").addEventListener("input", updateAstigmatism); $("k2Axis").addEventListener("input", updateAstigmatism);
+  $("sourceImages").addEventListener("change", () => {
+    clearSourceCase();
+    const files = [...$("sourceImages").files];
+    $("selectedFiles").textContent = files.length ? `Selected images (${files.length}): ${files.map(file => file.name).join(", ")}` : "";
+    $("extractStatus").textContent = ""; $("powerStatus").textContent = "";
+  });
 
   $("extractButton").addEventListener("click", async () => {
-    const files = [...$("pentacamImages").files, ...$("iolmasterImages").files, ...$("fourMapsImages").files];
+    const files = [...$("sourceImages").files];
     const status = $("extractStatus"); status.className = "status";
-    if (!files.length) { status.textContent = "Upload the Pentacam and IOLMaster 500 reports."; status.classList.add("error"); return; }
+    if (files.length !== 3) { status.textContent = "Select exactly three images: Pentacam Cataract Pre-Op, same-eye 4 Maps Refractive, and IOLMaster 500."; status.classList.add("error"); return; }
     const form = new FormData(); files.forEach(file => form.append("images", file));
-    originals.OD = null; originals.OS = null;
-    pentacamByEye.OD = null; pentacamByEye.OS = null;
-    corneaBackByEye.OD = null; corneaBackByEye.OS = null;
-    pentacamEyeConfirmed = false; $("eye").value = "";
+    clearSourceCase();
     $("extractButton").disabled = true; status.textContent = "Transcribing source-locked fields…";
     try {
       const response = await fetch("/iol/extract", {method:"POST", body:form, credentials:"same-origin"});
       const data = await response.json(); if (!response.ok) throw new Error(errorMessage(data));
       const unreadable = [];
       const pentacamEyes = new Set();
+      const expectedTypes = ["PENTACAM_CATARACT_PREOP", "PENTACAM_4_MAPS_REFRACTIVE", "IOLMASTER_500_BIOMETRY"];
+      const typeCounts = Object.fromEntries(expectedTypes.map(type => [type, 0]));
       let unreadablePentacamLaterality = false;
       for (const source of data.sources || []) {
         const item = source.extraction || {}; setIfPresent("patientName", item.patient_name); setIfPresent("patientAge", item.patient_age_years);
+        if (Object.hasOwn(typeCounts, item.document_type)) typeCounts[item.document_type]++;
         if (item.document_type === "PENTACAM_CATARACT_PREOP") {
           if (["OD","OS"].includes(item.eye)) { pentacamByEye[item.eye] = item.pentacam; pentacamEyes.add(item.eye); }
           else unreadablePentacamLaterality = true;
@@ -88,13 +108,14 @@
         }
         (item.unreadable_fields || []).forEach(field => unreadable.push(`${source.filename}: ${field}`));
       }
+      if (expectedTypes.some(type => typeCounts[type] !== 1)) throw new Error("The three images must contain one Pentacam Cataract Pre-Op, one 4 Maps Refractive, and one IOLMaster 500 report. Check the selected files.");
       if (unreadablePentacamLaterality || pentacamEyes.size === 0) throw new Error("Pentacam laterality was not read. Upload a readable Pentacam Cataract Pre-Op report showing OD or OS.");
       if (pentacamEyes.size > 1) throw new Error("Conflicting Pentacam laterality was detected. Upload the Cataract Pre-Op report for one operative eye only.");
       $("eye").value = [...pentacamEyes][0];
-      if ($("fourMapsImages").files.length && !corneaBackByEye[$("eye").value]) throw new Error("4 Maps Refractive Cornea Back could not be assigned to the operative eye.");
+      if (!corneaBackByEye[$("eye").value]) throw new Error("4 Maps Refractive Cornea Back could not be assigned to the operative eye.");
       pentacamEyeConfirmed = true;
       populateEye();
-      status.textContent = unreadable.length ? `Extraction completed. Surgeon entry is required only for unreadable fields: ${unreadable.join(", ")}.` : "Both reports extracted. Review values before evaluation.";
+      status.textContent = unreadable.length ? `Extraction completed. Surgeon entry is required only for unreadable fields: ${unreadable.join(", ")}.` : "Three reports extracted. Review values before evaluation.";
     } catch (error) { status.textContent = error.message || "Image transcription failed."; status.classList.add("error"); }
     finally { $("extractButton").disabled = false; }
   });

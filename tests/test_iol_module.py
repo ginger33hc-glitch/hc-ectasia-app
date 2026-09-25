@@ -257,6 +257,18 @@ def test_mobile_ui_contains_both_sources_and_no_browser_credential_storage():
     assert "Final responsibility rests with the surgeon at all times and under all circumstances." in html
 
 
+def test_single_upload_accepts_three_distinct_reports_and_enforces_same_eye():
+    html = Path("static/iol.html").read_text(encoding="utf-8")
+    script = Path("static/iol.js").read_text(encoding="utf-8")
+    assert html.count('type="file"') == 1
+    assert 'id="sourceImages"' in html and "multiple required" in html
+    assert 'files.length !== 3' in script
+    for document_type in ("PENTACAM_CATARACT_PREOP", "PENTACAM_4_MAPS_REFRACTIVE", "IOLMASTER_500_BIOMETRY"):
+        assert document_type in script
+    assert 'typeCounts[type] !== 1' in script
+    assert 'corneaBackByEye[$("eye").value]' in script
+
+
 def test_escrs_transfer_is_deidentified_and_kane_is_removed():
     html = Path("static/iol.html").read_text(encoding="utf-8")
     script = Path("static/iol.js").read_text(encoding="utf-8")
