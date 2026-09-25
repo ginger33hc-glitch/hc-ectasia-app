@@ -92,25 +92,85 @@ def test_missing_regularity_at_inclusive_threshold_fails_closed():
         IOLCaseInput.model_validate(payload)
 
 
-def test_catalog_is_single_approved_16_lens_source():
-    assert len(LENSES) == 16
+def test_catalog_includes_surgeon_supplied_toric_models():
+    assert len(LENSES) == 20
     assert get_lens("tecnis-eyhance-gib00").name == "TECNIS Eyhance GIB00"
     assert get_lens("clareon-panoptix-cnwtt0").name.startswith("CLAREON")
+    assert {get_lens(lens_id).a_constant for lens_id in
+            ("clareon-panoptix-toric-cnwtt3", "clareon-toric-cnw0t8")} == {119.1}
+    assert get_lens("tecnis-eyhance-toric-diu525").a_constant == 119.3
+    assert get_lens("enova-advance-toric").a_constant == 118.0
 
 
-def test_regular_toric_routes_to_selected_manufacturer_calculator():
-    case = power_payload(k2_d=43.0, astigmatism_type="REGULAR", incision_axis_deg=120, sia_d=0.2)
-    plan = plan_iol_power(case)
+def test_embedded_toric_calculation_precedes_optional_manufacturer_comparison():
+    case = power_payload(selected_lens_id="clareon-panoptix-toric-cnwtt3", k2_d=43.0,
+                         astigmatism_type="REGULAR", incision_axis_deg=110, sia_axis_deg=110, sia_d=0.25,
+                         posterior_cornea={"eye":"OD", "source":"PENTACAM_4_MAPS_REFRACTIVE_CORNEA_BACK",
+                                            "k1_d":-5.8, "k2_d":-6.1, "k1_axis_deg":20,
+                                            "k2_axis_deg":110, "rh_mm":6.7, "rv_mm":6.5})
+    response = [{"IOLs": [{"Predictions": [{"IOL": 21.0, "Rx": 0.01, "IsBestOption": True}]}]}]
+    fake = BytesIO(__import__("json").dumps(response).encode()); fake.__enter__ = lambda value: value; fake.__exit__ = lambda *args: None
+    with patch("iol_module.power.urlopen", return_value=fake):
+        plan = plan_iol_power(case, allow_toric_test=True)
     assert plan.route == "MANUFACTURER_TORIC"
-    assert plan.calculation_status == "EXTERNAL_REQUIRED"
+    assert plan.calculation_status == "TEST_ONLY"
+    assert plan.toric_status == "TEST_ONLY"
+    assert len(plan.toric_candidates) == 5
+    assert {candidate["model"] for candidate in plan.toric_candidates} == {
+        "CNWTT2", "CNWTT3", "CNWTT4", "CNWTT5", "CNWTT6"}
+    assert 0 <= plan.toric_candidates[0]["marker_axis_deg"] < 180
+    assert plan.toric_candidates[0]["residual_spectacle_cylinder_d"] >= 0
+    assert plan.calculator_url == "https://www.myalcon-toriccalc.com/"
+    assert plan.predictions[0]["IOL"] == 21.0
+    assert "not clinically validated" in plan.message
+
+
+def test_toric_missing_same_eye_posterior_preserves_sphere_but_has_no_axis():
+    case = power_payload(selected_lens_id="clareon-panoptix-toric-cnwtt3", k2_d=43.0,
+                         astigmatism_type="REGULAR", incision_axis_deg=110, sia_d=0.25)
+    response = [{"IOLs": [{"Predictions": [{"IOL": 21.0, "Rx": 0.01, "IsBestOption": True}]}]}]
+    fake = BytesIO(__import__("json").dumps(response).encode())
+    with patch("iol_module.power.urlopen", return_value=fake):
+        plan = plan_iol_power(case, allow_toric_test=True)
+    assert plan.toric_status == "INPUTS_INCOMPLETE"
+    assert plan.toric_candidates == []
+    assert plan.predictions[0]["IOL"] == 21.0
     assert plan.calculator_url == "https://www.myalcon-toriccalc.com/"
 
 
+def test_toric_prototype_is_disabled_by_default_for_doctor_sessions():
+    case = power_payload(selected_lens_id="clareon-panoptix-toric-cnwtt3", k2_d=43.0,
+                         astigmatism_type="REGULAR", incision_axis_deg=110, sia_d=0.25,
+                         posterior_cornea={"eye":"OD", "source":"PENTACAM_4_MAPS_REFRACTIVE_CORNEA_BACK",
+                                            "k1_d":-5.8, "k2_d":-6.1, "k1_axis_deg":20,
+                                            "k2_axis_deg":110, "rh_mm":6.7, "rv_mm":6.5})
+    with patch("iol_module.power._call_k6", return_value=[{"IOL":21.0, "Rx":0.01, "IsBestOption":True}]):
+        plan = plan_iol_power(case)
+    assert plan.toric_status == "TEST_RESTRICTED"
+    assert plan.toric_candidates == []
+    assert plan.predictions[0]["IOL"] == 21.0
+    assert plan.calculator_url == "https://www.myalcon-toriccalc.com/"
+
+
+def test_toric_fixed_incision_and_sia_reject_inconsistent_user_inputs():
+    inputs = dict(selected_lens_id="clareon-panoptix-toric-cnwtt3", k2_d=43.0,
+                  astigmatism_type="REGULAR", incision_axis_deg=110, sia_d=0.25)
+    with pytest.raises(ValidationError):
+        power_payload(**{**inputs, "incision_axis_deg":120})
+    with pytest.raises(ValidationError):
+        power_payload(**{**inputs, "sia_d":0.2})
+
+
 def test_unverified_manufacturer_toric_route_fails_closed():
-    case = power_payload(selected_lens_id="enova-adc-advance", k2_d=43.0, astigmatism_type="REGULAR", incision_axis_deg=120, sia_d=0.2)
-    plan = plan_iol_power(case)
+    case = power_payload(selected_lens_id="enova-adc-advance", k2_d=43.0, astigmatism_type="REGULAR", incision_axis_deg=110, sia_d=0.25)
+    response = [{"IOLs": [{"Predictions": [{"IOL": 20.5, "Rx": -0.1}]}]}]
+    fake = BytesIO(__import__("json").dumps(response).encode()); fake.__enter__ = lambda value: value; fake.__exit__ = lambda *args: None
+    with patch("iol_module.power.urlopen", return_value=fake):
+        plan = plan_iol_power(case, allow_toric_test=True)
     assert plan.calculation_status == "CALCULATION_UNAVAILABLE"
+    assert plan.toric_status == "UNSUPPORTED"
     assert plan.calculator_url is None
+    assert plan.predictions[0]["IOL"] == 20.5
 
 
 def test_post_refractive_overrides_standard_and_toric_routes():
@@ -167,6 +227,31 @@ def test_extraction_contract_encodes_pentacam_complement_and_no_tcrp_authority()
     assert "cct_pachy_vertex_um" in source and "hwtw_mm" in source and "acd_internal_mm" in source
     assert "ACD (Int.)" in source and "ACD (Ext.)" in source
     assert "tcrp_astigmatism_d" not in source.lower()
+
+
+def test_toric_posterior_source_has_separate_same_eye_fields():
+    from iol_module.extraction import EXTRACTION_SCHEMA
+
+    fields = EXTRACTION_SCHEMA["properties"]
+    assert "PENTACAM_4_MAPS_REFRACTIVE" in fields["document_type"]["enum"]
+    assert set(fields["cornea_back"]["required"]) == {
+        "k1_d", "k2_d", "k1_axis_deg", "k2_axis_deg", "rh_mm", "rv_mm"
+    }
+    assert "cornea_back" not in fields["pentacam"]["properties"]
+
+
+def test_posterior_cornea_cannot_be_taken_from_fellow_eye():
+    posterior = {
+        "eye": "OS", "source": "PENTACAM_4_MAPS_REFRACTIVE_CORNEA_BACK",
+        "k1_d": -5.8, "k2_d": -6.1, "k1_axis_deg": 10,
+        "k2_axis_deg": 100, "rh_mm": 6.7, "rv_mm": 6.5,
+    }
+    with pytest.raises(ValidationError):
+        power_payload(posterior_cornea=posterior)
+    case = power_payload(eye="OS", posterior_cornea=posterior)
+    assert case.posterior_cornea.k1_d == -5.8
+    with pytest.raises(ValidationError):
+        power_payload(eye="OS", posterior_cornea={**posterior, "k2_axis_deg": 40})
 
 
 def test_iol_module_is_first_class_and_routes_are_protected():

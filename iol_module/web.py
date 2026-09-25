@@ -62,7 +62,9 @@ def install(core: Any) -> None:
     def iol_power_plan(payload: dict[str, Any] = Body(...)):
         try:
             case = IOLPowerPlanInput.model_validate(payload)
-            return plan_iol_power(case).model_dump(mode="json")
+            identity = getattr(core, "_cerai_current_principal", None)
+            principal = identity() if getattr(core, "_cerai_named_users_enabled", False) and callable(identity) else None
+            return plan_iol_power(case, allow_toric_test=bool(principal and principal.role == "OWNER")).model_dump(mode="json")
         except ValidationError as exc:
             raise HTTPException(422, detail=json.loads(exc.json(include_url=False))) from exc
         except ValueError as exc:

@@ -142,6 +142,27 @@ class IOLRecommendation(StrictModel):
     legal_notice: str
 
 
+class PosteriorCorneaInput(StrictModel):
+    """One operative eye's Pentacam 4 Maps Refractive / Cornea Back panel."""
+
+    eye: Literal["OD", "OS"]
+    source: Literal["PENTACAM_4_MAPS_REFRACTIVE_CORNEA_BACK"]
+    k1_d: float = Field(ge=-12, lt=0)
+    k2_d: float = Field(ge=-12, lt=0)
+    k1_axis_deg: float = Field(ge=0, le=180)
+    k2_axis_deg: float = Field(ge=0, le=180)
+    rh_mm: float = Field(ge=3, le=12)
+    rv_mm: float = Field(ge=3, le=12)
+
+    @model_validator(mode="after")
+    def validate_posterior_axes(self):
+        if self.k1_d < self.k2_d:
+            raise ValueError("Cornea Back signed K1 must be no more negative than K2.")
+        if abs((self.k2_axis_deg - self.k1_axis_deg) % 180 - 90) > 5:
+            raise ValueError("Cornea Back K axes must be approximately orthogonal.")
+        return self
+
+
 class IOLPowerPlanInput(StrictModel):
     patient_name: str = Field(min_length=1, max_length=200)
     biological_sex: Literal["Male", "Female"]
@@ -162,6 +183,7 @@ class IOLPowerPlanInput(StrictModel):
     cct_um: float | None = Field(default=None, ge=300, le=900)
     lens_thickness_mm: float | None = Field(default=None, ge=2.5, le=7)
     wtw_mm: float | None = Field(default=None, ge=8, le=16)
+    posterior_cornea: PosteriorCorneaInput | None = None
 
     @property
     def astigmatism_d(self) -> float:
@@ -169,11 +191,22 @@ class IOLPowerPlanInput(StrictModel):
 
     @model_validator(mode="after")
     def validate_power_route(self):
+        if self.posterior_cornea is not None and self.posterior_cornea.eye != self.eye:
+            raise ValueError("Cornea Back laterality must match the operative eye.")
         if self.astigmatism_d >= 1.0 and self.astigmatism_type is None:
             raise ValueError("Astigmatism regularity is required for toric routing.")
         toric = self.astigmatism_d >= 1.0 and self.astigmatism_type == AstigmatismType.REGULAR
         if toric and (self.incision_axis_deg is None or self.sia_d is None):
             raise ValueError("Incision axis and surgeon-specific SIA are required for toric routing.")
+        if toric:
+            if self.k1_d > self.k2_d or abs((self.k2_axis_deg - self.k1_axis_deg) % 180 - 90) > 5:
+                raise ValueError("IOLMaster K1/K2 must identify approximately orthogonal flat/steep axes.")
+            if abs(self.sia_d - 0.25) > 1e-6:
+                raise ValueError("This surgeon's toric planning SIA is fixed at 0.25 D.")
+            if abs((self.incision_axis_deg - self.k2_axis_deg + 90) % 180 - 90) > 1:
+                raise ValueError("This surgeon's incision must coincide with the steep K2 axis.")
+            if self.sia_axis_deg is not None and abs((self.sia_axis_deg - self.k2_axis_deg + 90) % 180 - 90) > 1:
+                raise ValueError("SIA axis must coincide with the steep K2 axis.")
         if (
             self.axial_length_mm < 22.0
             and self.prior_corneal_surgery == PriorCornealSurgery.NONE
@@ -206,7 +239,7 @@ class IOLPowerPlan(StrictModel):
         "BARRETT_TRUE_K_EXTERNAL",
         "POST_RK_EXTERNAL",
     ]
-    calculation_status: Literal["COMPLETED", "EXTERNAL_REQUIRED", "CALCULATION_UNAVAILABLE"]
+    calculation_status: Literal["COMPLETED", "TEST_ONLY", "EXTERNAL_REQUIRED", "CALCULATION_UNAVAILABLE"]
     selected_lens_id: str
     selected_lens_name: str
     lens_category: Literal["MULTIFOCAL", "EDOF", "MONOFOCAL"]
@@ -221,3 +254,5 @@ class IOLPowerPlan(StrictModel):
     inputs: dict[str, object]
     predictions: list[dict[str, object]]
     message: str
+    toric_candidates: list[dict[str, object]] = Field(default_factory=list)
+    toric_status: Literal["NOT_APPLICABLE", "TEST_ONLY", "TEST_RESTRICTED", "INPUTS_INCOMPLETE", "UNSUPPORTED", "CALCULATION_UNAVAILABLE"] = "NOT_APPLICABLE"

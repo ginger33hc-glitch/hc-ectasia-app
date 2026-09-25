@@ -24,6 +24,10 @@ class Lens:
 
 LENSES = (
     Lens("clareon-panoptix-cnwtt0", "CLAREON PanOptix CNWTT0", "MULTIFOCAL", None, 119.1, "Alcon", ALCON_TORIC_URL),
+    Lens("clareon-panoptix-toric-cnwtt3", "CLAREON PanOptix Toric CNWTT2–6", "MULTIFOCAL", "Toric", 119.1, "Alcon", ALCON_TORIC_URL),
+    Lens("clareon-toric-cnw0t8", "CLAREON Toric CNW0T3–9", "MONOFOCAL", "Toric", 119.1, "Alcon", ALCON_TORIC_URL),
+    Lens("tecnis-eyhance-toric-diu525", "TECNIS Eyhance Toric DIU100–525", "MONOFOCAL", "Enhanced monofocal toric", 119.3, "Johnson & Johnson", TECNIS_TORIC_URL),
+    Lens("enova-advance-toric", "ENOVA Advance Toric", "EDOF", "Toric; exact model code to verify", 118.0, "ENOVA", None),
     Lens("tecnis-eyhance-gib00", "TECNIS Eyhance GIB00", "MONOFOCAL", "Enhanced monofocal", 119.3, "Johnson & Johnson", TECNIS_TORIC_URL),
     Lens("acrysof-single-sa60at", "AcrySof Single SA60AT", "MONOFOCAL", None, 118.7, "Alcon", ALCON_TORIC_URL),
     Lens("acrysof-ultrasert-au00t0", "AcrySof UltraSert AU00T0", "MONOFOCAL", None, 119.0, "Alcon", ALCON_TORIC_URL),

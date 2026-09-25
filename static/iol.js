@@ -5,6 +5,7 @@
   const setIfPresent = (id, value) => { if (value !== null && value !== undefined) $(id).value = value; };
   const originals = {OD:null, OS:null};
   const pentacamByEye = {OD:null, OS:null};
+  const corneaBackByEye = {OD:null, OS:null};
   let pentacamEyeConfirmed = false;
   let recommendation = null;
   let lensCatalog = [];
@@ -22,6 +23,12 @@
     $("siaAxisField").hidden = !required;
     $("incisionAxis").required = required;
     $("sia").required = required;
+    if (required) {
+      const steep = numberOrNull("k2Axis");
+      $("incisionAxis").value = steep === null ? "" : steep;
+      $("siaAxis").value = steep === null ? "" : steep;
+      $("sia").value = "0.25";
+    }
   }
 
   function populateEye() {
@@ -49,15 +56,16 @@
 
   $("surface").addEventListener("change", () => { $("stableField").hidden = $("surface").value !== "RESOLVED_AFTER_TREATMENT"; });
   $("priorSurgery").addEventListener("change", () => { $("historyField").hidden = !["MYOPIC_LASIK_PRK","HYPEROPIC_LASIK_PRK"].includes($("priorSurgery").value); });
-  $("eye").addEventListener("change", populateEye); $("k1").addEventListener("input", updateAstigmatism); $("k2").addEventListener("input", updateAstigmatism);
+  $("eye").addEventListener("change", populateEye); $("k1").addEventListener("input", updateAstigmatism); $("k2").addEventListener("input", updateAstigmatism); $("k2Axis").addEventListener("input", updateAstigmatism);
 
   $("extractButton").addEventListener("click", async () => {
-    const files = [...$("pentacamImages").files, ...$("iolmasterImages").files];
+    const files = [...$("pentacamImages").files, ...$("iolmasterImages").files, ...$("fourMapsImages").files];
     const status = $("extractStatus"); status.className = "status";
     if (!files.length) { status.textContent = "Upload the Pentacam and IOLMaster 500 reports."; status.classList.add("error"); return; }
     const form = new FormData(); files.forEach(file => form.append("images", file));
     originals.OD = null; originals.OS = null;
     pentacamByEye.OD = null; pentacamByEye.OS = null;
+    corneaBackByEye.OD = null; corneaBackByEye.OS = null;
     pentacamEyeConfirmed = false; $("eye").value = "";
     $("extractButton").disabled = true; status.textContent = "Transcribing source-locked fields…";
     try {
@@ -72,6 +80,9 @@
           if (["OD","OS"].includes(item.eye)) { pentacamByEye[item.eye] = item.pentacam; pentacamEyes.add(item.eye); }
           else unreadablePentacamLaterality = true;
         }
+        if (item.document_type === "PENTACAM_4_MAPS_REFRACTIVE" && ["OD","OS"].includes(item.eye)) {
+          corneaBackByEye[item.eye] = item.cornea_back;
+        }
         if (item.document_type === "IOLMASTER_500_BIOMETRY") {
           const report = item.iolmaster500 || {}; ["OD","OS"].forEach(eye => { if (report[eye] && report[eye].axial_length_mm !== null) originals[eye] = report[eye]; });
         }
@@ -80,6 +91,7 @@
       if (unreadablePentacamLaterality || pentacamEyes.size === 0) throw new Error("Pentacam laterality was not read. Upload a readable Pentacam Cataract Pre-Op report showing OD or OS.");
       if (pentacamEyes.size > 1) throw new Error("Conflicting Pentacam laterality was detected. Upload the Cataract Pre-Op report for one operative eye only.");
       $("eye").value = [...pentacamEyes][0];
+      if ($("fourMapsImages").files.length && !corneaBackByEye[$("eye").value]) throw new Error("4 Maps Refractive Cornea Back could not be assigned to the operative eye.");
       pentacamEyeConfirmed = true;
       populateEye();
       status.textContent = unreadable.length ? `Extraction completed. Surgeon entry is required only for unreadable fields: ${unreadable.join(", ")}.` : "Both reports extracted. Review values before evaluation.";
@@ -89,7 +101,8 @@
 
   function populateLenses() {
     const eligible = new Set(recommendation.eligible_categories || []);
-    const options = lensCatalog.filter(lens => eligible.has(lens.category));
+    const toric = recommendation.toric_evaluation_required;
+    const options = lensCatalog.filter(lens => eligible.has(lens.category) && (!toric || lens.subtype?.toLowerCase().includes("toric")));
     $("selectedLens").innerHTML = `<option value="">Select an eligible lens</option>` + options.map(lens => `<option value="${lens.id}">${lens.name} — ${lens.category} — A ${lens.a_constant.toFixed(1)}</option>`).join("");
   }
 
@@ -137,10 +150,16 @@
 
   $("powerButton").addEventListener("click", async () => {
     const status = $("powerStatus"); status.className="status"; const difference = kDifference();
+    const corneaBack = corneaBackByEye[$("eye").value];
+    const posteriorFields = ["k1_d","k2_d","k1_axis_deg","k2_axis_deg","rh_mm","rv_mm"];
+    const posteriorInput = corneaBack && posteriorFields.every(key => Number.isFinite(corneaBack[key])) ? {
+      eye:$("eye").value, source:"PENTACAM_4_MAPS_REFRACTIVE_CORNEA_BACK",
+      ...Object.fromEntries(posteriorFields.map(key => [key, corneaBack[key]]))
+    } : null;
     const payload = {patient_name:$("patientName").value, biological_sex:$("biologicalSex").value, eye:$("eye").value, selected_lens_id:$("selectedLens").value,
       axial_length_mm:Number($("al").value), acd_mm:Number($("acd").value), k1_d:Number($("k1").value), k1_axis_deg:Number($("k1Axis").value), k2_d:Number($("k2").value), k2_axis_deg:Number($("k2Axis").value), astigmatism_type:$("astigType").value || null,
       prior_corneal_surgery:$("priorSurgery").value, historical_data_available:$("historicalData").value === "true", incision_axis_deg:difference>=1?numberOrNull("incisionAxis"):null, sia_d:difference>=1?numberOrNull("sia"):null, sia_axis_deg:difference>=1?numberOrNull("siaAxis"):null,
-      cct_um:numberOrNull("cct"), lens_thickness_mm:numberOrNull("lensThickness"), wtw_mm:numberOrNull("wtw")};
+      cct_um:numberOrNull("cct"), lens_thickness_mm:numberOrNull("lensThickness"), wtw_mm:numberOrNull("wtw"), posterior_cornea:posteriorInput};
     if (!payload.selected_lens_id) { status.textContent="Select a clinic lens."; status.classList.add("error"); return; }
     $("powerButton").disabled=true; status.textContent="Determining the canonical calculation route…";
     try {
@@ -148,9 +167,19 @@
       let html=`<div class="warning"><strong>${data.calculator_name}</strong><br>${data.message}</div>`;
       html+=`<p><span>ACD target</span>: ${Number(data.target_refraction_d).toFixed(2)} D (<span>locked</span>)</p>`;
       if(data.second_formula_required) html+=`<div class="warning"><span>Second modern formula verification required</span> (AL ${Number(data.inputs.axial_length_mm).toFixed(2)} mm). <span>Use ESCRS where available and verify all values manually.</span></div>`;
-      if(data.calculator_url) html+=`<a class="external" target="_blank" rel="noopener noreferrer" href="${data.calculator_url}">Open ${data.calculator_name}</a>`;
       if(data.escrs_url) html+=`<button id="escrsTransfer" class="external" type="button">Transfer values to ESCRS</button>`;
-      if(data.predictions?.length){html+=`<table class="table"><thead><tr><th>IOL power</th><th>Predicted refraction</th><th>Selection</th></tr></thead><tbody>${data.predictions.map(p=>`<tr><td>${p.IOL ?? p.iol_power ?? "—"}</td><td>${p.Rx ?? p.predicted_refraction ?? "—"}</td><td>${p.IsBestOption ? "Best option" : ""}</td></tr>`).join("")}</tbody></table>`;}
+      const toricRoute = data.route === "MANUFACTURER_TORIC";
+      if(toricRoute && data.toric_candidates?.length) {
+        const fmt = (value, digits = 2) => Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : "—";
+        const candidates = data.toric_candidates.filter(c => /^[A-Z0-9]+$/.test(c.model));
+        html += `<div class="warning"><strong>TEST ONLY — unvalidated toric optical prototype.</strong> Independently check the source readings, model availability, implantation axis, and residual with the manufacturer's calculator before any clinical use.</div>`;
+        html += `<h3>Embedded toric calculation — ${fmt(candidates[0]?.spherical_equivalent_iol_d)} D K6 spherical equivalent</h3>`;
+        html += `<div class="recommendation">${candidates[0]?.model ?? "—"} · ${fmt(candidates[0]?.marker_axis_deg, 1)}° marker axis</div>`;
+        html += `<p>Predicted residual cylinder: ${fmt(candidates[0]?.residual_spectacle_cylinder_d)} D at ${fmt(candidates[0]?.residual_spectacle_axis_deg, 1)}° (prototype estimate).</p>`;
+        html += `<div style="overflow-x:auto"><table class="table"><thead><tr><th>Model</th><th>IOL cylinder</th><th>Marker axis</th><th>Predicted residual cylinder</th></tr></thead><tbody>${candidates.map(c => `<tr><td>${c.model}</td><td>${fmt(c.cylinder_iol_d)} D</td><td>${fmt(c.marker_axis_deg, 1)}°</td><td>${fmt(c.residual_spectacle_cylinder_d)} D at ${fmt(c.residual_spectacle_axis_deg, 1)}°</td></tr>`).join("")}</tbody></table></div>`;
+      } else if(toricRoute) html += `<div class="warning"><strong>No embedded toric model or axis available.</strong> ${data.toric_status === "TEST_RESTRICTED" ? "The unvalidated toric prototype is accessible only in the clinic OWNER test session." : data.toric_status === "INPUTS_INCOMPLETE" ? "Upload the same-eye Pentacam 4 Maps Refractive image and verify Pachy Vertex." : "Review source measurements and the selected lens family."}</div>`;
+      if(data.predictions?.length){html+=`<h3>${toricRoute?"Stage 1 — Cooke K6 spherical power":"Cooke K6 power"}</h3><table class="table"><thead><tr><th>IOL power</th><th>Predicted refraction</th><th>Selection</th></tr></thead><tbody>${data.predictions.map(p=>`<tr><td>${Number(p.IOL ?? p.iol_power).toFixed(2)}</td><td>${Number(p.Rx ?? p.predicted_refraction).toFixed(2)}</td><td>${p.IsBestOption ? "K6 best option" : ""}</td></tr>`).join("")}</tbody></table>`;}
+      if(data.calculator_url) html+=`<a class="external" target="_blank" rel="noopener noreferrer" href="${data.calculator_url}">Optional manufacturer toric calculator comparison</a>`;
       $("powerResult").innerHTML=html; status.textContent=data.calculation_status.replaceAll("_"," ");
       if(data.escrs_url) $("escrsTransfer").addEventListener("click", async () => {
         const button = $("escrsTransfer");

@@ -20,9 +20,9 @@ EYE_SCHEMA: dict[str, Any] = {
 
 EXTRACTION_SCHEMA: dict[str, Any] = {
     "type": "object", "additionalProperties": False,
-    "required": ["document_type", "eye", "patient_name", "patient_age_years", "pentacam", "iolmaster500", "unreadable_fields"],
+    "required": ["document_type", "eye", "patient_name", "patient_age_years", "pentacam", "cornea_back", "iolmaster500", "unreadable_fields"],
     "properties": {
-        "document_type": {"type": "string", "enum": ["PENTACAM_CATARACT_PREOP", "IOLMASTER_500_BIOMETRY", "OTHER"]},
+        "document_type": {"type": "string", "enum": ["PENTACAM_CATARACT_PREOP", "PENTACAM_4_MAPS_REFRACTIVE", "IOLMASTER_500_BIOMETRY", "OTHER"]},
         "eye": {"type": "string", "enum": ["OD", "OS", "BOTH", "UNKNOWN"]},
         "patient_name": {"type": ["string", "null"]},
         "patient_age_years": {"type": ["integer", "null"]},
@@ -37,6 +37,18 @@ EXTRACTION_SCHEMA: dict[str, Any] = {
                 "cct_pachy_vertex_um": {"type": ["number", "null"]},
                 "hwtw_mm": {"type": ["number", "null"]},
                 "acd_internal_mm": {"type": ["number", "null"]},
+            },
+        },
+        "cornea_back": {
+            "type": "object", "additionalProperties": False,
+            "required": ["k1_d", "k2_d", "k1_axis_deg", "k2_axis_deg", "rh_mm", "rv_mm"],
+            "properties": {
+                "k1_d": {"type": ["number", "null"]},
+                "k2_d": {"type": ["number", "null"]},
+                "k1_axis_deg": {"type": ["number", "null"]},
+                "k2_axis_deg": {"type": ["number", "null"]},
+                "rh_mm": {"type": ["number", "null"]},
+                "rv_mm": {"type": ["number", "null"]},
             },
         },
         "iolmaster500": {
@@ -58,7 +70,8 @@ You are transcribing one ophthalmic source image for the independent CER-AI IOL 
 Return only explicitly printed, readable values. Never estimate, calculate, average, copy
 from the fellow eye, or substitute a similar field. Nonmatching document objects use nulls.
 
-Classify as PENTACAM_CATARACT_PREOP, IOLMASTER_500_BIOMETRY, or OTHER. Preserve
+Classify as PENTACAM_CATARACT_PREOP, PENTACAM_4_MAPS_REFRACTIVE,
+IOLMASTER_500_BIOMETRY, or OTHER. Preserve
 OD/right or OS/left; use BOTH for a bilateral IOLMaster page.
 
 Pentacam Cataract Pre-Op source locks:
@@ -68,6 +81,12 @@ Pentacam Cataract Pre-Op source locks:
 - acd_internal_mm is ACD (Int.), the true internal ACD excluding corneal thickness.
   Never substitute ACD (Ext.).
 TCRP, SimK and Diff. are not authoritative and must not be extracted.
+
+Pentacam 4 Maps Refractive: transcribe the left numeric panel's "Cornea Back"
+K1, K2 (preserve printed negative signs), their explicitly printed axes, and
+Rh/Rv radii in mm. Do not use Cornea Front, color maps, or infer missing axes.
+Rh/Rv are horizontal and vertical radii, not principal radii. Set missing
+printed values to null. These measurements belong only to the indicated eye.
 
 IOLMaster 500 source locks: use only the upper biometry block, never lower IOL tables.
 Transcribe AL, K1 and axis, K2 and axis, and ACD separately for OD and OS. Set the AL
