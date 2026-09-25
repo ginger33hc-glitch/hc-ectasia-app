@@ -41,7 +41,7 @@ def power_payload(**overrides):
         "selected_lens_id": "clareon-mono-sy60wf", "axial_length_mm": 24.2,
         "acd_mm": 2.21, "k1_d": 42.0, "k1_axis_deg": 20,
         "k2_d": 42.5, "k2_axis_deg": 110, "astigmatism_type": None,
-        "target_refraction_d": 0.0, "prior_corneal_surgery": "NONE",
+        "prior_corneal_surgery": "NONE",
         "historical_data_available": False, "incision_axis_deg": None,
         "sia_d": None, "sia_axis_deg": None, "cct_um": 573,
         "lens_thickness_mm": None, "wtw_mm": 11.7,
@@ -135,6 +135,23 @@ def test_non_toric_standard_eye_uses_cooke_k6_and_exposes_external_verification(
 def test_short_eye_requires_real_lens_thickness_and_wtw():
     with pytest.raises(ValidationError):
         power_payload(axial_length_mm=21.9, lens_thickness_mm=None)
+
+
+@pytest.mark.parametrize("acd,target", [(2.49, 0.0), (2.5, -0.25), (3.5, -0.25), (3.51, -0.5)])
+@pytest.mark.parametrize("al,check", [(21.99, True), (22.0, False), (26.0, False), (26.01, True)])
+def test_acd_target_and_axial_length_second_formula_are_independent(acd, target, al, check):
+    case = power_payload(acd_mm=acd, axial_length_mm=al, lens_thickness_mm=4.5)
+    response = [{"IOLs": [{"Predictions": [{"IOL": 21.0, "Rx": 0.01}]}]}]
+    fake = BytesIO(__import__("json").dumps(response).encode())
+    fake.__enter__ = lambda value: value
+    fake.__exit__ = lambda *args: None
+    with patch("iol_module.power.urlopen", return_value=fake) as mocked:
+        plan = plan_iol_power(case)
+    assert plan.target_refraction_d == target
+    assert plan.target_locked is True
+    assert plan.second_formula_required is check
+    assert plan.inputs["target_refraction_d"] == target
+    assert __import__("json").loads(mocked.call_args.args[0].data)["Eyes"][0]["TgtRx"] == target
 
 
 def test_power_route_requires_surgeon_selected_biological_sex():

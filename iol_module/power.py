@@ -22,6 +22,18 @@ ESCRS_URL = "https://iolcalculator.escrs.org/"
 ASCRS_POST_REFRACTIVE_URL = "https://iolcalc.ascrs.org/"
 
 
+def _target_from_acd(acd_mm: float) -> float:
+    if acd_mm < 2.5:
+        return 0.0
+    if acd_mm > 3.5:
+        return -0.5
+    return -0.25
+
+
+def _second_formula_required(al_mm: float) -> bool:
+    return al_mm < 22.0 or al_mm > 26.0
+
+
 def _base_inputs(case: IOLPowerPlanInput) -> dict[str, object]:
     values: dict[str, object] = {
         "eye": case.eye,
@@ -33,7 +45,7 @@ def _base_inputs(case: IOLPowerPlanInput) -> dict[str, object]:
         "k2_d": case.k2_d,
         "k2_axis_deg": case.k2_axis_deg,
         "astigmatism_d": case.astigmatism_d,
-        "target_refraction_d": case.target_refraction_d,
+        "target_refraction_d": _target_from_acd(case.acd_mm),
     }
     for key, value in {
         "cct_um": case.cct_um,
@@ -57,9 +69,10 @@ def _external_plan(case: IOLPowerPlanInput, lens, *, route: str, name: str, url:
         selected_lens_name=lens.name,
         lens_category=lens.category,
         a_constant=lens.a_constant,
-        target_refraction_d=case.target_refraction_d,
-        target_locked=False,
+        target_refraction_d=_target_from_acd(case.acd_mm),
+        target_locked=True,
         target_warning=None,
+        second_formula_required=_second_formula_required(case.axial_length_mm),
         calculator_name=name,
         calculator_url=url,
         escrs_url=None,
@@ -72,7 +85,7 @@ def _external_plan(case: IOLPowerPlanInput, lens, *, route: str, name: str, url:
 def _k6_payload(case: IOLPowerPlanInput, a_constant: float) -> dict[str, object]:
     eye: dict[str, object] = {
         "SpecialSituation": "None",
-        "TgtRx": case.target_refraction_d,
+        "TgtRx": _target_from_acd(case.acd_mm),
         "K1": case.k1_d,
         "K2": case.k2_d,
         "Biometer": "Other",
@@ -158,8 +171,8 @@ def plan_iol_power(case: IOLPowerPlanInput) -> IOLPowerPlan:
             route="COOKE_K6", calculation_status="CALCULATION_UNAVAILABLE",
             selected_lens_id=lens.id, selected_lens_name=lens.name,
             lens_category=lens.category, a_constant=lens.a_constant,
-            target_refraction_d=case.target_refraction_d, target_locked=False,
-            target_warning=None, calculator_name="Cooke K6", calculator_url=None,
+            target_refraction_d=_target_from_acd(case.acd_mm), target_locked=True,
+            target_warning=None, second_formula_required=_second_formula_required(case.axial_length_mm), calculator_name="Cooke K6", calculator_url=None,
             escrs_url=ESCRS_URL, inputs=inputs, predictions=[],
             message=f"Cooke K6 could not complete the calculation. No substitute was used ({type(exc).__name__}).",
         )
@@ -167,8 +180,8 @@ def plan_iol_power(case: IOLPowerPlanInput) -> IOLPowerPlan:
         route="COOKE_K6", calculation_status="COMPLETED",
         selected_lens_id=lens.id, selected_lens_name=lens.name,
         lens_category=lens.category, a_constant=lens.a_constant,
-        target_refraction_d=case.target_refraction_d, target_locked=False,
-        target_warning=None, calculator_name="Cooke K6", calculator_url=None,
+        target_refraction_d=_target_from_acd(case.acd_mm), target_locked=True,
+        target_warning=None, second_formula_required=_second_formula_required(case.axial_length_mm), calculator_name="Cooke K6", calculator_url=None,
         escrs_url=ESCRS_URL, inputs=inputs, predictions=predictions,
         message="Cooke K6 calculation completed. The ESCRS calculator is provided as the external comparison route.",
     )
