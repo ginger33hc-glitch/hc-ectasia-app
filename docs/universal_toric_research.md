@@ -1,5 +1,26 @@
 # Universal toric IOL calculation: research status
 
+## 2026-09-25 workflow decision: no routine lens thickness
+
+The surgeon checked with the Pentacam manufacturer: crystalline lens thickness
+is only rarely measurable in the clinic's workflow. Therefore LT must **not**
+be a required input in the intended three-image workflow (4 Maps Refractive,
+Cataract Pre-OP, IOLMaster 500). The Castrop prototype remains a published
+optics reference only; its ELP equation requires measured LT and its C/H/R
+constants are not optimized for CNWTT2–6 in IOL Con. Do not fill LT with a
+population value or transfer C/H/R from another lens.
+
+The next candidate is a documented **LT-free spherical power/ELP method**
+(for example SRK/T using the CNWTT2–6 manufacturer optical A-constant 119.1),
+combined with a separately verified thick-cornea toric vector step using the
+same-eye Pentacam posterior measurements and the surgeon's SIA. This is an
+architecture for comparison, **not** a validated combined clinical formula:
+its ELP-to-cylinder vergence, anterior K index, posterior axis/sign, available
+CNWTT steps and resulting sphere and axis must be checked against paired
+manufacturer calculations and postoperative outcomes. If an independently
+specified and validated LT-free toric formula better fits these inputs, use it
+instead. Retain the current manufacturer comparison route meanwhile.
+
 The prototype in `research/toric_vergence.py` is **not available in the clinical
 application**. It reproduces the continuous optical result of the published
 Castrop example 1, but does not select an implant, predict a validated clinical
@@ -71,6 +92,14 @@ with axis but does not yet substitute the horizontal/vertical Rh/Rv for the
 flat/steep Castrop radii. In an oblique cornea those are different directions.
 ZEISS's IOLMaster 500 specification explicitly lists lens thickness as absent;
 the formula also needs a verified LT source or a separately validated variant.
+
+The surgeon's uploaded 4 Maps Refractive example confirms a `Cornea Back`
+numeric group containing Rh/Rv, K1/K2, Astig and Axis, while its `Lens Th.`
+box is blank. No patient identifiers or example measurements are retained in
+this research note. In this example the missing LT is a real calculation
+blocker, even though posterior surface information is present. IOL Con lists
+no optimized Castrop C/H/R for **Clareon PanOptix Toric CNWTT2–6** as of this
+review; nearby constants for other Alcon lenses must not be copied over.
 
 ## Why toric calculation differs from spherical IOL power
 
@@ -145,6 +174,8 @@ calculation identity; it does not establish surgical accuracy.
 - Alcon toric model information: https://www.myalcon.com/professional/cataract-surgery/iols/clareon-toric/
 - Alcon Clareon PanOptix model and cylinder specifications: https://www.alcon.co.jp/media-release/20220413-clareon-panoptix
 - Australian Clareon PanOptix Toric device listing (T2–T6): https://www.legislation.gov.au/F2024L01355/asmade/2024-10-24/text/original/pdf/2
+- ZEISS IOLMaster 500 capability table (no lens thickness): https://www.zeiss.com/meditec/en/products/optical-biometers.html
+- IOL Con CNWTT2–6 constants status: https://www.iolcon.org/printLenses.php
 
 ESCRS already supports toric formula comparison and a biometry handoff, but its
 published toric route and model coverage must be checked in a live calculation
