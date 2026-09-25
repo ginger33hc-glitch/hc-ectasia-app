@@ -54,3 +54,33 @@ class IOLMaster500ToricInput:
     @property
     def sia_d(self) -> float:
         return SURGEON_SIA_D
+
+
+@dataclass(frozen=True)
+class PentacamPosteriorInput:
+    """Same-eye 4 Maps Refractive / Cornea Back printed K1, K2 and axis.
+
+    These are signed *posterior surface powers*, not IOLMaster anterior K,
+    Pentacam TCRP or the posterior radii required by Castrop. Optical index
+    and meridional convention must be verified before converting to radii.
+    """
+
+    eye: str
+    posterior_k1_d: float
+    posterior_k2_d: float
+    posterior_k1_axis_deg: float
+    source_screen: str = "4 Maps Refractive / Cornea Back"
+
+    def __post_init__(self):
+        if self.eye not in ("OD", "OS"):
+            raise ValueError("Posterior readings must be assigned to OD or OS.")
+        if self.source_screen != "4 Maps Refractive / Cornea Back":
+            raise ValueError("Posterior readings need their source-locked panel.")
+        values = (self.posterior_k1_d, self.posterior_k2_d,
+                  self.posterior_k1_axis_deg)
+        if not all(isfinite(value) for value in values):
+            raise ValueError("Posterior readings and axis must be finite.")
+        if not (-12 <= self.posterior_k2_d <= self.posterior_k1_d < 0):
+            raise ValueError("Posterior K powers must be signed negative values.")
+        if not 0 <= self.posterior_k1_axis_deg <= 180:
+            raise ValueError("Posterior K1 axis must be in the 0–180 range.")
