@@ -49,7 +49,7 @@ cannot be inserted as the formula's posterior *radii*.
 | --- | --- | --- |
 | AL | IOLMaster 500 upper biometry | Confirm eye and printed/edited status. |
 | Anterior RCA1, RCA2 and axis ACA1 | IOLMaster 500 K1/K2 and axes | Confirm the device keratometric index before converting D to physical mm. |
-| Posterior RCP1, RCP2 and axis ACP1 | Same-eye Pentacam posterior-surface readout | Verify both meridional radii and their axis; posterior cylinder magnitude alone is insufficient. |
+| Posterior RCP1, RCP2 and axis ACP1 | Existing same-eye Pentacam 4 Maps Refractive, left-side Cornea Back K1/K2 and axis | Confirm the printed signed powers, posterior optical index and meridian convention before converting to physical radii. |
 | CCT | Pentacam Pachy Vertex | Check unit and same eye. |
 | External ACD | Pentacam ACD (Ext.), or ACD (Int.) + Pachy Vertex/1000 | Confirm which value is printed; do not add CCT twice. |
 | Crystalline lens thickness LT | Explicitly printed biometry | Current extractor allows null; absence blocks this formula. |
@@ -59,11 +59,15 @@ cannot be inserted as the formula's posterior *radii*.
 | Lens cylinder steps | Verified CNWTT2–6 catalog | Select a discrete product only after continuous calculation is validated. |
 
 The paper permits a fallback using assumed posterior radii and a statistical
-CPA when tomography is unavailable. For this workflow, direct Pentacam data
-have been reported, so this fallback is not the selected branch. If the
-standard uploaded screen shows only posterior astigmatism magnitude, obtain a
-posterior curvature readout that explicitly contains both radii and the axis;
-do not infer them from the magnitude or from TCRP.
+CPA when tomography is unavailable. This workflow already uploads an OD and
+OS Pentacam 4 Maps Refractive image for the refractive surgery module; the
+left-side `Cornea Back` table prints posterior K1, K2 and axis. Source-lock
+those fields separately for toric research on the existing images, without
+changing the canonical refractive module or requesting another screen. The
+current refractive extractor transcribes only posterior Km and Rmin from Show
+2 Exams; these do not supply the pair of cardinal posterior radii. The new
+research input contract stores signed posterior K values and axis but does
+not yet convert them into Castrop radii until the device convention is proven.
 
 ## Why toric calculation differs from spherical IOL power
 
@@ -95,10 +99,11 @@ calculation identity; it does not establish surgical accuracy.
 4. The existing IOLMaster anterior K1/K2 and axes are authoritative for the
    current clinical toric trigger. Converting keratometric D to *physical*
    anterior radii requires the device keratometric index. The surgeon reports
-   posterior astigmatism on the Pentacam Cataract Pre-OP images, but current
-   `iol_module/extraction.py` does not transcribe its magnitude or axis. The
-   actual posterior field and its convention need source verification; a
-   cylinder magnitude alone does not provide two physical posterior radii.
+   posterior astigmatism on the Pentacam Cataract Pre-OP images, and the
+   existing refractive module's 4 Maps Refractive OD/OS images have a Cornea
+   Back numeric panel. Neither current extractor transcribes its posterior
+   K1/K2/axis trio. Do not substitute the already-extracted posterior Km/Rmin
+   or the Cataract Pre-OP TCRP for the Castrop posterior radii.
 5. The surgeon supplied SIA 0.25 D and incision on K2; these may be used as
    explicit planning assumptions and should be checked against postoperative
    vector data before a lens recommendation is enabled.
@@ -110,9 +115,10 @@ calculation identity; it does not establish surgical accuracy.
 - Confirm the *actual toric model IDs* stocked or offered in Türkiye, and
   manufacturer documentation for each sphere range and cylinder step.
 - Source current model-specific optimized constants and their provenance.
-- Source-lock the actual Pentacam posterior magnitude **and axis**, or both
-  posterior meridional radii and orientation, with measurement conventions.
-  Do not confuse TCRP total astigmatism with posterior astigmatism.
+- Source-lock posterior K1, K2 and axis from the **existing** 4 Maps Refractive
+  Cornea Back numeric panel, checking signed values, the measuring eye and
+  Pentacam's conversion convention to physical radii. Do not confuse TCRP
+  total astigmatism with posterior astigmatism.
 - Record surgeon-specific incision location and SIA, including their axis
   convention. Validate left/right and 0/180-degree boundaries.
 - Compare the independent implementation against published examples and a
