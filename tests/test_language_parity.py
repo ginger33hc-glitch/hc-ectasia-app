@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_all_secure_interfaces_load_the_canonical_language_controller():
     for filename in ("index.html", "iol.html", "login.html", "module-select.html", "archive.html", "trial-login.html"):
         html = (ROOT / "static" / filename).read_text(encoding="utf-8")
-        assert html.count('/static/i18n.js?v=20') == 1, filename
+        assert html.count('/static/i18n.js?v=21') == 1, filename
 
 
 def test_secure_source_markup_is_english_only_and_turkish_is_canonicalized():
@@ -44,6 +44,9 @@ def test_dynamic_iol_and_archive_messages_have_turkish_presentation_labels():
         ("Irregular astigmatism: multifocal IOL excluded.", "Düzensiz astigmatizma"),
         ("CALCULATION UNAVAILABLE", "HESAPLAMA KULLANILAMIYOR"),
         ("Archived canonical assessment reopened.", "Arşivlenmiş kanonik değerlendirme yeniden açıldı"),
+        ("PATIENT IDENTITY NOT VERIFIED — SURGEON CONFIRMATION REQUIRED", "HASTA KİMLİĞİ DOĞRULANMADI"),
+        ("Canonical Pentacam values and provenance", "Kanonik Pentacam değerleri ve kökeni"),
+        ("The shared images exceed the 80 MB total limit.", "toplam 80 MB sınırını aşıyor"),
     ):
         assert english in i18n
         assert turkish in i18n

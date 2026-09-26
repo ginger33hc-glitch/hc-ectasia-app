@@ -49,6 +49,20 @@ def test_every_developer_text_fragment_has_a_canonical_turkish_translation():
     assert any(text.startswith(", to organize") for text in texts)
 
 
+def test_every_homepage_text_fragment_has_a_canonical_turkish_translation():
+    source = Path("static/public-home.html").read_text(encoding="utf-8")
+    source = re.sub(r"<(script|style)\b.*?</\1>", "", source, flags=re.S | re.I)
+    texts = TextNodes(source).texts
+    translations = translation_dictionary()
+    language_neutral = {
+        "CER-AI", "Corneal Ectasia Risk", "A", "ssessment", "I", "ntelligence",
+        "BAD-D", "Pentacam", "Randleman / ERSS", "CER-AI-adapted NICE", "PS3",
+        "Hüseyin Cengiz, M.D.", "2.0", "01", "02", "03", "04", "1", "2", "3", "4", "5", "6",
+    }
+    missing = [text for text in texts if text not in language_neutral and text not in translations]
+    assert not missing, missing
+
+
 def test_homepage_helper_does_not_replace_or_cache_developer_html():
     helper = Path("static/public-tr-home-overrides.js").read_text(encoding="utf-8")
     for retired in ("developerOriginalHtml", "DEVELOPER_TR_HTML", "applyDeveloperLocale", "section.innerHTML"):

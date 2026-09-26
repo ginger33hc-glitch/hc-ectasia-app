@@ -75,7 +75,7 @@ def test_new_editorial_sections_have_both_languages_with_one_existing_controller
     assert 'html[lang="tr"] [data-language-variant="en"]' in html
     scripts = structure.attributes("script")
     assert len(scripts) == 1
-    assert scripts[0]["src"] == "/static/public-i18n.js?v=3"
+    assert scripts[0]["src"] == "/static/public-i18n.js?v=4"
     assert "CER-AI yapay zekâyı nasıl kullanır?" in html
     assert "Bunlar sentetik eğitim olgularıdır" in html
 
