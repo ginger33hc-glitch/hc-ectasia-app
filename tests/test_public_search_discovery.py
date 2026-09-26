@@ -100,6 +100,17 @@ def test_surgeon_question_pages_are_indexable_bilingual_and_product_led(
     schema = json.loads(schema_match.group(1))
     assert schema["inLanguage"] == language
     assert schema["mainEntity"] == {"@id": "https://cer-ai.com/#software"}
+    assert len(schema["citation"]) >= 5
+    assert all(source.startswith("https://") for source in schema["citation"])
+    assert any(
+        heading in response.text
+        for heading in (
+            "Selected primary sources",
+            "Seçilmiş birincil kaynaklar",
+            "Selected validation and comparison sources",
+            "Seçilmiş doğrulama ve karşılaştırma kaynakları",
+        )
+    )
 
 
 def test_indexnow_key_is_public_only_on_canonical_host(public_app):
