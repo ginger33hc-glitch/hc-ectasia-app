@@ -9,6 +9,24 @@
   let pentacamEyeConfirmed = false;
   let recommendation = null;
   let lensCatalog = [];
+  const tr = value => window.CERAI_I18N?.translate(value) ?? String(value ?? "");
+  const warningLabel = code => ({
+    WARN_RETINA_SIGNIFICANT:"Significant retinal disease: multifocal IOL excluded.",
+    WARN_RETINA_MILD:"Mild retinal disease requires surgeon review.",
+    WARN_MACULAR_PATHOLOGY:"Macular pathology: multifocal IOL excluded.",
+    WARN_GLAUCOMA_PRESENT:"Definite glaucoma: multifocal IOL excluded.",
+    WARN_GLAUCOMA_SUSPECT:"Glaucoma suspect: multifocal IOL requires caution.",
+    WARN_OCULAR_SURFACE_MODERATE:"Moderate active ocular-surface disease: multifocal IOL excluded.",
+    WARN_OCULAR_SURFACE_SIGNIFICANT:"Significant active ocular-surface disease: multifocal IOL excluded.",
+    WARN_OCULAR_SURFACE_MILD:"Mild ocular-surface disease requires optimization and review.",
+    WARN_HOA_HIGH:"High total corneal HOA: multifocal IOL excluded.",
+    WARN_HOA_MODERATE:"Moderate total corneal HOA requires caution.",
+    WARN_KAPPA_HIGH:"High angle kappa: multifocal IOL excluded.",
+    WARN_ALPHA_HIGH:"High angle alpha: multifocal IOL excluded.",
+    WARN_PUPIL_TOO_SMALL:"Pupil diameter below 2.00 mm: multifocal IOL excluded.",
+    WARN_PUPIL_TOO_LARGE:"Pupil diameter above 4.00 mm: multifocal IOL excluded.",
+    WARN_IRREGULAR_ASTIGMATISM:"Irregular astigmatism: multifocal IOL excluded.",
+  })[code] || code;
 
   function clearSourceCase() {
     originals.OD = null; originals.OS = null;
@@ -161,11 +179,11 @@
     try {
       const response = await fetch("/iol/evaluate", {method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
       const data = await response.json(); if (!response.ok) throw new Error(errorMessage(data)); recommendation = data;
-      $("recommendation").textContent = `Recommended IOL: ${data.formatted_recommendation}`;
-      $("eligible").innerHTML = (data.eligible_categories || []).map(v => `<span class="pill">Eligible: ${v}</span>`).join("");
-      $("warnings").innerHTML = (data.warning_codes || []).map(v => `<div class="warning">${v}</div>`).join("");
-      $("reasons").replaceChildren(...(data.clinical_explanation || []).map(value => { const p=document.createElement("p"); p.className="reason"; p.textContent=value; return p; }));
-      $("legal").textContent = data.legal_notice; $("result").hidden = false;
+      $("recommendation").textContent = tr(`Recommended IOL: ${data.formatted_recommendation}`);
+      $("eligible").innerHTML = (data.eligible_categories || []).map(v => `<span class="pill">${tr(`Eligible: ${v}`)}</span>`).join("");
+      $("warnings").innerHTML = (data.warning_codes || []).map(v => `<div class="warning">${tr(warningLabel(v))}</div>`).join("");
+      $("reasons").replaceChildren(...(data.clinical_explanation || []).map(value => { const p=document.createElement("p"); p.className="reason"; p.textContent=tr(value); return p; }));
+      $("legal").textContent = tr(data.legal_notice); $("result").hidden = false;
       if (!lensCatalog.length) { const lenses = await fetch("/iol/lenses", {credentials:"same-origin"}); const body = await lenses.json(); if (!lenses.ok) throw new Error(errorMessage(body)); lensCatalog = body.lenses || []; }
       populateLenses(); $("powerSection").hidden = false; updateAstigmatism(); status.textContent = "Recommendation generated. Select the lens for Stage 2."; $("result").scrollIntoView({behavior:"smooth"});
     } catch (error) { status.textContent = error.message || "Recommendation could not be generated."; status.classList.add("error"); }
@@ -188,7 +206,7 @@
     $("powerButton").disabled=true; status.textContent="Determining the canonical calculation route…";
     try {
       const response=await fetch("/iol/power/plan",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); const data=await response.json(); if(!response.ok) throw new Error(errorMessage(data));
-      let html=`<div class="warning"><strong>${data.calculator_name}</strong><br>${data.message}</div>`;
+      let html=`<div class="warning"><strong>${tr(data.calculator_name)}</strong><br>${tr(data.message)}</div>`;
       html+=`<p><span>ACD target</span>: ${Number(data.target_refraction_d).toFixed(2)} D (<span>locked</span>)</p>`;
       if(data.second_formula_required) html+=`<div class="warning"><span>Second modern formula verification required</span> (AL ${Number(data.inputs.axial_length_mm).toFixed(2)} mm). <span>Use ESCRS where available and verify all values manually.</span></div>`;
       if(data.escrs_url) html+=`<button id="escrsTransfer" class="external" type="button">Transfer values to ESCRS</button>`;
@@ -204,7 +222,7 @@
       } else if(toricRoute) html += `<div class="warning"><strong>No embedded toric model or axis available.</strong> ${data.toric_status === "INPUTS_INCOMPLETE" ? "Upload the same-eye Pentacam 4 Maps Refractive image and verify Pachy Vertex." : "Review source measurements and the selected lens family."}</div>`;
       if(data.predictions?.length){html+=`<h3>${toricRoute?"Stage 1 — Cooke K6 spherical power":"Cooke K6 power"}</h3><table class="table"><thead><tr><th>IOL power</th><th>Predicted refraction</th><th>Selection</th></tr></thead><tbody>${data.predictions.map(p=>`<tr><td>${Number(p.IOL ?? p.iol_power).toFixed(2)}</td><td>${Number(p.Rx ?? p.predicted_refraction).toFixed(2)}</td><td>${p.IsBestOption ? "K6 best option" : ""}</td></tr>`).join("")}</tbody></table>`;}
       if(data.calculator_url) html+=`<a class="external" target="_blank" rel="noopener noreferrer" href="${data.calculator_url}">Optional manufacturer toric calculator comparison</a>`;
-      $("powerResult").innerHTML=html; status.textContent=data.calculation_status.replaceAll("_"," ");
+      $("powerResult").innerHTML=html; status.textContent=tr(data.calculation_status.replaceAll("_"," "));
       if(data.escrs_url) $("escrsTransfer").addEventListener("click", async () => {
         const button = $("escrsTransfer");
         const escrsWindow = window.open("about:blank", "_blank");
