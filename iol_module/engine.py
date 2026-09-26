@@ -43,10 +43,7 @@ def evaluate_case(case: IOLCaseInput) -> IOLRecommendation:
     alpha_high = case.angle_alpha_mm > 0.50
     pupil_small = case.pentacam_pupil_3d_mm < 2.00
     pupil_large = case.pentacam_pupil_3d_mm > 4.00
-    irregular = (
-        case.active_astigmatism_d >= 1.0
-        and case.astigmatism_type == AstigmatismType.IRREGULAR
-    )
+    irregular = case.astigmatism_type == AstigmatismType.IRREGULAR
     ocular_active = case.ocular_surface_status in {
         OcularSurfaceStatus.MODERATE,
         OcularSurfaceStatus.SIGNIFICANT,

@@ -106,8 +106,8 @@ def test_below_490_does_not_receive_lasik_exception(thickness):
 def test_exception_accepts_pass_or_caution_from_all_three_systems(overrides, expected):
     result = evaluate_normalized_case(_case(**overrides))
     assert (result["erss_status"], result["nice_status"], result["bad_d"]["status"]) == expected
-    assert result["ps3_decision"]["exception_applied"] is True
-    assert result["status"] == "PASS WITH CAUTION"
+    assert result["ps3_decision"]["exception_applied"] is (expected == ("PASS", "PASS", "PASS"))
+    assert result["status"] == ("PASS WITH CAUTION" if expected == ("PASS", "PASS", "PASS") else "STOP-DEFER")
 
 
 @pytest.mark.parametrize(

@@ -27,8 +27,8 @@ ASCRS_POST_REFRACTIVE_URL = "https://iolcalc.ascrs.org/"
 
 def _target_from_acd(acd_mm: float) -> float:
     if acd_mm < 2.5:
-        return 0.0
-    if acd_mm > 3.5:
+        return 0.25
+    if acd_mm >= 3.5:
         return -0.5
     return -0.25
 

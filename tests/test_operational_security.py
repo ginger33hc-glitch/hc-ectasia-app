@@ -63,6 +63,11 @@ def test_json_endpoint_has_a_separate_small_body_limit(monkeypatch):
     assert response.status_code == 413
 
 
+def test_iol_image_upload_uses_image_body_limit_without_weakening_json_limit():
+    assert security._request_limit("/iol/extract") == security.MAX_REQUEST_BYTES
+    assert security._request_limit("/iol/evaluate") == security.MAX_JSON_REQUEST_BYTES
+
+
 def test_upload_count_limit_is_enforced(monkeypatch):
     monkeypatch.setattr(security, "MAX_UPLOAD_FILES", 1)
     response = client.post(

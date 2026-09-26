@@ -158,7 +158,7 @@ def _is_protected_path(path: str) -> bool:
 
 
 def _request_limit(path: str) -> int:
-    return MAX_REQUEST_BYTES if path == "/analyze" or path == "/analysis/jobs" else MAX_JSON_REQUEST_BYTES
+    return MAX_REQUEST_BYTES if path in {"/analyze", "/analysis/jobs", "/iol/extract"} else MAX_JSON_REQUEST_BYTES
 
 
 def _secure_response(response, path: str):

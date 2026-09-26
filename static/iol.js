@@ -88,13 +88,14 @@
     try {
       const response = await fetch("/iol/extract", {method:"POST", body:form, credentials:"same-origin"});
       const data = await response.json(); if (!response.ok) throw new Error(errorMessage(data));
+      if(!data.identity?.patient_name || !["OD","OS"].includes(data.identity.eye)) throw new Error("Source identity verification failed. Check all three reports.");
       const unreadable = [];
       const pentacamEyes = new Set();
       const expectedTypes = ["PENTACAM_CATARACT_PREOP", "PENTACAM_4_MAPS_REFRACTIVE", "IOLMASTER_500_BIOMETRY"];
       const typeCounts = Object.fromEntries(expectedTypes.map(type => [type, 0]));
       let unreadablePentacamLaterality = false;
       for (const source of data.sources || []) {
-        const item = source.extraction || {}; setIfPresent("patientName", item.patient_name); setIfPresent("patientAge", item.patient_age_years);
+        const item = source.extraction || {}; setIfPresent("patientAge", item.patient_age_years);
         if (Object.hasOwn(typeCounts, item.document_type)) typeCounts[item.document_type]++;
         if (item.document_type === "PENTACAM_CATARACT_PREOP") {
           if (["OD","OS"].includes(item.eye)) { pentacamByEye[item.eye] = item.pentacam; pentacamEyes.add(item.eye); }
@@ -111,6 +112,8 @@
       if (expectedTypes.some(type => typeCounts[type] !== 1)) throw new Error("The three images must contain one Pentacam Cataract Pre-Op, one 4 Maps Refractive, and one IOLMaster 500 report. Check the selected files.");
       if (unreadablePentacamLaterality || pentacamEyes.size === 0) throw new Error("Pentacam laterality was not read. Upload a readable Pentacam Cataract Pre-Op report showing OD or OS.");
       if (pentacamEyes.size > 1) throw new Error("Conflicting Pentacam laterality was detected. Upload the Cataract Pre-Op report for one operative eye only.");
+      if (![...pentacamEyes].includes(data.identity.eye)) throw new Error("Operative eye verification failed. Check all three reports.");
+      setIfPresent("patientName", data.identity.patient_name);
       $("eye").value = [...pentacamEyes][0];
       if (!corneaBackByEye[$("eye").value]) throw new Error("4 Maps Refractive Cornea Back could not be assigned to the operative eye.");
       pentacamEyeConfirmed = true;
