@@ -145,17 +145,14 @@ def _ps3_procedure_decision(
         and moderate_keys == {"thinnest"}
         and _finite(thinnest_um)
         and 490.0 <= float(thinnest_um) < 500.0
-        and all(
-            status in {PASS, CAUTION}
-            for status in (erss_status, nice_status, bad_d_status)
-        )
+        and all(status == PASS for status in (erss_status, nice_status, bad_d_status))
     )
     if isolated_borderline_thickness:
         status = PASS_WITH_CAUTION
         detail = (
             "Raw PS3 LASIK disposition: DEFER. CER-AI 490-499 µm isolated-thickness "
             "exception applied because thinnest pachymetry is the sole PS3 Moderate "
-            "factor and ERSS, NICE, and Final BAD-D are each PASS or CAUTION."
+            "factor and ERSS, NICE, and Final BAD-D are each PASS."
         )
     elif selected == DEFER:
         status = STOP_DEFER

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import unicodedata
 from typing import Any
 
 EYE_SCHEMA: dict[str, Any] = {
@@ -97,6 +98,36 @@ and axes are the sole source for the toric trigger.
 For unreadable recognized-document fields return null and add the fully qualified key to
 unreadable_fields.
 """
+
+
+def validate_source_bundle(sources: list[dict[str, Any]]) -> dict[str, str]:
+    """Fail closed before values from different IOL reports can be combined."""
+    expected = {
+        "PENTACAM_CATARACT_PREOP", "PENTACAM_4_MAPS_REFRACTIVE",
+        "IOLMASTER_500_BIOMETRY",
+    }
+    documents = [item.get("extraction") or {} for item in sources]
+    types = [item.get("document_type") for item in documents]
+    if len(types) != 3 or set(types) != expected or len(set(types)) != 3:
+        raise ValueError("Upload exactly one Cataract Pre-Op, one same-eye 4 Maps Refractive, and one IOLMaster 500 report.")
+
+    names = [" ".join(str(item.get("patient_name") or "").split()) for item in documents]
+    if any(not name for name in names):
+        raise ValueError("Patient name must be readable on all three reports before combining their measurements.")
+    normalized = {unicodedata.normalize("NFKC", name).casefold() for name in names}
+    if len(normalized) != 1:
+        raise ValueError("Patient names differ across the three reports. Check the source images.")
+
+    by_type = dict(zip(types, documents))
+    eye = by_type["PENTACAM_CATARACT_PREOP"].get("eye")
+    if eye not in {"OD", "OS"}:
+        raise ValueError("The operative eye must be readable on the Pentacam Cataract Pre-Op report.")
+    if by_type["PENTACAM_4_MAPS_REFRACTIVE"].get("eye") != eye:
+        raise ValueError("The 4 Maps Refractive report must show the same operative eye.")
+    iolmaster = by_type["IOLMASTER_500_BIOMETRY"]
+    if iolmaster.get("eye") not in {"BOTH", eye} or not isinstance((iolmaster.get("iolmaster500") or {}).get(eye), dict):
+        raise ValueError("The IOLMaster report must include biometry for the operative eye.")
+    return {"patient_name": names[types.index("PENTACAM_CATARACT_PREOP")], "eye": eye}
 
 
 def extract_image(core: Any, raw: bytes, filename: str) -> dict[str, Any]:

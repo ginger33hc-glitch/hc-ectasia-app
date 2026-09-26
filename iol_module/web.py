@@ -14,7 +14,7 @@ from pydantic import ValidationError
 import operational_security
 
 from .engine import evaluate_case
-from .extraction import extract_image
+from .extraction import extract_image, validate_source_bundle
 from .lens_catalog import public_catalog
 from .escrs_transfer import create_escrs_transfer
 from .models import EscrsTransferInput, IOLCaseInput, IOLPowerPlanInput
@@ -36,6 +36,8 @@ def install(core: Any) -> None:
 
     @core.app.post("/iol/extract")
     async def iol_extract(images: list[UploadFile] = File(...)):
+        if len(images) != 3:
+            raise HTTPException(422, "Exactly three IOL source images are required.")
         payloads = await operational_security.read_uploads(images)
         results = []
         for raw, filename in payloads:
@@ -44,7 +46,11 @@ def install(core: Any) -> None:
             except Exception as exc:
                 raise HTTPException(502, f"Unable to transcribe {filename}.") from exc
             results.append({"filename": filename, "extraction": result})
-        return {"sources": results}
+        try:
+            identity = validate_source_bundle(results)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        return {"sources": results, "identity": identity}
 
     @core.app.post("/iol/evaluate")
     def iol_evaluate(payload: dict[str, Any] = Body(...)):

@@ -347,19 +347,17 @@ def test_490_to_499_exception_keeps_lasik_and_500_has_no_escalation():
     assert result['procedure_transitions'] == []
 
 
-def test_other_system_caution_is_accepted_by_490_to_499_exception():
+def test_other_system_caution_defers_lasik_and_evaluates_prk():
     extracted = _case(
         _eye('OD', pachy_thinnest_um=495, central_pachy_um=525, BAD_D=2.0),
         _eye('OS', pachy_thinnest_um=500, central_pachy_um=525),
     )
     result = _evaluate(extracted=extracted)
     od = result['eyes'][0]
-    assert od['status'] == 'PASS WITH CAUTION'
-    assert od['report_payload']['ps3']['decision']['status'] == 'PASS WITH CAUTION'
-    assert od['report_payload']['ps3']['decision']['exception_applied'] is True
-    assert od['report_payload']['procedure'] == 'LASIK'
-    assert 'lasik_assessment' not in od
-    assert result['procedure_transitions'] == []
+    assert od['lasik_assessment']['status'] == 'STOP-DEFER'
+    assert od['lasik_assessment']['report_payload']['ps3']['decision']['exception_applied'] is False
+    assert od['report_payload']['procedure'] == 'PRK'
+    assert result['procedure_transitions'][0]['from'] == 'LASIK'
 
 
 def test_prk_fallback_keeps_shared_stops_and_missing_data():

@@ -4,10 +4,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+import canonical_engine
 import operational_security
 from iol_module.engine import evaluate_case
+from iol_module.extraction import validate_source_bundle
 from iol_module.lens_catalog import LENSES, get_lens
 from iol_module.escrs_transfer import build_biomdirect, create_escrs_transfer
 from iol_module.models import EscrsTransferInput, IOLCaseInput, IOLPowerPlanInput
@@ -77,6 +80,49 @@ def test_toric_threshold_uses_active_iolmaster_k_difference_and_regularity():
     assert toric.toric_evaluation_required is True
     assert irregular.main_category == "EDOF"
     assert irregular.toric_modifier == "NON_TORIC"
+
+
+def test_documented_irregular_astigmatism_excludes_multifocal_below_toric_threshold():
+    recommendation = result({"iolm500_k2_d": 42.5, "astigmatism_type": "IRREGULAR"})
+    assert recommendation.multifocal_eligible is False
+    assert recommendation.main_category == "EDOF"
+    assert recommendation.toric_evaluation_required is False
+
+
+def _source_bundle(*, names=("Patient Example",) * 3, four_maps_eye="OD"):
+    return [
+        {"extraction": {"document_type": "PENTACAM_CATARACT_PREOP", "eye": "OD", "patient_name": names[0]}},
+        {"extraction": {"document_type": "PENTACAM_4_MAPS_REFRACTIVE", "eye": four_maps_eye, "patient_name": names[1]}},
+        {"extraction": {"document_type": "IOLMASTER_500_BIOMETRY", "eye": "BOTH", "patient_name": names[2], "iolmaster500": {"OD": {}, "OS": {}}}},
+    ]
+
+
+def test_three_iol_sources_require_one_readable_patient_and_operative_eye():
+    assert validate_source_bundle(_source_bundle(names=("Patient Example", " patient   example ", "PATIENT EXAMPLE"))) == {
+        "patient_name": "Patient Example", "eye": "OD",
+    }
+    with pytest.raises(ValueError, match="Patient names differ"):
+        validate_source_bundle(_source_bundle(names=("Patient Example", "Other Patient", "Patient Example")))
+    with pytest.raises(ValueError, match="readable on all three"):
+        validate_source_bundle(_source_bundle(names=("Patient Example", None, "Patient Example")))
+    with pytest.raises(ValueError, match="same operative eye"):
+        validate_source_bundle(_source_bundle(four_maps_eye="OS"))
+
+
+def test_iol_upload_over_two_megabytes_checks_identity_before_returning_values(monkeypatch):
+    reports = _source_bundle()
+    outcomes = iter(item["extraction"] for item in reports)
+    monkeypatch.setattr("iol_module.web.extract_image", lambda *_args: next(outcomes))
+    files = [("images", (f"report-{i}.png", b"x" * 750_000, "image/png")) for i in range(3)]
+    response = TestClient(canonical_engine.app).post("/iol/extract", files=files)
+    assert response.status_code == 200
+    assert response.json()["identity"] == {"patient_name": "Patient Example", "eye": "OD"}
+
+    reports[1]["extraction"]["patient_name"] = "Another Patient"
+    outcomes = iter(item["extraction"] for item in reports)
+    response = TestClient(canonical_engine.app).post("/iol/extract", files=files)
+    assert response.status_code == 422
+    assert "Patient names differ" in response.json()["detail"]
 
 
 def test_surgeon_k_power_override_retains_locked_iolmaster_axes():
@@ -183,7 +229,7 @@ def test_short_eye_requires_real_lens_thickness_and_wtw():
         power_payload(axial_length_mm=21.9, lens_thickness_mm=None)
 
 
-@pytest.mark.parametrize("acd,target", [(2.49, 0.0), (2.5, -0.25), (3.5, -0.25), (3.51, -0.5)])
+@pytest.mark.parametrize("acd,target", [(2.49, 0.25), (2.5, -0.25), (3.499, -0.25), (3.5, -0.5), (3.51, -0.5)])
 @pytest.mark.parametrize("al,check", [(21.99, True), (22.0, False), (26.0, False), (26.01, True)])
 def test_acd_target_and_axial_length_second_formula_are_independent(acd, target, al, check):
     case = power_payload(acd_mm=acd, axial_length_mm=al, lens_thickness_mm=4.5)
