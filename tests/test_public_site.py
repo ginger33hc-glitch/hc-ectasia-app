@@ -69,6 +69,9 @@ def test_public_homepage_identifies_software_and_clinical_author():
         graph = json.loads(match.group(1))["@graph"]
         by_type = {item["@type"]: item for item in graph}
         assert by_type["SoftwareApplication"]["softwareVersion"] == "2.0"
+        assert by_type["SoftwareApplication"]["alternateName"] == (
+            "Corneal Ectasia Risk Assessment Intelligence"
+        )
         assert by_type["Person"]["name"] == "Hüseyin Cengiz, M.D."
         assert by_type["Person"]["url"] == "https://cer-ai.com/about/huseyin-cengiz"
         assert by_type["Person"]["sameAs"] == [
@@ -121,6 +124,10 @@ def test_sitemap_contains_only_public_discovery_pages():
             "/learning/faq", "/corneal-ectasia-risk-assessment",
             "/clinical-evidence", "/references", "/about/huseyin-cengiz",
             "/editorial-policy",
+            "/what-is-recommended-for-corneal-ectasia-screening",
+            "/corneal-ectasia-screening-systems",
+            "/tr/korneal-ektazi-taramasi-onerileri",
+            "/tr/korneal-ektazi-tarama-sistemleri",
             "/tr/learning-center", "/tr/learning/randleman-erss",
             "/tr/learning/ps3-risk-assessment", "/tr/learning/faq",
             "/learning/cases/two-caution-pathways",

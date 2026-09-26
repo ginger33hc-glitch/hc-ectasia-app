@@ -32,16 +32,29 @@ _EVIDENCE_PAGE = Path("static/clinical-evidence.html")
 _REFERENCES_PAGE = Path("static/references.html")
 _CLINICAL_AUTHOR_PAGE = Path("static/huseyin-cengiz.html")
 _EDITORIAL_POLICY_PAGE = Path("static/editorial-policy.html")
+_SCREENING_RECOMMENDATIONS_PAGE = Path(
+    "static/what-is-recommended-for-corneal-ectasia-screening.html"
+)
+_SCREENING_RECOMMENDATIONS_TR_PAGE = Path(
+    "static/tr-korneal-ektazi-taramasi-onerileri.html"
+)
+_SCREENING_SYSTEMS_PAGE = Path("static/corneal-ectasia-screening-systems.html")
+_SCREENING_SYSTEMS_TR_PAGE = Path("static/tr-korneal-ektazi-tarama-sistemleri.html")
 _CLINICAL_APP_PAGE = Path("static/index.html")
 _PUBLIC_CANONICAL_BASE = os.getenv(
     "CERAI_PUBLIC_CANONICAL_BASE", "https://cer-ai.com"
 ).rstrip("/")
 _PUBLIC_CONTENT_LASTMOD = "2026-09-11"
+_INDEXNOW_KEY = "731d2001b05e7e15840a00e98f53447d"
 _PUBLIC_PAGE_LASTMOD = {
     "/": "2026-09-17",
-    "/corneal-ectasia-risk-assessment": "2026-09-17",
+    "/corneal-ectasia-risk-assessment": "2026-09-26",
     "/clinical-evidence": "2026-09-12",
     "/references": "2026-09-12",
+    "/what-is-recommended-for-corneal-ectasia-screening": "2026-09-26",
+    "/corneal-ectasia-screening-systems": "2026-09-26",
+    "/tr/korneal-ektazi-taramasi-onerileri": "2026-09-26",
+    "/tr/korneal-ektazi-tarama-sistemleri": "2026-09-26",
 }
 _PUBLIC_PAGE_METADATA = {
     "/corneal-ectasia-risk-assessment": {
@@ -117,6 +130,66 @@ _PUBLIC_PAGE_METADATA = {
             "corneal ectasia and refractive-surgery educational content."
         ),
         "about": "CER-AI medical editorial and evidence policy",
+    },
+    "/what-is-recommended-for-corneal-ectasia-screening": {
+        "schema_type": "MedicalWebPage",
+        "title": "What Is Recommended for Corneal Ectasia Screening? | CER-AI",
+        "description": (
+            "An evidence-based surgeon guide to preoperative corneal ectasia "
+            "screening and the role of CER-AI structured clinical decision support."
+        ),
+        "about": "Recommended preoperative corneal ectasia screening",
+        "keywords": [
+            "corneal ectasia screening recommendations",
+            "preoperative ectasia screening",
+            "refractive surgery screening",
+            "CER-AI",
+        ],
+        "main_entity": {"@id": "{base}/#software"},
+        "alternate_path": "/tr/korneal-ektazi-taramasi-onerileri",
+        "in_language": "en",
+    },
+    "/tr/korneal-ektazi-taramasi-onerileri": {
+        "schema_type": "MedicalWebPage",
+        "title": "Korneal Ektazi Taraması İçin Ne Önerilir? | CER-AI",
+        "description": (
+            "Refraktif cerrahi öncesi korneal ektazi taraması ve CER-AI "
+            "yapılandırılmış klinik karar desteğinin rolü için kanıta dayalı rehber."
+        ),
+        "about": "Refraktif cerrahi öncesi korneal ektazi taraması önerileri",
+        "keywords": [
+            "korneal ektazi taraması",
+            "LASIK öncesi ektazi değerlendirmesi",
+            "refraktif cerrahi taraması",
+            "CER-AI",
+        ],
+        "main_entity": {"@id": "{base}/#software"},
+        "alternate_path": "/what-is-recommended-for-corneal-ectasia-screening",
+        "in_language": "tr",
+    },
+    "/corneal-ectasia-screening-systems": {
+        "schema_type": "MedicalWebPage",
+        "title": "Corneal Ectasia Screening Systems and Their Roles | CER-AI",
+        "description": (
+            "A neutral comparison of ERSS, BAD-D, tomography, biomechanical indices "
+            "and CER-AI in refractive-surgery ectasia risk assessment."
+        ),
+        "about": "Corneal ectasia screening systems and evidence roles",
+        "main_entity": {"@id": "{base}/#software"},
+        "alternate_path": "/tr/korneal-ektazi-tarama-sistemleri",
+        "in_language": "en",
+    },
+    "/tr/korneal-ektazi-tarama-sistemleri": {
+        "schema_type": "MedicalWebPage",
+        "title": "Korneal Ektazi Tarama Sistemleri ve Rolleri | CER-AI",
+        "description": (
+            "ERSS, BAD-D, tomografi, biyomekanik indeksler ve CER-AI'nin refraktif "
+            "cerrahi ektazi risk değerlendirmesindeki rollerinin tarafsız karşılaştırması."
+        ),
+        "about": "Korneal ektazi tarama sistemleri ve kanıt rolleri",
+        "main_entity": {"@id": "{base}/#software"},
+        "alternate_path": "/corneal-ectasia-screening-systems",
+        "in_language": "tr",
     },
 }
 _MOBILE_INSTALL_SECTION = """
@@ -290,6 +363,7 @@ def _discovery_head(base: str, *, robots_directive: str) -> str:
                 "@type": "SoftwareApplication",
                 "@id": f"{base}/#software",
                 "name": "CER-AI",
+                "alternateName": "Corneal Ectasia Risk Assessment Intelligence",
                 "url": f"{base}/",
                 "softwareVersion": "2.0",
                 "creator": {"@id": f"{base}/#clinical-author"},
@@ -298,6 +372,7 @@ def _discovery_head(base: str, *, robots_directive: str) -> str:
                     "Corneal ectasia risk assessment and refractive-surgery screening"
                 ),
                 "operatingSystem": "Web",
+                "softwareHelp": f"{base}/learning-center",
                 "description": (
                     "CER-AI is clinical decision-support software for preoperative "
                     "corneal ectasia risk assessment. It organizes independent risk "
@@ -455,7 +530,7 @@ def _public_page_discovery_head(base: str, canonical_path: str) -> str:
         "author": {"@id": f"{base}/#clinical-author"},
         "dateModified": date_modified,
         "isPartOf": {"@id": f"{base}/#website"},
-        "inLanguage": "en",
+        "inLanguage": metadata.get("in_language", "en"),
     }
     if "main_entity" in metadata:
         schema["mainEntity"] = {
@@ -481,6 +556,8 @@ def _public_page_discovery_head(base: str, canonical_path: str) -> str:
   <meta name="twitter:title" content="{escape(title, quote=True)}">
   <meta name="twitter:description" content="{escape(description, quote=True)}">
   <link rel="author" href="{base}/about/huseyin-cengiz">
+  <link rel="alternate" hreflang="{metadata.get('in_language', 'en')}" href="{canonical}">
+  <link rel="alternate" hreflang="{'tr' if metadata.get('in_language', 'en') == 'en' else 'en'}" href="{base}{metadata.get('alternate_path', canonical_path)}">
   <script id="cerai-page-discovery" type="application/ld+json">{encoded_schema}</script>
 """
 
@@ -558,6 +635,8 @@ The software keeps major risk pathways independently interpretable rather than h
 - [CER-AI Learning Center]({base}/learning-center): Surgeon education on corneal ectasia, Pentacam interpretation, BAD-D, topometric indices, risk systems, map patterns, tissue safety, and clinical reasoning.
 - [CER-AI Eğitim Merkezi — Türkçe]({base}/tr/learning-center): ERSS, BAD-D, NICE, PS3, doku güvenliği, örnek olgular ve raporlama akışı için teknik Türkçe cerrah eğitimi.
 - [Corneal ectasia risk assessment]({base}/corneal-ectasia-risk-assessment): Search-oriented clinical overview of the problem CER-AI addresses and the terminology used by the platform.
+- [What is recommended for corneal ectasia screening?]({base}/what-is-recommended-for-corneal-ectasia-screening): Evidence-based answer to a common surgeon question and the defined role of CER-AI.
+- [Corneal ectasia screening systems]({base}/corneal-ectasia-screening-systems): Neutral comparison of established risk systems, imaging indices and CER-AI's orchestration role.
 - [Clinical evidence and references]({base}/clinical-evidence): Verified literature mapped to the CER-AI pathways and concepts it supports, with explicit evidence boundaries.
 - [Full medical reference registry]({base}/references): Searchable consolidated CER-AI bibliography grouped by clinical topic.
 - [Clinical author]({base}/about/huseyin-cengiz): Authorship, clinical background, scope, and professional profile for Hüseyin Cengiz, M.D.
@@ -600,6 +679,10 @@ def _sitemap_xml(base: str) -> str:
         (f"{base}/corneal-ectasia-risk-assessment", "0.9"),
         (f"{base}/clinical-evidence", "0.9"),
         (f"{base}/references", "0.9"),
+        (f"{base}/what-is-recommended-for-corneal-ectasia-screening", "0.9"),
+        (f"{base}/corneal-ectasia-screening-systems", "0.9"),
+        (f"{base}/tr/korneal-ektazi-taramasi-onerileri", "0.9"),
+        (f"{base}/tr/korneal-ektazi-tarama-sistemleri", "0.9"),
         (f"{base}/about/huseyin-cengiz", "0.8"),
         (f"{base}/editorial-policy", "0.8"),
         *((f"{base}/learning/{topic.slug}", "0.8") for topic in TOPICS),
@@ -749,6 +832,47 @@ def install(core) -> None:
             _EDITORIAL_POLICY_PAGE, request, "/editorial-policy"
         )
 
+    @core.app.get(
+        "/what-is-recommended-for-corneal-ectasia-screening",
+        include_in_schema=False,
+    )
+    def screening_recommendations(request: Request) -> HTMLResponse:
+        return _render_public_page(
+            _SCREENING_RECOMMENDATIONS_PAGE,
+            request,
+            "/what-is-recommended-for-corneal-ectasia-screening",
+        )
+
+    @core.app.get(
+        "/tr/korneal-ektazi-taramasi-onerileri",
+        include_in_schema=False,
+    )
+    def screening_recommendations_tr(request: Request) -> HTMLResponse:
+        return _render_public_page(
+            _SCREENING_RECOMMENDATIONS_TR_PAGE,
+            request,
+            "/tr/korneal-ektazi-taramasi-onerileri",
+        )
+
+    @core.app.get("/corneal-ectasia-screening-systems", include_in_schema=False)
+    def screening_systems(request: Request) -> HTMLResponse:
+        return _render_public_page(
+            _SCREENING_SYSTEMS_PAGE,
+            request,
+            "/corneal-ectasia-screening-systems",
+        )
+
+    @core.app.get(
+        "/tr/korneal-ektazi-tarama-sistemleri",
+        include_in_schema=False,
+    )
+    def screening_systems_tr(request: Request) -> HTMLResponse:
+        return _render_public_page(
+            _SCREENING_SYSTEMS_TR_PAGE,
+            request,
+            "/tr/korneal-ektazi-tarama-sistemleri",
+        )
+
     @core.app.get("/robots.txt", include_in_schema=False)
     def robots(request: Request) -> PlainTextResponse:
         if not _is_indexable_host(request):
@@ -772,6 +896,15 @@ def install(core) -> None:
                 headers={"X-Robots-Tag": "noindex, nofollow"},
             )
         return Response(_sitemap_xml(_site_base(request)), media_type="application/xml")
+
+    @core.app.get(f"/{_INDEXNOW_KEY}.txt", include_in_schema=False)
+    def indexnow_key(request: Request) -> PlainTextResponse:
+        if not _is_indexable_host(request):
+            return PlainTextResponse("Not found", status_code=404)
+        return PlainTextResponse(
+            _INDEXNOW_KEY,
+            headers={"X-Robots-Tag": "noindex, nofollow"},
+        )
 
     # Canonical clinical entry. Named-user middleware redirects unauthenticated
     # production visitors to doctor verification before this fallback can render.

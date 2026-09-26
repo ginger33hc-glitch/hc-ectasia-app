@@ -63,13 +63,65 @@ def test_product_page_explains_category_ai_boundaries_and_examples(public_app):
     assert len([m for m in structure.attributes("meta") if m.get("name") == "description"]) == 1
 
 
+@pytest.mark.parametrize(
+    ("path", "language", "counterpart", "required_phrase"),
+    (
+        ("/what-is-recommended-for-corneal-ectasia-screening", "en", "/tr/korneal-ektazi-taramasi-onerileri", "No single map, score or software result is sufficient by itself."),
+        ("/tr/korneal-ektazi-taramasi-onerileri", "tr", "/what-is-recommended-for-corneal-ectasia-screening", "Tek bir harita, skor veya yazılım sonucu tek başına yeterli değildir."),
+        ("/corneal-ectasia-screening-systems", "en", "/tr/korneal-ektazi-tarama-sistemleri", "Corneal ectasia screening systems and their roles"),
+        ("/tr/korneal-ektazi-tarama-sistemleri", "tr", "/corneal-ectasia-screening-systems", "Korneal ektazi tarama sistemleri ve rolleri"),
+    ),
+)
+def test_surgeon_question_pages_are_indexable_bilingual_and_product_led(
+    public_app, path, language, counterpart, required_phrase
+):
+    with TestClient(public_app, base_url="https://cer-ai.com") as client:
+        response = client.get(path)
+    assert response.status_code == 200
+    assert response.headers["x-robots-tag"].startswith("index,follow")
+    assert required_phrase in response.text
+    assert "CER-AI — Corneal Ectasia Risk Assessment Intelligence" in response.text
+    structure = PageStructure(response.text)
+    assert structure.attributes("html")[0]["lang"] == language
+    alternates = {
+        (item.get("hreflang"), item.get("href"))
+        for item in structure.attributes("link")
+        if item.get("rel") == "alternate"
+    }
+    other_language = "tr" if language == "en" else "en"
+    assert (language, f"https://cer-ai.com{path}") in alternates
+    assert (other_language, f"https://cer-ai.com{counterpart}") in alternates
+    schema_match = re.search(
+        r'<script id="cerai-page-discovery" type="application/ld\+json">(.*?)</script>',
+        response.text,
+        re.S,
+    )
+    assert schema_match is not None
+    schema = json.loads(schema_match.group(1))
+    assert schema["inLanguage"] == language
+    assert schema["mainEntity"] == {"@id": "https://cer-ai.com/#software"}
+
+
+def test_indexnow_key_is_public_only_on_canonical_host(public_app):
+    key = "731d2001b05e7e15840a00e98f53447d"
+    with TestClient(public_app, base_url="https://cer-ai.com") as client:
+        response = client.get(f"/{key}.txt")
+    assert response.status_code == 200
+    assert response.text.strip() == key
+    assert response.headers["x-robots-tag"] == "noindex, nofollow"
+
+    with TestClient(public_app, base_url="https://cer-ai-staging-staging.up.railway.app") as client:
+        response = client.get(f"/{key}.txt")
+    assert response.status_code == 404
+
+
 def test_new_editorial_sections_have_both_languages_with_one_existing_controller():
     html = Path("static/corneal-ectasia-risk-assessment.html").read_text(encoding="utf-8")
     structure = PageStructure(html)
     variants = [a for _, a in structure.tags if "data-language-variant" in a]
-    assert len(variants) == 10
-    assert sum(a["data-language-variant"] == "en" for a in variants) == 5
-    assert sum(a["data-language-variant"] == "tr" for a in variants) == 5
+    assert len(variants) == 12
+    assert sum(a["data-language-variant"] == "en" for a in variants) == 6
+    assert sum(a["data-language-variant"] == "tr" for a in variants) == 6
     assert all(a["lang"] == a["data-language-variant"] for a in variants)
     assert 'html:not([lang="tr"]) [data-language-variant="tr"]' in html
     assert 'html[lang="tr"] [data-language-variant="en"]' in html
@@ -220,7 +272,7 @@ def test_static_public_pages_have_page_specific_discovery_identity(
     assert schema["url"] == f"https://cer-ai.com{path}"
     assert schema["name"] == title
     expected_date = (
-        "2026-09-17"
+        "2026-09-26"
         if path == "/corneal-ectasia-risk-assessment"
         else "2026-09-12"
         if path in {"/clinical-evidence", "/references"}
