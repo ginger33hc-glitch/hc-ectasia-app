@@ -43,6 +43,9 @@ class PS3EyeInput:
     i_s_d: Optional[float] = None
     srax: Optional[str] = None  # Explicit surgeon confirmation only; machine classification is not an answer.
     srax_deg: Optional[float] = None
+    tomographic_astig_d: Optional[float] = None
+    srax_low_astig_enantiomorphism_confirmed: Optional[bool] = None
+    ppi_high_astig_otherwise_normal_confirmed: Optional[bool] = None
 
 
 @dataclass(frozen=True)
@@ -193,14 +196,6 @@ def evaluate_ps3(eye, inter_eye=None):
 
     findings.append(_elevation_finding(eye))
 
-    ppi_avg = _num(eye.ppi_avg)
-    if ppi_avg is None:
-        findings.append(PS3Finding("ppi_average", NOT_EVALUATED, "PPI Average unavailable."))
-    elif ppi_avg > 1.2:
-        findings.append(PS3Finding("ppi_average", MODERATE, f"PPI Average {ppi_avg:g} > 1.20."))
-    else:
-        findings.append(PS3Finding("ppi_average", NORMAL, f"PPI Average {ppi_avg:g} <= 1.20."))
-
     inter_eye_score, inter_eye_finding = _inter_eye_score(inter_eye)
     findings.append(inter_eye_finding)
 
@@ -228,7 +223,59 @@ def evaluate_ps3(eye, inter_eye=None):
                 "Surgeon confirmation: SRAX is not >20°." if confirmed is False else
                 f"Front-map SRAX {srax_deg:.1f}° <= 20°. Source: Axial/Sagittal Curvature (Front)."
             )
-            findings.append(PS3Finding("srax", HIGH if positive else NORMAL, (measured + evidence) if confirmed is not None else evidence))
+            tomographic_astig = _num(eye.tomographic_astig_d)
+            exception_eligible = (
+                positive
+                and tomographic_astig is not None
+                and abs(tomographic_astig) < 1.0
+            )
+            if exception_eligible and eye.srax_low_astig_enantiomorphism_confirmed is None:
+                findings.append(PS3Finding(
+                    "srax", NOT_EVALUATED,
+                    measured
+                    + f"Tomographic astigmatism {abs(tomographic_astig):g} D < 1 D. "
+                    + "Surgeon confirmation required: is enantiomorphism present for the PS3 SRAX exception?",
+                ))
+            elif exception_eligible and eye.srax_low_astig_enantiomorphism_confirmed is True:
+                findings.append(PS3Finding(
+                    "srax", NORMAL,
+                    measured
+                    + f"SRAX ignored in PS3 only: tomographic astigmatism {abs(tomographic_astig):g} D < 1 D and enantiomorphism confirmed by the surgeon.",
+                ))
+            else:
+                findings.append(PS3Finding("srax", HIGH if positive else NORMAL, (measured + evidence) if confirmed is not None else evidence))
+
+    ppi_avg = _num(eye.ppi_avg)
+    tomographic_astig = _num(eye.tomographic_astig_d)
+    other_automated_normal = all(
+        item.status == NORMAL
+        for item in findings
+        if item.key in AUTOMATED_KEYS and item.key != "ppi_average"
+    )
+    ppi_exception_eligible = (
+        ppi_avg is not None
+        and ppi_avg > 1.2
+        and tomographic_astig is not None
+        and abs(tomographic_astig) > 2.0
+        and other_automated_normal
+    )
+    if ppi_avg is None:
+        findings.append(PS3Finding("ppi_average", NOT_EVALUATED, "PPI Average unavailable."))
+    elif ppi_exception_eligible and eye.ppi_high_astig_otherwise_normal_confirmed is None:
+        findings.append(PS3Finding(
+            "ppi_average", NOT_EVALUATED,
+            f"PPI Average {ppi_avg:g} > 1.20 and corneal astigmatism {abs(tomographic_astig):g} D > 2 D. "
+            "Surgeon confirmation required: are all other tomographic features normal for the PS3 PPI exception?",
+        ))
+    elif ppi_exception_eligible and eye.ppi_high_astig_otherwise_normal_confirmed is True:
+        findings.append(PS3Finding(
+            "ppi_average", NORMAL,
+            f"PPI Average {ppi_avg:g} ignored in PS3 only: corneal astigmatism {abs(tomographic_astig):g} D > 2 D and all other tomographic features confirmed normal by the surgeon.",
+        ))
+    elif ppi_avg > 1.2:
+        findings.append(PS3Finding("ppi_average", MODERATE, f"PPI Average {ppi_avg:g} > 1.20."))
+    else:
+        findings.append(PS3Finding("ppi_average", NORMAL, f"PPI Average {ppi_avg:g} <= 1.20."))
 
     review_notes = (
         "Corneal Thickness Map morphology: not evaluated; surgeon review required; not counted in automated PS3.",

@@ -43,7 +43,7 @@ def test_turkish_exports_translate_current_report_sections_and_preserve_snapshot
             'Kaynak: Axial/Sagittal Curvature (Front).',
                 'No Source Şule Işık', 'Dr. Çağrı Şen',
             'SHOW_2_CORNEA_BACK / show2.png', 'BAD_D_STRIP / OD-bad.png',
-                    'CER-AI-2026-09-21-ERSS-PACHYMETRY-SCORING-V10',
+                    'CER-AI-2026-09-22-PS3-SOURCE-EXCEPTIONS-V11',
         ):
             assert required in content
         assert 'PASS-NO-035' not in content

@@ -90,6 +90,27 @@ def test_adapter_maps_reconciled_canonical_values_to_linear_input():
     assert inp.ps3_inter_eye.os_anterior_km_d == 44.0
 
 
+def test_adapter_accepts_ps3_exceptions_only_from_surgeon_confirmed_provenance():
+    eye = _eye("OD")
+    eye.update({
+        "ps3_srax_exception": "YES",
+        "ps3_ppi_exception": "NO",
+        "field_provenance": {
+            "ps3_srax_exception": [{"source": "SURGEON_CONFIRMED"}],
+            "ps3_ppi_exception": [{"source": "SURGEON_CONFIRMED"}],
+        },
+    })
+    inp = build_clinical_core_input(eye, _plan(), age_years=30)
+    assert inp.ps3_eye.tomographic_astig_d == 1.0
+    assert inp.ps3_eye.srax_low_astig_enantiomorphism_confirmed is True
+    assert inp.ps3_eye.ppi_high_astig_otherwise_normal_confirmed is False
+
+    eye["field_provenance"] = {}
+    untrusted = build_clinical_core_input(eye, _plan(), age_years=30)
+    assert untrusted.ps3_eye.srax_low_astig_enantiomorphism_confirmed is None
+    assert untrusted.ps3_eye.ppi_high_astig_otherwise_normal_confirmed is None
+
+
 def test_legacy_nice_specific_candidates_cannot_override_canonical_fields():
     eye = _eye(); inp = build_clinical_core_input(eye, _plan(), age_years=30)
     assert inp.nice_k2_d == 44.5

@@ -35,7 +35,11 @@ TTL_SECONDS = 3600
 MAX_SESSIONS = 64
 
 NUMERIC_FIELDS = COMPLETION_NUMERIC_FIELDS
-SELECT_FIELDS = {"srax": ("YES", "NO")}
+SELECT_FIELDS = {
+    "srax": ("YES", "NO"),
+    "ps3_srax_exception": ("YES", "NO"),
+    "ps3_ppi_exception": ("YES", "NO"),
+}
 _logger = logging.getLogger("uvicorn.error")
 
 _SAFE_TRACE_KEYS = frozenset({
@@ -97,12 +101,46 @@ def _eye_record(extracted, eye_id):
     )
 
 
+def _surgeon_choice(eye, key):
+    value = str(eye.get(key) or "").upper()
+    if value not in {"YES", "NO"}:
+        return None
+    provenance = (eye.get("field_provenance") or {}).get(key) or []
+    if any(
+        isinstance(item, dict)
+        and str(item.get("source") or "").upper() == "SURGEON_CONFIRMED"
+        for item in provenance
+    ):
+        return value
+    return None
+
+
 def _expanded_ps3_missing(eye_id, message, decision, extracted):
     """Translate a PS3 factor dependency into the exact missing source/form fields."""
     if not str(message).lower().startswith("ps3: "):
         return [(eye_id, str(message))]
     factor = str(message).split(":", 1)[1].strip().lower()
     eye = _eye_record(extracted, eye_id)
+    if factor == "srax":
+        astig = eye.get("topographic_astig_D")
+        if (
+            _surgeon_choice(eye, "srax") == "YES"
+            and _finite(astig)
+            and abs(float(astig)) < 1.0
+            and _surgeon_choice(eye, "ps3_srax_exception") is None
+        ):
+            return [(eye_id, "PS3: ps3_srax_exception")]
+    if factor == "ppi_average":
+        ppi = eye.get("PPI_avg")
+        astig = eye.get("topographic_astig_D")
+        if (
+            _finite(ppi)
+            and float(ppi) > 1.2
+            and _finite(astig)
+            and abs(float(astig)) > 2.0
+            and _surgeon_choice(eye, "ps3_ppi_exception") is None
+        ):
+            return [(eye_id, "PS3: ps3_ppi_exception")]
     direct = {
         "anterior_km": ("Kmean_D",),
         "thinnest": ("pachy_thinnest_um",),
@@ -242,6 +280,40 @@ def _srax_request(eye):
     }
 
 
+def _ps3_exception_request(eye, key):
+    if key == "ps3_srax_exception":
+        return {
+            "eye": eye,
+            "label": "PS3 SRAX exception — is enantiomorphism present?",
+            "kind": "select",
+            "key": key,
+            "destination": "measurement",
+            "options": ["YES", "NO"],
+            "required_for": ["PS3"],
+            "source_screen": "4 Maps Refractive / Show 2 Exams Topometric",
+            "source_box": "Axial/Sagittal Curvature (Front) and Cornea Front Astig",
+            "help": (
+                "The canonical tomographic astigmatism is below 1 D. Choose YES only after confirming "
+                "enantiomorphism. YES ignores this SRAX factor in PS3 only; ERSS and every other pathway remain unchanged."
+            ),
+        }
+    return {
+        "eye": eye,
+        "label": "PS3 PPI exception — are all other tomographic features normal?",
+        "kind": "select",
+        "key": key,
+        "destination": "measurement",
+        "options": ["YES", "NO"],
+        "required_for": ["PS3"],
+        "source_screen": "Pentacam tomography review",
+        "source_box": "PPI Average, Cornea Front Astig, and all other tomographic features",
+        "help": (
+            "The canonical corneal astigmatism is above 2 D. Choose YES only after confirming all other "
+            "tomographic features are normal. YES ignores the PPI Average factor in PS3 only; every other pathway remains unchanged."
+        ),
+    }
+
+
 def _request(eye, message, extracted):
     if eye == "GLOBAL" and str(message)[:2] in {"OD", "OS"}:
         eye = str(message)[:2]
@@ -249,6 +321,11 @@ def _request(eye, message, extracted):
     prefix = str(eye).lower()
     text = str(message)
     lower = text.lower()
+
+    if lower == "ps3: ps3_srax_exception":
+        return _ps3_exception_request(eye, "ps3_srax_exception")
+    if lower == "ps3: ps3_ppi_exception":
+        return _ps3_exception_request(eye, "ps3_ppi_exception")
 
     if eye == "GLOBAL" and text == EXAM_DATE_CONFLICT_ISSUE:
         readings = []

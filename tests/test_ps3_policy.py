@@ -65,6 +65,58 @@ def test_ppi_average_boundary():
     assert finding(evaluate_ps3(normal_eye(ppi_avg=1.2001), normal_inter_eye()), "ppi_average").status == MODERATE
 
 
+def test_ppi_exception_requires_strictly_over_two_d_and_surgeon_confirmation():
+    pending = evaluate_ps3(
+        normal_eye(ppi_avg=1.21, tomographic_astig_d=2.01), normal_inter_eye()
+    )
+    assert finding(pending, "ppi_average").status == NOT_EVALUATED
+    assert "ppi_average" in pending.missing_keys
+
+    ignored = evaluate_ps3(
+        normal_eye(
+            ppi_avg=1.21,
+            tomographic_astig_d=2.01,
+            ppi_high_astig_otherwise_normal_confirmed=True,
+        ),
+        normal_inter_eye(),
+    )
+    assert finding(ignored, "ppi_average").status == NORMAL
+    assert "ignored in PS3 only" in finding(ignored, "ppi_average").detail
+
+    declined = evaluate_ps3(
+        normal_eye(
+            ppi_avg=1.21,
+            tomographic_astig_d=2.01,
+            ppi_high_astig_otherwise_normal_confirmed=False,
+        ),
+        normal_inter_eye(),
+    )
+    assert finding(declined, "ppi_average").status == MODERATE
+
+    boundary = evaluate_ps3(
+        normal_eye(
+            ppi_avg=1.21,
+            tomographic_astig_d=2.0,
+            ppi_high_astig_otherwise_normal_confirmed=True,
+        ),
+        normal_inter_eye(),
+    )
+    assert finding(boundary, "ppi_average").status == MODERATE
+
+
+def test_ppi_exception_is_unavailable_when_another_automated_factor_is_not_normal():
+    result = evaluate_ps3(
+        normal_eye(
+            anterior_km_d=48.0,
+            ppi_avg=1.21,
+            tomographic_astig_d=2.5,
+            ppi_high_astig_otherwise_normal_confirmed=True,
+        ),
+        normal_inter_eye(),
+    )
+    assert finding(result, "ppi_average").status == MODERATE
+
+
 def test_canonical_f_b_ele_th_thresholds_are_strictly_greater_than_12_and_15():
     boundary = evaluate_ps3(normal_eye(f_ele_th_um=12.0, b_ele_th_um=15.0), normal_inter_eye())
     assert finding(boundary, "elevation").status == NORMAL
@@ -167,6 +219,49 @@ def test_srax_exactly_20_is_not_high_but_more_than_20_is_high():
     assert finding(boundary, "srax").status == NORMAL
     high = evaluate_ps3(normal_eye(srax="YES", srax_deg=20.01), normal_inter_eye())
     assert finding(high, "srax").status == HIGH
+
+
+def test_srax_exception_requires_under_one_d_and_confirmed_enantiomorphism():
+    pending = evaluate_ps3(
+        normal_eye(srax="YES", srax_deg=25.0, tomographic_astig_d=0.99),
+        normal_inter_eye(),
+    )
+    assert finding(pending, "srax").status == NOT_EVALUATED
+    assert "srax" in pending.missing_keys
+
+    ignored = evaluate_ps3(
+        normal_eye(
+            srax="YES",
+            srax_deg=25.0,
+            tomographic_astig_d=0.99,
+            srax_low_astig_enantiomorphism_confirmed=True,
+        ),
+        normal_inter_eye(),
+    )
+    assert finding(ignored, "srax").status == NORMAL
+    assert "ignored in PS3 only" in finding(ignored, "srax").detail
+
+    declined = evaluate_ps3(
+        normal_eye(
+            srax="YES",
+            srax_deg=25.0,
+            tomographic_astig_d=0.99,
+            srax_low_astig_enantiomorphism_confirmed=False,
+        ),
+        normal_inter_eye(),
+    )
+    assert finding(declined, "srax").status == HIGH
+
+    boundary = evaluate_ps3(
+        normal_eye(
+            srax="YES",
+            srax_deg=25.0,
+            tomographic_astig_d=1.0,
+            srax_low_astig_enantiomorphism_confirmed=True,
+        ),
+        normal_inter_eye(),
+    )
+    assert finding(boundary, "srax").status == HIGH
 
 
 def test_negative_i_s_keeps_large_srax_visible_without_inferior_risk_factor():

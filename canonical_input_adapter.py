@@ -306,6 +306,16 @@ def _surgeon_confirmed_srax(eye):
     return None
 
 
+def _surgeon_confirmed_choice(eye, key):
+    state = str(eye.get(key) or "").upper()
+    if state not in {"YES", "NO"}:
+        return None
+    for item in (eye.get("field_provenance") or {}).get(key) or []:
+        if isinstance(item, dict) and str(item.get("source") or "").upper() == "SURGEON_CONFIRMED":
+            return state == "YES"
+    return None
+
+
 def _ps3_eye(eye):
     srax_deg = _front_map_srax(eye)
     return PS3EyeInput(
@@ -317,6 +327,13 @@ def _ps3_eye(eye):
         i_s_d=_first_number(eye, "I_S"),
         srax=_surgeon_confirmed_srax(eye),
         srax_deg=srax_deg,
+        tomographic_astig_d=_first_number(eye, "topographic_astig_D"),
+        srax_low_astig_enantiomorphism_confirmed=_surgeon_confirmed_choice(
+            eye, "ps3_srax_exception"
+        ),
+        ppi_high_astig_otherwise_normal_confirmed=_surgeon_confirmed_choice(
+            eye, "ps3_ppi_exception"
+        ),
     )
 
 

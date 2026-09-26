@@ -502,6 +502,22 @@ TR_CLINICAL = {
 
 REPLACEMENTS = (
     (
+        r"Tomographic astigmatism ([\d.]+) D < 1 D\. Surgeon confirmation required: is enantiomorphism present for the PS3 SRAX exception\?",
+        r"Tomografik astigmatizma \1 D < 1 D. Cerrah doğrulaması gerekli: PS3 SRAX istisnası için enantiyomorfizm mevcut mu?",
+    ),
+    (
+        r"SRAX ignored in PS3 only: tomographic astigmatism ([\d.]+) D < 1 D and enantiomorphism confirmed by the surgeon\.",
+        r"SRAX yalnız PS3 içinde yok sayıldı: tomografik astigmatizma \1 D < 1 D ve enantiyomorfizm cerrah tarafından doğrulandı.",
+    ),
+    (
+        r"PPI Average ([\d.]+) > 1\.20 and corneal astigmatism ([\d.]+) D > 2 D\. Surgeon confirmation required: are all other tomographic features normal for the PS3 PPI exception\?",
+        r"PPI ortalaması \1 > 1,20 ve korneal astigmatizma \2 D > 2 D. Cerrah doğrulaması gerekli: PS3 PPI istisnası için diğer tüm tomografik özellikler normal mi?",
+    ),
+    (
+        r"PPI Average ([\d.]+) ignored in PS3 only: corneal astigmatism ([\d.]+) D > 2 D and all other tomographic features confirmed normal by the surgeon\.",
+        r"PPI ortalaması \1 yalnız PS3 içinde yok sayıldı: korneal astigmatizma \2 D > 2 D ve diğer tüm tomografik özelliklerin normal olduğu cerrah tarafından doğrulandı.",
+    ),
+    (
         r"Astigmatic disparity within validation thresholds: magnitude difference ([\d.]+) D; axis difference ([\d.]+)°; no PS3 consequence\.",
         r"Astigmatik uyumsuzluk doğrulama sınırları içindedir: büyüklük farkı \1 D; aks farkı \2°; PS3 sonucu etkilenmez.",
     ),

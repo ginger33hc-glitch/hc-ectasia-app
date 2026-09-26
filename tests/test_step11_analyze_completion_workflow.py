@@ -179,6 +179,50 @@ def test_ps3_factor_is_expanded_to_each_exact_missing_canonical_field():
     )
 
 
+def test_ps3_srax_exception_requests_an_audited_surgeon_confirmation():
+    od = _eye(
+        "OD",
+        srax="YES",
+        srax_deg=25.0,
+        topographic_astig_D=0.8,
+        field_provenance={"srax": [{"source": "SURGEON_CONFIRMED"}]},
+    )
+    response = _respond(od=od)
+    request = next(
+        item for item in response["input_requests"]
+        if item.get("eye") == "OD" and item.get("key") == "ps3_srax_exception"
+    )
+    assert request["kind"] == "select"
+    assert request["options"] == ["YES", "NO"]
+    assert request["required_for"] == ["PS3"]
+    assert "PS3 only" in request["help"]
+
+
+def test_ps3_ppi_exception_requests_confirmation_only_after_thresholds_are_met():
+    response = _respond(
+        od=_eye("OD", PPI_avg=1.3, topographic_astig_D=2.5),
+    )
+    request = next(
+        item for item in response["input_requests"]
+        if item.get("eye") == "OD" and item.get("key") == "ps3_ppi_exception"
+    )
+    assert request["kind"] == "select"
+    assert request["options"] == ["YES", "NO"]
+    assert "above 2 D" in request["help"]
+
+
+def test_ps3_exception_answer_is_stored_as_surgeon_confirmed_provenance():
+    extracted = {"eyes": [_eye("OD"), _eye("OS")]}
+    completed = workflow._overrides(
+        extracted, {"OD": {"ps3_srax_exception": "YES", "ps3_ppi_exception": "NO"}}
+    )
+    od = next(item for item in completed["eyes"] if item["eye"] == "OD")
+    assert od["ps3_srax_exception"] == "YES"
+    assert od["ps3_ppi_exception"] == "NO"
+    assert od["field_provenance"]["ps3_srax_exception"] == [{"source": "SURGEON_CONFIRMED"}]
+    assert od["field_provenance"]["ps3_ppi_exception"] == [{"source": "SURGEON_CONFIRMED"}]
+
+
 def test_ps3_intereye_requirement_identifies_the_actual_eye_and_field():
     response = _respond(od=_eye("OD", posterior_Kmean_D=None))
     request = next(item for item in response["input_requests"] if item.get("key") == "posterior_Kmean_D")
