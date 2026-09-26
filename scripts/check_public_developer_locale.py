@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import time
@@ -85,7 +86,8 @@ def main():
         summary["public_assets"] = wait_for_public_scripts(base)
 
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch()
+        channel = os.environ.get("CERAI_PLAYWRIGHT_CHANNEL")
+        browser = playwright.chromium.launch(channel=channel) if channel else playwright.chromium.launch()
         if args.baseline_ref:
             if args.environment != "local":
                 raise ValueError("Legacy reproduction is local only")

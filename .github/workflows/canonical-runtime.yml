@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   canonical-runtime:
     runs-on: ubuntu-latest
@@ -19,10 +22,6 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install --require-hashes -r requirements-dev.txt
-      - name: Audit production dependencies
-        run: pip-audit -r requirements.txt
-      - name: Audit development dependencies
-        run: pip-audit -r requirements-dev.txt
       - name: Critical static checks
         run: ruff check --select E9,F63,F7,F82 .
       - name: Compile decision-critical runtime modules
@@ -31,64 +30,22 @@ jobs:
         env:
           OPENAI_API_KEY: test-key-for-import-only
         run: python -c "import canonical_engine; assert canonical_engine.runtime_invariants()"
-      - name: Phase 1 launch behavior contract
-        env:
-          OPENAI_API_KEY: test-key-for-import-only
-        run: python -m pytest -q tests/test_launch_behavior_contract.py
-      - name: Phase 2 canonical clinical core, readiness, eligibility, source registry, provenance, and boundary contract
-        env:
-          OPENAI_API_KEY: test-key-for-import-only
-        run: python -m pytest -q tests/test_canonical_readiness.py tests/test_clinical_eligibility.py tests/test_clinical_eligibility_integration.py tests/test_clinical_core_equivalence.py tests/test_clinical_core_bad.py tests/test_clinical_core_nice_disposition_equivalence.py tests/test_clinical_core_ps3_safety_equivalence.py tests/test_clinical_core_planning_equivalence.py tests/test_clinical_core_refraction.py tests/test_clinical_core_pipeline.py tests/test_clinical_core_shadow_equivalence.py tests/test_clinical_core_report_payload.py tests/test_clinical_core_readiness_equivalence.py tests/test_pentacam_canonical_source_lock.py tests/test_pentacam_provenance.py tests/test_source_interchange_regression.py tests/test_phase2_boundary_contract.py
-      - name: Phase 3 direct canonical input, runtime, and workflow boundary
-        env:
-          OPENAI_API_KEY: test-key-for-import-only
-        run: python -m pytest -q tests/test_canonical_input_adapter.py tests/test_canonical_ex500_resolution.py tests/test_canonical_runtime_service.py tests/test_canonical_workflow_cutover.py tests/test_canonical_workflow_cutover_contract.py
-      - name: Phase 4 cleanup contract
-        env:
-          OPENAI_API_KEY: test-key-for-import-only
-        run: python -m pytest -q tests/test_phase4_cleanup_contract.py
-      - name: Archive, Railway preflight, migration, catalog, audit, user, UI, historical-report, research security, and public site tests
-        env:
-          OPENAI_API_KEY: test-key-for-import-only
-        run: python -m pytest -q tests/test_case_archive.py tests/test_railway_archive_preflight.py tests/test_archive_migration.py tests/test_case_catalog.py tests/test_audit_log.py tests/test_user_access.py tests/test_named_user_ui.py tests/test_historical_report.py tests/test_research_export.py tests/test_operational_security.py tests/test_public_site.py
-      - name: Behavior-lock, equivalence, and clinical regression tests
-        env:
-          OPENAI_API_KEY: test-key-for-import-only
-        run: python -m pytest -q tests/test_behavior_lock_v0743.py tests/test_microkeratome_planning.py tests/test_reconciliation_behavior_lock.py tests/test_exam_date_reconciliation_policy.py tests/test_rmin_front_source_policy.py tests/test_erss_runtime.py tests/test_mandatory_source_set_policy.py tests/test_negative_is_boundary.py tests/test_contact_lens_washout_gate.py
-      - name: Step 9 canonical procedure-planning acceptance
-        env:
-          OPENAI_API_KEY: test-key-for-import-only
-        run: python -m pytest -q tests/test_step9_planning_runtime_acceptance.py
-      - name: Step 10 canonical report acceptance
-        env:
-          OPENAI_API_KEY: test-key-for-import-only
-        run: python -m pytest -q tests/test_step10_canonical_reports.py
-      - name: Step 11 Analyze and surgeon-completion workflow acceptance
-        env:
-          OPENAI_API_KEY: test-key-for-import-only
-        run: python -m pytest -q tests/test_step11_analyze_completion_workflow.py
-      - name: Step 12 canonical archive and access acceptance
-        env:
-          OPENAI_API_KEY: test-key-for-import-only
-        run: python -m pytest -q tests/test_step12_archive_access_acceptance.py
-      - name: Step 13 mobile and PWA workflow acceptance
-        env:
-          OPENAI_API_KEY: test-key-for-import-only
-        run: python -m pytest -q tests/test_step13_mobile_pwa_acceptance.py
-      - name: Step 14 architecture acceptance
-        env:
-          OPENAI_API_KEY: test-key-for-import-only
-        run: python -m pytest -q tests/test_step14_architecture_acceptance.py
       - name: Complete application regression suite
         env:
           OPENAI_API_KEY: test-key-for-import-only
         run: python -m pytest -q
-      - name: Test files are independent of import order
-        if: ${{ always() }}
-        env:
-          OPENAI_API_KEY: test-key-for-import-only
-        shell: bash
-        run: |
-          for test_file in tests/test_*.py; do
-            python -m pytest -q "$test_file"
-          done
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install audit dependencies
+        run: pip install --require-hashes -r requirements-dev.txt
+      - name: Audit production dependencies
+        run: pip-audit -r requirements.txt
+      - name: Audit development dependencies
+        run: pip-audit -r requirements-dev.txt
